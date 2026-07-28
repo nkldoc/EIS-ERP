@@ -6,7 +6,7 @@ Ext.bgYear = Date_now[0] - 0 + ((Date_now[1] < 10 ? 0 : 1) - 0);
 Ext.store = new Ext.data.JsonStore({
     autoDestroy: false,
     autoLoad: false,
-    url: "tor/api/List_audit_document.php",
+    url: "tor/api/List_audit_document",
     baseParams: {
         type: Ext.status_sign_document,
         keyData: Ext.keyData,

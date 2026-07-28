@@ -4,9 +4,9 @@ Ext.onReady(function () {
     Ext.QuickTips.init();
     Ext.idRep = 'frm-repSpEmp';
     //Spring Boot cross context
-    Ext.urlReport = (true) ? '../../reports/repITAo12' : '../../reports/printr.php?get=true'; //DEBUG  
+    Ext.urlReport = (true) ? 'https://eis.nmu.ac.th:8443/reports/repITAo12' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
     //
-//    Ext.urlReport = (false) ? '../../reports/pro/repITAo12' : '../../reports/printr.php?get=true'; //DEBUG  
+//    Ext.urlReport = (false) ? 'https://eis.nmu.ac.th:8443/reports/pro/repITAo12' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
 
     // Spring Boot
     Ext.titleReport = 'รายงาน ITAo';

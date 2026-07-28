@@ -4052,16 +4052,44 @@ Ext.isBook = null;
                                                                                                                                                                 }
                                                                                                                                                                 };
                                                                                                                                                                 Ext.editHistoryAp = (statusx) => {
-                                                                                                                                                        Ext.currentEditHistoryStatus = statusx;
-                                                                                                                                                                Ext.AppPoStore(statusx).show();
+                                                                                                                                                                if (!Ext.selectRow || typeof Ext.selectRow.get !== "function") {
+                                                                                                                                                                Ext.Msg.alert("แจ้งเตือน", "ไม่พบรายการที่ต้องการแก้ไข กรุณาเลือกรายการใหม่");
+                                                                                                                                                                        return;
+                                                                                                                                                                }
+                                                                                                                                                                var selectedItemName = Ext.selectRow.get("c_name")
+                                                                                                                                                                        || Ext.selectRow.get("c_name_dtl")
+                                                                                                                                                                        || "";
+                                                                                                                                                                var existingPeriodWindow = Ext.getCmp("winPeriodHdrID");
+                                                                                                                                                                if (existingPeriodWindow) {
+                                                                                                                                                                existingPeriodWindow.destroy();
+                                                                                                                                                                }
+                                                                                                                                                                Ext.currentEditHistoryStatus = statusx || "edit";
+                                                                                                                                                                var periodWindow = Ext.AppPoStore(Ext.currentEditHistoryStatus);
+                                                                                                                                                                if (!periodWindow) {
+                                                                                                                                                                Ext.Msg.alert("แจ้งเตือน", "ไม่สามารถสร้างหน้าต่างแก้ไขรายการได้");
+                                                                                                                                                                        return;
+                                                                                                                                                                }
+                                                                                                                                                                periodWindow.show();
+                                                                                                                                                                var chequeTabs = Ext.getCmp("winChequeID");
+                                                                                                                                                                var editForm = chequeTabs && chequeTabs.items && chequeTabs.items.items
+                                                                                                                                                                        ? chequeTabs.items.items[0]
+                                                                                                                                                                        : null;
+                                                                                                                                                                if (!editForm || typeof editForm.getForm !== "function") {
+                                                                                                                                                                periodWindow.destroy();
+                                                                                                                                                                        Ext.Msg.alert("แจ้งเตือน", "ไม่พบแบบฟอร์มรายละเอียดการตรวจรับ");
+                                                                                                                                                                        return;
+                                                                                                                                                                }
                                                                                                                                                                 Ext.resetTransfTotal(false);
-                                                                                                                                                                Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
-                                                                                                                                                                Ext.getCmp("winChequeID").items.items[0].getForm().loadRecord(Ext.selectRow);
+                                                                                                                                                                periodWindow.getEl().mask("Please wait...", "x-mask-loading");
+                                                                                                                                                                editForm.getForm().loadRecord(Ext.selectRow);
                                                                                                                                                                 Ext.HDR_ID = Ext.selectRow.data.po_working_hdr_id;
                                                                                                                                                                 Ext.storeTransf.setBaseParam("sp_check_period_hdr_id", Ext.selectRow.get("sp_check_period_hdr_id"));
                                                                                                                                                                 Ext.storeTransf.removeAll();
                                                                                                                                                                 Ext.storeTransf.reload({
                                                                                                                                                                 callback: function (record, operation, success) {
+                                                                                                                                                                if (!success) {
+                                                                                                                                                                Ext.resetTransfTotal(false);
+                                                                                                                                                                }
                                                                                                                                                                 Ext.defer(function () {
                                                                                                                                                                 Ext.resetTransfTotal(true);
                                                                                                                                                                 }, 100);
@@ -4083,8 +4111,19 @@ Ext.isBook = null;
                                                                                                                                                         }
                                                                                                                                                         Ext.storePeriodHdr.reload({
                                                                                                                                                         callback: function (rec, operation, success) {
-                                                                                                                                                        if (success) {
-                                                                                                                                                        Ext.each(Ext.storePeriodHdr, function (value, item) {
+                                                                                                                                                        if (!success || !rec || rec.length === 0) {
+                                                                                                                                                        var failedPeriodWindow = Ext.getCmp("winPeriodHdrID");
+                                                                                                                                                                if (failedPeriodWindow && failedPeriodWindow.getEl()) {
+                                                                                                                                                        failedPeriodWindow.getEl().unmask();
+                                                                                                                                                                }
+                                                                                                                                                                Ext.Msg.alert(
+                                                                                                                                                                        "แจ้งเตือน",
+                                                                                                                                                                        success
+                                                                                                                                                                                ? "ไม่พบข้อมูลรายละเอียดงวดที่ต้องการแก้ไข"
+                                                                                                                                                                                : "ไม่สามารถโหลดข้อมูลรายละเอียดงวดได้ กรุณาลองใหม่"
+                                                                                                                                                                );
+                                                                                                                                                                return;
+                                                                                                                                                        }
                                                                                                                                                         Ext.perioidHdr = rec[0];
                                                                                                                                                                 Ext.selHdrPeriod = rec[0];
                                                                                                                                                                 Ext.c_arrive_code = rec[0].data.c_arrive_code;
@@ -4101,7 +4140,7 @@ Ext.isBook = null;
                                                                                                                                                                 var dc_bank_acc_creditor_id = Ext.dc_bank_acc_creditor_id;
                                                                                                                                                                         var index = dc_bank_acc_creditor_id > 0 ? dc_bank_acc_creditor_id : 0;
                                                                                                                                                                         Ext.getCmp("dc_bank_acc_creditor_id").setValue(index);
-                                                                                                                                                                        Ext.getCmp("dc_creditor_idID").setValue(Ext.selectRow.json.dc_creditor_id);
+                                                                                                                                                                        Ext.getCmp("dc_creditor_idID").setValue(Ext.selectRow.get("dc_creditor_id"));
                                                                                                                                                                 } else {
                                                                                                                                                                 Ext.getCmp("dc_bank_acc_creditor_id").setValue(0);
                                                                                                                                                                 }
@@ -4110,6 +4149,11 @@ Ext.isBook = null;
                                                                                                                                                                 });
                                                                                                                                                                 if (success) {
                                                                                                                                                         Ext.getCmp("winPeriodHdrID").getEl().unmask();
+                                                                                                                                                                if (Ext.isEmpty(rec[0].get("c_name"))) {
+                                                                                                                                                                rec[0].data.c_name = selectedItemName
+                                                                                                                                                                        || rec[0].get("c_name_dtl")
+                                                                                                                                                                        || "";
+                                                                                                                                                                }
                                                                                                                                                                 Ext.getCmp("gridSub2ID").isController("editMaingrid", rec[0]);
                                                                                                                                                                 if (statusx === "edit") {
                                                                                                                                                         Ext.getCmp("c_name_dtlID").setValue(rec[0].data.c_name_dtl + rec[0].data.c_i_perod);
@@ -4169,7 +4213,7 @@ Ext.isBook = null;
                                                                                                                                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                                                                                                                                         Ext.booking_store.load({
                                                                                                                                                                         params: {dc_cost_id: Ext.selectRow.data.dc_cost_id, i_yyyy_overlap: Ext.selectRow.data.i_yyyy_overlap, dc_expense_budget_type_id: Ext.selectRow.data.dc_expense_budget_type_id},
-                                                                                                                                                                                callback: function (record, success) {
+                                                                                                                                                                                callback: function (record, operation, success) {
                                                                                                                                                                                 if (success) {
                                                                                                                                                                                 Ext.getCmp("fscheckBgID").expand();
                                                                                                                                                                                         Ext.getCmp("fscheckBgID").doLayout();
@@ -4227,12 +4271,13 @@ Ext.isBook = null;
                                                                                                                                                         Ext.getCmp("c_booking_radiogroup").hide();
                                                                                                                                                         }
                                                                                                                                                         Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                                                                                                                                                                if (Ext.selectRow.data.po_working_hdr_id_edit == "0" && statusx === "editMaingrid" && [null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
+                                                                                                                                                                 if (Ext.selectRow.data.po_working_hdr_id_edit == "0" && statusx === "editMaingrid" && [null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
                                                                                                                                                         console.log(64);
-                                                                                                                                                                Ext.getCmp("winEditComentID").destroy();
+                                                                                                                                                                var editCommentWindow = Ext.getCmp("winEditComentID");
+                                                                                                                                                                if (editCommentWindow) {
+                                                                                                                                                                editCommentWindow.destroy();
+                                                                                                                                                                }
                                                                                                                                                         }
-                                                                                                                                                        }
-                                                                                                                                                        });
                                                                                                                                                         }
                                                                                                                                                         },
                                                                                                                                                         });
@@ -4472,6 +4517,7 @@ Ext.isBook = null;
                                                                                                                                                                                         success: function (form, action) {
                                                                                                                                                                                         //แจ้งเตือน
                                                                                                                                                                                         Ext.editHistoryAp(statusx);
+                                                                                                                                                                                        // Ext.getCmp("winEditComentID").destroy();
 //                                Ext.senMsgToProcure(99, "ดำเนินการ แก้ไขหน้าตรวจรับ", Ext.session.dc_cost_id);
                                                                                                                                                                                         },
                                                                                                                                                                                         failure: function (form, action) {
@@ -4505,8 +4551,9 @@ Ext.isBook = null;
                                                                                                                                                         };
 //senMsg
                                                                                                                                                                 Ext.senMsgToProcure = (msgType, msg, cost_id) => {
+
                                                                                                                                                         Ext.Ajax.request({
-                                                                                                                                                        url: "https://eis.nmu.ac.th:8443/supplies/websocket/event",
+                                                                                                                                                        url: "https://eis.nmu.ac.th/supplies/websocket/event",
                                                                                                                                                                 params: {
                                                                                                                                                                 msgType: msgType, //msgType msg dc_cost_id
                                                                                                                                                                         msg: msg,

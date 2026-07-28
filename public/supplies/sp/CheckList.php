@@ -1,4 +1,4 @@
-<?php include("../conf/config.php");
+<?php include(__DIR__ . "/../conf/config.php");
 $ss_user_id = $_SESSION["user_id"] ?? null;
 if (!$ss_user_id) { 
     session_destroy();
@@ -12,10 +12,11 @@ if (!$ss_user_id) {
 
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <base href="/supplies/sp/" />
     <title><?php echo COMPANY_NAME; ?></title>
     <!-- System ERP :: Src js  -->
-    <?php include("../lib/loadJs.php"); ?>
-    <?php include("../lib/loadCss.php"); ?>
+    <?php include(__DIR__ . "/../lib/loadJs.php"); ?>
+    <?php include(__DIR__ . "/../lib/loadCss.php"); ?>
     <!-- System ERP :: -->
     <script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?= __VPRODUCT_; ?>&f=<?php echo $_SERVER["PHP_SELF"]; ?>"></script>
     <!-- System ERP :: -->

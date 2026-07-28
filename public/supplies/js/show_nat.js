@@ -2524,10 +2524,36 @@ Ext.onReady(function () {
             });
             Ext.get("divID").update('<div id="logout">' + '<div id="userInfo" style="margin-top:0px; float:left;"></div>' + "</div>");
             Ext.get("userInfo").update(response.responseText);
-            var url = window.location.href;
-            url = url.split("#");
-            if (url[1]) {
-                Ext.getCmp("content-panel").update('<iframe src="' + url[1] + '.php" frameborder="0" width="100%" height="100%"></iframe>');
+            function openHashPage() {
+                var route = window.location.hash ?
+                    window.location.hash.substring(1).replace(/^\s+|\s+$/g, "") : "";
+
+                if (!route) {
+                    return;
+                }
+
+                // IIS serves PHP pages through extensionless URLs.  Keeping the
+                // iframe extensionless also avoids a redirect from *.php which
+                // used to make hash routes fail intermittently.
+                route = route.replace(/\.php(?=([?#]|$))/i, "");
+
+                // Hash routes are local application paths only.
+                if (!/^\.\/[A-Za-z0-9_./-]+(?:\?[^"'<>]*)?$/.test(route) ||
+                    route.indexOf("../") !== -1) {
+                    return;
+                }
+
+                Ext.getCmp("content-panel").update(
+                    '<iframe id="iframecontentID" src="' + route +
+                    '" frameborder="0" width="100%" height="100%"></iframe>'
+                );
+            }
+
+            openHashPage();
+            if (window.addEventListener) {
+                window.addEventListener("hashchange", openHashPage, false);
+            } else {
+                window.onhashchange = openHashPage;
             }
 
             // --- เริ่มระบบเช็ค Session Realtime ตรงนี้ ---

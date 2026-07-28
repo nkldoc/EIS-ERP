@@ -3,8 +3,8 @@ Ext.onReady(function () {
   Ext.QuickTips.init();
   Ext.idRep = "frm-repTor";
   //Spring Boot cross context
-Ext.urlReport = true ? "../../reports/Monthly_debt" : "../../reports/printr.php?get=true"; //DEBUG
-// Ext.urlReport = false ? "../../reports/repSpContractPeriodnotorNew" : "../../reports/printr.php?get=true"; //DEBUG
+Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/Monthly_debt" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG
+// Ext.urlReport = false ? "https://eis.nmu.ac.th:8443/reports/repSpContractPeriodnotorNew" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG
   // Spring Boot
   Ext.titleReport = "รายงานก่อหนี้ประจำเดือน";
   function PermissionEmp(p) {

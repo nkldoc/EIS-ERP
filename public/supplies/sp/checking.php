@@ -1,9 +1,9 @@
 <?php //Test
- include("../conf/config.php");
- include("../lib/database/DatabaseServer.php");
- include("../lib/database/apiUtil.php");
- include("../lib/date/i_date.class.php"); //pageStatus.class
- include("./class/pageStatus.class.php"); //pageStatus.class
+ require_once __DIR__ . "/../conf/config.php";
+ require_once __DIR__ . "/../lib/database/DatabaseServer.php";
+ require_once __DIR__ . "/../lib/database/apiUtil.php";
+ require_once __DIR__ . "/../lib/date/i_date.class.php"; //pageStatus.class
+ require_once __DIR__ . "/class/pageStatus.class.php"; //pageStatus.class
  if (!isset($_SESSION['user_id'])) {
     echo "<script>window.top.location.href =\"../access/signin.php\"</script>";
     exit;
@@ -18,15 +18,41 @@
 
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <base href="/supplies/sp/" />
         <title><?php echo COMPANY_NAME; ?></title>
         <!-- System ERP :: Src js  -->
-        <?php include("../lib/loadJs.php"); ?>
-        <?php include("../lib/loadCss.php"); ?>
+        <?php include __DIR__ . "/../lib/loadJs.php"; ?>
+        <?php include __DIR__ . "/../lib/loadCss.php"; ?>
         <!-- System ERP :: -->
         <script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?= __VPRODUCT_; ?>&f=<?php echo $_SERVER["PHP_SELF"]; ?>"></script>
         <!-- System ERP :: -->
         <script type="text/javascript" src="./js/helps/checkingHelp.js?_dc=<?= __VPRODUCT_; ?>"></script>
         <script type="text/javascript">
+                /*
+                 * IIS canonicalizes *.php to an extensionless URL with HTTP 301.
+                 * Browsers may turn a POST into GET while following that redirect,
+                 * which drops the request body. Normalize the affected ExtJS API
+                 * URLs before the request is sent so mode/type remain intact.
+                 */
+                (function installIisPostUrlNormalizer() {
+                    if (!Ext.data || !Ext.data.Connection || Ext.iisPostUrlNormalizerInstalled) {
+                        return;
+                    }
+
+                    var originalRequest = Ext.data.Connection.prototype.request;
+                    var affectedEndpoints = /(mnCheckingController|All_PoWorkingImpHdr)\.php(?=([?#]|$))/i;
+
+                    Ext.data.Connection.prototype.request = function (options) {
+                        if (options && typeof options.url === "string") {
+                            options.url = options.url.replace(affectedEndpoints, "$1");
+                        }
+
+                        return originalRequest.call(this, options);
+                    };
+
+                    Ext.iisPostUrlNormalizerInstalled = true;
+                }());
+
                 //--------config ---------------------------------------------------------------
                 Ext.menu_name = '<?PHP echo "{$pg->get_menu()}"; $_SESSION['menu'] = "{$pg->get_menu()}"; ?>';
                 Ext.menu_code = '<?PHP echo "{$pg->get_code()}"; ?>';

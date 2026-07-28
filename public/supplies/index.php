@@ -22,11 +22,6 @@ if (!$ss_user_id) {
 
 // Permission Logic
 include "bi/logic/permission_logic.php";
-
-//echo " Current Absolute Path: " . realpath(__DIR__ . "/bi/logic/permission_logic.php");
-//// หรือ
-//echo $permission . " Document Root: " . $_SERVER['DOCUMENT_ROOT'];
-//exit();
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -59,7 +54,11 @@ include "bi/logic/permission_logic.php";
                     Ext.Ajax.on('requestcomplete', Ext.getBody().unmask, Ext.getBody());
                     Ext.Ajax.on('requestexception', Ext.getBody().unmask, Ext.getBody());
                 };
-                Ext.ipServer = "<?php echo $_SERVER['SERVER_ADDR']; ?>";
+                Ext.ipServer = "<?php echo htmlspecialchars(
+                    (string) ($_SERVER['SERVER_ADDR'] ?? $_SERVER['LOCAL_ADDR'] ?? '127.0.0.1'),
+                    ENT_QUOTES,
+                    'UTF-8'
+                ); ?>";
                 Ext.NMU_PERMISSION = "<?php echo NMU_PERMISSION_HOST; ?>";
 //                var user = '<?php echo $ss_username ?>';
 //                var user_id = <?php echo $ss_user_id ?>;
@@ -323,7 +322,7 @@ include "bi/logic/permission_logic.php";
     </head>
     <script type="text/javascript" src="websocket.js?_dc=<?php echo rand(0, 100000); ?>"></script>
     <script type="text/javascript" src="js/Function.js?_dc=<?php echo rand(0, 100000); ?>"></script>
-    <script type="text/javascript" src="js/show_nat.js?_dc=<?php echo rand(0, 100000); ?>"></script> 
+    <script type="text/javascript" src="js/show_nat.js?_dc=<?php echo rand(0, 100000); ?>"></script>
     <body>
     </body>
 

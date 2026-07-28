@@ -15,6 +15,17 @@ $root = "data";
 $data = array();
 $con = null;
 
+if (!isset($_REQUEST["type"]) || trim((string) $_REQUEST["type"]) === "") {
+    http_response_code(400);
+    header("Content-Type: application/json; charset=utf-8");
+    echo json_encode(array(
+        "success" => false,
+        "data" => array(),
+        "msg" => "Missing required parameter: type"
+    ));
+    exit;
+}
+
 if ($_REQUEST["type"] == "dc_cost_all") {
     $sqlMain = "
 		SELECT * FROM " . DB_CENTER . "dc_cost

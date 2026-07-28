@@ -4,9 +4,9 @@ Ext.onReady(function () {
     Ext.QuickTips.init();
     Ext.idRep = 'frm-repSpEmp';
     //Spring Boot cross context
-    Ext.urlReport = (true) ? '../../reports/reportSpEmp' : '../../reports/printr.php?get=true'; //DEBUG  
- //   Ext.urlReport = (true) ? 'http://localhost:8081/reports/reportSpEmp' : '../../reports/printr.php?get=true'; //DEBUG  
-//    Ext.urlReport = (false) ? '../../reports/reportSpEmp' : '../../reports/printr.php?get=true'; //DEBUG 
+    Ext.urlReport = (true) ? 'https://eis.nmu.ac.th:8443/reports/reportSpEmp' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
+ //   Ext.urlReport = (true) ? 'https://eis.nmu.ac.th:8443/reports/reportSpEmp' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
+//    Ext.urlReport = (false) ? 'https://eis.nmu.ac.th:8443/reports/reportSpEmp' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG 
     // Spring Boot
     Ext.titleReport = 'รายงานพนักงานพัสดุและสายงาน';
 

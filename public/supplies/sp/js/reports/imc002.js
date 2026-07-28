@@ -11,7 +11,7 @@ Ext.onReady(function ()
     Ext.QuickTips.init();
     Ext.idRep = 'frm-report';
     //Spring Boot cross context
-     Ext.urlReport = (1) ? '../../reports/getRepImc002' : '../../reports/printr.php?get=true'; //DEBUG 
+     Ext.urlReport = (1) ? 'https://eis.nmu.ac.th:8443/reports/getRepImc002' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG 
     // Spring Boot
     Ext.titleReport = 'รายงาน Order งานโครงการ';
     Ext.MessageBox.minWidth = 200;

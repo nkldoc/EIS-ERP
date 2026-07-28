@@ -1,6 +1,26 @@
-<?PHP
-include_once("../conf/config.php");
-include_once("../lib/database/DatabaseServer.php");
+<?php
+
+require_once __DIR__ . "/../conf/config.php";
+require_once __DIR__ . "/../lib/database/DatabaseServer.php";
+
+header("Content-Type: application/json; charset=utf-8");
+
+$jsonInput = json_decode((string) file_get_contents("php://input"), true);
+$requestUserId = $_REQUEST["ss_user_id"] ?? ($jsonInput["ss_user_id"] ?? null);
+$requestUserId = filter_var($requestUserId, FILTER_VALIDATE_INT, [
+    "options" => ["min_range" => 1],
+]);
+
+if ($requestUserId === false || $requestUserId === null) {
+    http_response_code(400);
+    echo json_encode([
+        "reval" => 1,
+        "success" => "Error",
+        "msg" => "Missing or invalid ss_user_id",
+    ]);
+    exit;
+}
+
 $db        = new DatabaseServer();
 $sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
                 , isnull((select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
@@ -28,7 +48,12 @@ $sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
                 left join dbo.sp_department d on d.dc_department_id = c.dc_department_id
                 left join dbo.sp_department_type e on e.dc_department_type_id = d.dc_department_type_id
     WHERE a.dc_user_id = ?";
-$arrParam[] = ($_REQUEST['ss_user_id']??null);
+$arrParam = [$requestUserId];
+$re = [
+    "reval" => 1,
+    "success" => "Error",
+    "msg" => "Supplies user was not found",
+];
 $stmt = $db->QueryParam($sqlMain, $arrParam);
 while ($data = $db->Fetch($stmt)) {
     // Do not carry any authenticated fields from the previous user.
@@ -62,6 +87,7 @@ while ($data = $db->Fetch($stmt)) {
      $_SESSION["i_type_user"] = intval($data["i_type_user"]); //ประเภทผู้ใช้งาน
      $_SESSION["dc_cost_acc_id"] = intval($data["dc_cost_acc_id"]); //id ศูนย์ต้นทุนทางบัญชีของหน่วยงานที่ log in
      $_SESSION["last_login"] = date("Y-m-d H:i:s");
+     $_SESSION["last_activity"] = time();
      $_SESSION['created'] = time();
     //Java Session
 //    require_once("../java/Java.inc");
@@ -92,7 +118,7 @@ while ($data = $db->Fetch($stmt)) {
     $re = array("reval" => 0, "success" => "Success", "msg" => "Login Success");
 }
 
-
+session_write_close();
 echo json_encode($re);
 exit;
 

@@ -4,8 +4,8 @@ Ext.onReady(function () {
     Ext.idRep = "frm-repTor";
 
     //Spring Boot cross context
-    Ext.urlReport1 = 1 ? "../../reports/repBgExpense" : "../../reports/printr.php?get=true"; //DEBUG 
-//   Ext.urlReport1 = false ? "../../reports/repBgExpense" : "../../reports/printr.php?get=true"; //DEBUG
+    Ext.urlReport1 = 1 ? "https://eis.nmu.ac.th:8443/reports/repBgExpense" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG 
+//   Ext.urlReport1 = false ? "https://eis.nmu.ac.th:8443/reports/repBgExpense" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG
 
     Ext.titleReport = "รายงานการจองงบประมาณ ฝ่ายพัสดุ (PR)";
     function PermissionEmp(p) {

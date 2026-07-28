@@ -233,6 +233,7 @@ $sqlMain = ";WITH base AS (
     FROM base 
 )
 SELECT a.* 
+    , COUNT(*) OVER() AS total_count
 , CASE 
     WHEN a.i_status = 9 
         THEN a.dc_user_create_id
@@ -289,6 +290,7 @@ FROM r
     $i = $start + 1;
     $arrStatus = array(0 => "รอลงนาม", 1 => "ลงนามแล้ว", 2 => "Reject");
 
+    $totalCount = 0;
     while ($row = $db->Fetch($stmt)) {
 $list = prlist($row["urlfile"]);
 $roomn = next_room($row["nextUserId"]);
@@ -378,10 +380,8 @@ $next_name = null;
             );
       
         ${$root}[] = $temp;
-        $totalCount = intVal(@$row['rn']);
+        $totalCount = intval($row['total_count'] ?? 0);
     }
-    $sqlCount = $row["rn"];//"select count(*) as totalCount from ({$sqlTempTable}) a";
-//    $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
     echo json_encode(array("debug" => true, "totalCount" => $totalCount, $root => ${$root}));
     exit();
 }

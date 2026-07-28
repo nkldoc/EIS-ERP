@@ -2,7 +2,7 @@ Ext.onReady(function () {
     Ext.QuickTips.init();
     Ext.idRep = 'frm-report';
     //Spring Boot cross context
-    Ext.urlReport = (1) ?'../../reports/reportImc003' : '../../reports/printr.php?get=true'; 
+    Ext.urlReport = (1) ?'https://eis.nmu.ac.th:8443/reports/reportImc003' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; 
 
 
     // Spring Boot

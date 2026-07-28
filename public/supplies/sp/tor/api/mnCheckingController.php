@@ -9,7 +9,18 @@ $db = new DatabaseServer();
 $date = new i_date();
 $util = new apiUtil();
 
-$mode = $_REQUEST["mode"];
+$mode = trim((string) ($_REQUEST["mode"] ?? ""));
+
+if ($mode === "") {
+    http_response_code(400);
+    header("Content-Type: application/json; charset=utf-8");
+    echo json_encode(array(
+        "reval" => 1,
+        "success" => false,
+        "msg" => "Missing required parameter: mode"
+    ));
+    exit;
+}
 $table = "dbo.sp_tor";
 $keyName = "tor_id";
 $data = $util->mnUser($_REQUEST);

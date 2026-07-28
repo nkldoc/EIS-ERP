@@ -3,7 +3,7 @@ Ext.onReady(function () {
     Ext.QuickTips.init();
     Ext.idRep = "frm-repTor";
     //Spring Boot cross context
-    Ext.urlReport = true ? "../../reports/RepSpBgBilling" : "../../reports/printr.php?get=true"; //DEBUG 
+    Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/RepSpBgBilling" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG 
     // Spring Boot
     Ext.titleReport = "รายงานรอบการวางบิล";
     // storeYear
