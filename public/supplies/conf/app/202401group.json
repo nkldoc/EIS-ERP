@@ -1,0 +1,49 @@
+{
+    "webapp": {
+    "url": "https://eis.vajira.ac.th:8443/procure/",
+    "context": "procure",
+    "http-port": "8080",
+    "https-port": "8433", 
+    "app-sql-db":{"port": 1433, "db":"eis_procure","user":"sa","password":"nkl","detail":"main programe"},  
+    "app-mysql-db":{"port": 3306, "db":"pro_notif","user":"root","password":"admin","detail":"main programe"},   
+    "year":2024, 
+    "doc_gen":[{"name":"PR","doc_gen":"PR"},
+                {"name":"SC","doc_gen":"สนธ"},
+                {"name":"IR","doc_gen":"IR"},
+                {"name":"AP","doc_gen":"AP"},
+                {"name":"BL","doc_gen":"BL"}],
+    "group":[{ "value":1, "name":"group1", "totalCount":0,"nameTxt":"รายการขอซื้อ/จ้าง"
+                ,"menuGroupID":[{"id":1,"approved":false},
+                                {"id":2,"approved":false},
+                                {"id":3,"approved":false},
+                                {"id":4,"approved":true}]}, 
+              { "value":2, "name":"group2", "totalCount":0, "nameTxt":"รายการทำสัญญา/รายละเอียด"
+                ,"menuGroupID":[{"id":5,"approved":false},
+                                {"id":6,"approved":false},
+                                {"id":7,"approved":false},
+                                
+                                {"id":8,"approved":true}]}, 
+              { "value":3, "name":"group3", "totalCount":0, "nameTxt":"รายการรับของ/ตรวจรับ"
+                ,"menuGroupID":[{"id":9,"approved":false},
+                                {"id":10,"approved":false}]}, 
+              { "value":4, "name":"group4", "totalCount":0, "nameTxt":"รายการวางบิล/ส่งเบิก"
+                ,"menuGroupID":[{"id":11,"approved":false},
+                                {"id":12,"approved":false},
+                                {"id":13,"approved":false},
+                                {"id":14,"approved":true}]}],  
+    "booking":[
+              { "value":1, "nameTxt":"Pre order","url_get":"https://eis.vajira.ac.th/nmu", "url_booking":"https://eis.vajira.ac.th/nmu"}, 
+              { "value":2, "nameTxt":"Sign contract", "url_get":"https://eis.vajira.ac.th/nmu", "url_booking":"https://eis.vajira.ac.th/nmu"}, 
+              { "value":3, "nameTxt":"In receivership","url_get":"https://eis.vajira.ac.th/nmu", "url_booking":"https://eis.vajira.ac.th/nmu" },
+              { "value":4, "nameTxt":"Approve","url_get":"https://eis.vajira.ac.th/nmu", "url_booking":"https://eis.vajira.ac.th/nmu" }],
+    "path": [
+      {
+        "app_path": "E\\:ERP\\procure", 
+        "app_report": "D:\\ERP\\procure_reports",
+        "app_report_file": "D:\\ERP\\_reports\\procure\\target",         
+        "app_upload_path": "D:\\procure_upload",
+        "app_export_file": "D:\\procure_export_files"
+      }
+    ]
+  }
+}

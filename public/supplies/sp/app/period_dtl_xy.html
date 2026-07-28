@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>Pivot X/Y – Key ⇒ Value (Single-File)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#0f172a; --panel:#111827; --soft:#1f2937; --muted:#94a3b8;
+      --fg:#e5e7eb; --accent:#38bdf8; --ok:#34d399; --warn:#f59e0b;
+      --danger:#f43f5e;
+    }
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, 'TH Sarabun New', sans-serif;
+    }
+    .wrap{max-width:1100px; margin:24px auto; padding:0 16px;}
+    h1{font-size:22px; margin:0 0 12px}
+    .grid{
+      display:grid; grid-template-columns: 1fr 1fr; gap:16px;
+    }
+    .panel{
+      background:var(--panel); border:1px solid var(--soft); border-radius:14px; padding:14px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.25);
+    }
+    .panel h2{margin:0 0 10px; font-size:16px; color:#d1d5db}
+    textarea{
+      width:100%; min-height:180px; resize:vertical; box-sizing:border-box;
+      background:#0b1220; color:var(--fg); border:1px solid var(--soft); border-radius:10px; padding:10px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px;
+    }
+    .controls{display:grid; grid-template-columns: repeat(6, 1fr); gap:10px; align-items:end}
+    label{font-size:12px; color:var(--muted)}
+    select, input[type="text"]{
+      width:100%; padding:8px; border-radius:10px; border:1px solid var(--soft); background:#0b1220; color:var(--fg)
+    }
+    .btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+    button{
+      padding:8px 12px; border-radius:10px; border:1px solid var(--soft); background:#0b1220; color:var(--fg); cursor:pointer
+    }
+    button.primary{background:var(--accent); border-color:transparent; color:#062230; font-weight:600}
+    button.ok{background:var(--ok); border-color:transparent; color:#062230; font-weight:600}
+    button.warn{background:var(--warn); border-color:transparent; color:#062230; font-weight:600}
+    .out{display:grid; grid-template-columns: 1fr; gap:16px}
+    table{width:100%; border-collapse:collapse; overflow:hidden; border-radius:12px; border:1px solid var(--soft)}
+    th, td{padding:10px 12px; border-bottom:1px solid var(--soft); text-align:left}
+    th{background:#0b1220; color:#cbd5e1; position:sticky; top:0}
+    tr:hover td{background:#0b1322}
+    .muted{color:var(--muted)}
+    .pill{display:inline-block; padding:2px 8px; background:#0b1220; border:1px solid var(--soft); border-radius:999px; font-size:12px}
+    .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    .note{color:var(--muted); font-size:12px}
+    canvas{width:100%; height:360px; background:#0b1220; border:1px solid var(--soft); border-radius:12px}
+    .kbadge{font-weight:600; color:var(--accent)}
+    .vbadge{font-weight:600; color:var(--ok)}
+    .err{color:#fecaca; background:#7f1d1d; border:1px solid #ef4444; padding:8px 10px; border-radius:10px; white-space:pre-wrap}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pivot X/Y – Key ⇒ Value <span class="note">รวมโค้ดหน้าเดียว</span></h1>
+
+  <div class="grid">
+    <!-- Left: Input JSON -->
+    <div class="panel">
+      <h2>① ข้อมูล (JSON)</h2>
+      <div class="row" style="justify-content:space-between">
+        <span class="note">วางเป็น <b>array</b> ของ objects (ถ้าเป็น object เดี่ยว ระบบจะหุ้มให้เอง)</span>
+        <span class="pill">ตัวอย่าง: 1 แถวจาก TOR</span>
+      </div>
+      <textarea id="jsonInput" spellcheck="false"></textarea>
+      <div class="btns">
+        <button class="warn" id="btnSample">โหลดตัวอย่าง</button>
+        <button id="btnPrettify">จัดรูปแบบ</button>
+        <button id="btnMinify">ย่อ</button>
+        <button id="btnCopy">คัดลอก</button>
+        <button id="btnDownload">ดาวน์โหลด JSON</button>
+      </div>
+    </div>
+
+    <!-- Right: Controls -->
+    <div class="panel">
+      <h2>② ตั้งค่าแกน & การรวมค่า</h2>
+      <div class="controls">
+        <div>
+          <label>แกน X (Key / มิติ)</label>
+          <select id="selX"></select>
+        </div>
+        <div>
+          <label>แกน Y (Value / ตัวเลข)</label>
+          <select id="selY"></select>
+        </div>
+        <div>
+          <label>ฉลาก (Label)</label>
+          <select id="selLabel"></select>
+        </div>
+        <div>
+          <label>Aggregator</label>
+          <select id="selAgg">
+            <option value="sum">Sum</option>
+            <option value="count">Count</option>
+            <option value="avg">Average</option>
+            <option value="min">Min</option>
+            <option value="max">Max</option>
+          </select>
+        </div>
+        <div>
+          <label>เรียงลำดับ</label>
+          <select id="selSort">
+            <option value="value_desc">ค่าสูง→ต่ำ</option>
+            <option value="value_asc">ค่าต่ำ→สูง</option>
+            <option value="key_asc">ค่า X A→Z</option>
+            <option value="key_desc">ค่า X Z→A</option>
+          </select>
+        </div>
+        <div>
+          <label>ตัวเลือก</label>
+          <select id="selTopN">
+            <option value="0">ทั้งหมด</option>
+            <option value="5">Top 5</option>
+            <option value="10">Top 10</option>
+            <option value="15">Top 15</option>
+          </select>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="primary" id="btnRun">รัน Pivot</button>
+        <button class="ok" id="btnChart">วาดกราฟ</button>
+        <span class="note">คีย์: <span class="kbadge" id="kbX">X</span> / ค่า: <span class="vbadge" id="kbY">Y</span></span>
+      </div>
+      <div id="errBox" class="err" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
+    <h2>③ ตารางผลลัพธ์</h2>
+    <div class="row">
+      <span class="pill">แถว:  <span id="rowCount">0</span></span>
+      <span class="pill">รวม (Sum): <span id="sumValue">0</span></span>
+      <span class="pill">เฉลี่ย (Avg): <span id="avgValue">0</span></span>
+    </div>
+    <div style="overflow:auto; margin-top:10px">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th id="thX">X (Key)</th>
+            <th id="thY">Y (Value)</th>
+            <th>Label(s)</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:16px">
+    <h2>④ แผนภูมิแท่ง (Bar)</h2>
+    <canvas id="chart"></canvas>
+    <div class="note" style="margin-top:6px">* กราฟนี้ไม่ใช้ไลบรารีภายนอก เพื่อให้ไฟล์เดียวจบ</div>
+  </div>
+</div>
+
+<script>
+/** ---------- Label ภาษาไทย (แก้ไข/เติมได้) ---------- */
+const LABELS_TH = {
+  sp_tor_dtl_period_id: "TOR-งวด-รายละเอียด",
+  sp_tor_hdr_period_id: "TOR-งวด-หัวข้อ",
+  dc_bg_budget_type_id: "ประเภทงบประมาณ",
+  po_expense_id: "หมวดค่าใช้จ่าย",
+  i_hire_type: "ประเภทจัดจ้าง",
+  i_product_type: "ประเภทสินค้า",
+  i_is_inv: "เป็นพัสดุคงคลังหรือไม่",
+  sp_tor_id: "TOR ID",
+  dc_creditor_id: "ผู้ขาย/เจ้าหนี้",
+  i_qty: "ปริมาณ",
+  dc_unit_type_id: "หน่วยนับ",
+  c_name: "ชื่อรายการ",
+  f_total_amt :"ชื่อรายการ",
+  manday: "ชื่อรายการ",
+  
+};
+
+/** ---------- ตัวอย่างข้อมูล (1 แถว) ---------- */
+const SAMPLE_ROWS = [
+  {
+    "sp_tor_dtl_period_id": 4966,
+    "sp_tor_hdr_period_id": 4806,
+    "dc_bg_budget_type_id": 28,
+    "po_expense_id": 1431,
+    "i_hire_type": 1,
+    "i_product_type": 2,
+    "i_is_inv": 0,
+    "sp_tor_id": 2994,
+    "dc_creditor_id": 7565,
+    "i_qty": 1,
+    "dc_unit_type_id": 33,
+    "c_name": "ซื้อเตียงผ่าตัดไฟฟ้า จำนวน 13 เตียง",
+    "f_total_amt": 5850000,
+    "manday": 0
+  },
+  {
+    "sp_tor_dtl_period_id": 4967,
+    "sp_tor_hdr_period_id": 4807,
+    "dc_bg_budget_type_id": 21,
+    "po_expense_id": 1432,
+    "i_hire_type": 1,
+    "i_product_type": 2,
+    "i_is_inv": 1,
+    "sp_tor_id": 2995,
+    "dc_creditor_id": 7566,
+    "i_qty": 1,
+    "dc_unit_type_id": 33,
+    "c_name": "ซื้อเครื่องดมยาสลบ จำนวน 2 เครื่อง",
+    "f_total_amt": 4800000,
+    "manday": 0
+  },
+  {
+    "sp_tor_dtl_period_id": 4968,
+    "sp_tor_hdr_period_id": 4808,
+    "dc_bg_budget_type_id": 22,
+    "po_expense_id": 1520,
+    "i_hire_type": 1,
+    "i_product_type": 2,
+    "i_is_inv": 1,
+    "sp_tor_id": 2996,
+    "dc_creditor_id": 7567,
+    "i_qty": 1,
+    "dc_unit_type_id": 33,
+    "c_name": "ซื้อเครื่องติดตามสัญญาณชีพ จำนวน 10 เครื่อง",
+    "f_total_amt": 2500000,
+    "manday": 0
+  },
+  {
+    "sp_tor_dtl_period_id": 4969,
+    "sp_tor_hdr_period_id": 4809,
+    "dc_bg_budget_type_id": 23,
+    "po_expense_id": 1450,
+    "i_hire_type": 2,
+    "i_product_type": 7,
+    "i_is_inv": 0,
+    "sp_tor_id": 2997,
+    "dc_creditor_id": 7568,
+    "i_qty": 1,
+    "dc_unit_type_id": 33,
+    "c_name": "จ้างบำรุงรักษาเครื่องเอกซเรย์ 1 งาน",
+    "f_total_amt": 300000,
+    "manday": 10
+  },
+  {
+    "sp_tor_dtl_period_id": 4970,
+    "sp_tor_hdr_period_id": 4810,
+    "dc_bg_budget_type_id": 24,
+    "po_expense_id": 1460,
+    "i_hire_type": 1,
+    "i_product_type": 2,
+    "i_is_inv": 0,
+    "sp_tor_id": 2998,
+    "dc_creditor_id": 7569,
+    "i_qty": 1,
+    "dc_unit_type_id": 33,
+    "c_name": "ซื้อโคมไฟผ่าตัด จำนวน 4 โคม",
+    "f_total_amt": 600000,
+    "manday": 0
+  }
+]
+;
+
+/** ---------- Utils ---------- */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+const fmtNumber = n => new Intl.NumberFormat('th-TH', {maximumFractionDigits: 4}).format(Number(n)||0);
+
+function toArray(input) {
+  if (Array.isArray(input)) return input;
+  if (input && typeof input === 'object') return [input];
+  return [];
+}
+
+function safeParse(jsonStr) {
+  try {
+    return JSON.parse(jsonStr);
+  } catch(e) {
+    // ลองกรณีว่าผู้ใช้วาง object เดี่ยว (ไม่ใช่ array)
+    try {
+      const obj = JSON.parse(jsonStr);
+      return [obj];
+    } catch(e2) {
+      throw e;
+    }
+  }
+}
+
+function optionLabel(key){
+  const th = LABELS_TH[key] ? ` – ${LABELS_TH[key]}` : "";
+  return `${key}${th}`;
+}
+
+function fillSelectOptions(keys, sel, onlyNumeric=false, allowEmpty=false){
+  sel.innerHTML = "";
+  if (allowEmpty){
+    const opt = document.createElement('option');
+    opt.value = ""; opt.textContent = "(ว่าง)";
+    sel.appendChild(opt);
+  }
+  keys.forEach(k=>{
+    if (onlyNumeric){
+      // เงื่อนไข numeric เดี๋ยวคัดกรองจาก sample row
+      // จะเลือกเฉพาะฟิลด์ที่เป็น number ใน sampleRow
+      // หากไม่มี sample ให้เปิดทั้งหมด
+    }
+    const opt = document.createElement('option');
+    opt.value = k; opt.textContent = optionLabel(k);
+    sel.appendChild(opt);
+  });
+}
+
+function inferKeys(rows){
+  const first = rows[0] || {};
+  const keys = Object.keys(first);
+  const numKeys = keys.filter(k => typeof first[k] === 'number');
+  return {keys, numKeys};
+}
+
+/** ---------- Pivot Core ---------- */
+function aggregate(values, agg){
+  if (!values.length) return 0;
+  if (agg === 'count') return values.length;
+  if (agg === 'min') return Math.min(...values.map(Number));
+  if (agg === 'max') return Math.max(...values.map(Number));
+  if (agg === 'avg'){
+    const s = values.reduce((a,b)=>a+Number(b||0),0);
+    return s/values.length;
+  }
+  // default sum
+  return values.reduce((a,b)=>a+Number(b||0),0);
+}
+
+function pivotXY(rows, xKey, yKey, labelKey, agg='sum'){
+  const map = new Map();
+  for (const r of rows){
+    const x = r[xKey];
+    const y = Number(r[yKey] ?? 0);
+    const label = labelKey ? r[labelKey] : undefined;
+    const curr = map.get(x) || { xKey, yKey, xValue: x, values: [], labels: new Set() };
+    curr.values.push(y);
+    if (label) curr.labels.add(label);
+    map.set(x, curr);
+  }
+  return Array.from(map.values()).map(o => ({
+    xKey: o.xKey,
+    yKey: o.yKey,
+    xValue: o.xValue,
+    yValue: aggregate(o.values, agg),
+    label: o.labels.size ? Array.from(o.labels).join(", ") : ""
+  }));
+}
+
+function sortPivot(arr, mode){
+  const collate = new Intl.Collator('th-TH', {numeric:true, sensitivity:'base'});
+  if (mode === 'value_desc') return arr.sort((a,b)=> b.yValue - a.yValue);
+  if (mode === 'value_asc') return arr.sort((a,b)=> a.yValue - b.yValue);
+  if (mode === 'key_desc') return arr.sort((a,b)=> collate.compare(String(b.xValue), String(a.xValue)));
+  // key_asc default
+  return arr.sort((a,b)=> collate.compare(String(a.xValue), String(b.xValue)));
+}
+
+function applyTopN(arr, topN){
+  const n = Number(topN||0);
+  if (!n || n<=0) return arr;
+  return arr.slice(0, n);
+}
+
+/** ---------- Table Render ---------- */
+function renderTable(rows){
+  const tbody = $('#tbody'); tbody.innerHTML = "";
+  let sum = 0;
+  rows.forEach(r=>{
+    sum += Number(r.yValue)||0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="kbadge">${r.xValue ?? '(null)'}</span></td>
+      <td><span class="vbadge">${fmtNumber(r.yValue)}</span></td>
+      <td class="muted">${r.label||''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  $('#rowCount').textContent = rows.length;
+  $('#sumValue').textContent = fmtNumber(sum);
+  $('#avgValue').textContent = fmtNumber(rows.length ? sum/rows.length : 0);
+}
+
+/** ---------- Canvas Bar Chart (no external libs) ---------- */
+function drawBarChart(canvas, rows, opts={}){
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const H = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+
+  // Background
+  ctx.fillStyle = '#0b1220';
+  ctx.fillRect(0,0, W/devicePixelRatio, H/devicePixelRatio);
+
+  const pad = 18, left = 140, right = 24, top = 24, bottom = 24;
+  const chartW = (W/devicePixelRatio) - left - right;
+  const chartH = (H/devicePixelRatio) - top - bottom;
+
+  const values = rows.map(r=>Number(r.yValue)||0);
+  const labels = rows.map(r=>String(r.xValue));
+  const maxV = Math.max(1, Math.max(...values, 0));
+  const barH = Math.max(12, Math.min(36, chartH / Math.max(1, rows.length) - 6));
+  const stepY = barH + 6;
+
+  // Axis
+  ctx.strokeStyle = '#1f2937';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(left, top);
+  ctx.lineTo(left, top + chartH);
+  ctx.moveTo(left, top + chartH);
+  ctx.lineTo(left + chartW, top + chartH);
+  ctx.stroke();
+
+  // Bars
+  ctx.font = '12px system-ui, sans-serif';
+  rows.forEach((r, i)=>{
+    const v = values[i];
+    const x = left;
+    const y = top + i*stepY + 4;
+    const w = (v / maxV) * chartW;
+
+    // label
+    ctx.fillStyle = '#94a3b8';
+    const text = labels[i];
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 8, y + barH/2);
+
+    // bar
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(x, y, w, barH);
+
+    // value
+    ctx.fillStyle = '#e5e7eb';
+    const valTxt = fmtNumber(v);
+    const tx = x + w + 6;
+    const ty = y + barH/2;
+    ctx.fillText(valTxt, tx, ty);
+  });
+
+  // Title
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = 'bold 14px system-ui, sans-serif';
+  ctx.fillText(opts.title || 'ผลรวมตามแกน X', left, 16);
+}
+
+/** ---------- Wiring UI ---------- */
+const jsonInput = $('#jsonInput');
+const selX = $('#selX'), selY = $('#selY'), selLabel = $('#selLabel');
+const selAgg = $('#selAgg'), selSort = $('#selSort'), selTopN = $('#selTopN');
+const kbX = $('#kbX'), kbY = $('#kbY');
+const errBox = $('#errBox');
+
+function loadSample(){
+  jsonInput.value = JSON.stringify(SAMPLE_ROWS, null, 2);
+  bootstrapSelectsFromInput();
+}
+function prettify(){
+  try{
+    const obj = JSON.parse(jsonInput.value);
+    jsonInput.value = JSON.stringify(obj, null, 2);
+  }catch(e){
+    showError(e);
+  }
+}
+function minify(){
+  try{
+    const obj = JSON.parse(jsonInput.value);
+    jsonInput.value = JSON.stringify(obj);
+  }catch(e){
+    showError(e);
+  }
+}
+function copyText(){
+  navigator.clipboard.writeText(jsonInput.value).then(()=>{
+    flash('คัดลอกแล้ว');
+  });
+}
+function downloadJSON(){
+  const blob = new Blob([jsonInput.value], {type:'application/json;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pivot_input.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function flash(msg){
+  const b = document.createElement('div');
+  b.textContent = msg;
+  b.style.position='fixed'; b.style.right='16px'; b.style.bottom='16px';
+  b.style.background='#34d399'; b.style.color='#062230';
+  b.style.padding='8px 12px'; b.style.borderRadius='10px'; b.style.boxShadow='0 6px 20px rgba(0,0,0,.25)';
+  document.body.appendChild(b);
+  setTimeout(()=>b.remove(), 1100);
+}
+function showError(e){
+  errBox.style.display='block';
+  errBox.textContent = (e && e.message) ? e.message : String(e);
+  setTimeout(()=>{ errBox.style.display='none'; }, 4000);
+}
+
+function bootstrapSelectsFromInput(){
+  try{
+    const rows = toArray(safeParse(jsonInput.value));
+    if (!rows.length) return;
+    const {keys, numKeys} = inferKeys(rows);
+
+    // X: ทุกคีย์, Y: เฉพาะ numeric, Label: ทุกคีย์ (อนุโลม)
+    fillSelectOptions(keys, selX);
+    fillSelectOptions(numKeys.length ? numKeys : keys, selY); // ถ้าไม่มี numeric ในแถวแรก อนุโลมทั้งหมด
+    fillSelectOptions(keys, selLabel, false, true);
+
+    // default suggestion
+    if (keys.includes('i_product_type')) selX.value = 'i_product_type';
+    if (keys.includes('i_qty')) selY.value = 'i_qty';
+    if (keys.includes('c_name')) selLabel.value = 'c_name';
+
+    kbX.textContent = optionLabel(selX.value||'X');
+    kbY.textContent = optionLabel(selY.value||'Y');
+  }catch(e){
+    // ignore
+  }
+}
+
+function runPivot(){
+  try{
+    const rows = toArray(safeParse(jsonInput.value));
+    if (!rows.length) throw new Error('ไม่มีข้อมูล');
+    const xKey = selX.value; const yKey = selY.value; const labelKey = selLabel.value || '';
+    const agg = selAgg.value; const sortMode = selSort.value; const topN = selTopN.value;
+
+    const pivot = pivotXY(rows, xKey, yKey, labelKey, agg);
+    sortPivot(pivot, sortMode);
+    const clipped = applyTopN(pivot, topN);
+    renderTable(clipped);
+    kbX.textContent = optionLabel(xKey); kbY.textContent = optionLabel(yKey);
+
+    // auto-draw chart quickly
+    drawBarChart($('#chart'), clipped, { title: `ผลรวม (${agg}) ของ ${optionLabel(yKey)} ตาม ${optionLabel(xKey)}` });
+  }catch(e){
+    showError(e);
+  }
+}
+
+function drawChartOnly(){
+  const tb = Array.from($('#tbody').querySelectorAll('tr'));
+  if (!tb.length){ runPivot(); return; }
+  // rebuild from table (simple)
+  const rows = tb.map(tr=>{
+    const x = tr.children[0].innerText.trim();
+    const y = Number((tr.children[1].innerText||'').replace(/[, ]/g,''));
+    const label = tr.children[2].innerText.trim();
+    return {xValue:x, yValue:y, label};
+  });
+  drawBarChart($('#chart'), rows, { title: `ผลรวมของ ${optionLabel(selY.value||'Y')} ตาม ${optionLabel(selX.value||'X')}` });
+}
+
+/** ---------- Bind ---------- */
+$('#btnSample').addEventListener('click', loadSample);
+$('#btnPrettify').addEventListener('click', prettify);
+$('#btnMinify').addEventListener('click', minify);
+$('#btnCopy').addEventListener('click', copyText);
+$('#btnDownload').addEventListener('click', downloadJSON);
+$('#btnRun').addEventListener('click', runPivot);
+$('#btnChart').addEventListener('click', drawChartOnly);
+
+selX.addEventListener('change', ()=> kbX.textContent = optionLabel(selX.value||'X'));
+selY.addEventListener('change', ()=> kbY.textContent = optionLabel(selY.value||'Y'));
+
+/** ---------- Init ---------- */
+jsonInput.value = JSON.stringify(SAMPLE_ROWS, null, 2);
+bootstrapSelectsFromInput();
+runPivot();
+</script>
+</body>
+</html>

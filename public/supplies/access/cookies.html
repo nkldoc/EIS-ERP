@@ -1,0 +1,90 @@
+<html>
+    <head>
+        <script type="text/javascript">
+        function setCookie(params) {
+        var name            = params.name,
+            value           = params.value,
+            expireDays      = params.days,
+            expireHours     = params.hours,
+            expireMinutes   = params.minutes,
+            expireSeconds   = params.seconds;
+
+        var expireDate = new Date();
+        if (expireDays) {
+            expireDate.setDate(expireDate.getDate() + expireDays);
+        }
+        if (expireHours) {
+            expireDate.setHours(expireDate.getHours() + expireHours);
+        }
+        if (expireMinutes) {
+            expireDate.setMinutes(expireDate.getMinutes() + expireMinutes);
+        }
+        if (expireSeconds) {
+            expireDate.setSeconds(expireDate.getSeconds() + expireSeconds);
+        }
+
+        document.cookie = name +"="+ escape(value) +
+            ";domain="+ window.location.hostname +
+            ";path=/"+
+            ";expires="+expireDate.toUTCString();
+    }
+
+    function deleteCookie(name) {
+        setCookie({name: name, value: "", seconds: 1});
+    }
+    
+    
+//setCookie({name: "reminder", value: "buyCoffee", minutes: 20});
+//deleteCookie("reminder");
+            
+            // function to show cookies
+            function showCookies() {
+                var show = document.getElementById("show");
+                show.innerHTML = document.cookie;
+            }
+
+            // function to delete cookies
+            function deleteCookies() {
+                var Cookies = document.cookie.split(';');
+
+                // set 1 Jan, 1970 expiry for every cookies
+                for (var i = 0; i < Cookies.length; i++)
+                    document.cookie = Cookies[i] + "=;expires=" + new Date(0).toUTCString();
+                  //  showCookies();
+            }
+
+            // set object in the cookies on webpage load.
+            window.onload = () => {
+//                let object = {name: "eis", site: "eis.vajira.ac.th", }
+//                document.cookie = 'object=' + JSON.stringify(object); 
+//                else
+//                setCookie({name: "eis", value: "eis.vajira.ac.th", minutes: 20});
+            };
+
+    var logInCookies = () =>{
+        
+        fetch('https://eis.vajira.ac.th:8443/procure/access/login_2.php', {
+            method: 'POST',
+            credentials: 'include', 
+            body: JSON.stringify({ userf: 'admin', passwordf: 'adminnmu' }), //userf passwordf
+            headers: { 'Content-Type': 'application/json' },
+        }); 
+        
+    };
+        </script>
+    </head>
+    <body>
+        <h2>Clear all cookies using JavaScript</h2>
+        <h4>Click on the below buttons to show and clear cookies.</h4>
+        <button onclick = "setCookie({name: 'reminder', value: 'buyCoffee', minutes: 20})">set Cookie</button>
+        <button onclick = "deleteCookie('reminder')">delete Cookie</button>
+        <br>
+        <button onclick = "showCookies()">show Cookies</button>
+        <button onclick = "deleteCookies()">clear Cookies</button>
+        <br>
+        <br>
+        <br>
+        <button onclick = "logInCookies()"> Login </button>
+        <div id = "show"></div> 
+    </body>
+</html>

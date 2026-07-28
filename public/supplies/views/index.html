@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Catalina Log Viewer</title>
+</head>
+<body>
+  <h1>Catalina Log</h1>
+  <pre id="log"></pre>
+
+  <script>
+    fetch('/logs/catalina')
+      .then(response => response.text())
+      .then(log => {
+        document.getElementById('log').textContent = log;
+      })
+      .catch(error => console.error('Error loading log:', error));
+  </script>
+</body>
+</html>

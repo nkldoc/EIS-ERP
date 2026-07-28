@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PDF Text Input & List</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        label { margin-right: 10px; }
+        table { margin-top: 20px; border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid black; padding: 6px; text-align: center; }
+        #input-area { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h2>เพิ่มข้อความ และตำแหน่งลงตาราง</h2>
+
+    <div id="input-area">
+        <label>ข้อความ: <input type="text" id="text-input" /></label>
+        <label>หน้า: <input type="number" id="page-input" min="1" value="1" /></label>
+        <label>X: <input type="number" step="0.01" id="x-input" /></label>
+        <label>Y: <input type="number" step="0.01" id="y-input" /></label>
+        <button id="add-button">➕ เพิ่มข้อความ</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ข้อความ</th>
+                <th>หน้า</th>
+                <th>X</th>
+                <th>Y</th>
+                <th>ลบ</th>
+            </tr>
+        </thead>
+        <tbody id="text-table-body">
+            <!-- รายการจะถูกเพิ่มที่นี่ -->
+        </tbody>
+    </table>
+
+    <script>
+        const addButton = document.getElementById("add-button");
+        const textInput = document.getElementById("text-input");
+        const pageInput = document.getElementById("page-input");
+        const xInput = document.getElementById("x-input");
+        const yInput = document.getElementById("y-input");
+        const tableBody = document.getElementById("text-table-body");
+
+        addButton.addEventListener("click", () => {
+            const text = textInput.value.trim();
+            const page = parseInt(pageInput.value);
+            const x = parseFloat(xInput.value);
+            const y = parseFloat(yInput.value);
+
+            if (!text || isNaN(page) || isNaN(x) || isNaN(y)) {
+                alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+                return;
+            }
+
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${text}</td>
+                <td>${page}</td>
+                <td>${x.toFixed(2)}</td>
+                <td>${y.toFixed(2)}</td>
+                <td><button class="delete-btn">ลบ</button></td>
+            `;
+
+            tr.querySelector(".delete-btn").addEventListener("click", () => tr.remove());
+
+            tableBody.appendChild(tr);
+
+            // เคลียร์ input หลังเพิ่ม
+            textInput.value = '';
+            xInput.value = '';
+            yInput.value = '';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+{
+    "msg": "Users found",
+    "users":"root",
+    "app": "supplies",
+    "token": "", 
+    "metaData": {
+        "root": "users",
+        "totalProperty": "totalCount",
+        "successProperty": "ok'",
+        "messageProperty": "msg" 
+    }, 
+    "status_step_document":[
+        {
+            "value": 1,
+            "name": "บันทึกรายการลงนามอนุมัติขอดำเนินเรื่องเอกสารซื้อจ้าง",
+            "c_code": "APSTEP11",
+            "i_enabled":0
+        },
+        {
+            "value": 2,
+            "name": "บันทึกรายการลงนามอนุมัติใบขอซื้อจ้าง",
+            "c_code": "APSTEP21",
+            "i_enabled":1 
+        },
+        {
+            "value": 3,
+            "name": "บันทึกรายการลงนามอนุมัติแต่งตั้งคณะกรรมการตรวจรับ",
+            "c_code": "APSTEP22",
+            "i_enabled":1 
+        },
+        {
+            "value": 4,
+            "name": "ลงนามขออนุมัติรายการคำสั่งซื้อ PO",
+            "c_code": "APSTEP24",
+            "i_enabled":0 
+        },
+        {
+            "value": 5,
+            "name": "ลงนามขออนุมัติรายการตรวจรับ",
+            "c_code": "APSTEP31",
+            "i_enabled":0 
+        }
+    ], 
+    "status_sigature_document": [
+        {
+            "value": 1,
+            "name": "หัวหน้าสายงานซื้อจ้างลงนามตรวจสอบ"
+        },
+        {
+            "value": 2,
+            "name": "หัวหน้าพัสดุลงนามตรวจสอบ"
+        },
+        {
+            "value": 3,
+            "name": "รองคณะบดีลงนามตรวจสอบ"
+        },
+        {
+            "value": 3,
+            "name": "คณะบดีลงนามเอกสาร อนุมัติรายการขอซื้อจ้าง"
+        },
+        {
+            "value": 4,
+            "name": "คณะบดีลงนามเอกสารมอบอำนาจดำเนินการยกเลิก/ประกาศแผนใหม่"
+        }
+    ],
+    "status_approved_document": [
+        {
+            "value": 1,
+            "name": "สถานะรอดำเนินการ"   
+        },
+        {
+            "value": 2,
+            "name": "สถานะดำเนินการแล้ว" 
+        },
+        {
+            "value": 3,
+            "name": "สถานะยกเลิกแล้วประกาศแผนใหม่"
+        },
+        {
+            "value": 4,
+            "name": "สถานะยกเลิก"
+        }
+    ]

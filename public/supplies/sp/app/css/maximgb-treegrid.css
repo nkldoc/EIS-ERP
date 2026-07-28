@@ -1,0 +1,31 @@
+/* Minimal styles for Maximgb TreeGrid */
+.ux-maximgb-tg-panel .ux-maximgb-tg-uiwrap { position: relative; height:16px; }
+.ux-maximgb-tg-elbow-line { position:absolute; width:16px; height:16px; border-left:1px solid #ccc; }
+.ux-maximgb-tg-elbow-empty { position:absolute; width:16px; height:16px; }
+
+.ux-maximgb-tg-elbow,
+.ux-maximgb-tg-elbow-end,
+.ux-maximgb-tg-elbow-active {
+  position:absolute;
+  width:16px;
+  height:16px;
+  text-align:center;
+  line-height:16px;
+  font-weight:bold;
+  color:#666;
+  border:1px solid transparent;
+  border-radius:2px;
+}
+.ux-maximgb-tg-elbow-active {
+  border-color:#bbb;
+  background:#f7f7f7;
+}
+
+.ux-maximgb-tg-elbow-plus::after,
+.ux-maximgb-tg-elbow-end-plus::after { content:'+'; }
+
+.ux-maximgb-tg-elbow-minus::after,
+.ux-maximgb-tg-elbow-end-minus::after { content:'–'; }
+
+/* Avoid column width jitter for master cell */
+.ux-maximgb-tg-mastercell-wrap { display:flex; align-items:center; gap:4px; }

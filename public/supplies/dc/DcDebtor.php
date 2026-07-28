@@ -1,0 +1,28 @@
+<?php include("../conf/config.php"); ?> 
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title><?php echo COMPANY_NAME;?></title>
+<!-- System ERP :: Src js  -->
+<?php include("../lib/loadJs.php"); ?>
+<?php include("../lib/loadCss.php"); ?>
+<!-- System ERP :: -->
+<script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?php echo rand(0,100000); ?>&f=<?php echo $_SERVER["PHP_SELF"];?>"></script>
+<!-- System ERP :: -->
+<script type="text/javascript">
+    <?php 
+    //echo "Ext.CNT_TYPE_DEBTOR_AND_CREDITOR	= ".CNT_TYPE_DEBTOR_AND_CREDITOR."; // 	ลูกหนี้/เจ้าหนี้ \r\n";
+    //echo "Ext.CNT_TYPE_CREDITOR				= ".CNT_TYPE_CREDITOR."; //  เจ้าหนี้ \r\n";
+
+    ?>
+user_right_edit = 1;
+user_right_delete = 1;
+user_right_add = 1;
+user_right_read = 1;
+</script>
+<script type="text/javascript" src="js/DcDebtor.js?_dc=<?php echo rand(0,100000); ?>"></script>
+</head>
+<body>
+</body>
+</html>

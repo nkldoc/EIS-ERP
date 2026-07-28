@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Clickable Table</title>
+        <style>
+            table {
+                border-collapse: collapse;
+                width: 50%;
+                margin: 20px auto;
+            }
+            th, td {
+                border: 1px solid black;
+                padding: 8px;
+                text-align: center;
+                cursor: pointer;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+            .highlighted {
+                background-color: lightblue;
+            }
+        </style>
+    </head>
+    <body>
+
+        <h1>คลิ๊กเลือกตำแหน่งวางลายเซ็นต์</h1>
+        <table id="myTable">
+            <thead>
+                <tr>
+                    <th>ตำแหน่งซ้าย</th>
+                    <th>ตำแหน่งขวา</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Row 1, Col 1</td>
+                    <td>Row 1, Col 2</td>
+                </tr>
+                <tr>
+                    <td>Row 2, Col 1</td>
+                    <td>Row 2, Col 2</td>
+                </tr>
+                <tr>
+                    <td>Row 3, Col 1</td>
+                    <td>Row 3, Col 2</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>Clicked Cell: <span id="cellInfo">None</span></p>
+<!--        <button id="setRecordID">เลือกบันทึก</button>-->
+
+        <script>
+            const table = document.getElementById('myTable');
+            const cellInfoSpan = document.getElementById('cellInfo');
+//            const setRecordBtn = document.getElementById('setRecordID');
+            let previouslyClickedCell = null;
+
+            // เก็บตำแหน่งล่าสุดที่คลิก
+            let selectedRowIndex = null;
+            let selectedColumnIndex = null;
+
+            function getQueryParams() {
+                const params = new URLSearchParams(window.location.search);
+        //        window.parent.console.log(isNaN(parseInt(params.get('rowIndex'))));
+        //        window.parent.console.log(parseInt(params.get('Column')));
+                return {
+                    rowIndex: isNaN(parseInt(params.get('rowIndex'))) ? 2 : parseInt(params.get('rowIndex')),
+                    column: isNaN(parseInt(params.get('Column'))) ? 1 : parseInt(params.get('Column'))
+                };
+            }
+
+            function highlightCellByQueryParam() {
+                const {rowIndex, column} = getQueryParams();
+
+                if (!isNaN(rowIndex) && !isNaN(column)) {
+
+                    const body = table.tBodies[0];
+                    const row = body.rows[rowIndex - 1];
+                    if (row && row.cells[column - 1]) {
+                        const cell = row.cells[column - 1];
+                        cell.classList.add('highlighted');
+                        cellInfoSpan.textContent = `Row: ${rowIndex}, Column: ${column}`;
+                        previouslyClickedCell = cell;
+
+                        // Set selected indexes
+                        selectedRowIndex = rowIndex;
+                        selectedColumnIndex = column;
+
+                        if (window.parent && window.parent.Ext && window.parent.Ext.Msg) {
+//                            window.parent.Ext.Msg.alert('แจ้งเตือน', `Row: ${rowIndex}, Column: ${column}`);
+                        }
+                    }
+                }
+            }
+
+            // เมื่อคลิกในตาราง
+            table.addEventListener('click', function (event) {
+                if (event.target.tagName === 'TD') {
+                    const clickedCell = event.target;
+                    const rowIndex = clickedCell.parentNode.rowIndex; // starts at 1
+                    const cellIndex = clickedCell.cellIndex + 1;
+
+                    // Save values for use when clicking "เลือกบันทึก"
+                    selectedRowIndex = rowIndex;
+                    selectedColumnIndex = cellIndex;
+
+                    cellInfoSpan.textContent = `Row: ${rowIndex}, Column: ${cellIndex}`;
+
+                    if (previouslyClickedCell) {
+                        previouslyClickedCell.classList.remove('highlighted');
+                    }
+                    clickedCell.classList.add('highlighted');
+                    previouslyClickedCell = clickedCell;
+
+                    // ปิดหน้าต่าง
+                    if (window.parent.Ext.getCmp('win-grid-rowColID') && typeof window.parent.Ext.getCmp('win-grid-rowColID').destroy === 'function') {
+                        if (window.parent && window.parent.Ext.gridEditorRec) {
+                            const record = window.parent.Ext.gridEditorRec.record;
+                            
+                            record.set('row', selectedRowIndex);
+                            record.set('col', selectedColumnIndex);
+                            record.set('column', selectedColumnIndex);
+                            window.parent.Ext.gridEditorRec.completeEdit();
+//                            window.parent.console.log(record);
+//                            window.parent.Ext.Msg.alert('แจ้งเตือน', `Row: ${selectedRowIndex}, Column: ${selectedColumnIndex}`);
+//                            record.commit();
+                        }
+                        window.parent.Ext.getCmp('win-grid-rowColID').destroy();
+                    } else {
+                        window.close();
+                    }
+                }
+            });
+
+       
+
+            document.addEventListener('DOMContentLoaded', highlightCellByQueryParam);
+        </script>
+
+    </body>
+</html>
