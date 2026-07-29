@@ -1,0 +1,31 @@
+Url
+- https://uat-eis.vajira.ac.th/NMU_permission/login
+
+ชื่อฟิลด์
+- ชื่อ
+- นามสกุล
+- อีเมล์
+- ตำแหน่ง
+- หน่วยงาน
+- ฝ่าย (ถ้ามี)
+
+Discovery endpoint
+https://vdid.vajira.ac.th/.well-known/openid-configuration
+
+
+
+
+==================
+รหัสผู้ใช้ client id
+eis
+รหัสผ่าน client secret
+PeL+lUSj(8-J{o:E
+
+Redirect uri https://uat-eis.vajira.ac.th/NMU_permission/login
+
+Authority https://vdid.vajira.ac.th/
+scope:  "openid profile email ephis"
+
+ผม rigister Return URL เพิ่มนะครับหน้าเป็น Server Product ครับ
+1. https://eis.vajira.ac.th/NMU_permission/login
+2. https://eis.vajira.ac.th:8443/procure

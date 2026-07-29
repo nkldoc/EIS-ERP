@@ -1,0 +1,1 @@
+document.getElementById("main").innerHTML = "<h2>Script 22 Loaded</h2>";
