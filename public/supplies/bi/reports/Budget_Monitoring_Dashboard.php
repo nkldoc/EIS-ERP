@@ -21,7 +21,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
 
 <head>
 
-        <meta charset="utf-8" />Budget_Monitoring_Dashboard.php
+        
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="shortcut icon" href="../../images/favicon.ico" type="image/x-icon">
         <link rel="icon" href="../../images/favicon.ico" type="image/x-icon">
@@ -53,6 +53,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
         <script src="../bootstrap/bootstrap-select-1.13.14/dist/js/bootstrap-select.min.js"></script>
         <script src="../../js/echarts/macarons.js"></script>
         <script src="../lib/xlsx.full.min.js"></script>
+        <script src="../js/ExportReserveSummary.js"></script>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <title><?php echo COMPANY_NAME; ?></title>
 
@@ -108,12 +109,14 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                         <div class="legend-badges">
                                                 <span class="badge badge-primary mr-1">จำนวนงบประมาณ</span>
                                                 <span class="badge badge-info mr-1">จองเงิน</span>
+                                                <span class="badge mr-1" style="background:#6f42c1;color:#fff;">เงินจองตรวจรับ</span>
                                                 <span class="badge badge-danger">คงเหลือหลังจองเงิน</span>
                                                 <span class="badge badge-danger"> % </span>
                                         </div>
                                 </div>
 
                                 <div class="filter-bar mb-3">
+                                        
                                         <div class="d-flex justify-content-end align-items-center gap-2 mb-3 flex-wrap filter-bar">
                                                 <div class="filter-group">
                                                         <label for="budget_year_filter" class="me-2 fw-semibold">ปีงบประมาณ:</label>
@@ -138,6 +141,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                         <input type="checkbox" class="custom-control-input" id="darkToggle">
                                                         <label class="custom-control-label" for="darkToggle"><i class="bi bi-moon-stars"></i> Dark</label>
                                                 </div>
+                                                <button id="btnExportReserve"
+        class="btn btn-warning btn-sm rounded-pill px-3"
+        onclick="exportReserveSummary()">
+    📊 Export จองเงิน/ใช้ไปแล้ว
+</button>
                                         </div>
                                 </div>
 
@@ -225,36 +233,44 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                 <div class="dv-wrapper">
                                         <table id="dvTable" class="table-dv-main">
                                                 <thead>
-                                                        <tr>
-                                                                <th rowspan="2">ลำดับ</th>
-                                                                <th rowspan="2">รหัสงบประมาณ / หมวดค่าใช้จ่าย</th>
-                                                                <th class="group-income" colspan="4">รายได้ส่วนงาน</th>
-                                                                <th class="group-bkk" colspan="4">อุดหนุนกรุงเทพมหานคร</th>
-                                                                <th class="group-gov" colspan="4">อุดหนุนรัฐบาล</th>
-                                                                <th class="group-Savings" colspan="4">สะสมสวนงาน</th>
-                                                        </tr>
-                                                        <tr>
-                                                                <th class="group-income">งบประมาณ</th>
-                                                                <th class="group-income">ที่ใช้ไป(จอง)</th>
-                                                                <th class="group-income">คงเหลือ</th>
-                                                                <th class="group-income">%</th>
+                                                <tr>
+                                                        <th rowspan="2">ลำดับ</th>
+                                                        <th rowspan="2">รหัสงบประมาณ / หมวดค่าใช้จ่าย</th>
+                                                        <th class="group-income" colspan="6">รายได้ส่วนงาน</th>
+                                                        <th class="group-bkk" colspan="6">อุดหนุนกรุงเทพมหานคร</th>
+                                                        <th class="group-gov" colspan="6">อุดหนุนรัฐบาล</th>
+                                                        <th class="group-Savings" colspan="6">สะสมสวนงาน</th>
+                                                </tr>
+                                                <tr>
+                                                        <th class="group-income">งบประมาณ</th>
+                                                        <th class="group-income">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
+                                                        <th class="group-income">เงินจองตรวจรับ</th>
+                                                        <th class="group-income">เบิกจ่ายแล้ว</th>
+                                                        <th class="group-income">คงเหลือ</th>
+                                                        <th class="group-income">%</th>
 
-                                                                <th class="group-bkk">งบประมาณ</th>
-                                                                <th class="group-bkk">ที่ใช้ไป(จอง)</th>
-                                                                <th class="group-bkk">คงเหลือ</th>
-                                                                <th class="group-bkk">%</th>
+                                                        <th class="group-bkk">งบประมาณ</th>
+                                                        <th class="group-income">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
+                                                        <th class="group-income">เงินจองตรวจรับ</th>
+                                                        <th class="group-bkk">เบิกจ่ายแล้ว</th>
+                                                        <th class="group-bkk">คงเหลือ</th>
+                                                        <th class="group-bkk">%</th>
 
-                                                                <th class="group-gov">งบประมาณ</th>
-                                                                <th class="group-gov">ที่ใช้ไป(จอง)</th>
-                                                                <th class="group-gov">คงเหลือ</th>
-                                                                <th class="group-gov">%</th>
+                                                        <th class="group-gov">งบประมาณ</th>
+                                                        <th class="group-income">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
+                                                        <th class="group-income">เงินจองตรวจรับ</th>
+                                                        <th class="group-gov">เบิกจ่ายแล้ว</th>
+                                                        <th class="group-gov">คงเหลือ</th>
+                                                        <th class="group-gov">%</th>
 
-                                                                <th class="group-Savings">งบประมาณ</th>
-                                                                <th class="group-Savings">ที่ใช้ไป(จอง)</th>
-                                                                <th class="group-Savings">คงเหลือ</th>
-                                                                <th class="group-Savings">%</th>
-                                                        </tr>
-                                                </thead>
+                                                        <th class="group-Savings">งบประมาณ</th>
+                                                        <th class="group-income">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
+                                                        <th class="group-income">เงินจองตรวจรับ</th>
+                                                        <th class="group-Savings">เบิกจ่ายแล้ว</th>
+                                                        <th class="group-Savings">คงเหลือ</th>
+                                                        <th class="group-Savings">%</th>
+                                                </tr>
+                                        </thead>
                                                 <tbody id="dvBody"></tbody>
                                         </table>
                                 </div>

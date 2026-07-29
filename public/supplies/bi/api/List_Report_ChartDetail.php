@@ -27,7 +27,70 @@ function List_QueryParam()
 
 	// Filter staff
 	if (!empty($_REQUEST['staff'])) {
-		$where .= " AND b.sp_emp_id IN (" . $_REQUEST["staff"] . ")";
+		// Expecting a comma-separated list from the client; client may include the token 'unassigned'
+		$raw = trim($_REQUEST['staff']);
+		$parts = array_filter(array_map('trim', explode(',', $raw)), function($v){ return $v !== ''; });
+		$ids = [];
+		foreach ($parts as $p) {
+			if ($p === 'unassigned') {
+				$ids[] = 0; // map client-side 'unassigned' token to sp_emp_id = 0
+			} elseif (is_numeric($p)) {
+				$ids[] = intval($p);
+			}
+		}
+		$ids = array_unique($ids);
+		if (count($ids) > 0) {
+			$where .= " AND b.sp_emp_id IN (" . implode(',', $ids) . ")";
+		}
+	}
+
+	// ✅ Filter sub_status (สถานะใบขอเบิก)
+	$subStatusWhere = "";
+	if (!empty($_REQUEST['sub_status'])) {
+		$raw = trim($_REQUEST['sub_status']);
+		$parts = array_filter(array_map('trim', explode(',', $raw)), function($v){ return $v !== ''; });
+		if (count($parts) > 0) {
+			// Mapping from status name to numeric values
+			$statusMap = [
+				'รอผู้ดำเนินการลงนาม' => ['0.3'],
+				'รอผู้ขอเบิกลงนาม' => ['0.4'],
+				'รอฝ่ายการคลังลงนาม' => ['0.5', '5'],
+				'รอรับใบขอเบิก' => ['1'],
+				'รอผู้ตรวจสอบลงนาม' => ['2'],
+				'ทักท้วง' => ['3'],
+				'รอตรวจสอบงบประมาณ' => ['4'],
+				'รอผู้อนุมัติลงนาม' => ['6'],
+				'รอเตรียมจ่าย' => ['7'],
+				'รอหัวหน้าฝ่ายการคลังลงนามเช็ค' => ['8'],
+				'รอผู้บริหารลงนามเช็ค' => ['9'],
+				'รอทำทะเบียนจ่าย' => ['10'],
+				'ทำทะเบียนจ่าย' => ['11'],
+				'อยู่ระหว่างการจัดทำใบขอเบิก' => [NULL],
+			];
+			$numericValues = [];
+			$hasNull = false;
+			foreach ($parts as $p) {
+				if (isset($statusMap[$p])) {
+					foreach ($statusMap[$p] as $val) {
+						if ($val === NULL) {
+							$hasNull = true;
+						} else {
+							$numericValues[] = $val;
+						}
+					}
+				}
+			}
+			$numericValues = array_unique($numericValues);
+			if (count($numericValues) > 0 || $hasNull) {
+				if ($hasNull && count($numericValues) > 0) {
+					$subStatusWhere = " AND (CAST(pb.i_sub_status AS FLOAT) IN (" . implode(',', $numericValues) . ") OR pb.i_sub_status IS NULL)";
+				} elseif ($hasNull) {
+					$subStatusWhere = " AND pb.i_sub_status IS NULL";
+				} else {
+					$subStatusWhere = " AND CAST(pb.i_sub_status AS FLOAT) IN (" . implode(',', $numericValues) . ")";
+				}
+			}
+		}
 	}
 
 	$month_idx = isset($_REQUEST['month_idx']) ? intval($_REQUEST['month_idx']) : 12;
@@ -99,17 +162,45 @@ function List_QueryParam()
 			(SELECT c_name FROM " . DB_NMU_ERP . "sp_department WHERE dc_department_id = b.dc_department_id) AS dc_department,
 			CONVERT(VARCHAR, (SELECT TOP 1 act_date_dt FROM sp_tor_item WHERE tor_id = b.tor_id AND sp_status_hdr_id = 26 ORDER BY id DESC), 120) AS d_act_date_dt26,
 			CONVERT(VARCHAR, (SELECT TOP 1 act_date_dt FROM sp_tor_item WHERE tor_id = b.tor_id AND sp_status_hdr_id = 25 ORDER BY id DESC), 120) AS d_act_date_dt24,
+			CASE CAST(pb.i_sub_status AS FLOAT)
+				WHEN 0.3  THEN N'รอผู้ดำเนินการลงนาม'
+				WHEN 0.4  THEN N'รอผู้ขอเบิกลงนาม'
+				WHEN 0.5  THEN N'รอฝ่ายการคลังลงนาม'
+				WHEN 1    THEN N'รอรับใบขอเบิก'
+				WHEN 2    THEN N'รอผู้ตรวจสอบลงนาม'
+				WHEN 3    THEN N'ทักท้วง'
+				WHEN 4    THEN N'รอตรวจสอบงบประมาณ'
+				WHEN 5    THEN N'รอฝ่ายการคลังลงนาม'
+				WHEN 6    THEN N'รอผู้อนุมัติลงนาม'
+				WHEN 7    THEN N'รอเตรียมจ่าย'
+				WHEN 8    THEN N'รอหัวหน้าฝ่ายการคลังลงนามเช็ค'
+				WHEN 9    THEN N'รอผู้บริหารลงนามเช็ค'
+				WHEN 10   THEN N'รอทำทะเบียนจ่าย'
+				WHEN 11   THEN N'ทำทะเบียนจ่าย'
+				ELSE N'อยู่ระหว่างการจัดทำใบขอเบิก'
+			END AS sub_status_name,
 			b.c_name,
 			b.c_code,
 			(SELECT c_name FROM " . DB_NMU_ERP . "sp_type_event ac WHERE ac.sp_type_event_id = 
 				(SELECT TOP 1 event_type FROM " . DB_NMU_ERP . "sp_tor_event WHERE sp_tor_id = b.tor_id ORDER BY d_create DESC)) AS event_type,
 			(SELECT TOP 1 event_detail FROM " . DB_NMU_ERP . "sp_tor_event WHERE sp_tor_id = b.tor_id ORDER BY d_create DESC) AS sp_event_detail
 		FROM NMU_ERP..sp_Tor b
+		OUTER APPLY (
+			SELECT TOP 1 beg.i_sub_status
+			FROM NMU_ERP..sp_tor_contract       c
+			JOIN NMU_ERP..sp_tor_hdr_period     p   ON p.sp_tor_contract_id     = c.sp_tor_contract_id
+			JOIN NMU_ERP..sp_check_period_hdr   chk ON chk.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id
+			JOIN NMU_EIS..po_working_hdr        w   ON w.po_working_hdr_id      = chk.po_working_hdr_id
+			JOIN NMU_EIS..po_working_begin_hdr  beg ON beg.po_working_begin_hdr_id = w.po_working_begin_hdr_id
+			WHERE c.sp_tor_id = b.tor_id
+			  AND beg.i_sub_status IS NOT NULL
+			ORDER BY w.po_working_hdr_id DESC
+		) pb
 		WHERE 1 = 1
 		  AND i_enabled = 1
 		  AND i_is_notor = 0
 		  AND ISNULL(b.i_parent, 0) = 0
-		{$where}";
+		{$where}{$subStatusWhere}";
 
 	if (@$_REQUEST["show_sql"]) {
 		echo $sqlMain;
@@ -140,6 +231,7 @@ function List_QueryParam()
 				"event_type"                => $row["event_type"],
 				"sp_event_detail"           => $row["sp_event_detail"],
 				"f_amt"                     => (float) $row["f_amt"],
+				"sub_status_name"           => $row["sub_status_name"],
 				"d_act_date_dt26"           => $row["d_act_date_dt26"],
 				"d_act_date_dt24"           => $row["d_act_date_dt24"],
 				"children"                  => isset($detailMap[$sp_tor_id]) ? $detailMap[$sp_tor_id] : [],

@@ -1,520 +1,425 @@
 Ext.onReady(function () {
-    Ext.QuickTips.init();
-    var bi_report = Ext.get("work-bi-win-shortcut");
-    // var bi = Ext.get('work-bi-win-shortcut');
-    var processmonth = Ext.get("work-process-month-win-shortcut");
-    var reportsmonth = Ext.get("work-reports-month-win-shortcut");
-    var reportsyear = Ext.get("work-reports-year-win-shortcut");
+  Ext.QuickTips.init();
+  var bi_report = Ext.get("work-bi-win-shortcut");
+  // var bi = Ext.get('work-bi-win-shortcut');
+  var processmonth = Ext.get("work-process-month-win-shortcut");
+  var reportsmonth = Ext.get("work-reports-month-win-shortcut");
+  var reportsyear = Ext.get("work-reports-year-win-shortcut");
 
-    var rightlogo = Ext.get("right-logo-win-shortcut");
-    var readme = Ext.get("work-readme-win-shortcut");
-    var replyreport = Ext.get("work-reply-report-win-shortcut");
-    var replyreportPie = Ext.get("work-reply-reportPie-win-shortcut");
-    var replyreportPermission = Ext.get("work-reply-permission-win-shortcut");
-    var replyreportEventBar = Ext.get("work-reply-reportEventBar-win-shortcut");
-    var sing = Ext.get("work-sign-digital-win-shortcut");
-    var desktop = Ext.get("x-desktop");
-    //-----------------------------------------
+  var rightlogo = Ext.get("right-logo-win-shortcut");
+  var readme = Ext.get("work-readme-win-shortcut");
+  var replyreport = Ext.get("work-reply-report-win-shortcut");
+  var replyreportPie = Ext.get("work-reply-reportPie-win-shortcut");
+  var replyreportPermission = Ext.get("work-reply-permission-win-shortcut");
+  var replyreportEventBar = Ext.get("work-reply-reportEventBar-win-shortcut");
+  var sing = Ext.get("work-sign-digital-win-shortcut");
+  var desktop = Ext.get("x-desktop");
+  //-----------------------------------------
 
-    //-----------------------------------------
-    function WinDash1(id, txt, items, w, h, x, y, icon) {
-        var iconCsl = icon ? icon : "icon-graph";
-        return new Ext.Window({
-            collapsible: true,
-            maximizable: true,
-            title: txt,
-            iconCls: iconCsl,
-            id: id,
-            width: w,
-            height: h,
-            layout: "fit",
-            modal: false,
-            plain: true,
-            initCenter: false,
-            x: x,
-            y: y,
-            items: items,
-            listeners: {
-                beforrender: function () {},
-                afterrender: function () {
-                    Ext.getCmp(id).getEl().mask("Please wait...", "x-mask-loading");
-                    var tt = 0;
-                    switch (id) {
-                        case "reportsmonthFrmID":
-                            tt = 0;
-                            break;
-                        case "win-1":
-                            tt = 0;
-                            break;
-                        case "win-2":
-                            tt = 1000;
-                            break;
-                        case "win-3":
-                            tt = 1500;
-                            break;
-                    }
-                    setTimeout(function () {
-                        Ext.getCmp(id).getEl().unmask();
-                    }, tt);
-                },
-            },
-        });
-    }
+  //-----------------------------------------
+  function WinDash1(id, txt, items, w, h, x, y, icon) {
+    var iconCsl = icon ? icon : "icon-graph";
+    return new Ext.Window({
+      collapsible: true,
+      maximizable: true,
+      title: txt,
+      iconCls: iconCsl,
+      id: id,
+      width: w,
+      height: h,
+      layout: "fit",
+      modal: false,
+      plain: true,
+      initCenter: false,
+      x: x,
+      y: y,
+      items: items,
+      listeners: {
+        beforrender: function () {},
+        afterrender: function () {
+          Ext.getCmp(id).getEl().mask("Please wait...", "x-mask-loading");
+          var tt = 0;
+          switch (id) {
+            case "reportsmonthFrmID":
+              tt = 0;
+              break;
+            case "win-1":
+              tt = 0;
+              break;
+            case "win-2":
+              tt = 1000;
+              break;
+            case "win-3":
+              tt = 1500;
+              break;
+          }
+          setTimeout(function () {
+            Ext.getCmp(id).getEl().unmask();
+          }, tt);
+        },
+      },
+    });
+  }
 
-    if (readme) {
-        readme.on("click", function (e) {
-            var winTutorial = new Ext.Window({
-                title: "คู่มือการใช้งาน",
-                iconCls: "icon-application-view-list",
-                id: "winTutorial_torID",
-                modal: true,
-                plain: true,
-                collapsible: true,
-                maximizable: true,
-                border: false,
-                layout: 'fit',
-                width: desktop.getWidth(),
-                height: desktop.getHeight(),
-                tbar: [],
-                html: '<iframe src="../sp/tutorial/workflow.php" frameborder="0" width="100%" height="100%"></iframe>',
-            });
-            // ตัวอย่าง: สมมติว่าดึงข้อมูล Action มาจากระบบก่อน DOC_WAIT_PROCURE_HEAD	SIGN
-            var a = {
-                module_code: "DOC", //DOC PR PO AR DC
-                action_code: "SIGN", //SUBMIT,SIGN,RETURN,CANCEL
-                doc_no: "PR0013", //
-                current_status: "DOC_WAIT_PROCURE_HEAD", //รหัส current
-                action_desc: "ยืนยันข้อมูล",
-                button_icon: "icon-accept",
-                confirm_message: "คุณต้องการบันทึกข้อมูลใช่หรือไม่?"
-            };
+  if (readme) {
+    readme.on("click", function (e) {
+      //window.open('../alert/period.php?_dc=' + Math.floor(Math.random() * 1000000000), 'Monitoring', 'fullscreen="yes"');
+    });
+  }
 
-            Ext.datax = a;
-            function processWorkflow(btn) {
-                Ext.Msg.confirm(
-                        'ยืนยัน',
-                        'ต้องการดำเนินการ [' + Ext.datax.doc_no + '] ใช่หรือไม่ ?',
-                        function (btn) {
-                            if (btn != 'yes')
-                                return;
-                            Ext.Ajax.request({
-                                url: './api/all_workflowProcess.php',
-                                params: {
-                                    module_code: Ext.datax.module_code,
-                                    document_no: Ext.datax.doc_no, //txtDocNo.getValue(),
-                                    action_code: Ext.datax.action_code,
-                                    current_status: Ext.datax.current_status
-                                },
+  if (replyreport) {
+    replyreport.on("click", function (e) {
+      window.open("./Report_ReplyReport.php?_dc=" + Math.floor(Math.random() * 1000000000));
+    });
+  }
 
-                                success: function (response) {
-                                    try {
-                                        // ดักจับ Error เผื่อ responseText ไม่ใช่ JSON ที่ถูกต้อง (เช่น Server พังแล้วส่ง Error 500 เป็น HTML กลับมา)
-                                        var obj = Ext.decode(response.responseText);
+  if (replyreportPie) {
+    replyreportPie.on("click", function (e) {
+      window.open("./Report_ReplyReportPie.php?_dc=" + Math.floor(Math.random() * 1000000000));
+    });
+  }
 
-                                        if (obj && obj.success) {
-                                            Ext.Msg.alert('ดำเนินการเรียบร้อยแล้ว ', obj.msgtatus || '');
-                                            // dsMaster.reload();
-                                        } else {
-                                            Ext.Msg.alert(
-                                                    'ผิดพลาด',
-                                                    (obj && obj.message) ? obj.message : 'เกิดข้อผิดพลาดจากระบบ'
-                                                    );
-                                        }
-                                    } catch (e) {
-                                        // หาก Ext.decode พัง หรือเกิด Runtime Error อื่นๆ จะมาตกที่บล็อกนี้
-                                        console.error("JSON Decode Error: ", e); // เก็บ Log ไว้ดูใน Console ของ Browser
+  if (replyreportEventBar) {
+    replyreportEventBar.on("click", function (e) {
+      window.open("./Report_TorEventBar.php?_dc=" + Math.floor(Math.random() * 1000000000));
+    });
+  }
 
-                                        Ext.Msg.alert(
-                                                'ผิดพลาด',
-                                                'ไม่สามารถอ่านข้อมูลจากเซิร์ฟเวอร์ได้ (Invalid JSON Response)'
-                                                );
-                                    }
-                                }
+  if (replyreportPermission) {
+    replyreportPermission.on("click", function (e) {
+      var item = {
+        xtype: "displayfield",
+        html: '<iframe src="./Permission_Board.php?_dc=' + Math.floor(Math.random() * 1000000000) + '" frameborder="0" width="100%" height="100%"></iframe>',
+      };
+      if (!Ext.get("win-permission")) {
+        WinDash1("win-permission", "กำหนดสิทธิ์ผู้ใช้งาน", [item], 1000, 600, 100, 50, "icon-cog").show();
+      } else {
+        Ext.getCmp("win-permission").destroy();
+        WinDash1("win-permission", "กำหนดสิทธิ์ผู้ใช้งาน", [item], 1000, 600, 100, 50, "icon-cog").show();
+      }
+    });
+  }
 
-                            });
+  if (sing) {
+    sing.on("click", function (e) {
+      var fullURL = "sp/appAuditDoc01?st=ST9001";
+      //						  var fullURL = 'sp/dashBoard?st=ST0000';
+      var fullNameSplit = fullURL.split("?");
+      var uri = fullNameSplit[0];
+      var method = window.parent.Ext.isEmpty(fullNameSplit[1]) ? "" : fullNameSplit[1];
+      Ext.page = Ext.apply({ uri: uri, method: method });
+      window.parent.Ext.History.add(uri);
+      window.parent.Ext.getCmp("content-panel").update('<iframe id="iframecontentID" src="' + Ext.page.uri + ".php?" + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
+    });
+  }
 
-                        }
-                );
+  if (rightlogo) {
+    rightlogo.on("click", function (e) {
+      Ext.MessageBox.show({
+        title: "Address",
+        msg: "Please enter your address:",
+        width: 300,
+        buttons: Ext.MessageBox.OKCANCEL,
+        multiline: true,
+        fn: function (buttons) {
+          if (buttons) alert(buttons + " == ");
+          console.log(this);
+        },
+        animEl: "right-logo-win-shortcut",
+      });
+    });
+  }
 
-            }
-            // เรียกใช้ getTopToolbar() เพื่อเพิ่มปุ่มอย่างถูกต้อง
+  // ... (skip lines)
 
-            var topToolbar = winTutorial.getTopToolbar();
-            if (topToolbar) {
-                topToolbar.add({
-                    text: a.action_desc,
-                    iconCls: a.button_icon,
-                    actionCode: a.action_code,
-                    tooltip: a.confirm_message,
-                    handler: function (btn) {
+  if (processmonth) {
+    processmonth.on(
+      "click",
+      function () {
+        // ...
+      },
+      this,
+    );
+  }
 
-                        processWorkflow(btn);
-                    }
-                });
-                topToolbar.doLayout();
-            }
-            winTutorial.show();
+  if (reportsmonth) {
+    reportsmonth.on("contextmenu", biMenu, this);
+    reportsmonth.on("click", biMenu, this);
+  }
 
-//            window.open('../alert/period.php?_dc=' + Math.floor(Math.random() * 1000000000), 'Monitoring', 'fullscreen="yes"');
-        });
-    }
+  if (bi_report) {
+    bi_report.on("contextmenu", birepor, this);
+    bi_report.on("click", birepor, this);
+  }
 
-    if (replyreport) {
-        replyreport.on("click", function (e) {
-            window.open("./Report_ReplyReport.php?_dc=" + Math.floor(Math.random() * 1000000000));
-        });
-    }
+  if (reportsyear) {
+    reportsyear.on("contextmenu", biMenuYear, this);
+    reportsyear.on("click", biMenuYear, this);
+  }
 
-    if (replyreportPie) {
-        replyreportPie.on("click", function (e) {
-            window.open("./Report_ReplyReportPie.php?_dc=" + Math.floor(Math.random() * 1000000000));
-        });
-    }
+  //-----------------------------------------reports/Rep_RepBgProType2_1.php
+  //    Ext.getCmp("dis1ID").update('<iframe src="/reports/Rep_RepBgProType2_1.php" frameborder="0" width="100%" height="100%"></iframe>');
 
-    if (replyreportEventBar) {
-        replyreportEventBar.on("click", function (e) {
-            window.open("./Report_TorEventBar.php?_dc=" + Math.floor(Math.random() * 1000000000));
-        });
-    }
+  var item1 = { xtype: "displayfield", id: "dis1ID", html: '<iframe src="./reports/Rep_RepBgProType2_1.php" frameborder="0" width="100%" height="100%"></iframe>' };
+  var item2 = { xtype: "displayfield", html: '<div id="html2" style="width:100%; text-align: center; font-size:28"> 2 </div>' };
+  var item3 = { xtype: "displayfield", html: '<div id="html3" style="width:100%; text-align: center; font-size:28"> 3 </div>' };
 
-    if (replyreportPermission) {
-        replyreportPermission.on("click", function (e) {
-            var item = {
-                xtype: "displayfield",
-                html: '<iframe src="./Permission_Board.php?_dc=' + Math.floor(Math.random() * 1000000000) + '" frameborder="0" width="100%" height="100%"></iframe>',
-            };
-            if (!Ext.get("win-permission")) {
-                WinDash1("win-permission", "กำหนดสิทธิ์ผู้ใช้งาน", [item], 1000, 600, 100, 50, "icon-cog").show();
-            } else {
-                Ext.getCmp("win-permission").destroy();
-                WinDash1("win-permission", "กำหนดสิทธิ์ผู้ใช้งาน", [item], 1000, 600, 100, 50, "icon-cog").show();
-            }
-        });
-    }
-
-    if (sing) {
-        sing.on("click", function (e) {
-            var fullURL = "sp/appAuditDoc01?st=ST9001";
-            //						  var fullURL = 'sp/dashBoard?st=ST0000';
-            var fullNameSplit = fullURL.split("?");
-            var uri = fullNameSplit[0];
-            var method = window.parent.Ext.isEmpty(fullNameSplit[1]) ? "" : fullNameSplit[1];
-            Ext.page = Ext.apply({uri: uri, method: method});
-            window.parent.Ext.History.add(uri);
-            window.parent.Ext.getCmp("content-panel").update('<iframe id="iframecontentID" src="' + Ext.page.uri + ".php?" + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
-        });
-    }
-
-    if (rightlogo) {
-        rightlogo.on("click", function (e) {
-            Ext.MessageBox.show({
-                title: "Address",
-                msg: "Please enter your address:",
-                width: 300,
-                buttons: Ext.MessageBox.OKCANCEL,
-                multiline: true,
-                fn: function (buttons) {
-                    if (buttons)
-                        alert(buttons + " == ");
-                    console.log(this);
-                },
-                animEl: "right-logo-win-shortcut",
-            });
-        });
-    }
-
-    // ... (skip lines)
-
-    if (processmonth) {
-        processmonth.on(
-                "click",
-                function () {
-                    // ...
-                },
-                this,
-                );
-    }
-
-    if (reportsmonth) {
-        reportsmonth.on("contextmenu", biMenu, this);
-        reportsmonth.on("click", biMenu, this);
-    }
-
-    if (bi_report) {
-        bi_report.on("contextmenu", birepor, this);
-        bi_report.on("click", birepor, this);
-    }
-
-    if (reportsyear) {
-        reportsyear.on("contextmenu", biMenuYear, this);
-        reportsyear.on("click", biMenuYear, this);
-    }
-
-    //-----------------------------------------reports/Rep_RepBgProType2_1.php
-    //    Ext.getCmp("dis1ID").update('<iframe src="/reports/Rep_RepBgProType2_1.php" frameborder="0" width="100%" height="100%"></iframe>');
-
-    var item1 = {xtype: "displayfield", id: "dis1ID", html: '<iframe src="./reports/Rep_RepBgProType2_1.php" frameborder="0" width="100%" height="100%"></iframe>'};
-    var item2 = {xtype: "displayfield", html: '<div id="html2" style="width:100%; text-align: center; font-size:28"> 2 </div>'};
-    var item3 = {xtype: "displayfield", html: '<div id="html3" style="width:100%; text-align: center; font-size:28"> 3 </div>'};
-
-    // bi.on(
-    //   "click",
-    //   function () {
-    //     if (!Ext.get("win-1")) var wn1 = WinDash1("win-1", "Pie ซื้อครุภัณฑ์ประจำเดือน", item1, 800, 400, 95, 32).show();
-    //     else Ext.getCmp("win-1").destroy();
-    //     if (!Ext.get("win-2")) var wn2 = WinDash1("win-2", "กราฟ2", item2, 400, 400, 915, 32).show();
-    //     else Ext.getCmp("win-2").destroy();
-    //     if (!Ext.get("win-3")) var wn2 = WinDash1("win-3", "กราฟ3", item3, 400, 400, 915, 432).show();
-    //     else Ext.getCmp("win-3").destroy();
-    //   },
-    //   this
-    // );
-    if (processmonth) {
-        processmonth.on(
-                "click",
-                function () {
-                    var dt = new Date();
-                    var items = [
-                        new Ext.FormPanel({
-                            id: "reportsmonthFrmID",
-                            columnWidth: 1,
-                            url: "api/?",
-                            frame: true,
-                            labelAlign: "left",
-                            bodyStyle: "padding:1px",
-                            labelWidth: 120,
-                            items: [
-                                {
-                                    xtype: "textfield",
-                                    fieldLabel: "วันที่",
-                                    readOnly: true,
-                                    value: new Date().add("Y", 543).dateFormat("d-m-Y"),
-                                    name: "d_update_dt",
-                                },
-                                {
-                                    xtype: "textfield",
-                                    readOnly: true,
-                                    fieldLabel: "เดือนที่ประมวลผล",
-                                    value: new Date().add("Y", 543).dateFormat("m-Y"),
-                                    name: "yyyymm",
-                                },
-                                {
-                                    xtype: "component",
-                                    autoEl: {
-                                        tag: "blockquote",
-                                        html: "การประมวลผลประจำเดือน",
-                                    },
-                                },
-                                {
-                                    xtype: "container",
-                                    autoEl: "ul",
-                                    cls: "ux-unordered-list",
-                                    items: [
-                                        {
-                                            xtype: "component",
-                                            autoEl: "li",
-                                            html: "เพื่อสรุปข้อมูลประจำเดือน",
-                                        },
-                                        {
-                                            xtype: "component",
-                                            autoEl: "li",
-                                            html: "และเรียกข้อมูลล่าสุดของเดือนนี้",
-                                        },
-                                    ],
-                                },
-                            ],
-                            buttonAlign: "center",
-                            buttons: [
-                                {
-                                    text: "ประมวลผลระบบพัสดุซื้อ/จ้าง",
-                                    icon: "./../images/icons/cog_start.png",
-                                    handler: function () {
-                                        Ext.getCmp("win-1-report").getEl().mask("กำลังประมวลผล โปรดรอ...", "x-mask-loading");
-                                        Ext.Ajax.request({
-                                            url: "api/processMnMonthly.php",
-                                            method: "POST",
-                                            params: {
-                                                mode: "BIPROCESSMONTHLY",
-                                                id: 0,
-                                                bg_type_id: 0,
-                                            },
-                                            success: function (result, request) {
-                                                var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-                                                //                                                console.log(jsonData.yyymm);
-                                                Ext.Msg.alert("แจ้งเตือน", " บันทึกเรียบร้อย " + jsonData.yyymm);
-                                                Ext.getCmp("win-1-report").destroy();
-                                            },
-                                        });
-                                    },
-                                },
-                            ],
-                        }),
-                    ];
-                    console.log(items);
-                    if (!Ext.get("win-1-report"))
-                        var wn1 = WinDash1("win-1-report", "รายงานประจำเดือน", items, 700, 400, 30, 300, "icon-start").show();
-                    else
-                        Ext.getCmp("win-1-report").destroy();
-                    wn1.show();
-                },
-                this,
-                );
-    }
-    var biMenu = function (e) {
-        e.stopEvent();
-        new Ext.menu.Menu({
+  // bi.on(
+  //   "click",
+  //   function () {
+  //     if (!Ext.get("win-1")) var wn1 = WinDash1("win-1", "Pie ซื้อครุภัณฑ์ประจำเดือน", item1, 800, 400, 95, 32).show();
+  //     else Ext.getCmp("win-1").destroy();
+  //     if (!Ext.get("win-2")) var wn2 = WinDash1("win-2", "กราฟ2", item2, 400, 400, 915, 32).show();
+  //     else Ext.getCmp("win-2").destroy();
+  //     if (!Ext.get("win-3")) var wn2 = WinDash1("win-3", "กราฟ3", item3, 400, 400, 915, 432).show();
+  //     else Ext.getCmp("win-3").destroy();
+  //   },
+  //   this
+  // );
+  if (processmonth) {
+    processmonth.on(
+      "click",
+      function () {
+        var dt = new Date();
+        var items = [
+          new Ext.FormPanel({
+            id: "reportsmonthFrmID",
+            columnWidth: 1,
+            url: "api/?",
+            frame: true,
+            labelAlign: "left",
+            bodyStyle: "padding:1px",
+            labelWidth: 120,
             items: [
-                {
-                    text: "รายงานพัสดุซื้อจ้างประจำเดือนตาม PR",
-                    icon: "../images/icons/report.png",
-                    handler: function (e) {
-                        window.open("./RepBiPrMonthly.php?_dc=" + Math.floor(Math.random() * 1000000000));
-                    },
-                    scope: this,
+              {
+                xtype: "textfield",
+                fieldLabel: "วันที่",
+                readOnly: true,
+                value: new Date().add("Y", 543).dateFormat("d-m-Y"),
+                name: "d_update_dt",
+              },
+              {
+                xtype: "textfield",
+                readOnly: true,
+                fieldLabel: "เดือนที่ประมวลผล",
+                value: new Date().add("Y", 543).dateFormat("m-Y"),
+                name: "yyyymm",
+              },
+              {
+                xtype: "component",
+                autoEl: {
+                  tag: "blockquote",
+                  html: "การประมวลผลประจำเดือน",
                 },
-                {
-                    text: "รายงานซื้อครุภัณฑ์ประจำเดือนตามแหล่งเงิน",
-                    icon: "../images/icons/report.png",
-                    handler: function (e) {
-                        window.open("./RepBgPrMonthly.php?_dc=" + Math.floor(Math.random() * 1000000000));
-                    },
-                    scope: this,
-                },
-                {
-                    text: "รายงานพัสดุ",
-                    hidden: true,
-                    handler: function () {
-                        const form = createAssetReportForm({
-                            id: "assetForm1",
-                            buttonText: "แสดงรายงานพัสดุ",
-                            onSubmit: function () {
-                                const f = Ext.getCmp("assetForm1").getForm();
-                                if (f.isValid()) {
-                                    const vals = f.getValues();
-                                    window.open(`./Rep_AssetReport.php?type=${vals.asset_type}&date=${vals.d_update_dt}`);
-                                }
-                            },
-                        });
-                        WinDash1("win-asset-form", "รายงานพัสดุ", [form], 700, 300, 100, 200).show();
-                    },
-                },
+              },
+              {
+                xtype: "container",
+                autoEl: "ul",
+                cls: "ux-unordered-list",
+                items: [
+                  {
+                    xtype: "component",
+                    autoEl: "li",
+                    html: "เพื่อสรุปข้อมูลประจำเดือน",
+                  },
+                  {
+                    xtype: "component",
+                    autoEl: "li",
+                    html: "และเรียกข้อมูลล่าสุดของเดือนนี้",
+                  },
+                ],
+              },
             ],
-        }).showAt(e.getXY());
-    };
-    var birepor = function (e) {
-        e.stopEvent();
-        window.open("./reports/Rep_RepBIPrType.php?_dc=" + Math.floor(Math.random() * 1000000000));
+            buttonAlign: "center",
+            buttons: [
+              {
+                text: "ประมวลผลระบบพัสดุซื้อ/จ้าง",
+                icon: "./../images/icons/cog_start.png",
+                handler: function () {
+                  Ext.getCmp("win-1-report").getEl().mask("กำลังประมวลผล โปรดรอ...", "x-mask-loading");
+                  Ext.Ajax.request({
+                    url: "api/processMnMonthly.php",
+                    method: "POST",
+                    params: {
+                      mode: "BIPROCESSMONTHLY",
+                      id: 0,
+                      bg_type_id: 0,
+                    },
+                    success: function (result, request) {
+                      var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                      //                                                console.log(jsonData.yyymm);
+                      Ext.Msg.alert("แจ้งเตือน", " บันทึกเรียบร้อย " + jsonData.yyymm);
+                      Ext.getCmp("win-1-report").destroy();
+                    },
+                  });
+                },
+              },
+            ],
+          }),
+        ];
+        console.log(items);
+        if (!Ext.get("win-1-report")) var wn1 = WinDash1("win-1-report", "รายงานประจำเดือน", items, 700, 400, 30, 300, "icon-start").show();
+        else Ext.getCmp("win-1-report").destroy();
+        wn1.show();
+      },
+      this,
+    );
+  }
+  var biMenu = function (e) {
+    e.stopEvent();
+    new Ext.menu.Menu({
+      items: [
+        {
+          text: "รายงานพัสดุซื้อจ้างประจำเดือนตาม PR",
+          icon: "../images/icons/report.png",
+          handler: function (e) {
+            window.open("./RepBiPrMonthly.php?_dc=" + Math.floor(Math.random() * 1000000000));
+          },
+          scope: this,
+        },
+        {
+          text: "รายงานซื้อครุภัณฑ์ประจำเดือนตามแหล่งเงิน",
+          icon: "../images/icons/report.png",
+          handler: function (e) {
+            window.open("./RepBgPrMonthly.php?_dc=" + Math.floor(Math.random() * 1000000000));
+          },
+          scope: this,
+        },
+        {
+          text: "รายงานพัสดุ",
+          hidden: true,
+          handler: function () {
+            const form = createAssetReportForm({
+              id: "assetForm1",
+              buttonText: "แสดงรายงานพัสดุ",
+              onSubmit: function () {
+                const f = Ext.getCmp("assetForm1").getForm();
+                if (f.isValid()) {
+                  const vals = f.getValues();
+                  window.open(`./Rep_AssetReport.php?type=${vals.asset_type}&date=${vals.d_update_dt}`);
+                }
+              },
+            });
+            WinDash1("win-asset-form", "รายงานพัสดุ", [form], 700, 300, 100, 200).show();
+          },
+        },
+      ],
+    }).showAt(e.getXY());
+  };
+  var birepor = function (e) {
+    e.stopEvent();
+    window.open("./reports/Rep_RepBIPrType.php?_dc=" + Math.floor(Math.random() * 1000000000));
 
-        // new Ext.menu.Menu({
-        //     items: [
-        //         {
-        //             text: "รายงานพัสดุซื้อจ้างประจำเดือนตาม PR",
-        //             icon: "../images/icons/report.png",
-        //             handler: function (e) {
-        //                 window.open('./RepBiPrMonthly.php?_dc=' + Math.floor(Math.random() * 1000000000));
-        //             },
-        //             scope: this,
-        //         }, {
-        //             text: "รายงานซื้อครุภัณฑ์ประจำเดือนตามแหล่งเงิน",
-        //             icon: "../images/icons/report.png",
-        //             handler: function (e) {
-        //                  window.open('./RepBgPrMonthly.php?_dc=' + Math.floor(Math.random() * 1000000000));
-        //             },
-        //             scope: this,
-        //         }],
-        // }).showAt(e.getXY());
-    };
-    var biMenuYear = function (e) {
+    // new Ext.menu.Menu({
+    //     items: [
+    //         {
+    //             text: "รายงานพัสดุซื้อจ้างประจำเดือนตาม PR",
+    //             icon: "../images/icons/report.png",
+    //             handler: function (e) {
+    //                 window.open('./RepBiPrMonthly.php?_dc=' + Math.floor(Math.random() * 1000000000));
+    //             },
+    //             scope: this,
+    //         }, {
+    //             text: "รายงานซื้อครุภัณฑ์ประจำเดือนตามแหล่งเงิน",
+    //             icon: "../images/icons/report.png",
+    //             handler: function (e) {
+    //                  window.open('./RepBgPrMonthly.php?_dc=' + Math.floor(Math.random() * 1000000000));
+    //             },
+    //             scope: this,
+    //         }],
+    // }).showAt(e.getXY());
+  };
+  var biMenuYear = function (e) {
+    e.stopEvent();
+    new Ext.menu.Menu({
+      items: [
+        {
+          text: "รายงานเปรียบเทียบ PR",
+          icon: "../images/icons/book_magnify.png",
+          handler: function (e) {
+            //                        window.open('./RepBICutAnalysisPeriod.php?_dc=' + Math.floor(Math.random() * 1000000000));
+          },
+          scope: this,
+        },
+      ],
+    }).showAt(e.getXY());
+  };
+
+  if (reportsmonth) {
+    reportsmonth.on("contextmenu", biMenu, this);
+    reportsmonth.on("click", biMenu, this);
+  }
+  if (bi_report) {
+    bi_report.on("contextmenu", birepor, this);
+    bi_report.on("click", birepor, this);
+  }
+
+  if (reportsyear) {
+    reportsyear.on("contextmenu", biMenuYear, this);
+    reportsyear.on("click", biMenuYear, this);
+  }
+  // bi_report
+  /*
+    bi.on("contextmenu", function (e) {
         e.stopEvent();
         new Ext.menu.Menu({
             items: [
                 {
-                    text: "รายงานเปรียบเทียบ PR",
+                    text: "รายการสถานะของ PR",
                     icon: "../images/icons/book_magnify.png",
                     handler: function (e) {
-                        //                        window.open('./RepBICutAnalysisPeriod.php?_dc=' + Math.floor(Math.random() * 1000000000));
+                        window.open('../alert/index.php', 'Monitoring', 'fullscreen="yes"');
                     },
                     scope: this,
-                },
+                }, {
+                    text: "รายการสถานะ PO / งวด/รับของ/วางบิง/ตรวจรับ/เบิก",
+                    icon: "../images/icons/book_magnify.png",
+                    handler: function (e) {
+                        window.open('../alert/period.php?_dc=' + Math.floor(Math.random() * 1000000000), 'Monitoring', 'fullscreen="yes"');
+                    },
+                    scope: this,
+
+                }
             ],
         }).showAt(e.getXY());
-    };
+    }, this);*/
 
-    if (reportsmonth) {
-        reportsmonth.on("contextmenu", biMenu, this);
-        reportsmonth.on("click", biMenu, this);
-    }
-    if (bi_report) {
-        bi_report.on("contextmenu", birepor, this);
-        bi_report.on("click", birepor, this);
-    }
-
-    if (reportsyear) {
-        reportsyear.on("contextmenu", biMenuYear, this);
-        reportsyear.on("click", biMenuYear, this);
-    }
-    // bi_report
-    /*
-     bi.on("contextmenu", function (e) {
-     e.stopEvent();
-     new Ext.menu.Menu({
-     items: [
-     {
-     text: "รายการสถานะของ PR",
-     icon: "../images/icons/book_magnify.png",
-     handler: function (e) {
-     window.open('../alert/index.php', 'Monitoring', 'fullscreen="yes"');
-     },
-     scope: this,
-     }, {
-     text: "รายการสถานะ PO / งวด/รับของ/วางบิง/ตรวจรับ/เบิก",
-     icon: "../images/icons/book_magnify.png",
-     handler: function (e) {
-     window.open('../alert/period.php?_dc=' + Math.floor(Math.random() * 1000000000), 'Monitoring', 'fullscreen="yes"');
-     },
-     scope: this,
-
-     }
-     ],
-     }).showAt(e.getXY());
-     }, this);*/
-
-    destopfn = function (e) {
-        e.stopEvent();
-        new Ext.menu.Menu({
-            items: [
-                {
-                    text: "Properties",
-                    disabled: true,
-                },
-                {
-                    text: "กำหนดสิทธิ์ผู้ใช้งาน (Permission)",
-                    icon: "../images/icons/cog.png",
-                    hidden: window.parent.Ext.session.user_id == 1 ? false : true,
-                    handler: function (e) {
-                        var item = {
-                            xtype: "displayfield",
-                            html: '<iframe src="./Permission_Board.php?_dc=' + Math.floor(Math.random() * 1000000000) + '" frameborder="0" width="100%" height="100%"></iframe>',
-                        };
-                        if (!Ext.get("win-permission")) {
-                            WinDash1("win-permission", "กำหนดสิทธิ์ผู้ใช้งาน", [item], 1000, 600, 100, 50, "icon-cog").show();
-                        } else {
-                            Ext.getCmp("win-permission").destroy();
-                            WinDash1("win-permission", "กำหนดสิทธิ์ผู้ใช้งาน", [item], 1000, 600, 100, 50, "icon-cog").show();
-                        }
-                    },
-                    scope: this,
-                },
-                {
-                    text: "โหลดหน้าใหม่",
-                    icon: "../images/icons/page_white_refresh.png",
-                    handler: function (e) {
-                        window.location.reload();
-                    },
-                    scope: this,
-                },
-            ],
-        }).showAt(e.getXY());
-    };
-    desktop.on("contextmenu", destopfn, this);
+  destopfn = function (e) {
+    e.stopEvent();
+    new Ext.menu.Menu({
+      items: [
+        {
+          text: "Properties",
+          disabled: true,
+        },
+        {
+          text: "กำหนดสิทธิ์ผู้ใช้งาน (Permission)",
+          icon: "../images/icons/cog.png",
+          hidden: window.parent.Ext.session.user_id == 1 ? false : true,
+          handler: function (e) {
+            var item = {
+              xtype: "displayfield",
+              html: '<iframe src="./Permission_Board.php?_dc=' + Math.floor(Math.random() * 1000000000) + '" frameborder="0" width="100%" height="100%"></iframe>',
+            };
+            if (!Ext.get("win-permission")) {
+              WinDash1("win-permission", "กำหนดสิทธิ์ผู้ใช้งาน", [item], 1000, 600, 100, 50, "icon-cog").show();
+            } else {
+              Ext.getCmp("win-permission").destroy();
+              WinDash1("win-permission", "กำหนดสิทธิ์ผู้ใช้งาน", [item], 1000, 600, 100, 50, "icon-cog").show();
+            }
+          },
+          scope: this,
+        },
+        {
+          text: "โหลดหน้าใหม่",
+          icon: "../images/icons/page_white_refresh.png",
+          handler: function (e) {
+            window.location.reload();
+          },
+          scope: this,
+        },
+      ],
+    }).showAt(e.getXY());
+  };
+  desktop.on("contextmenu", destopfn, this);
 });

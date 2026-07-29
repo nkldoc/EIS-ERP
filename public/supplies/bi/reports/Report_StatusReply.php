@@ -1,3 +1,6 @@
+<?php
+include("../../conf/config.php");
+?>
 <!DOCTYPE html>
 <html lang="th">
 
@@ -8,8 +11,8 @@
         <link rel="icon" href="../../images/favicon.ico" type="image/x-icon">
         <title>Reply Report Dashboard - ฝ่ายพัสดุ</title>
 
-        <?php include("../lib/loadJs.php"); ?>
-        <?php include("../lib/loadCss.php"); ?>
+        <?php include("../../lib/loadJs.php"); ?>
+        <?php include("../../lib/loadCss.php"); ?>
 
         <script src="../../ws_user/js/jquery.min.js"></script>
         <script src="../../js/echarts/echarts.js"></script>

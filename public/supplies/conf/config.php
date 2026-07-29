@@ -50,7 +50,7 @@ define("DB_SERVER", ".");
 define("DB_NAME", "NMU_ERP");
 define("STATUS_SERVER", "dev-eis");
 define("DB_USER", "sa");
-define("DB_PASS", "nklV1");
+define("DB_PASS", "nkl");
 define("DB_CHARSET", "UTF-8");
 
 /* * ******* DB other ********** */
@@ -65,7 +65,7 @@ define("DB_NMU_ERP", "NMU_ERP.dbo.");
 // provide the original scheme through X-Forwarded-Proto.
 $forwardedProto = strtolower(trim(explode(',', $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')[0]));
 $requestIsHttps = (
-        (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') || $forwardedProto === 'https' || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443
+    (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') || $forwardedProto === 'https' || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443
 );
 define("OST_HOST", $requestIsHttps ? "https" : "http");
 define("HTTPS_HOST_NAME", STATUS_SERVER . ".nmu.ac.th"); //uat-eis.vajira.ac.th

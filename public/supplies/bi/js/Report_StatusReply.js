@@ -52,13 +52,14 @@
       params.year_en = yearTh;
     }
 
-    Ext.Ajax.request({
+    $.ajax({
       url: "../api/List_Report_StatusReply.php",
       method: "POST", // or GET
-      params: params,
-      success: function (resp) {
+      data: params,
+      dataType: "text",
+      success: function (responseText) {
         try {
-          const obj = Ext.decode(resp.responseText);
+          const obj = JSON.parse(responseText);
           if (obj.success && obj.data) {
             window.DATA_RAW = obj.data;
             initFilters(); // Populate filters and trigger render via selectAll/event
@@ -73,7 +74,7 @@
           if (loader) loader.style.display = "none";
         }
       },
-      failure: function () {
+      error: function () {
         console.error("Ajax Failed");
         if (loader) loader.style.display = "none";
       },
@@ -285,19 +286,20 @@
     $title.text(`รายละเอียด${typeLabel}`);
     $sub.text(`ปีงบประมาณ ${yearTh} | เดือน: ${monthLabel}`);
 
-    Ext.Ajax.request({
-      url: "../api/List_Report_StatusReplyDetail.php",
-      method: "POST",
-      params: {
-        fn: "List_QueryParam",
-        year_th: yearTh,
-        month_idx: monthIdx,
-        staff: staffIds,
-        data_type: type,
-      },
-      success: function (resp) {
-        try {
-          const obj = Ext.decode(resp.responseText);
+    $.ajax({
+  url: "../api/List_Report_StatusReplyDetail.php",
+  method: "POST",
+  data: {
+    fn: "List_QueryParam",
+    year_th: yearTh,
+    month_idx: monthIdx,
+    staff: staffIds,
+    data_type: type,
+  },
+  dataType: "text",
+  success: function (responseText) {
+    try {
+      const obj = JSON.parse(responseText);
           if (obj.success && obj.data) {
             renderModalTable(obj.data);
             $("#modalFooterInfo").text(`ทั้งหมด ${obj.data.length.toLocaleString()} รายการ`);

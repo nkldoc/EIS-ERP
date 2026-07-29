@@ -6,7 +6,7 @@ $dateJson3 = Get_ChartTorType();
 $title = "ตารางสรุปข้อมูลสถานะการดำเนินงาน แต่ละวิธีการดำเนินงาน";
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en">    
 
 <head>
     <meta charset="UTF-8">
@@ -290,6 +290,12 @@ $title = "ตารางสรุปข้อมูลสถานะการ�
             <label for="asset_type_filter" class="font-weight-bold mb-0 ml-3">ประเภทสินทรัพย์:</label>
             <select id="asset_type_filter" class="selectpicker" data-width="auto" data-live-search="true" data-style="btn-white border">
                 <option value="all">ทุกประเภท</option>
+                <!-- Populated by JS -->
+            </select>
+
+            <label for="responsible_filter" class="font-weight-bold mb-0 ml-3">ผู้รับผิดชอบงาน:</label>
+            <select id="responsible_filter" class="selectpicker" data-width="auto" data-live-search="true" data-style="btn-white border">
+                <option value="all">ทั้งหมด</option>
                 <!-- Populated by JS -->
             </select>
 

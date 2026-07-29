@@ -1,4 +1,5 @@
 <?php
+include("../../conf/config.php");
 // ===== Budget Dashboard Demo (PHP, with Data View colored by fund) =====
 
 if (isset($_GET['action']) && $_GET['action'] === 'data') {
@@ -17,8 +18,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
         <link rel="shortcut icon" href="../../images/favicon.ico" type="image/x-icon">
         <link rel="icon" href="../../images/favicon.ico" type="image/x-icon">
         <title>ตารางสรุปข้อมูลรายปี Dashboard </title>
-        <?php include("../lib/loadJs.php"); ?>
-        <?php include("../lib/loadCss.php"); ?>
+        <?php include("../../lib/loadJs.php"); ?>
+        <?php include("../../lib/loadCss.php"); ?>
         <script src="../../ws_user/js/jquery.min.js"></script>
         <script src="../../js/echarts/echarts.js"></script>
         <script src="../bootstrap/bootstrap-4.6.2-dist/js/bootstrap.bundle.min.js"></script>

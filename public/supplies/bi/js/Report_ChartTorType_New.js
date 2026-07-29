@@ -86,9 +86,8 @@
   function initFilters() {
     // 1. Year Filter (Reloads Page)
     const $year = $("#budget_year_filter");
-    const currentYear = new Date().getFullYear();
-    for (let y = currentYear - 2; y <= currentYear + 1; y++) {
-      const th = y + 543;
+    const currentYearTh = new Date().getFullYear() + 543; // ปีไทยปัจจุบัน
+    for (let th = currentYearTh - 3; th <= currentYearTh + 1; th++) {
       $year.append(new Option(`พ.ศ. ${th}`, th));
     }
 
@@ -131,17 +130,35 @@
         filterData(val);
       });
     }
+
+    // 3. Responsible Person Filter (Client Side)
+    const $resp = $("#responsible_filter");
+    if ($resp.length && RAW_DATA.length) {
+      const respSet = new Set();
+      RAW_DATA.forEach((r) => {
+        if (r.sp_emp) respSet.add(r.sp_emp);
+      });
+
+      Array.from(respSet)
+        .sort()
+        .forEach((name) => {
+          $resp.append(new Option(name, name));
+        });
+
+      setTimeout(() => {
+        $resp.val("all").selectpicker("refresh");
+      }, 0);
+
+      $resp.on("changed.bs.select", function () {
+        renderDashboard(RAW_DATA);
+      });
+    }
   }
 
   function filterData(sectionId) {
     startLoading();
     setTimeout(() => {
-      if (!sectionId || sectionId === "all") {
-        renderDashboard(RAW_DATA);
-      } else {
-        const filtered = RAW_DATA.filter((r) => getCostId(r) === sectionId);
-        renderDashboard(filtered);
-      }
+      renderDashboard(RAW_DATA);
       stopLoading();
     }, 200);
   }
@@ -166,6 +183,10 @@
     });
 
     const $sel = $("#asset_type_filter");
+
+    // จำค่าที่เลือกอยู่ก่อน refresh
+    const currentVal = $sel.val() || "all";
+
     // Keep "All" option
     $sel.find("option:not([value='all'])").remove();
 
@@ -174,13 +195,21 @@
       .forEach((t) => {
         $sel.append(`<option value="${t}">${t}</option>`);
       });
+
+    // คืนค่าที่เคยเลือกไว้ ถ้ายังมีอยู่ ไม่งั้นใช้ "all"
+    $sel.val(currentVal);
     $sel.selectpicker("refresh");
 
-    // Bind Events
-    $("#asset_type_filter, #search_filter")
-      .off("change keyup")
-      .on("change keyup", function () {
-        // Debounce search slightly if needed, but for local data it's fast enough
+    // Bind Events (ใช้ changed.bs.select แทน change เพื่อรองรับ selectpicker)
+    $("#asset_type_filter, #responsible_filter")
+      .off("changed.bs.select")
+      .on("changed.bs.select", function () {
+        renderDashboard(RAW_DATA);
+      });
+
+    $("#search_filter")
+      .off("keyup input")
+      .on("keyup input", function () {
         renderDashboard(RAW_DATA);
       });
   }
@@ -191,6 +220,7 @@
     const assetFilter = $("#asset_type_filter").val();
     const searchFilter = $("#search_filter").val().toLowerCase().trim();
     const sectionFilter = $("#cost_sys_main_filter").val();
+    const responsibleFilter = $("#responsible_filter").val();
 
     const rows = allRows.filter((r) => {
       // Asset Type
@@ -202,6 +232,11 @@
       // Section (re-apply here for consistency)
       if (sectionFilter && sectionFilter !== "all") {
         if (getCostId(r) !== sectionFilter) return false;
+      }
+
+      // Responsible Person
+      if (responsibleFilter && responsibleFilter !== "all") {
+        if ((r.sp_emp || "") !== responsibleFilter) return false;
       }
 
       // Search
@@ -399,6 +434,7 @@
     const globalSection = $("#cost_sys_main_filter").val(); // 'all' or specific ID
     const assetFilter = $("#asset_type_filter").val();
     const searchFilter = $("#search_filter").val().toLowerCase().trim();
+    const responsibleFilter = $("#responsible_filter").val();
 
     // 3. Filter RAW_DATA
     const filtered = RAW_DATA.filter((r) => {
@@ -414,6 +450,11 @@
       if (assetFilter && assetFilter !== "all") {
         const t = r.i_product_type_name || r.i_product_type;
         if (t !== assetFilter) return false;
+      }
+
+      // Responsible Person Check
+      if (responsibleFilter && responsibleFilter !== "all") {
+        if ((r.sp_emp || "") !== responsibleFilter) return false;
       }
 
       // Search Check

@@ -3,8 +3,8 @@ Ext.onReady(function () {
   Ext.QuickTips.init();
   Ext.idRep = "frm-repTor";
   //Spring Boot cross context
-Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registrationGL" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG
-// Ext.urlReport = false ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registrationGL" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG
+Ext.urlReport     = true ? "../../reports/repSpContract_registrationGL" : "../../reports/printr.php?get=true"; //DEBUG (PDF/Excel เดิม)
+Ext.urlReportHTML = "report/RepSpContract_registrationGL_html.php"; // endpoint HTML ใหม่
   // Spring Boot
   Ext.titleReport = "รายงานทะเบียนคุมสัญญา";
   function PermissionEmp(p) {
@@ -75,7 +75,7 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
     autoDestroy: false,
     autoLoad: false,
     url: "api/All_RepSpContract.php",
-    baseParams: { type: "sp_tor_contract", all: "all" },
+    baseParams: { type: "sp_tor_contract", all: "all", i_sys: "0" },
     root: "data",
     idProperty: "id",
     fields: ["id", "c_code"],
@@ -127,7 +127,7 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
     autoDestroy: false,
     autoLoad: true,
     url: "api/All_RepSpContractPeriodnotor.php",
-    baseParams: { type: "sp_emp", all: "all" },
+    baseParams: { type: "sp_emp", all: "all", i_sys: "0" },
     root: "data",
     idProperty: "id",
     fields: ["id", "c_name"],
@@ -141,7 +141,7 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
     autoDestroy: false,
     autoLoad: true,
     url: "api/All_RepSpTorExp.php",
-    baseParams: { type: "dc_expense_budget_type", all: "all" },
+    baseParams: { type: "dc_expense_budget_type", all: "all", i_sys: "0" },
     root: "data",
     idProperty: "id",
     fields: ["id", "c_name"],
@@ -158,6 +158,7 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
     baseParams: {
         type: "po_expense",
         all: "all",
+        i_sys: "0",
     },
     root: "data",
     idProperty: "id",
@@ -167,6 +168,30 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
             Ext.getCmp("po_expense_idID").setValue("0");
         },
     },
+});
+Ext.dc_creditor = new Ext.data.JsonStore({
+    autoDestroy: false,
+    autoLoad: true,
+    url: "api/All_RepSpContract.php",
+    baseParams: { type: "dc_creditor", all: "all", i_sys: "0" },
+    root: "data",
+    idProperty: "id",
+    fields: ["id", "c_name"],
+    listeners: {
+        load: function (t, records, options) {
+            Ext.getCmp("dc_creditor_idID").setValue("0");
+        },
+    },
+});
+// ── ส่วนงาน (dc_cost) : แหล่งข้อมูลของ combo ค้นหา + เลือกได้หลายรายการ ──
+// (แทนที่ radio "ข้อมูลซื้อจ้าง" เดิม) — join กับ NMU_DATACENTER..dc_cost
+Ext.dc_cost = new Ext.data.JsonStore({
+    autoDestroy: false,
+    autoLoad: true,
+    url: "api/RepSpContract_registrationGL_dc_cost.php",
+    root: "data",
+    idProperty: "dc_cost_acc_id",
+    fields: ["dc_cost_acc_id", "dc_cost_parent_id", "c_code", "c_code_tree", "c_name"],
 });
 // var pu_arr = [];
   // pu_arr[1]="จัดซื้อ";
@@ -192,30 +217,67 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
       Ext.getCmp("dis_i_yyyyID").setValue(parseInt(Ext.getCmp("i_yyyyID").getValue()) + y543 > 0 ? parseInt(Ext.getCmp("i_yyyyID").getValue()) + y543 : "- เลือกทั้งหมด -");
       Ext.getCmp("dis_dc_expense_budget_type_idID").setValue(getStoreItems(Ext.dc_expense_budget_type, Ext.getCmp("dc_expense_budget_type_idID").getValue(), "c_name"));
       Ext.getCmp("dis_po_expense_idID").setValue(getStoreItems(Ext.po_expense, Ext.getCmp("po_expense_idID").getValue(), "c_name"));
+      Ext.getCmp("dis_dc_creditor_idID").setValue(getStoreItems(Ext.dc_creditor, Ext.getCmp("dc_creditor_idID").getValue(), "c_name"));
+      // ส่วนงาน (เลือกได้หลายรายการ) — combo จะอัพเดต dis_dc_cost_acc_idID ให้เองทุกครั้งที่เลือก/ยกเลิกเลือก
+      // แต่ sync ซ้ำอีกครั้งตรงนี้เผื่อกรณี field ยังไม่เคย trigger listener
+      var dcCostCombo = Ext.getCmp("dc_cost_acc_idID");
+      if (dcCostCombo && typeof dcCostCombo.updateDisplay === "function") {
+        dcCostCombo.updateDisplay();
+      }
     }
   function frmWithOutAjax(value) {
-    //set display title report
     getTitleReport(value);
-    //set submit post report with ajax
     var frm = Ext.getCmp(Ext.idRep).getForm().el.dom;
     frm.setAttribute("target", Ext.idRep);
     frm.setAttribute("action", Ext.urlReport);
     frm.submit();
     frm.focus();
   }
+  // เปิดรายงาน HTML ใน tab ใหม่ (ส่ง params ผ่าน URL querystring)
+  function frmHtmlReport() {
+    getTitleReport("html");
+    var form   = Ext.getCmp(Ext.idRep).getForm();
+    var values = form.getValues();
+    // ข้อมูลซื้อจ้าง (i_sys) ถูกแทนที่ด้วยฟิลด์ "ส่วนงาน" (dc_cost_acc_id) แล้ว
+    // คงค่า i_sys ไว้ตามค่าจาก hidden field เดิม (ค่าเริ่มต้น "0" = ไม่กรองแยกระบบ)
+    // อ่านค่า i_type_Rep จาก DOM โดยตรง (1=PR, 2=เลขสัญญา, 0=ทั้งหมด)
+    var checkedRep = document.querySelector('input[name="i_type_Rep"]:checked');
+    values['i_type_Rep'] = checkedRep ? checkedRep.value : '1';
+    var qs = [];
+    for (var k in values) {
+        if (values.hasOwnProperty(k)) {
+            qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(values[k]));
+        }
+    }
+    var url = Ext.urlReportHTML + '?' + qs.join('&');
+    window.open(url, '_blank');
+}
+  // เปิดรายงาน HTML แบบเดียวกัน แต่สั่ง auto export เป็น Excel ทันที
+  // (ใช้คิวรี่ชุดเดียวกับรายงาน HTML ผ่าน RepSpContract_registrationGL_data.php)
+  function frmExcelReport() {
+    getTitleReport("excel");
+    var form   = Ext.getCmp(Ext.idRep).getForm();
+    var values = form.getValues();
+    // ข้อมูลซื้อจ้าง (i_sys) ถูกแทนที่ด้วยฟิลด์ "ส่วนงาน" (dc_cost_acc_id) แล้ว
+    var checkedRep = document.querySelector('input[name="i_type_Rep"]:checked');
+    values['i_type_Rep'] = checkedRep ? checkedRep.value : '1';
+    values['auto'] = 'excel'; // บอกหน้า HTML report ให้ดาวน์โหลด Excel อัตโนมัติหลังโหลดข้อมูลเสร็จ
+    var qs = [];
+    for (var k in values) {
+        if (values.hasOwnProperty(k)) {
+            qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(values[k]));
+        }
+    }
+    var url = Ext.urlReportHTML + '?' + qs.join('&');
+    window.open(url, '_blank');
+  }
   function setButtonReport() {
-   //
-    var pdfReport = {
-      text: Ext.GLOBAL_BU_REPORT_TH,
+    var htmlReport = {
+      text: "\u0e41\u0e2a\u0e14\u0e07\u0e23\u0e32\u0e22\u0e07\u0e32\u0e19", // แสดงรายงาน
       scale: "small",
       iconCls: "icon-pdf",
-      handler: function () { 
-      //  console.log (Ext.getCmp("i_purchaseID").items.items[(Ext.getCmp("i_purchaseID").getValue().inputValue-1)].boxLabel) ;
-      //  console.log (Ext.getCmp("i_type_contractID").items.items[(Ext.getCmp("i_type_contractID").getValue().inputValue-1)].boxLabel) ;
-      //  console.log (Ext.getCmp("i_type_RepID").items.items[(Ext.getCmp("i_type_RepID").getValue().inputValue-1)].boxLabel) ;
-      //  console.log (Ext.getCmp("i_report_contentID").items.items[(Ext.getCmp("i_report_contentID").getValue().inputValue-1)].boxLabel) ;
-      //  return false ;
-        frmWithOutAjax("pdf");
+      handler: function () {
+        frmHtmlReport();
       },
     };
     var excelReport = {
@@ -224,28 +286,10 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
       id: "rep-excel",
       iconCls: "icon-excel",
       handler: function () {
-        frmWithOutAjax("excel");
+        frmExcelReport();
       },
     };
-    var html = {
-      text: "html",
-      scale: "small",
-      id: "rep-exp2pdf",
-      iconCls: "icon-html",
-      handler: function () {
-        frmWithOutAjax("exp2html");
-      },
-    };
-    var exp2xlsx = {
-      text: "Export Xlsx",
-      scale: "small",
-      id: "rep-exp2xlsx",
-      iconCls: "icon-export",
-      handler: function () {
-        frmWithOutAjax("exp2xlsx");
-      },
-    };
-        return [pdfReport, excelReport/*, exp2pdf, exp2xlsx*/];
+    return [htmlReport, excelReport];
   }
   var panelForm = new Ext.Panel({
     region: "center",
@@ -284,6 +328,7 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
                   {xtype: "hidden", id: "dc_department_idID", name: "dc_department_id", value: Ext.session.dc_department_id},
                   // {xtype: "hidden", id: "sp_emp_idtID", name: "sp_emp_id", value: Ext.session.sp_emp_id},
                   { xtype: "hidden", id: "dis_sp_tor_contract_idID", name: "dis_sp_tor_contract_id", value: "ทั้งหมด" },
+                  { xtype: "hidden", id: "i_sysID", name: "i_sys", value: "0" }, // 0=ทั้งหมด 1=คณะแพทย์ 3=มหาวิทยาลัย
                   // { xtype: "hidden", id: "dis_i_purchaseID", name: "dis_i_purchase", value: "ทั้งหมด" },
                   // { xtype: "hidden", id: "dis_type_contractID", name: "dis_i_type_contract", value: "ทั้งหมด" },
                   { xtype: "hidden", id: "dis_i_type_RepID", name: "dis_i_type_Rep", value: "ทั้งหมด" },
@@ -294,6 +339,10 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
                   {xtype: "hidden", id: "dis_i_yyyyID", name: "dis_i_yyyy", value: "2566" },
                   {xtype: "hidden", id: "dis_dc_expense_budget_type_idID", name: "dis_dc_expense_budget_type_id", value: "ทั้งหมด"},
                   {xtype: "hidden", id: "dis_po_expense_idID", name: "dis_po_expense_id", value: "ทั้งหมด"},
+                  {xtype: "hidden", id: "dis_dc_creditor_idID", name: "dis_dc_creditor_id", value: "ทั้งหมด"},
+                  {xtype: "hidden", id: "dis_dc_cost_acc_idID", name: "dis_dc_cost_acc_id", value: "ทั้งหมด"},
+                  // เก็บ id ของ "ส่วนงาน" ที่เลือกไว้จริง (คั่นด้วยจุลภาค รองรับเลือกหลายรายการ)
+                  { xtype: "hidden", id: "dc_cost_acc_idHiddenID", name: "dc_cost_acc_id", value: "" },
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                   /*new Ext.form.ComboBox({
                     id: "dc_department_idID",
@@ -462,7 +511,8 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
                     displayField: "c_code",
                     mode: "local",
                     triggerAction: "all",
-                    width: 150,
+                    width: 260,
+                    listWidth: 320,
                     forceSelection: true,
                     selectOnFocus: true,
                     value: "0",
@@ -501,7 +551,24 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
                         this.getStore().clearFilter();
                       },
                     },
-                  }), 
+                  }),
+                 
+                  new Ext.form.ComboBox({
+                    id: "dc_creditor_idID",
+                    hiddenName: "dc_creditor_id",
+                    fieldLabel: "ผู้ขายผู้รับจ้าง",
+                    store: Ext.dc_creditor,
+                    valueField: "id",
+                    displayField: "c_name",
+                    mode: "local",
+                    triggerAction: "all",
+                    emptyText: "กรุณาเลือก...",
+                    width: 500,
+                    forceSelection: true,
+                    selectOnFocus: true,
+                    typeAhead: false,
+                    value: "0",
+                  }),
                   
                   {
                     xtype: "radiogroup",
@@ -609,6 +676,92 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
                       }  
                   },
                   {
+                    // ── ส่วนงาน : ค้นหาได้ + เลือกได้หลายรายการ (แทนที่ radio "ข้อมูลซื้อจ้าง" เดิม) ──
+                    // ข้อมูลมาจาก NMU_DATACENTER..dc_cost (ตรวจสอบแล้วว่ามีข้อมูลจริง)
+                    // การเลือก: คลิกที่รายการในลิสต์เพื่อติ๊ก/ยกเลิกติ๊ก โดยลิสต์จะไม่ปิดจนกว่าจะคลิกออกนอกกล่อง
+                    // ค่าที่เลือกจริงจะถูกเก็บเป็น id คั่นด้วยจุลภาคไว้ใน hidden field "dc_cost_acc_idID" (ดูด้านบน)
+                    xtype: "combo",
+                    id: "dc_cost_acc_idID",
+                    fieldLabel: "ส่วนงาน",
+                    store: Ext.dc_cost,
+                    valueField: "dc_cost_acc_id",
+                    displayField: "c_name",
+                    mode: "local",
+                    triggerAction: "all",
+                    width: 500,
+                    listWidth: 460,
+                    editable: true,
+                    forceSelection: false,
+                    selectOnFocus: true,
+                    typeAhead: false,
+                    emptyText: "ค้นหาและเลือกส่วนงาน (เลือกได้หลายรายการ) — ค่าเริ่มต้น: ทั้งหมด",
+                    minChars: 0,
+                    selectedIds: [], // เก็บ dc_cost_acc_id ที่ถูกเลือกไว้ทั้งหมด
+                    tpl:
+                      '<tpl for=".">' +
+                      '<div class="x-combo-list-item dc-cost-item" data-costid="{dc_cost_acc_id}">' +
+                      '<input type="checkbox" class="dc-cost-chk" style="margin-right:6px;"/>{c_name}' +
+                      '</div></tpl>',
+                    listeners: {
+                      beforequery: function (q) {
+                        q.forceAll = true;
+                        var input = Ext.fly(q.combo.el.dom);
+                      },
+                      select: function (combo, record) {
+                        var id = record.get("dc_cost_acc_id");
+                        var idx = combo.selectedIds.indexOf(id);
+                        if (idx >= 0) {
+                          combo.selectedIds.splice(idx, 1);
+                        } else {
+                          combo.selectedIds.push(id);
+                        }
+                        combo.updateDisplay();
+                        combo.syncCheckboxes();
+                        // เปิดลิสต์ค้างไว้เพื่อให้เลือกรายการถัดไปได้ต่อเนื่อง (multi-select)
+                        Ext.defer(function () {
+                          combo.doQuery(combo.getRawValue(), true);
+                        }, 10);
+                        return false;
+                      },
+                      afterrender: function (combo) {
+                        combo.syncCheckboxes = function () {
+                          var view = this.view;
+                          if (!view || !view.all || !view.all.elements) return;
+                          Ext.each(view.all.elements, function (el) {
+                            var node = Ext.get(el);
+                            var rec = view.getRecord(el);
+                            if (!rec) return;
+                            var chk = node.child("input.dc-cost-chk");
+                            if (chk) {
+                              chk.dom.checked = combo.selectedIds.indexOf(rec.get("dc_cost_acc_id")) >= 0;
+                            }
+                          });
+                        };
+                        combo.updateDisplay = function () {
+                          if (this.selectedIds.length === 0) {
+                            this.setRawValue("");
+                            Ext.getCmp("dc_cost_acc_idHiddenID").setValue("");
+                            Ext.getCmp("dis_dc_cost_acc_idID").setValue("ทั้งหมด");
+                            return;
+                          }
+                          var names = [];
+                          Ext.each(this.selectedIds, function (id) {
+                            var rec = Ext.dc_cost.getById(id);
+                            if (rec) names.push(rec.get("c_name"));
+                          });
+                          this.setRawValue(names.join(", "));
+                          Ext.getCmp("dc_cost_acc_idHiddenID").setValue(this.selectedIds.join(","));
+                          Ext.getCmp("dis_dc_cost_acc_idID").setValue(names.join(", "));
+                        };
+                      },
+                      expand: function (combo) {
+                        Ext.defer(function () {
+                          if (combo.syncCheckboxes) combo.syncCheckboxes();
+                        }, 10);
+                      },
+                    },
+                  },
+                  {
                     xtype: "radiogroup",
                     columns: [115,115,115],
                     // hidden: true,
@@ -616,6 +769,11 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
                     id: "i_type_RepID",
                     name: "i_type_Rep",
                     items: [
+                      {
+                            inputValue: 0,
+                            name: "i_type_Rep",
+                            boxLabel: "ทั้งหมด",
+                        },
                         {
                             checked: true,
                             inputValue: 1,
@@ -713,6 +871,3 @@ Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registr
     },
   });
 });
-
-
-

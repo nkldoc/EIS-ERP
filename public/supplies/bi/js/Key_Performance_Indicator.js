@@ -61,10 +61,10 @@
 
     if (year) CURRENT_YEAR_EN = year;
 
-    Ext.Ajax.request({
+    $.ajax({
       url: "../api/List_Key_Performance_Indicator.php",
       method: "POST", // POST for safety
-      params: {
+      data: {
         fn: "List_QueryParam",
         year_en: year,
         sp_emp_id: empId,
@@ -72,9 +72,10 @@
         use_kpi2: $("#useRepKPI2").is(":checked") ? 1 : 0,
         ...params,
       },
-      success: function (resp) {
+      dataType: "text",
+      success: function (responseText) {
         try {
-          const o = Ext.decode(resp.responseText || "{}");
+          const o = JSON.parse(responseText || "{}");
           window.DATA_KPI_RAW = Array.isArray(o.data) ? o.data : [];
 
           initFilterMethods();
@@ -85,9 +86,9 @@
           if (loader) loader.style.display = "none";
         }
       },
-      failure: function () {
+      error: function () {
         if (loader) loader.style.display = "none";
-        Ext.Msg.alert("Error", "เชื่อมต่อ Server ไม่สำเร็จ");
+        alert("เชื่อมต่อ Server ไม่สำเร็จ");
       },
     });
   }
@@ -187,12 +188,13 @@
 
   // --- Load Employees (Call on Start) ---
   function loadEmployees() {
-    Ext.Ajax.request({
+    $.ajax({
       url: "../api/List_Key_Performance_Indicator.php",
-      params: { fn: "List_Emp" },
-      success: function (resp) {
+      data: { fn: "List_Emp" },
+      dataType: "text",
+      success: function (responseText) {
         try {
-          const o = Ext.decode(resp.responseText);
+          const o = JSON.parse(responseText);
           const $emp = $("#filter_emp");
           if (o.data) {
             // Keep 'All' option
@@ -243,15 +245,16 @@
     // WORKAROUND: Pass the list of selected methods to PHP? Or fetch all for that month and filter in JS?
     // Fetching all for that month is safer.
 
-    Ext.Ajax.request({
+    $.ajax({
       url: "../api/List_Key_Performance_Indicator.php",
-      params: {
+      data: {
         fn: "List_Detail",
         year_en: CURRENT_YEAR_EN,
         month_no: monthNo,
       },
-      success: function (resp) {
-        const o = Ext.decode(resp.responseText);
+      dataType: "text",
+      success: function (responseText) {
+        const o = JSON.parse(responseText);
         const list = o.data || [];
 
         // Client-side filtering by selected Methods

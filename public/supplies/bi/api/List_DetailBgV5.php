@@ -22,27 +22,46 @@ function List_QueryParam()
 	$year_en                    = intval(@$_REQUEST["year_en"]);
 	$dc_expense_budget_type_id  = intval(@$_REQUEST["dc_expense_budget_type_id"]);
 	$bg_expense_id              = intval(@$_REQUEST["bg_expense_id"]);
+	$dc_cost_id                 = isset($_REQUEST['dc_cost_id']) && is_numeric($_REQUEST['dc_cost_id'])
+                              ? intval($_REQUEST['dc_cost_id']) : 38;  // ← เพิ่ม
 
 	$detailMap = [];
 
 	// ---- WHERE สำหรับ #temp_1 (bg_reserve_money) ----
+	// [FIX] ห้ามกรอง dc_cost_id / i_year / bg_expense_id / dc_budget_type_id / i_pr_type ตรงนี้เด็ดขาด
+	// เพราะ window function ใน #temp_1 (i_last, i_reserve_max, i_success) คำนวณด้วย
+	// PARTITION BY pr_id / PARTITION BY i_sys,pr_id,po_id,chk_id ซึ่งต้องเห็นทุกแถวของ PR นั้น
+	// ครบทุกปี ทุก cost center และทุก bg_expense_id เหมือนใน SP_BG_RESERVE_MONEY ต้นฉบับ
+	// (ซึ่งกรองแค่ i_enable = 1 เท่านั้น) ถ้ากรองก่อนคำนวณ window function ผลลัพธ์ i_last/i_last_max
+	// จะคลาดเคลื่อน ทำให้บาง PR/PO ถูกจัดสถานะผิดและหลุดจากเงื่อนไข WHERE i_last = i_last_max ไป
 	$whereTemp1 = "";
-	if ($year_en > 0) {
-		$whereTemp1 .= " AND a.i_year = {$year_en} ";
+
+	// [FIX] ย้ายเงื่อนไขทั้งหมด (dc_cost_id/i_year/bg_expense_id/dc_expense_budget_type_id/i_pr_type)
+	// มากรองตรงนี้แทน โดยกรองที่ผลลัพธ์สุดท้าย (#temp_bg_reserve_money) หลังจาก #temp_1/#temp_2
+	// ถูกคำนวณจากข้อมูลครบทุกแถวแล้ว
+	$whereFinal = "";
+	if ($dc_cost_id > 0) {
+		$whereFinal .= " AND a.dc_cost_id = {$dc_cost_id} ";
 	}
-	if ($dc_expense_budget_type_id > 0) {
-		if (in_array($dc_expense_budget_type_id, [4, 5])) {
-			$whereTemp1 .= " AND a.i_pr_type = 2 ";
-		} else {
-			$whereTemp1 .= " AND a.i_pr_type = 1 ";
-		}
-		$whereTemp1 .= " AND a.dc_budget_type_id = {$dc_expense_budget_type_id} ";
+	if ($year_en > 0) {
+		$whereFinal .= " AND a.i_year = {$year_en} ";
 	}
 	if ($bg_expense_id > 0) {
-		$whereTemp1 .= " AND a.bg_expense_id = {$bg_expense_id} ";
+		$whereFinal .= " AND a.bg_expense_id = {$bg_expense_id} ";
 	}
-
-	$whereFinal = "";
+	// [FIX 2026-07-28] เดิมบังคับเดา i_pr_type จากการเช็คว่า dc_expense_budget_type_id
+	// อยู่ใน [4,5] หรือไม่ (in [4,5] => i_pr_type=2, อื่น ๆ => i_pr_type=1 เสมอ) แต่ข้อมูลจริง
+	// พิสูจน์แล้วว่า budget_type เดียวกัน (เช่น dc_expense_budget_type_id=49) มีทั้งแถวที่
+	// i_pr_type=1 และ i_pr_type=2 ปนกันได้จริง (เช่น pr_id=3958/po_id=3836/chk_id=5649
+	// f_amt=21,828.00 ซึ่งเป็น i_pr_type=2 แต่ถูกกรองทิ้งเพราะ query บังคับ i_pr_type=1)
+	// จึงตัดการบังคับ i_pr_type ออก กรองแค่ dc_expense_budget_type_id พอ ให้ตรงกับพฤติกรรม
+	// default ของ List_RepSupReserveMoney.php ที่ไม่กรอง i_pr_type เว้นแต่ระบุมาตรง ๆ ว่า = 2
+	if ($dc_expense_budget_type_id > 0) {
+		$whereFinal .= " AND a.dc_expense_budget_type_id = {$dc_expense_budget_type_id} ";
+	}
+	// [FIX] เวอร์ชันเดียวกัน แต่ใช้ alias "y" สำหรับ subquery ที่เช็คว่า PR นี้อยู่ในขอบเขตที่กำลังกรองอยู่หรือเปล่า
+	// (ใช้ตอนดึง PO ข้าม budget_type ใน Result Set 3)
+	$whereFinalY = $whereFinal !== "" ? str_replace("a.", "y.", $whereFinal) : "";
 
 	$sqlMain = "SET NOCOUNT ON 
 					SELECT
@@ -68,59 +87,19 @@ function List_QueryParam()
 						{$whereTemp1}
 						GROUP BY i_sys, i_pr_type, i_year, dc_cost_acc_id, dc_cost_id, pr_id, po_id, chk_id, i_reserve, i_finish, dc_budget_type_id, bg_expense_id
 
-						SELECT *
-							, CASE 
-								WHEN i_reserve = 2 
-									THEN CASE WHEN (SELECT TOP 1
-								aa.i_last
-							FROM #temp_1 aa
-							WHERE a.i_sys = aa.i_sys AND aa.pr_id = a.pr_id AND aa.po_id = a.po_id AND aa.i_pr_type = a.i_pr_type AND i_last = 3 AND i_success = 1) = 3 THEN 3 ELSE 2 END
-								ELSE MAX(i_last) OVER (PARTITION by pr_id)  
-							END AS i_last_max
-							, CASE 
-								WHEN i_reserve = 1  THEN (SELECT ISNULL(SUM(f_amt),0)
-							FROM #temp_1 aa
-							WHERE  a.i_sys = aa.i_sys AND aa.pr_id = a.pr_id AND aa.dc_budget_type_id = a.dc_budget_type_id AND aa.bg_expense_id = a.bg_expense_id AND i_reserve = 3)
-								WHEN i_reserve = 2  THEN (SELECT ISNULL(SUM(f_amt),0)
-							FROM #temp_1 aa
-							WHERE  a.i_sys = aa.i_sys AND aa.pr_id = a.pr_id AND aa.po_id = a.po_id AND aa.dc_budget_type_id = a.dc_budget_type_id AND aa.bg_expense_id = a.bg_expense_id AND i_reserve = 3)
-							ELSE 0
-						END AS f_amt_pay
-						INTO #temp_2
-						FROM #temp_1 a
-
-						SELECT
-							i_sys
-							, i_pr_type
-							, i_year
-							, dc_cost_acc_id
-							, dc_cost_id
-							, pr_id
-							, po_id
-							, chk_id
-							, dc_budget_type_id AS dc_expense_budget_type_id
-							, bg_expense_id
-							, i_reserve
-							, i_finish
-							, i_last
-							, ISNULL(f_amt,0) - ISNULL(f_amt_pay,0) AS f_amt
-						INTO #temp_bg_reserve_money
-						FROM #temp_2 a
-						WHERE i_last = i_last_max
-							OR i_reserve = 3
-							OR i_last = (
-								SELECT
-								CASE
-										WHEN COUNT(*) < 1 THEN 1
-										ELSE 3
-									END
-							FROM #temp_2 aa
-							WHERE i_last = 2
-								AND aa.i_sys = a.i_sys
-								AND aa.pr_id = a.pr_id
-								AND aa.i_pr_type = a.i_pr_type
-								AND aa.dc_budget_type_id = a.dc_budget_type_id 
-							)
+						-- [FIX 2026-07-28] เดิมตรงนี้คำนวณ #temp_2 -> #temp_bg_reserve_money เอง
+						-- (หัก f_amt_pay ตามขั้น i_reserve=3 ออกจากยอดจอง + กรองด้วย i_last_max)
+						-- ซึ่งพิสูจน์แล้วว่าให้ยอดรวมผิดไปจากของจริง (21,092,225.70 vs 22,868,325.70)
+						-- เปลี่ยนมาเรียก SP_BG_RESERVE_MONEY ตรง ๆ แทน ให้ตรงกับ List_RepSupReserveMoney.php
+						-- ซึ่งพิสูจน์แล้วว่ายอดถูกต้อง (#temp_1 ยังคงไว้ตามเดิม เพราะยังใช้ใน has_po /
+						-- PO cross-budget-type matching ของ Result Set 1 และ Result Set 3 ด้านล่าง)
+						CREATE TABLE #temp_bg_reserve_money(
+							i_sys bigint, i_pr_type tinyint, i_year bigint, dc_cost_acc_id bigint,
+							dc_cost_id bigint, pr_id bigint, po_id bigint, chk_id bigint,
+							dc_expense_budget_type_id bigint, bg_expense_id bigint, d_create datetime,
+							i_reserve tinyint, i_finish tinyint, i_last int, f_amt decimal(18, 2)
+						)
+						INSERT INTO #temp_bg_reserve_money EXEC NMU_EIS..SP_BG_RESERVE_MONEY
 
 						-- ====== Result Set 1: PR ทั้งหมด (i_reserve != 3) พร้อม flag has_po ======
 						SELECT
@@ -144,7 +123,7 @@ function List_QueryParam()
 								(SELECT TOP 1 event_type FROM " . DB_NMU_ERP . "sp_tor_event WHERE sp_tor_id = b.tor_id
 								ORDER BY d_create DESC)) AS event_type
 							,(SELECT TOP 1 event_detail FROM " . DB_NMU_ERP . "sp_tor_event WHERE sp_tor_id = b.tor_id ORDER BY d_create DESC) AS sp_event_detail
-							,(SELECT COUNT(*) FROM #temp_bg_reserve_money x
+							,(SELECT COUNT(*) FROM #temp_1 x
 								WHERE x.pr_id = a.pr_id AND x.i_reserve = 2 AND x.po_id > 0) AS has_po
 						FROM #temp_bg_reserve_money a
 						INNER JOIN NMU_ERP..sp_Tor b ON a.pr_id = b.tor_id
@@ -187,7 +166,7 @@ function List_QueryParam()
 							,SUM(s.f_period_cut_total) AS f_period_cut_total
 						FROM @TEMP_SP_BG_BUDGET_SUM s
 						WHERE s.i_year = {$year_en}
-							AND s.dc_cost_id = 38
+							AND s.dc_cost_id = {$dc_cost_id}
 							" . ($dc_expense_budget_type_id > 0 ? " AND s.dc_expense_budget_type_id = {$dc_expense_budget_type_id} " : "") . "
 							" . ($bg_expense_id > 0 ? " AND s.bg_expense_id = {$bg_expense_id} " : "") . "
 						GROUP BY s.dc_expense_budget_type_id, s.bg_expense_id
@@ -209,21 +188,103 @@ function List_QueryParam()
 							,(SELECT c_name FROM " . DB_NMU_ERP . "sp_department WHERE dc_department_id = b.dc_department_id) AS dc_department
 							,b.c_name AS po_name
 							,b.c_code AS po_code
+							,1 AS i_own_match
 						FROM #temp_bg_reserve_money a
 						INNER JOIN NMU_ERP..sp_Tor b ON a.po_id = b.tor_id
 						WHERE a.i_reserve = 2
 							AND a.i_sys = 1
 							AND a.po_id IS NOT NULL
 							AND a.po_id > 0
-						ORDER BY a.po_id, a.pr_id
+							{$whereFinal}
+
+						UNION ALL
+
+						
+						SELECT
+							x.i_sys
+							,x.pr_id
+							,x.po_id
+							,x.f_amt AS f_amt_contract
+							,x.bg_expense_id
+							,x.dc_budget_type_id AS dc_expense_budget_type_id
+							,(SELECT c_name FROM " . DB_NMU_EIS . "bg_expense WHERE bg_expense_id = x.bg_expense_id) AS bg_expense
+							,(SELECT c_name FROM " . DB_CENTER . "dc_expense_budget_type WHERE dc_expense_budget_type_id = x.dc_budget_type_id) AS dc_expense_budget_type
+							,(SELECT c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = b2.dc_cost2_id) AS dc_cost_id2
+							,(SELECT c_name_th FROM " . DB_CENTER . "dc_sub_cost WHERE dc_sub_cost_id = b2.dc_sub_cost_id) AS dc_sub_cost
+							,(SELECT c_name FROM " . DB_NMU_ERP . "sp_emp WHERE sp_emp_id = b2.sp_emp_id) AS sp_emp
+							,(SELECT c_name FROM " . DB_NMU_ERP . "sp_status_hdr WHERE sp_status_hdr_id = b2.tor_status_id) AS sp_status_hdr
+							,(SELECT c_name FROM " . DB_NMU_ERP . "sp_department WHERE dc_department_id = b2.dc_department_id) AS dc_department
+							,b2.c_name AS po_name
+							,b2.c_code AS po_code
+							,CASE WHEN
+									({$bg_expense_id} = 0 OR x.bg_expense_id = {$bg_expense_id})
+								AND ({$dc_expense_budget_type_id} = 0 OR x.dc_budget_type_id = {$dc_expense_budget_type_id})
+								THEN 1 ELSE 0 END AS i_own_match
+						FROM #temp_1 x
+						INNER JOIN NMU_ERP..sp_Tor b2 ON x.po_id = b2.tor_id
+						WHERE x.i_reserve = 2
+							AND x.i_sys = 1
+							AND x.po_id IS NOT NULL
+							AND x.po_id > 0
+							AND EXISTS (
+								SELECT 1 FROM #temp_bg_reserve_money y
+								WHERE y.i_sys = x.i_sys
+									AND y.pr_id = x.pr_id
+									AND y.i_reserve != 3
+									{$whereFinalY}
+							)
+							AND NOT EXISTS (
+								SELECT 1 FROM #temp_bg_reserve_money z
+								WHERE z.i_sys = x.i_sys
+									AND z.pr_id = x.pr_id
+									AND z.po_id = x.po_id
+									AND z.i_reserve = 2
+							)
+
+						ORDER BY po_id, pr_id
+
+						-- ====== Result Set 4: เงินจองตรวจรับ (i_reserve=3, i_finish=0) + เบิกจ่ายแล้ว (i_reserve=3, i_finish=1) ======
+						-- [เพิ่ม] ให้ตรงกับสูตรในหน้า Budget_Monitoring_Dashboard.php (List_Rep_Budget_Monitoring_Dashboard.php Result Set 2)
+						SELECT
+							ISNULL(SUM(CASE WHEN a.i_reserve = 3 AND ISNULL(a.i_finish,0) = 0 THEN a.f_amt ELSE 0 END), 0) AS f_reserve_check_total
+							, ISNULL(SUM(CASE WHEN a.i_reserve = 3 AND ISNULL(a.i_finish,0) = 1 THEN a.f_amt ELSE 0 END), 0) AS f_paid_total
+						FROM #temp_bg_reserve_money a
+						WHERE a.i_reserve = 3
+							AND a.i_sys = 1
+							{$whereFinal}
+
+						-- ====== Result Set 5: D1 (po_working ที่ยังไม่เคลียร์) ======
+						-- [เพิ่ม] ให้ตรงกับสูตร f_d1_not_finish ในหน้า Budget_Monitoring_Dashboard.php
+						SELECT
+							ISNULL(SUM(ISNULL(bb.f_total,0)), 0) - ISNULL(SUM(ret.f_return), 0) AS f_d1_total
+						FROM NMU_EIS..po_working_hdr aa
+						INNER JOIN NMU_EIS..po_working_dtl bb
+							ON aa.po_working_hdr_id = bb.po_working_hdr_id
+							AND bb.bg_expense_id IS NOT NULL
+						LEFT JOIN (
+							SELECT po_working_hdr_id, SUM(ISNULL(f_return,0)) AS f_return
+							FROM NMU_EIS..po_return
+							WHERE i_enable = 1
+							GROUP BY po_working_hdr_id
+						) ret ON aa.po_working_hdr_id = ret.po_working_hdr_id
+						WHERE aa.i_enable = 1
+							AND bb.i_budget_year_overlap = {$year_en}
+							AND bb.f_total != 0
+							AND CASE WHEN ISNULL(bb.dc_cost_ref_id,0) = 0
+									 THEN bb.dc_cost_id
+									 ELSE bb.dc_cost_ref_id END = {$dc_cost_id}
+							" . ($bg_expense_id > 0 ? " AND bb.bg_expense_id = {$bg_expense_id} " : "") . "
+							" . ($dc_expense_budget_type_id > 0 ? " AND bb.dc_expense_budget_type_id = {$dc_expense_budget_type_id} " : "") . "
 ";
 
-	$stmt = $db->QueryParam($sqlMain, array());
-
+	// [FIX] ย้าย show_sql มาเช็คก่อนรันคิวรีจริง เดิม $db->QueryParam() ถูกเรียกไปแล้วก่อน
+	// เช็ค show_sql ทำให้ debug ไม่ได้ถ้าคิวรีช้า/timeout เพราะต้องรอคิวรีจบก่อนเสมอ
 	if (@$_REQUEST["show_sql"]) {
 		echo $sqlMain;
 		exit;
 	}
+
+	$stmt = $db->QueryParam($sqlMain, array());
 
 	if ($stmt) {
 		$no = 0;
@@ -302,6 +363,11 @@ function List_QueryParam()
 		if ($db->NextResult($stmt)) {
 			$no_contract = 0;
 			while ($rowC = $db->Fetch($stmt)) {
+				// ✅ แก้ไข 5: PO ที่ดึงมาจากก้อน "cross budget_type" (i_own_match = 0) เป็น PO ที่
+				// ผูกกับ budget_type อื่น ไม่ใช่ของ budget_type ที่กำลังกรองอยู่จริง เก็บไว้แสดงในตาราง
+				// เพื่อความโปร่งใส แต่ห้ามรวมเข้า f_contract_total ไม่งั้นยอด "เงินจองงบประมาณตามบัญชีจัดสรร"
+				// จะถูกนับซ้ำ (เช่น 030300020001 ค่าวัสดุสำนักงาน แหล่งเงินกทม.4 ที่ยอดสูงเกินจริง)
+				$is_own_match = (int)($rowC['i_own_match'] ?? 1) === 1;
 				$contract_rows[] = array(
 					"no"                        => ++$no_contract,
 					"pr_id"                     => $rowC["pr_id"],
@@ -318,28 +384,64 @@ function List_QueryParam()
 					"dc_expense_budget_type_id" => $rowC["dc_expense_budget_type_id"],
 					"dc_expense_budget_type"    => $rowC["dc_expense_budget_type"],
 					"f_amt_contract"            => (float)$rowC["f_amt_contract"],
+					"is_cross_type"             => !$is_own_match,
 				);
-				$f_contract_total += (float)$rowC["f_amt_contract"];
+				if ($is_own_match) {
+					$f_contract_total += (float)$rowC["f_amt_contract"];
+				}
 			}
 		}
 
-		$f_pr_card   = $f_reserve_total - $f_contract_total;
+		// ---- Result Set 4: เงินจองตรวจรับ (i_reserve=3, i_finish=0) + เบิกจ่ายแล้ว (i_reserve=3, i_finish=1) ----
+		// [เพิ่ม] ให้ตรงกับ Budget_Monitoring_Dashboard.php
+		$f_check_total = 0;
+		$f_paid_total  = 0;
+		if ($db->NextResult($stmt)) {
+			if ($rowChk = $db->Fetch($stmt)) {
+				$f_check_total = (float)($rowChk['f_reserve_check_total'] ?? 0);
+				$f_paid_total  = (float)($rowChk['f_paid_total']          ?? 0);
+			}
+		}
+
+		// ---- Result Set 5: D1 (po_working ที่ยังไม่เคลียร์) ----
+		// [เพิ่ม] ให้ตรงกับ Budget_Monitoring_Dashboard.php: f_d1_not_finish = f_d1_total - f_paid_total
+		$f_d1_total = 0;
+		if ($db->NextResult($stmt)) {
+			if ($rowD1 = $db->Fetch($stmt)) {
+				$f_d1_total = (float)($rowD1['f_d1_total'] ?? 0);
+			}
+		}
+		$f_d1_not_finish = $f_d1_total - $f_paid_total;
+
+		// [FIX 2026-07-28] เดิมส่งเฉพาะ $f_pr_only_total (has_po==0) กลับไปในชื่อ "f_pr_total"
+		// ทำให้หน้า Rep_DetailByTypeV5.php ที่คำนวณ $f_reserve_total = $f_pr_total + $f_contract_total
+		// ได้ยอดต่ำกว่าจริง เพราะ PR ที่มี PO แล้วแต่ PO ไม่ own-match (ถูก reclassify เป็นคนละ
+		// bg_expense/budget_type) จะหายไปทั้งสองฝั่ง (ไม่นับใน f_pr_only_total เพราะ has_po=1,
+		// ไม่นับใน f_contract_total เพราะ i_own_match=0)
+		// Result Set 1 (i_reserve != 3 ทั้งหมด) รวมทั้ง PR-stage และ PO-stage ไว้แล้วโดยไม่ทับซ้อนกัน
+		// (มาจาก SP_BG_RESERVE_MONEY โดยตรง) จึงส่ง $f_pr_total (ผลรวมเต็ม) กลับไปแทน
+		$f_pr_card   = $f_pr_total;
 		$f_remaining = $f_budget_total  - $f_reserve_total;
 		$totalCount  = $no;
 	}
 
 	return json_encode(array(
-		"totalCount"          => $totalCount,
-		$root                 => ${$root},
-		"budget_detail"       => array_values($budget_detail),  // [FIX] ส่ง per-row ให้ JS budgetMap
-		"f_budget_total"      => $f_budget_total,
-		"f_reserve_total"     => $f_reserve_total,
-		"f_remaining"         => $f_remaining,
-		"f_pr_total"          => $f_pr_card,
-		"f_contract_total"    => $f_contract_total,
-		"contract"            => $contract_rows,
-		"f_plan_cut_total"    => $f_plan_cut_total,
-		"f_period_cut_total"  => $f_period_cut_total,
+		"totalCount"            => $totalCount,
+		$root                   => ${$root},
+		"budget_detail"         => array_values($budget_detail),  // [FIX] ส่ง per-row ให้ JS budgetMap
+		"f_budget_total"        => $f_budget_total,
+		"f_reserve_total"       => $f_reserve_total,
+		"f_remaining"           => $f_remaining,
+		"f_pr_total"            => $f_pr_card,
+		"f_pr_only_total"       => $f_pr_only_total,  // [FIX] เก็บตัวเดิมไว้แยกต่างหาก เผื่อหน้าอื่นต้องใช้
+		"f_contract_total"      => $f_contract_total,
+		"contract"              => $contract_rows,
+		"f_plan_cut_total"      => $f_plan_cut_total,
+		"f_period_cut_total"    => $f_period_cut_total,
+		// [เพิ่ม] เงินจองตรวจรับ / เบิกจ่ายแล้ว / D1 ให้ตรงกับ Budget_Monitoring_Dashboard.php
+		"f_reserve_check_total" => $f_check_total,
+		"f_paid_total"          => $f_paid_total,
+		"f_d1_not_finish"       => $f_d1_not_finish,
 	));
 }
 

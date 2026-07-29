@@ -8,8 +8,8 @@
         <link rel="icon" href="../../images/favicon.ico" type="image/x-icon">
         <title>Pie Dashboard - ฝ่ายพัสดุ</title>
 
-        <?php include("../lib/loadJs.php"); ?>
-        <?php include("../lib/loadCss.php"); ?>
+        <?php include("../../lib/loadJs.php"); ?>
+        <?php include("../../lib/loadCss.php"); ?>
 
         <script src="../../ws_user/js/jquery.min.js"></script>
         <script src="../../js/echarts/echarts.js"></script>
@@ -198,6 +198,13 @@
                                                 <select id="filter_method" class="selectpicker form-control" multiple data-live-search="true" data-actions-box="true" data-width="100%" title="เลือกประเภทงาน"></select>
                                         </div>
                                 </div>
+
+                                <div class="col-lg-3 col-md-4 mb-2">
+                                        <div class="info-box">
+                                                <div class="info-label">สถานะใบขอเบิก (ตัวกรอง)</div>
+                                                <select id="filter_sub_status" class="selectpicker form-control" multiple data-live-search="true" data-actions-box="true" data-width="100%" title="เลือกสถานะใบขอเบิก"></select>
+                                        </div>
+                                </div>
                         </div>
                 </div>
 
@@ -369,6 +376,7 @@
                                                                         <th>ชื่องบประมาณ</th>
                                                                         <th class="col-w-100">หน่วยงาน</th>
                                                                         <th class="col-w-150">ผู้รับผิดชอบ</th>
+                                                                         <th class="col-w-150">สถานะใบขอเบิก</th>
                                                                         <th class="col-w-120">จำนวนเงิน</th>
                                                                 </tr>
                                                         </thead>

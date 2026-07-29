@@ -11,25 +11,26 @@
   let chartBar;
 
   function loadAll(params = {}) {
-    Ext.Ajax.request({
-      url: "../api/List_Rep_Yearly_PR_Performance_Summary.php",
-      method: "GET",
-      params: { fn: "List_QueryParam", ...params },
-      success: function (resp) {
-        const o = Ext.decode(resp.responseText || "{}");
-        window.DATA_BUDGET = Array.isArray(o.data) ? o.data : [];
+    $.ajax({
+          url: "../api/List_Rep_Yearly_PR_Performance_Summary.php",
+          method: "GET",
+          data: { fn: "List_QueryParam", ...params },
+          dataType: "text",
+          success: function (responseText) {
+            const o = JSON.parse(responseText || "{}");
+            window.DATA_BUDGET = Array.isArray(o.data) ? o.data : [];
 
-        renderBar(window.DATA_BUDGET);
+            renderBar(window.DATA_BUDGET);
 
-        const pl = document.getElementById("pageLoader");
-        if (pl) pl.style.display = "none";
-      },
-      failure: function () {
-        const pl = document.getElementById("pageLoader");
-        if (pl) pl.style.display = "none";
-        Ext.Msg.alert("Error", "ดึงข้อมูลไม่สำเร็จ");
-      },
-    });
+            const pl = document.getElementById("pageLoader");
+            if (pl) pl.style.display = "none";
+          },
+          error: function () {
+            const pl = document.getElementById("pageLoader");
+            if (pl) pl.style.display = "none";
+            alert("ดึงข้อมูลไม่สำเร็จ");
+          },
+        });
   }
 
   /* ---------- กราฟหลัก ---------- */

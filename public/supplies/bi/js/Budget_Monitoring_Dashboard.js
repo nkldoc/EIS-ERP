@@ -111,7 +111,7 @@
     });
   }
   // รวมข้อมูลละเอียด (ต่อ bg_expense_id) ให้เหลือระดับ "แหล่งเงิน" (dc_expense_budget_type / c_name)
-      function aggregateBySource(rows, { year = "all", ids = [] } = {}) {
+function aggregateBySource(rows, { year = "all", ids = [] } = {}) {
     // ควบคุมลำดับให้สวยงาม
     const ORDER = ["เงินรายได้คณะแพทย์ฯ-โรงพยาบาล", "เงินอุดหนุนกทม.", "เงินอุดหนุนรัฐบาล", "เงินสะสมส่วนงาน"];
     const sortKey = (name) => {
@@ -119,29 +119,33 @@
       return i === -1 ? 999 : i;
     };
 
-     const map = new Map();
+    const map = new Map();
     rows.forEach((r) => {
         if (year !== "all" && String(r.budget_year) !== String(year)) return;
         if (ids && ids.length && !ids.includes(String(r.dc_expense_budget_type_id))) return;
 
-        const name   = r.dc_expense_budget_type || r.c_name || "ไม่ทราบแหล่งเงิน";
-        const total  = Number(r.f_plan_begin)     || 0;
-        
-        // ✅ แก้ตรงนี้: ใช้ PR+PO จริง แทน f_reserve_budget
-        const booked = Number(r.f_reserve_actual) || Number(r.f_reserve_budget) || 0;
-        const pr     = Number(r.f_pr_total)        || 0;
-        const po     = Number(r.f_contract_total)  || 0;
+        const name    = r.dc_expense_budget_type || r.c_name || "ไม่ทราบแหล่งเงิน";
+        const total = Number(r.f_budget_real) || 0;
+        const booked  = Number(r.f_reserve_total) || 0;
+        const insp    = Number(r.f_reserve_check_total) || 0; // เงินจองตรวจรับ (i_reserve=3, i_finish=0)
+        const working = Number(r.f_paid_total) || 0;
+        const d1 = Number(r.f_d1_not_finish) || 0;
 
-        const cur = map.get(name) || { name, total: 0, booked: 0, pr: 0, po: 0 };
-        cur.total  += total;
-        cur.booked += booked;
-        cur.pr     += pr;
-        cur.po     += po;
+
+        const remain = Number(r.dc_expense_budget_type_id) === 5
+    ? Math.max(0, total - booked) - insp - working - d1
+    : total - booked - insp - working - d1;
+        const cur = map.get(name) || { name, typeId: Number(r.dc_expense_budget_type_id) || 0, total: 0, booked: 0, insp: 0, working: 0, d1: 0, remain: 0 };
+        cur.total   += total;
+        cur.booked  += booked;
+        cur.insp    += insp;
+        cur.working += working;
+        cur.d1      += d1;
+        cur.remain  += remain;
         map.set(name, cur);
     });
-
-    return Array.from(map.values())
-        .map((x) => ({ ...x, remain: x.total - x.booked }))
+return Array.from(map.values())
+        .map((x) => ({ ...x, remain: x.remain }))
         .sort((a, b) => sortKey(a.name) - sortKey(b.name));
 }
 
@@ -158,20 +162,25 @@
     const $multi = $("#multiCheckCombo");
     $multi.empty();
     const seen = new Set();
-    const first3 = [];
+    const defaultIds = [];
+
+    // ค่าเริ่มต้น: เลือกเฉพาะ 4 แหล่งเงินนี้ (ผู้ใช้ยังเลือกเพิ่ม/ลดเองได้)
+    const DEFAULT_NAMES = ["เงินรายได้ส่วนงาน", "เงินอุดหนุนรัฐบาล", "เงินอุดหนุนกทม.", "เงินสะสมส่วนงาน"];
 
     window.DATA_BUDGET.forEach((it) => {
       if (year !== "all" && String(it.budget_year) !== String(year)) return;
       if (!seen.has(it.dc_expense_budget_type_id)) {
         seen.add(it.dc_expense_budget_type_id);
         $multi.append(new Option(it.c_name, it.dc_expense_budget_type_id));
-        if (first3.length < 4) first3.push(String(it.dc_expense_budget_type_id));
+        if (DEFAULT_NAMES.includes(String(it.c_name || "").trim())) {
+          defaultIds.push(String(it.dc_expense_budget_type_id));
+        }
       }
     });
 
     $multi.selectpicker(); // init
     $multi.selectpicker("refresh");
-    $multi.selectpicker("val", first3);
+    $multi.selectpicker("val", defaultIds);
 
     renderStatusCards(window.DATA_STATUS);
     renderCharts();
@@ -210,9 +219,14 @@
       if (ids && ids.length && !ids.includes(String(r.dc_expense_budget_type_id))) return;
       // if (onlyEquipment && String(r.i_product_type1) !== "1") return;
 
-      const total = +r.f_plan_begin || 0;
-      const booked = +r.f_reserve_budget || 0;
-      const remain = total - booked;
+      const total = Number(r.f_budget_real) || 0;
+      const booked  = Number(r.f_reserve_total) || 0;
+      const insp    = Number(r.f_reserve_check_total) || 0; // เงินจองตรวจรับ (i_reserve=3, i_finish=0)
+      const working = Number(r.f_paid_total) || 0;
+      const d1 = Number(r.f_d1_not_finish) || 0;
+      const remain = Number(r.dc_expense_budget_type_id) === 5
+    ? Math.max(0, total - booked) - insp - working - d1
+    : total - booked - insp - working - d1;
 
       out.push({
         id: r.dc_expense_budget_type_id,
@@ -221,15 +235,18 @@
         bg_expense_id: r.bg_expense_id,
         total,
         booked,
+        insp,
+        working,
         remain,
       });
     });
     return out;
   }
-
   function buildSummary(items) {
     const sumAll = items.reduce((s, it) => s + it.total, 0);
     const sumBooked = items.reduce((s, it) => s + it.booked, 0);
+    const sumInsp = items.reduce((s, it) => s + it.insp, 0);
+    const sumPaid = items.reduce((s, it) => s + it.working, 0);
     const sumRemain = items.reduce((s, it) => s + it.remain, 0);
 
     const el = document.getElementById("summaryBox");
@@ -247,8 +264,17 @@
           <div class="summary-value total">${toBaht(sumAll)}</div>
         </div>
         <div class="summary-item">
-          <span class="summary-label">จองเงิน / ใช้ไปแล้ว</span>
-          <div class="summary-value booked">${toBaht(sumBooked)}</div>
+        <span class="summary-label">จองเงิน / ใช้ไปแล้ว</span>
+        <div class="summary-value booked">${toBaht(sumBooked)}</div>
+        <div class="text-xs text-muted">* รวม PO ที่ยังไม่ได้เบิกจ่าย เมื่อเบิกแล้วยอดจะลดลงอัตโนมัติ</div>
+      </div>
+        <div class="summary-item">
+          <span class="summary-label">เงินจองตรวจรับ</span>
+          <div class="summary-value insp" style="color:#6f42c1">${toBaht(sumInsp)}</div>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">เบิกจ่ายแล้ว</span>
+          <div class="summary-value paid">${toBaht(sumPaid)}</div>
         </div>
         <div class="summary-item">
           <span class="summary-label">คงเหลือ</span>
@@ -280,7 +306,7 @@
         axisPointer: { type: "shadow" },
         formatter: (params) => `<b>${params[0].axisValue}</b><br>` + params.map((p) => `${p.marker} ${p.seriesName}: <b>${fmt2(p.value)}</b>`).join("<br>"),
       },
-      legend: [{ data: ["จำนวนงบประมาณ", "จองเงิน", "คงเหลือหลังจองเงิน"], top: "2%", left: "40%" }],
+      legend: [{ data: ["จำนวนงบประมาณ", "จองเงิน", "เงินจองตรวจรับ", "เบิกจ่ายแล้ว", "คงเหลือหลังจองเงิน"], top: "2%", left: "40%" }],
       toolbox: {
         feature: {
           saveAsImage: {},
@@ -310,6 +336,20 @@
           name: "จองเงิน",
           type: "bar",
           data: items.map((x) => x.booked),
+          itemStyle: { borderColor: "#111", borderWidth: 1 },
+          label: { show: true, position: "top", distance: 6, formatter: (p) => echarts.format.addCommas(fmt2(p.value)) },
+        },
+        {
+          name: "เงินจองตรวจรับ",
+          type: "bar",
+          data: items.map((x) => x.insp),
+          itemStyle: { color: "#6f42c1", borderColor: "#111", borderWidth: 1 },
+          label: { show: true, position: "top", distance: 6, formatter: (p) => echarts.format.addCommas(fmt2(p.value)) },
+        },
+        {
+          name: "เบิกจ่ายแล้ว",
+          type: "bar",
+          data: items.map((x) => x.working),
           itemStyle: { borderColor: "#111", borderWidth: 1 },
           label: { show: true, position: "top", distance: 6, formatter: (p) => echarts.format.addCommas(fmt2(p.value)) },
         },
@@ -418,11 +458,19 @@
     items.forEach((it) => {
       const src = (it.c_name || "").trim();
 
-      // ตัวเลขจาก API (เป็นเลขจริง ไม่ใช่ string มีคอมมา)
-      const total = +it.f_plan_begin || 0; // ใช้เป็น "ที่ใช้ไป"
-      const check = +it.f_reserve_budget || 0; // ใช้เป็น "ตรวจรับแล้ว"
-      const paid = 0; // ตอนนี้ไม่มี -> 0
-      const left = total - check; // คงเหลือ
+// แก้เป็น — สำหรับ type 4,5 ใช้ f_budget_display เสมอ
+  const budget = Number(it.f_budget_display) || Number(it.f_budget_real) || 0;
+      // ใช้ f_reserve_actual (= f_pr_total + f_po_total จากการจองจริง) เพื่อให้ตรงกับรายงาน Rep_BudgetDetail
+      const used  = Number(it.f_reserve_actual) || 0;
+    const check = Number(it.f_reserve_actual) || 0;
+    // เงินจองตรวจรับ = ตรวจรับแล้วแต่ยังไม่เบิกจ่าย (i_reserve = 3 AND i_finish = 0)
+    // เดิมใช้ f_po_total (i_reserve = 2) ผิด เพราะยอดนั้นถูกนับรวมอยู่ใน f_reserve_actual/used อยู่แล้ว
+    const insp  = Number(it.f_reserve_check_total) || 0;
+     
+      const paid        = Number(it.f_paid_total) || 0;
+      const d1notfinish = Number(it.f_d1_not_finish) || 0;
+      // ต้องหักเงินจองตรวจรับ (insp) ออกจากคงเหลือด้วย ไม่งั้นคงเหลือจะสูงเกินจริง
+      const left        = Math.round((budget - used - insp - paid - d1notfinish) * 100) / 100;
 
       const key = String(it.bg_expense_id || "");
       if (!byExp.has(key)) {
@@ -443,58 +491,79 @@
           // เงินรายได้
           income_used: 0,
           income_check: 0,
+          income_insp: 0,
           income_paid: 0,
           income_left: 0,
+          income_note: [],
           // อุดหนุน กทม.
           bkk_used: 0,
           bkk_check: 0,
+          bkk_insp: 0,
           bkk_paid: 0,
           bkk_left: 0,
+          bkk_note: [],
           // อุดหนุน รัฐบาล
           gov_used: 0,
           gov_check: 0,
+          gov_insp: 0,
           gov_paid: 0,
           gov_left: 0,
+          gov_note: [],
           // อุดหนุน สะสมส่วนงาน
           Savings_used: 0,
           Savings_check: 0,
+          Savings_insp: 0,
           Savings_paid: 0,
           Savings_left: 0,
+          Savings_note: [],
         });
       }
-
-      const row = byExp.get(key);
+    const row = byExp.get(key); 
       if (src.includes("รายได้")) {
-        row.income_used += total;
-        row.income_check += check;
-        row.income_paid += paid;
-        row.income_left += left;
-
+        row.income_used  += budget;  // ← แก้จาก used เป็น budget
+        row.income_check += used;    // ← แก้จาก check เป็น used
+        row.income_insp  += insp;
+        row.income_paid  += paid;
+        row.income_left  += left;
         row.income_type_id = String(it.dc_expense_budget_type_id || "").trim();
+        if (it.transfer_note) row.income_note.push(it.transfer_note);
       } else if (src.includes("กทม")) {
-        row.bkk_used += total;
-        row.bkk_check += check;
-        row.bkk_paid += paid;
-        row.bkk_left += left;
-
+        row.bkk_used  += budget;     // ← แก้
+        row.bkk_check += used;       // ← แก้
+        row.bkk_insp  += insp;
+        row.bkk_paid  += paid;
+        row.bkk_left  += left;
         row.bkk_type_id = String(it.dc_expense_budget_type_id || "").trim();
-      } else if (src.includes("รัฐบาล")) {
-        row.gov_used += total;
-        row.gov_check += check;
-        row.gov_paid += paid;
-        row.gov_left += left;
-        row.gov_type_id = String(it.dc_expense_budget_type_id || "").trim();
-      } else if (src.includes("เงินสะสมส่วนงาน")) {
-        row.Savings_used += total;
-        row.Savings_check += check;
-        row.Savings_paid += paid;
-        row.Savings_left += left;
+        if (it.transfer_note) row.bkk_note.push(it.transfer_note);
+    } else if (src.includes("รัฐบาล")) {
+    row.gov_used  += budget;
+    row.gov_check += used;
+    row.gov_insp  += insp;
+    row.gov_paid  += paid;   // ← แก้: ไม่แสดง f_paid_total ในคอลัมน์นี้
+    row.gov_left  += Math.round((budget - used - insp - paid) * 100) / 100;
+    row.gov_type_id = String(it.dc_expense_budget_type_id || "").trim();
+    if (it.transfer_note) row.gov_note.push(it.transfer_note);
+      } else {
+        // fallback: แหล่งเงินที่ไม่ใช่รายได้/กทม/รัฐบาล → สะสมส่วนงาน
+        row.Savings_used  += budget;
+        row.Savings_check += used;
+        row.Savings_insp  += insp;
+        row.Savings_paid  += paid;
+        row.Savings_left  += left;
         row.savings_type_id = String(it.dc_expense_budget_type_id || "").trim();
+        if (it.transfer_note) row.Savings_note.push(it.transfer_note);
       }
     });
-
-    // คืนค่าเป็นอาร์เรย์ เรียงตามลำดับ (no) ถ้ามี
-    return Array.from(byExp.values()).sort((a, b) => {
+  // คืนค่าเป็นอาร์เรย์ เรียงตามลำดับ (no) ถ้ามี — รวมหมายเหตุแต่ละกลุ่มเป็นข้อความเดียว
+    return Array.from(byExp.values())
+      .map((r) => ({
+        ...r,
+        income_note: r.income_note.join(" / "),
+        bkk_note: r.bkk_note.join(" / "),
+        gov_note: r.gov_note.join(" / "),
+        Savings_note: r.Savings_note.join(" / "),
+      }))
+      .sort((a, b) => {
       const na = Number(a.no) || 0,
         nb = Number(b.no) || 0;
       return na - nb;
@@ -611,172 +680,115 @@
       return `<span class="pct-badge ${cls}">${v.toFixed(2)}%</span>`;
     };
 
-    const cell = (cls, v, colKey, bgId, bgExId) => {
+    const cell = (cls, v, colKey, bgId, bgExId, note) => {
       const cleanBg = (bgId || "").toString().trim();
       const cleanExBg = (bgExId || "").toString().trim();
-      return `<td class="${cls} ${Number(v) < 0 ? "neg" : ""}"
+      const isNeg = Number(v) < 0;
+      const noteHtml = isNeg && note ? `<div class="cell-note" style="color:#d9534f;">${note}</div>` : "";
+      return `<td class="${cls} ${isNeg ? "neg" : ""}"
                   data-col="${colKey || ""}"
                   data-Exbg="${cleanExBg}"
                   data-bg="${cleanBg}">
                 ${v === null || v === undefined || v === "" ? "-" : toBaht(v)}
+                ${noteHtml}
               </td>
             `;
     };
 
     // Build full per-bg breakdown (ignore current filters) to support special-case overrides
-    const fullByBg = {}; // bgId -> { sources: { income: {used,check}, bkk:..., gov:..., sav:... }, rawTotal, cutsTotal }
+    const fullByBg = {}; // bgId -> { sources: { income: {used,check,working}, bkk:..., gov:..., sav:... }, rawTotal, cutsTotal }
     const displayAdjMap = {}; // bgId -> display-only adjustments (do NOT write back to r.*)
     (window.DATA_BUDGET || []).forEach((it) => {
       const bgId = String(it.bg_expense_id || "").trim();
       if (!bgId) return;
       const src = (it.dc_expense_budget_type || it.c_name || "").trim();
-      const raw = Number(it.f_plan_begin) || 0;
+      const raw = Number(it.f_budget_real) || Number(it.f_budget_display) || 0;
       const chk = Number(it.f_reserve_budget) || 0;
+      const working = Number(it.f_paid_total) || 0;
       const planCut = Number(it.f_plan_cut_total) || 0;
       const periodCut = Number(it.f_period_cut_total) || 0;
-      if (!fullByBg[bgId]) fullByBg[bgId] = { sources: { income: { used: 0, check: 0 }, bkk: { used: 0, check: 0 }, gov: { used: 0, check: 0 }, sav: { used: 0, check: 0 } }, rawTotal: 0, cutsTotal: 0, prTotal: 0 };
+      if (!fullByBg[bgId]) fullByBg[bgId] = { sources: { income: { used: 0, check: 0, working: 0 }, bkk: { used: 0, check: 0, working: 0 }, gov: { used: 0, check: 0, working: 0 }, sav: { used: 0, check: 0, working: 0 } }, rawTotal: 0, cutsTotal: 0, prTotal: 0 };
       const fb = fullByBg[bgId];
-      if (src.includes("รายได้")) { fb.sources.income.used += raw; fb.sources.income.check += chk; }
-      else if (src.includes("กทม")) { fb.sources.bkk.used += raw; fb.sources.bkk.check += chk; }
-      else if (src.includes("รัฐบาล")) { fb.sources.gov.used += raw; fb.sources.gov.check += chk; }
-      else { fb.sources.sav.used += raw; fb.sources.sav.check += chk; }
+      if (src.includes("รายได้")) { fb.sources.income.used += raw; fb.sources.income.check += chk; fb.sources.income.working += working; }
+      else if (src.includes("กทม")) { fb.sources.bkk.used += raw; fb.sources.bkk.check += chk; fb.sources.bkk.working += working; }
+      else if (src.includes("รัฐบาล")) { fb.sources.gov.used += raw; fb.sources.gov.check += chk; fb.sources.gov.working += working; }
+      else { fb.sources.sav.used += raw; fb.sources.sav.check += chk; fb.sources.sav.working += working; }
       fb.rawTotal += raw;
       fb.cutsTotal += (planCut + periodCut);
-      fb.prTotal += Number(it.f_amt) || 0;
+      fb.prTotal += Number(it.f_reserve_budget) || 0;
     });
 
     rows.forEach((r) => {
-      // Special-case: when LV.4 contains 030300210001 we must ensure the
-      // displayed/forwarded "reserved" amount matches the authoritative PR
-      // total (9852225.60). We scale source-level check values so their sum
-      // equals the required reserved amount; this keeps per-source ordering
-      // while making the DataView and the detail page consistent.
-      try {
-        const label = (r.bg_expense || "").toString();
-        if (label.includes("030300210001")) {
-          const bgIdKey = (r.bg_expense_id || "").toString().trim();
-          const fb = fullByBg[bgIdKey];
-          if (fb && fb.rawTotal > 0) {
-            const DESIRED_RESERVE = fb.prTotal && fb.prTotal > 0 ? fb.prTotal : 9852225.6;
-            const sumChecks = (fb.sources.income.check || 0) + (fb.sources.bkk.check || 0) + (fb.sources.gov.check || 0) + (fb.sources.sav.check || 0);
-            if (sumChecks > 0) {
-              const scale = DESIRED_RESERVE / sumChecks;
-              fb.sources.income.check = (fb.sources.income.check || 0) * scale;
-              fb.sources.bkk.check = (fb.sources.bkk.check || 0) * scale;
-              fb.sources.gov.check = (fb.sources.gov.check || 0) * scale;
-              fb.sources.sav.check = (fb.sources.sav.check || 0) * scale;
-            } else {
-              // no checks present — allocate reserve proportional to used amounts
-              const sumUsed = (fb.sources.income.used || 0) + (fb.sources.bkk.used || 0) + (fb.sources.gov.used || 0) + (fb.sources.sav.used || 0);
-              if (sumUsed > 0) {
-                fb.sources.income.check = (fb.sources.income.used || 0) * (DESIRED_RESERVE / sumUsed);
-                fb.sources.bkk.check = (fb.sources.bkk.used || 0) * (DESIRED_RESERVE / sumUsed);
-                fb.sources.gov.check = (fb.sources.gov.used || 0) * (DESIRED_RESERVE / sumUsed);
-                fb.sources.sav.check = (fb.sources.sav.used || 0) * (DESIRED_RESERVE / sumUsed);
-              }
-            }
-            // store adjusted checks in displayAdjMap (display-only)
-            displayAdjMap[bgIdKey] = {
-              income_check: fb.sources.income.check || 0,
-              bkk_check: fb.sources.bkk.check || 0,
-              gov_check: fb.sources.gov.check || 0,
-              Savings_check: fb.sources.sav.check || 0,
-              prTotal: fb.prTotal || 0,
-            };
-            // DO NOT modify r.* here — keep detail report parameters unchanged
-          }
-        }
-      } catch (e) {}
-      
       const tr = document.createElement("tr");
       const rawBgId = r.bg_expense_id != null ? String(r.bg_expense_id) : "";
-      const rawBgExId = r.dc_expense_budget_type_id != null ? String(r.dc_expense_budget_type_id) : "";
-      const bgId = rawBgId.trim(); // 👈 ตัดช่องว่างหัว–ท้ายให้หมด
-      const bgExId = rawBgExId.trim(); // 👈 ตัดช่องว่างหัว–ท้ายให้หมด
-      // By default, display uses the computed values. For special-case budgets
-      // like 030300210001 we want the DataView to show the "reserved" amount
-      // in the first column (ที่ใช้ไป(จอง)). So prepare display variables
-      // and only swap them for the specific LV.4 code.
-      let display = {
+      const bgId = rawBgId.trim(); 
+
+      // จุดที่ 1: เตรียมชุดข้อมูลที่รวมค่าเงินพัสดุทำเบิก (_paid) ไว้แสดงผล
+      const display = {
         income_used: r.income_used,
         income_check: r.income_check,
+        income_insp: r.income_insp,
+        income_paid: r.income_paid,   // เพิ่มฟิลด์ทำเบิกรายได้ส่วนงาน
         income_left: r.income_left,
         bkk_used: r.bkk_used,
         bkk_check: r.bkk_check,
+        bkk_insp: r.bkk_insp,
+        bkk_paid: r.bkk_paid,         // เพิ่มฟิลด์ทำเบิกอุดหนุน กทม.
         bkk_left: r.bkk_left,
         gov_used: r.gov_used,
         gov_check: r.gov_check,
+        gov_insp: r.gov_insp,
+        gov_paid: r.gov_paid,         // เพิ่มฟิลด์ทำเบิกอุดหนุนรัฐบาล
         gov_left: r.gov_left,
         Savings_used: r.Savings_used,
         Savings_check: r.Savings_check,
+        Savings_insp: r.Savings_insp,
+        Savings_paid: r.Savings_paid, // เพิ่มฟิลด์ทำเบิกสะสมส่วนงาน
         Savings_left: r.Savings_left,
       };
-     try {
-  const label = (r.bg_expense || "").toString();
-  if (label.includes("030300210001")) {
 
-    // รายได้ส่วนงาน
-    display.income_used  = 15200000;
-    display.income_check = 9852225.60;
-    display.income_left  = 15200000 - 9852225.60; // 5,347,774.40
+      const pctIncome = display.income_used > 0 ? (display.income_check / display.income_used) * 100 : 0;
+      const pctBkk = display.bkk_used > 0 ? (display.bkk_check / display.bkk_used) * 100 : 0;
+      const pctGov = display.gov_used > 0 ? (display.gov_check / display.gov_used) * 100 : 0;
+      const pctSavings = display.Savings_used > 0 ? (display.Savings_check / display.Savings_used) * 100 : 0;
 
-    // อุดหนุนกรุงเทพมหานคร
-    display.bkk_used  = 1300000;
-    display.bkk_check = 1024834.06;
-    display.bkk_left  = 1300000 - 1024834.06; // 275,165.94
-  }
-} catch (e) {}
-
-      // percent should represent (reserved / budget) * 100 using original row values
-let pctIncome = display.income_used > 0 
-  ? (display.income_check / display.income_used) * 100 
-  : 0;
-const pctBkk = display.bkk_used > 0 ? (display.bkk_check / display.bkk_used) * 100 : 0;
-      const pctGov = r.gov_used > 0 ? (r.gov_check / r.gov_used) * 100 : 0;
-      const pctSavings = r.Savings_used > 0 ? (r.Savings_check / r.Savings_used) * 100 : 0;
-      // If we have a display-only adjustment for this bg, and it's the special LV.4,
-      // force the percent to the requested value (display-only).
-      // try {
-      //   const bgIdKey = (r.bg_expense_id || "").toString().trim();
-      //   const adj = displayAdjMap[bgIdKey] || null;
-      //   if (adj && (r.bg_expense || "").toString().includes("030300210001")) {
-      //     // User requested explicit percent 59.71 — present that value in UI.
-      //     pctIncome = 59.71;
-      //   }
-      // } catch (e) {}
-      // html += `<td style="text-align:center;">${r.no}</td>`;
-      // ${cell("col-income text-right", r.income_paid)}
-      // ${cell("col-bkk text-right", r.bkk_paid)}
-      // ${cell("col-gov text-right", r.gov_paid)}
-      // ${cell("col-Savings text-right", r.Savings_paid)}
-
+      // จุดที่ 2: วาด HTML แถวตารางตาราง เพิ่มคอลัมน์ เงินพัสดุทำเบิก เข้าไปข้างหน้าคอลัมน์คงเหลือ
       tr.innerHTML = `
       <td class="sticky-col text-center">${r.no}</td>
       <td class="sticky-col text-left" data-bg="${bgId}" data-col="desc">${r.bg_expense}</td>
 
-
-      ${cell("col-income text-right", display.income_used, "income_used", bgId, r.income_type_id)}
+      ${cell("col-income text-right", display.income_used, "income_used", bgId, r.income_type_id, r.income_note)}
       ${cell("col-income text-right", display.income_check, "income_check", bgId, r.income_type_id)}
+      ${cell("col-income text-right", display.income_insp, "income_insp", bgId, r.income_type_id)}
+      ${cell("col-income text-right", display.income_paid, "income_paid", bgId, r.income_type_id)} 
       ${cell("col-income text-right", display.income_left, "income_left", bgId, r.income_type_id)}
-    <td class="col-income text-center" data-bg="${bgId}" data-exbg="${r.income_type_id || ""}" data-col="income_pct">${pctBadge(pctIncome)}</td>
+      <td class="col-income text-center" data-bg="${bgId}" data-exbg="${r.income_type_id || ""}" data-col="income_pct">${pctBadge(pctIncome)}</td>
 
-    ${cell("col-bkk text-right", display.bkk_used, "bkk_used", bgId, r.bkk_type_id)}
-    ${cell("col-bkk text-right", display.bkk_check, "bkk_check", bgId, r.bkk_type_id)}
-    ${cell("col-bkk text-right", display.bkk_left, "bkk_left", bgId, r.bkk_type_id)}
-    <td class="col-bkk text-center" data-bg="${bgId}" data-exbg="${r.bkk_type_id || ""}" data-col="bkk_pct">${pctBadge(pctBkk)}</td>
+      ${cell("col-bkk text-right", display.bkk_used, "bkk_used", bgId, r.bkk_type_id, r.bkk_note)}
+      ${cell("col-bkk text-right", display.bkk_check, "bkk_check", bgId, r.bkk_type_id)}
+      ${cell("col-bkk text-right", display.bkk_insp, "bkk_insp", bgId, r.bkk_type_id)}
+      ${cell("col-bkk text-right", display.bkk_paid, "bkk_paid", bgId, r.bkk_type_id)}       
+      ${cell("col-bkk text-right", display.bkk_left, "bkk_left", bgId, r.bkk_type_id)}
+      <td class="col-bkk text-center" data-bg="${bgId}" data-exbg="${r.bkk_type_id || ""}" data-col="bkk_pct">${pctBadge(pctBkk)}</td>
 
-    ${cell("col-gov text-right", display.gov_used, "gov_used", bgId, r.gov_type_id)}
-    ${cell("col-gov text-right", display.gov_check, "gov_check", bgId, r.gov_type_id)}
-    ${cell("col-gov text-right", display.gov_left, "gov_left", bgId, r.gov_type_id)}
-    <td class="col-gov text-center" data-bg="${bgId}" data-exbg="${r.gov_type_id || ""}" data-col="gov_pct">${pctBadge(pctGov)}</td>
+      ${cell("col-gov text-right", display.gov_used, "gov_used", bgId, r.gov_type_id, r.gov_note)}
+      ${cell("col-gov text-right", display.gov_check, "gov_check", bgId, r.gov_type_id)}
+      ${cell("col-gov text-right", display.gov_insp, "gov_insp", bgId, r.gov_type_id)}
+      ${cell("col-gov text-right", display.gov_paid, "gov_paid", bgId, r.gov_type_id)}       
+      ${cell("col-gov text-right", display.gov_left, "gov_left", bgId, r.gov_type_id)}
+      <td class="col-gov text-center" data-bg="${bgId}" data-exbg="${r.gov_type_id || ""}" data-col="gov_pct">${pctBadge(pctGov)}</td>
 
-    ${cell("col-Savings text-right", display.Savings_used, "sav_used", bgId, r.savings_type_id)}
-    ${cell("col-Savings text-right", display.Savings_check, "sav_check", bgId, r.savings_type_id)}
-    ${cell("col-Savings text-right", display.Savings_left, "sav_left", bgId, r.savings_type_id)}
-    <td class="col-Savings text-center" data-bg="${bgId}" data-exbg="${r.savings_type_id || ""}" data-col="sav_pct">${pctBadge(pctSavings)}</td>
+      ${cell("col-Savings text-right", display.Savings_used, "sav_used", bgId, r.savings_type_id, r.Savings_note)}
+      ${cell("col-Savings text-right", display.Savings_check, "sav_check", bgId, r.savings_type_id)}
+      ${cell("col-Savings text-right", display.Savings_insp, "sav_insp", bgId, r.savings_type_id)}
+      ${cell("col-Savings text-right", display.Savings_paid, "sav_paid", bgId, r.savings_type_id)} 
+      ${cell("col-Savings text-right", display.Savings_left, "sav_left", bgId, r.savings_type_id)}
+      <td class="col-Savings text-center" data-bg="${bgId}" data-exbg="${r.savings_type_id || ""}" data-col="sav_pct">${pctBadge(pctSavings)}</td>
       `;
 
       tbody.appendChild(tr);
+      
+      // จุดที่ 3: จัดการ Event ดับเบิ้ลคลิกแยกรายละเอียด ให้รองรับคอลัมน์ทำเบิกอันใหม่
       tr.addEventListener("dblclick", function (e) {
         const td = e.target.closest("td");
         const col = td ? td.dataset.col : "";
@@ -789,10 +801,10 @@ const pctBkk = display.bkk_used > 0 ? (display.bkk_check / display.bkk_used) * 1
         if (bg && col) {
           // --- map col → prefix เพื่อดึงยอดจาก row ---
           const prefixMap = {
-            income_used:  "income", income_check: "income", income_left: "income", income_pct: "income",
-            bkk_used:     "bkk",    bkk_check:    "bkk",    bkk_left:    "bkk",    bkk_pct:    "bkk",
-            gov_used:     "gov",    gov_check:    "gov",    gov_left:    "gov",    gov_pct:    "gov",
-            sav_used:     "Savings",sav_check:    "Savings",sav_left:    "Savings",sav_pct:    "Savings",
+            income_used:  "income", income_check: "income", income_paid: "income", income_left: "income", income_pct: "income",
+            bkk_used:     "bkk",    bkk_check:    "bkk",    bkk_paid:    "bkk",    bkk_left:    "bkk",    bkk_pct:    "bkk",
+            gov_used:     "gov",    gov_check:    "gov",    gov_paid:    "gov",    gov_left:    "gov",    gov_pct:    "gov",
+            sav_used:     "Savings",sav_check:    "Savings",sav_paid:    "Savings",sav_left:    "Savings",sav_pct:    "Savings",
           };
           const prefix = prefixMap[col] || "";
 
@@ -801,20 +813,24 @@ const pctBkk = display.bkk_used > 0 ? (display.bkk_check / display.bkk_used) * 1
           const fReserve   = prefix ? (display[prefix + "_check"] || 0) : 0;
           const fRemaining = prefix ? (display[prefix + "_left"]  || 0) : 0;
 
-          // col ที่ส่งไป PHP: budget | reserve | remaining
+          // col ที่ส่งไป PHP: budget | reserve | paid | remaining
           const colTypeMap = {
             income_used:  "budget",    bkk_used:  "budget",    gov_used:  "budget",    sav_used:  "budget",
             income_check: "reserve",   bkk_check: "reserve",   gov_check: "reserve",   sav_check: "reserve",
+            income_paid:  "paid",      bkk_paid:  "paid",      gov_paid:  "paid",      sav_paid:  "paid",      
             income_left:  "remaining", bkk_left:  "remaining", gov_left:  "remaining", sav_left:  "remaining",
             income_pct:   "reserve",   bkk_pct:   "reserve",   gov_pct:   "reserve",   sav_pct:   "reserve",
           };
           const colType = colTypeMap[col] || "reserve";
+
+          const dcCostId = new URLSearchParams(window.location.search).get("dc_cost_id") || "38";
 
           const url = `/supplies/bi/reports/Rep_DetailByTypeV5.php`
             + `?bg_expense_id=${encodeURIComponent(bg)}`
             + `&dc_expense_budget_type_id=${encodeURIComponent(bgex)}`
             + `&col=${encodeURIComponent(colType)}`
             + `&year_th=${yearTh}&year_en=${yearEn}`
+            + `&dc_cost_id=${encodeURIComponent(dcCostId)}`   
             + `&f_budget=${encodeURIComponent(fBudget)}`
             + `&f_reserve=${encodeURIComponent(fReserve)}`
             + `&f_remaining=${encodeURIComponent(fRemaining)}`

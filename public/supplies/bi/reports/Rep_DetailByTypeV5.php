@@ -9,7 +9,7 @@ $year_en = isset($_REQUEST["year_en"]) ? intval($_REQUEST["year_en"]) : intval(d
 $year_th = $year_en + 543;
 
 // ===== คอลัมน์ที่คลิกมาจาก DataView =====
-$col = in_array($_REQUEST["col"] ?? "", ["budget","reserve","remaining"])
+$col = in_array($_REQUEST["col"] ?? "", ["budget","reserve","remaining","paid"])
        ? $_REQUEST["col"] : "reserve";
 
 // ===== ยอดเงิน 3 คอลัมน์ที่ JS ส่งมา =====
@@ -30,12 +30,9 @@ $f_remaining     = floatval($_REQUEST["f_remaining"] ?? 0);
 $bg_expense_label = htmlspecialchars($_REQUEST["bg_expense_label"] ?? "");
 
 // mapping ชื่อ / สี / text-class ตามคอลัมน์ที่คลิก
-$colLabel = ["budget" => "งบประมาณ", "reserve" => "ที่ใช้ไป (จอง)", "remaining" => "คงเหลือหลังจองเงิน"][$col];
-$colColor = ["budget" => "#4e73df",  "reserve" => "#f6c23e",         "remaining" => "#1cc88a"][$col];
-$colText  = ["budget" => "text-primary", "reserve" => "text-warning", "remaining" => "text-success"][$col];
-
-$display_amount = ["budget" => $f_budget_total, "reserve" => $f_reserve_total, "remaining" => $f_remaining][$col];
-$pct_used = ($f_budget_total > 0) ? round(($f_reserve_total / $f_budget_total) * 100, 2) : 0;
+$colLabel = ["budget" => "งบประมาณ", "reserve" => "เงินจองงบประมาณ<br>ตามบัญชีจัดสรร", "remaining" => "คงเหลือหลังจองเงิน", "paid" => "เบิกจ่ายแล้ว"][$col];
+$colColor = ["budget" => "#4e73df",  "reserve" => "#f6c23e",         "remaining" => "#1cc88a",           "paid" => "#20c997"][$col];
+$colText  = ["budget" => "text-primary", "reserve" => "text-warning", "remaining" => "text-success",      "paid" => "text-info"][$col];
 
 // ===== ดึงข้อมูลจาก API =====
 $data_json = List_QueryParam();
@@ -52,6 +49,43 @@ $f_period_cut_total = floatval($data_arr['f_period_cut_total'] ?? 0);
 $contract_rows    = $data_arr["contract"]                  ?? [];
 $f_contract_total = floatval($data_arr["f_contract_total"] ?? 0);
 $total_contract   = count($contract_rows);
+
+// ✅ แก้ไข 3: คำนวณ "ที่ใช้ไป (จอง)" จากยอดรายการจริง (Result Set 1) แทนการเชื่อค่า
+// f_reserve ที่ส่งมาทาง URL จากหน้า Dashboard ก่อนหน้า (ซึ่งมาจากสโตร์โปรซีเยอร์
+// SP_BG_BUDGET_SUM คนละ query กับรายการ PR/PO ที่แสดงจริงในหน้านี้ ทำให้ยอดไม่ตรงกัน)
+//
+// [FIX 2026-07-28] เดิมเคยบวก + $f_contract_total เข้าไปด้วย โดยเข้าใจผิดว่า $f_pr_total
+// (จาก API) มีแค่ยอด PR ที่ยังไม่มี PO เท่านั้น แต่จริง ๆ Result Set 1 ใน List_DetailBgV5.php
+// (ที่มาของ $f_pr_total) กรองแค่ i_reserve != 3 ครอบคลุมทั้ง PR-stage (i_reserve=1) และ
+// PO-stage (i_reserve=2) อยู่แล้วโดยไม่ทับซ้อนกัน (คำนวณจาก SP_BG_RESERVE_MONEY โดยตรง
+// ซึ่งยืนยันแล้วว่ายอดถูกต้อง) การบวก $f_contract_total ซ้ำเข้าไปอีกจึงไม่ถูกต้อง
+// และยิ่งแย่กว่านั้นคือ $f_contract_total นับเฉพาะ PO ที่ i_own_match=1 (ตรงกับ bg_expense/
+// budget_type ที่กำลังกรองอยู่พอดี) ทำให้ PR ที่มี PO แต่ PO ถูก reclassify เป็นคนละ
+// bg_expense/budget_type สูญเงินไปจากทั้งสองยอด (ก่อนหน้านี้เคยถูกตัดออกจาก
+// $f_pr_only_total เพราะ has_po=1 ด้วย) รวมเป็นยอดหาย 1,776,100 บาทที่เจอ
+//
+// $f_contract_total ยังคงใช้แสดงในการ์ด "เงินจองสัญญา (PO)" แยกต่างหากตามปกติ
+// เพียงแค่ไม่ต้องเอามาบวกรวมกับ $f_pr_total อีก
+$f_reserve_total = $f_pr_total;
+
+// ===== เงินจองตรวจรับ / เบิกจ่ายแล้ว / D1 (ดึงจาก API ที่เพิ่มมาให้ตรงกับ Budget_Monitoring_Dashboard.php) =====
+$f_check_total   = floatval($data_arr['f_reserve_check_total'] ?? 0); // เงินจองตรวจรับ (i_reserve=3, i_finish=0)
+$f_paid_total    = floatval($data_arr['f_paid_total']          ?? 0); // เบิกจ่ายแล้ว (i_reserve=3, i_finish=1)
+$f_d1_not_finish = floatval($data_arr['f_d1_not_finish']       ?? 0); // D1 ที่ยังไม่เคลียร์
+
+// ✅ แก้ไข 4: สูตร "คงเหลือหลังจองเงิน" ให้ตรงกับ Budget_Monitoring_Dashboard.php
+// เดิม: f_remaining = f_budget_total - f_reserve_total (ไม่ได้หักเงินจองตรวจรับ/เบิกจ่ายแล้ว/D1 ออก ทำให้คงเหลือสูงเกินจริง)
+// สูตรจริงในหน้า Dashboard (Budget_Monitoring_Dashboard.js):
+//   remain = (dc_expense_budget_type_id === 5 ? Math.max(0, total - booked) : total - booked) - insp - paid - d1
+$dc_expense_budget_type_id = intval($_REQUEST["dc_expense_budget_type_id"] ?? 0);
+$f_reserve_net = ($dc_expense_budget_type_id === 5)
+    ? max(0, $f_budget_total - $f_reserve_total)
+    : ($f_budget_total - $f_reserve_total);
+$f_remaining = $f_reserve_net - $f_check_total - $f_paid_total - $f_d1_not_finish;
+
+// ===== ยอดที่แสดงในการ์ดบนสุด (ต้องคำนวณหลังจากได้ f_reserve_total/f_remaining ที่ถูกต้องแล้ว) =====
+$display_amount = ["budget" => $f_budget_total, "reserve" => $f_reserve_total, "remaining" => $f_remaining, "paid" => $f_paid_total][$col];
+$pct_used = ($f_budget_total > 0) ? round(($f_reserve_total / $f_budget_total) * 100, 2) : 0;
 
 // ✅ แก้ไข 2: ลบ special case 030300210001 ออก
 // เดิม block นี้บังคับให้ remaining = 0 เสมอ ทำให้คงเหลือแสดงไม่ถูกต้อง
@@ -129,7 +163,7 @@ function thaiDate($dateStr)
         </div>
         <div class="col-md-4 col-sm-6 mb-3">
             <div class="stat-card" style="border-left-color:#f6c23e;<?= $col==='reserve' ? ' outline:2px solid #f6c23e;' : '' ?>">
-                <div class="stat-title">ที่ใช้ไป (จอง)</div>
+                <div class="stat-title">เงินจองงบประมาณตามบัญชีจัดสรร</div>
                 <div class="stat-value text-warning"><?= number_format($f_reserve_total, 2) ?></div>
                 <div class="small text-muted"><?= $pct_used ?>% ของงบประมาณ</div>
             </div>
@@ -138,6 +172,22 @@ function thaiDate($dateStr)
             <div class="stat-card" style="border-left-color:#1cc88a;<?= $col==='remaining' ? ' outline:2px solid #1cc88a;' : '' ?>">
                 <div class="stat-title">คงเหลือหลังจองเงิน</div>
                 <div class="stat-value text-success"><?= number_format($f_remaining, 2) ?></div>
+            </div>
+        </div>
+
+        <!-- เงินจองตรวจรับ (i_reserve=3, i_finish=0) -->
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="stat-card" style="border-left-color:#6f42c1;">
+                <div class="stat-title">เงินจองตรวจรับ</div>
+                <div class="stat-value" style="color:#6f42c1;"><?= number_format($f_check_total, 2) ?></div>
+            </div>
+        </div>
+
+        <!-- เบิกจ่ายแล้ว (i_reserve=3, i_finish=1) -->
+        <div class="col-md-3 col-sm-6 mb-3">
+            <div class="stat-card" style="border-left-color:#20c997;<?= $col==='paid' ? ' outline:2px solid #20c997;' : '' ?>">
+                <div class="stat-title">เบิกจ่ายแล้ว</div>
+                <div class="stat-value text-info"><?= number_format($f_paid_total, 2) ?></div>
             </div>
         </div>
 
@@ -318,8 +368,9 @@ function thaiDate($dateStr)
                             elseif (strpos($status, 'รอ') !== false) $badgeClass = 'bg-status-orange';
 
                             $f_amt_contract = floatval($row['f_amt_contract'] ?? 0);
+                            $is_cross_type  = !empty($row['is_cross_type']);
                         ?>
-                            <tr>
+                            <tr<?= $is_cross_type ? ' style="background:#fff8e1;"' : '' ?>>
                                 <td class="text-center text-muted"><?= $i + 1 ?></td>
                                 <td class="font-weight-bold text-danger"><?= $row['po_code'] ?? '-' ?></td>
                                 <td style="vertical-align: top;">
@@ -337,10 +388,13 @@ function thaiDate($dateStr)
                                 <td>
                                     <div style="font-size:0.9rem;"><?= $row['dc_expense_budget_type'] ?? '-' ?></div>
                                     <small class="text-muted"><?= $row['bg_expense'] ?? '' ?></small>
+                                    <?php if ($is_cross_type): ?>
+                                        <br><small class="text-warning" title="PR ต้นทางจองไว้ในแหล่งเงินที่กำลังดูอยู่ แต่ PO ฉบับนี้ผูกกับแหล่งเงินอื่น จึงไม่ถูกรวมในยอด 'เงินจองงบประมาณตามบัญชีจัดสรร' ของแหล่งเงินนี้">⚠ ข้ามแหล่งเงิน (ไม่รวมยอด)</small>
+                                    <?php endif; ?>
                                 </td>
                                 <td><?= $row['sp_emp'] ?? '-' ?></td>
                                 <td><?= $row['dc_department'] ?? '-' ?></td>
-                                <td class="text-right font-weight-bold text-danger">
+                                <td class="text-right font-weight-bold <?= $is_cross_type ? 'text-muted' : 'text-danger' ?>">
                                     <?= number_format($f_amt_contract, 2) ?>
                                 </td>
                             </tr>
@@ -393,6 +447,8 @@ function thaiDate($dateStr)
         var fPrOnlyTotal = <?= json_encode($f_pr_total) ?>;
         var fPrWithPo    = 0;
         var fPrTotal     = <?= json_encode($f_pr_total) ?>;
+        var fCheck       = <?= json_encode($f_check_total) ?>;
+        var fPaid        = <?= json_encode($f_paid_total) ?>;
         var bgLabel      = <?= json_encode($bg_expense_label) ?>;
         var yearTh       = <?= json_encode($year_th) ?>;
 
@@ -451,6 +507,8 @@ function thaiDate($dateStr)
             sumrem_bg:'D4EDDA', sumrem_fc:'155724',
             amt_fc:   '1A56DB',
             pr_fc2:   '17A2B8',
+            chk_bg:   'E2D9F3', chk_fc:   '432874',
+            paid_bg:  'D1F5E8', paid_fc:  '0F6848',
         };
 
         function makeSummary(r3Bg, r3Fc, r3Label) {
@@ -459,8 +517,12 @@ function thaiDate($dateStr)
                 [
                     cell("งบประมาณ",          C.bud_bg, C.bud_fc, true),
                     cell(fBudget,              C.num_bg, null,     true, numFmt),
-                    cell("ที่ใช้ไป (จอง)",    C.res_bg, C.res_fc, true),
+                    cell("เงินจองงบประมาณตามบัญชีจัดสรร",    C.res_bg, C.res_fc, true),
                     cell(fReserve,             C.num_bg, null,     true, numFmt),
+                    cell("เงินจองตรวจรับ",     C.chk_bg, C.chk_fc, true),
+                    cell(fCheck,               C.num_bg, null,     true, numFmt),
+                    cell("เบิกจ่ายแล้ว",       C.paid_bg,C.paid_fc,true),
+                    cell(fPaid,                C.num_bg, null,     true, numFmt),
                     cell("คงเหลือ",            C.rem_bg, C.rem_fc, true),
                     cell(fRemaining,           C.num_bg, null,     true, numFmt),
                     cell("เงินจอง PR",         C.pr_bg,  C.pr_fc,  true),
@@ -539,6 +601,8 @@ function thaiDate($dateStr)
         var fReserve       = <?= json_encode($f_reserve_total) ?>;
         var fRemaining     = <?= json_encode($f_remaining) ?>;
         var fContractTotal = <?= json_encode($f_contract_total) ?>;
+        var fCheck         = <?= json_encode($f_check_total) ?>;
+        var fPaid          = <?= json_encode($f_paid_total) ?>;
         var bgLabel        = <?= json_encode($bg_expense_label) ?>;
         var yearTh         = <?= json_encode($year_th) ?>;
 
@@ -596,6 +660,8 @@ function thaiDate($dateStr)
             sumcon_bg:'FADBD8', sumcon_fc:'922B21',
             sumrem_bg:'D4EDDA', sumrem_fc:'155724',
             con_fc2:  'C0392B',
+            chk_bg:   'E2D9F3', chk_fc:   '432874',
+            paid_bg:  'D1F5E8', paid_fc:  '0F6848',
         };
 
         function makeSummary(r3Bg, r3Fc, r3Label) {
@@ -604,8 +670,12 @@ function thaiDate($dateStr)
                 [
                     cell("งบประมาณ",          C.bud_bg, C.bud_fc, true),
                     cell(fBudget,              C.num_bg, null,     true, numFmt),
-                    cell("ที่ใช้ไป (จอง)",    C.res_bg, C.res_fc, true),
+                    cell("เงินจองงบประมาณตามบัญชีจัดสรร",    C.res_bg, C.res_fc, true),
                     cell(fReserve,             C.num_bg, null,     true, numFmt),
+                    cell("เงินจองตรวจรับ",     C.chk_bg, C.chk_fc, true),
+                    cell(fCheck,               C.num_bg, null,     true, numFmt),
+                    cell("เบิกจ่ายแล้ว",       C.paid_bg,C.paid_fc,true),
+                    cell(fPaid,                C.num_bg, null,     true, numFmt),
                     cell("คงเหลือ",            C.rem_bg, C.rem_fc, true),
                     cell(fRemaining,           C.num_bg, null,     true, numFmt),
                     cell("เงินจองสัญญา (PO)", C.con_bg, C.con_fc, true),

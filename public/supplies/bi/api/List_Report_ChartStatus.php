@@ -85,7 +85,29 @@ function List_QueryParam()
         CASE 
             WHEN t.act_date IS NOT NULL THEN 'จ่ายงานแล้ว'
             ELSE 'รอดำเนินการ'
-        END AS status_name
+        END AS status_name,
+
+        -- ✅ เพิ่ม: จำนวนเงิน
+        ISNULL(a.f_total_amt, 0) AS f_amt,
+
+        -- ✅ เพิ่ม: สถานะใบขอเบิก
+        CASE CAST(pb.i_sub_status AS FLOAT)
+            WHEN 0.3  THEN N'รอผู้ดำเนินการลงนาม'
+            WHEN 0.4  THEN N'รอผู้ขอเบิกลงนาม'
+            WHEN 0.5  THEN N'รอฝ่ายการคลังลงนาม'
+            WHEN 1    THEN N'รอรับใบขอเบิก'
+            WHEN 2    THEN N'รอผู้ตรวจสอบลงนาม'
+            WHEN 3    THEN N'ทักท้วง'
+            WHEN 4    THEN N'รอตรวจสอบงบประมาณ'
+            WHEN 5    THEN N'รอฝ่ายการคลังลงนาม'
+            WHEN 6    THEN N'รอผู้อนุมัติลงนาม'
+            WHEN 7    THEN N'รอเตรียมจ่าย'
+            WHEN 8    THEN N'รอหัวหน้าฝ่ายการคลังลงนามเช็ค'
+            WHEN 9    THEN N'รอผู้บริหารลงนามเช็ค'
+            WHEN 10   THEN N'รอทำทะเบียนจ่าย'
+            WHEN 11   THEN N'ทำทะเบียนจ่าย'
+            ELSE N'อยู่ระหว่างการจัดทำใบขอเบิก'
+        END AS sub_status_name
 
     FROM NMU_ERP..sp_tor a
     OUTER APPLY (
@@ -93,6 +115,17 @@ function List_QueryParam()
         FROM sp_tor_item 
         WHERE tor_id = a.tor_id AND sp_status_hdr_id = 25
     ) t
+    OUTER APPLY (
+        SELECT TOP 1 beg.i_sub_status
+        FROM NMU_ERP..sp_tor_contract       c
+        JOIN NMU_ERP..sp_tor_hdr_period     p   ON p.sp_tor_contract_id     = c.sp_tor_contract_id
+        JOIN NMU_ERP..sp_check_period_hdr   chk ON chk.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id
+        JOIN NMU_EIS..po_working_hdr        w   ON w.po_working_hdr_id      = chk.po_working_hdr_id
+        JOIN NMU_EIS..po_working_begin_hdr  beg ON beg.po_working_begin_hdr_id = w.po_working_begin_hdr_id
+        WHERE c.sp_tor_id = a.tor_id
+          AND beg.i_sub_status IS NOT NULL
+        ORDER BY w.po_working_hdr_id DESC
+    ) pb
     WHERE a.i_enabled = 1
       AND ISNULL(a.i_is_notor, 0) = 0
       AND ISNULL(a.i_parent, 0) = 0
@@ -104,6 +137,13 @@ function List_QueryParam()
           (a.i_yyyy = $yearEn AND MONTH(a.d_create) BETWEEN 1 AND 9)
       )";
 
+    // Debug helper: return the SQL (with parameters interpolated) when ?debug=1 is provided
+    if (isset($_REQUEST['debug']) && intval($_REQUEST['debug']) === 1) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'sql' => $db->debugSql($sqlMain, [])], JSON_UNESCAPED_UNICODE);
+        return;
+    }
+
     $stmt = $db->QueryParam($sqlMain, array());
     $data = [];
     if ($stmt) {
@@ -114,7 +154,9 @@ function List_QueryParam()
                 'staff_name'   => $row['staff_name'],
                 'sp_emp_id'    => intval($row['sp_emp_id']),
                 'method_name'  => $row['method_name'],
-                'status_name'  => $row['status_name']
+                'status_name'  => $row['status_name'],
+                'f_amt'          => floatval($row['f_amt']),          // ✅ เพิ่ม
+                'sub_status_name'=> $row['sub_status_name'],          // ✅ เพิ่ม
             ];
         }
     }
