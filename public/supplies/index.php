@@ -54,21 +54,14 @@ include "bi/logic/permission_logic.php";
                     Ext.Ajax.on('requestcomplete', Ext.getBody().unmask, Ext.getBody());
                     Ext.Ajax.on('requestexception', Ext.getBody().unmask, Ext.getBody());
                 };
-                Ext.ipServer = "<?php echo htmlspecialchars(
-                    (string) ($_SERVER['SERVER_ADDR'] ?? $_SERVER['LOCAL_ADDR'] ?? '127.0.0.1'),
-                    ENT_QUOTES,
-                    'UTF-8'
-                ); ?>";
+                Ext.ipServer = "<?php
+echo htmlspecialchars(
+        (string) ($_SERVER['SERVER_ADDR'] ?? $_SERVER['LOCAL_ADDR'] ?? '127.0.0.1'),
+        ENT_QUOTES,
+        'UTF-8'
+);
+?>";
                 Ext.NMU_PERMISSION = "<?php echo NMU_PERMISSION_HOST; ?>";
-//                var user = '<?php echo $ss_username ?>';
-//                var user_id = <?php echo $ss_user_id ?>;
-//                var emp_id = <?php echo $ss_emp_id ?>;
-//                var cost_id = <?php echo $ss_cost_id ?>;
-//                var view = <?php echo $ss_view ?? 1 ?>;
-//                //0 => all ,1 => only , 2 => cost;
-//                Ext.JsonMsg = '{"sessId":"","user_id":' + user_id + ',"user_chat_id":0,"sp_emp_id":' + emp_id + ',"cost_id":' + cost_id + ',"view":' + view + ',"typemsg":"connect","msg":"","user_name":"' + user + '","datetime":"","useronline":0}';
-//
-//                // Permission Logic
                 window.USER_HAS_PERMISSION = <?php echo $permission ? 'true' : 'false'; ?>;
 
 

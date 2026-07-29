@@ -1,0 +1,236 @@
+.td-success {
+  background: #e4ffe4;
+}
+/*application_start.png*/
+.td-error {
+  background: #ffe4e4;
+}
+.icon-back {
+    background-image: url(../images/icons/arrow_refresh_small.png);
+}
+.icon-building-edit {
+  background-image: url(../images/icons/building_edit.png);
+}
+.icon-table_delete {
+  background-image: url(../images/icons/table_delete.png);
+}
+.icon-arrow_undo {
+  background-image: url(../images/icons/arrow_undo.png);
+}
+.icon-start {
+    background-image: url(../images/icons/application_start.png);
+}
+.icon-contract {
+    background-image: url(../images/icons/application_side_contract.png);
+}
+.icon-detail {
+    background-image: url(../images/icons/application_view_detail.png);
+}
+.icon-add {
+    background-image: url(../images/icons/drop-add.gif);
+}
+.icon-del {
+  background-image: url(../images/icons/drop-no.gif);
+}
+.icon-yes {
+  background-image: url(../images/icons/drop-yes.gif);
+}
+.icon-save-darf {
+  background-image: url(../images/icons/page_save.png) !important;
+}
+.icon-save {
+  background-image: url(../images/icons/save.png) !important;
+}
+.icon-back {
+    background-image: url(../images/icons/page_cancel.png) !important;
+}
+.icon-script-save {
+    background-image: url(../images/icons/script_save.png) !important;
+}
+.icon-save-edit {
+    background-image: url(../images/icons/disk_edit.png) !important;
+}
+.icon-save-booking {
+    background-image: url(../images/icons/book_edit.png.png) !important;
+}
+.icon-excl {
+  background-image: url(../images/icons/exclamation.gif);
+}
+.icon-html {
+  background-image: url(../images/icons/file-htm.ico);
+}
+.icon-downloadHTML {
+  background-image: url(../images/icons/file-download.ico);
+}
+.icon-magnifier {
+  background-image: url(../images/icons/magnifier2.png);
+}
+.icon-clear {
+  background-image: url(../images/icons/decline.png);
+} /*for poplov*/
+.page_magnify {
+  background-image: url(../images/icons/page_magnify.png);
+}
+.database_start {
+  background-image: url(../images/icons/database_start.png);
+}
+.book_open_mark {
+  background-image: url(../images/icons/book_open_mark.png);
+}
+.page-copy-icon {
+  background-image: url(../images/icons/page-copy-icon.png);
+}
+.printer_mono {
+  background-image: url(../images/icons/printer_mono.png);
+}
+.import_excel {
+  background-image: url(../images/icons/page_white_excel.png);
+}
+.icon-excel {
+  background-image: url(../images/icons/excel1.png);
+  background-repeat: no-repeat;
+  padding: 0px 20px 20px 20px;
+
+  /*background-size:cover;*/
+}
+.icon-tag-yellow {
+  background-image: url(../images/icons/tag_yellow.png);
+}
+.icon-delete {
+  background-image: url(../images/icons/delete.png);
+}
+.icon-star {
+  background-image: url(../images/icons/star.png);
+}
+.icon-application-form-add {
+  background-image: url(../images/icons/application_form_add.png);
+}
+.icon-application-view-list {
+  background-image: url(../images/icons/application_view_list.png);
+}
+.icon-refresh {
+  background-image: url(../images/icons/arrow_refresh_small.png);
+}
+.icon-report {
+  background-image: url(../images/icons/report.png);
+}
+.icon-report-start {
+  background-image: url(../images/icons/report_start.png);
+}
+.icon-page-white-stack {
+  background-image: url(../images/icons/page_white_stack.png);
+}
+.icon-bin {
+  background-image: url(../images/icons/bin.gif);
+}
+.icon-cancel {
+  background-image: url(../images/icons/bullet_cross.png);
+}
+.icon-list {
+  background-image: url(../images/icons/text_list_bullets.png);
+}
+.icon-copy {
+  background-image: url(../images/icons/page_copy.png);
+}
+.icon-paste {
+  background-image: url(../images/icons/page_paste.png);
+}
+.icon-folder-user {
+    background-image: url(../images/icons/folder_user.png);
+}
+.icon-grid {
+    background-image: url(../images/icons/table_row.png);
+}
+.icon-form {
+    background-image: url(../images/icons/application_form_add.png);
+}
+.icon-user-edit {
+    background-image: url(../images/icons/user_edit.png);
+}
+.icon-user-home {
+    background-image: url(../images/icons/user_home.png);
+}
+.icon-report-user {
+    background-image: url(../images/icons/report_user.png);
+}
+.icon-bullet_home {
+    background-image: url(../images/icons/bullet_home.png);
+}
+.icon-user-comment {
+    background-image: url(../images/icons/user_comment.png);
+}
+.icon-pdf {
+    background-image: url(../images/icons/icon_pdf.png);
+    background-repeat: no-repeat;
+    padding: 0px 20px 20px 20px;
+}
+.icon-chart-pie{ 
+    background-image: url(../images/icons/chart_pie.png);
+} 
+.icon-pr{ 
+    background-image: url(../images/icons/application.png);
+} 
+.icon-audit{ 
+    background-image: url(../images/icons/application_start.png);
+} 
+.icon-sign{ 
+    background-image: url(../images/icons/application_osx_get.png);
+}  
+.grid-odd {
+  background-color: #f5f5f5;
+}
+.grid-even {
+  background-color: #ffffff;
+}
+.x-btn-text-icon .x-btn-icon-small-left .x-btn-text {
+  padding: 3px 0px 3px 18px;
+}
+.x-toolbar-right {
+  padding: 2px 0px 4px 0px;
+}
+/*HEADER CENTER*/
+.x-grid3-hd-row {
+  text-align: center;
+}
+.ui-label {
+  font-weight: bold;
+  text-align: left;
+  /* 	padding:4px;  */
+}
+.float-textfield {
+  color: blue;
+  font-weight: bold;
+  text-align: right;
+}
+.blink {
+  animation: blink-animation 1s steps(5, start) infinite;
+  -webkit-animation: blink-animation 1s steps(5, start) infinite;
+}
+@keyframes blink-animation {
+  to {
+    visibility: hidden;
+  }
+}
+@-webkit-keyframes blink-animation {
+  to {
+    visibility: hidden;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.disabled-row {
+  border: 5px;
+  color:#15428b !important;
+  background: #D3D3D3;
+  text-decoration : line-through;
+ font-style:italic !important;
+
+}

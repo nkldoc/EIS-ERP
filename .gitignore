@@ -1,4 +1,5 @@
 # php
 /public/supplies/conf/config.php
+/public/procure/conf/config.php
 /storage/sessions/
 /storage/logs/

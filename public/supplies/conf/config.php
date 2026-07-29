@@ -31,16 +31,7 @@ if (!empty($_SESSION['user_id']) && !empty($_SESSION['last_activity']) && ($now 
 } elseif (!empty($_SESSION['user_id'])) {
     $_SESSION['last_activity'] = $now;
 }
-// ต่ออายุ cookie ทุกครั้งที่มีการใช้งาน
-if (!headers_sent() && session_status() === PHP_SESSION_ACTIVE) {
-    setcookie(session_name(), session_id(), [
-        'expires' => time() + $timeout,
-        'path' => '/',
-        'secure' => $isHttps,
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
-}
+
 
 // สุ่มล้าง Session ที่หมดอายุ
 if (rand(1, 50) === 1 && function_exists('session_gc')) {
