@@ -1,5 +1,22 @@
-# php
+# Local application configuration
 /public/supplies/conf/config.php
 /public/procure/conf/config.php
+
+# Runtime data
 /storage/sessions/
 /storage/logs/
+*.log
+*.tmp
+*.cache
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# IDE and operating-system metadata
+/.idea/
+/.vscode/
+**/desktop.ini
+**/Thumbs.db
+**/.DS_Store
