@@ -1,12 +1,12 @@
-/* global Ext */
+﻿/* global Ext */
 
 Ext.onReady(function () {
     Ext.QuickTips.init();
     Ext.idRep = 'frm-repSpEmp';
     //Spring Boot cross context
-    Ext.urlReport = (true) ? '../../reports/repProApNonePo' : '../../reports/printr.php?get=true'; //DEBUG  
+    Ext.urlReport = (true) ? 'https://eis.nmu.ac.th:8443/reports/repProApNonePo' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
     //
-//    Ext.urlReport = (false) ? '../../reports/pro/reportSpEmp' : '../../reports/printr.php?get=true'; //DEBUG  
+//    Ext.urlReport = (false) ? 'https://eis.nmu.ac.th:8443/reports/pro/reportSpEmp' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
     Ext.dc_expense_budget_type = new Ext.data.JsonStore({
         autoDestroy: false,
         autoLoad: true,

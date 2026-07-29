@@ -1,11 +1,11 @@
-/* global Ext */
+﻿/* global Ext */
 Ext.onReady(function () {
     Ext.QuickTips.init();
     Ext.idRep = "frm-repTor";
 
     //Spring Boot cross context
-    Ext.urlReport1 = 1 ? "../../reports/repBudGetOverlap" : "../../reports/printr.php?get=true"; //DEBUG 
-//   Ext.urlReport1 = false ? "../../reports/repBudGetOverlap" : "../../reports/printr.php?get=true"; //DEBUG
+    Ext.urlReport1 = 1 ? "https://eis.nmu.ac.th:8443/reports/repBudGetOverlap" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG 
+//   Ext.urlReport1 = false ? "https://eis.nmu.ac.th:8443/reports/repBudGetOverlap" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG
 
     Ext.titleReport = "รายงานการใช้ใบกันเหลื่อม ฝ่ายพัสดุ";
     function PermissionEmp(p) {

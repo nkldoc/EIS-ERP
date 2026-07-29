@@ -1,10 +1,10 @@
-/* global Ext */
+﻿/* global Ext */
 Ext.onReady(function () {
   Ext.QuickTips.init();
   Ext.idRep = "frm-repTor";
   //Spring Boot cross context
-    Ext.urlReport = true ? "../../reports/repProSpContract" : "../../reports/printr.php?get=true"; //DEBUG
-//    Ext.urlReport = false ? "../../reports/repSpContract" : "../../reports/printr.php?get=true"; //DEBUG
+    Ext.urlReport = true ? "https://eis.nmu.ac.th:8443/reports/repProSpContract" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG
+//    Ext.urlReport = false ? "https://eis.nmu.ac.th:8443/reports/repSpContract" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG
   // Spring Boot
   Ext.titleReport = "รายงานผลจัดทำสัญญาหรือข้อตกลงเป็นหนังสือ";
 

@@ -1,12 +1,12 @@
-/* global Ext */
+﻿/* global Ext */
 
 Ext.onReady(function () {
     Ext.QuickTips.init();
     Ext.idRep = 'frm-Rep_ExpenseBgType';
     //Spring Boot cross context
-    Ext.urlReport = (true) ? '../../reports/Rep_ExpenseBgType' : '../../reports/printr.php?get=true'; //DEBUG  
- //   Ext.urlReport = (true) ? 'http://localhost:8081/reports/reportSpEmp' : '../../reports/printr.php?get=true'; //DEBUG  
-//    Ext.urlReport = (false) ? '../../reports/reportSpEmp' : '../../reports/printr.php?get=true'; //DEBUG 
+    Ext.urlReport = (true) ? 'https://eis.nmu.ac.th:8443/reports/Rep_ExpenseBgType' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
+ //   Ext.urlReport = (true) ? 'https://eis.nmu.ac.th:8443/reports/reportSpEmp' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
+//    Ext.urlReport = (false) ? 'https://eis.nmu.ac.th:8443/reports/reportSpEmp' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG 
     // Spring Boot
     Ext.titleReport = 'รายงานแหล่งเงิน';
 
