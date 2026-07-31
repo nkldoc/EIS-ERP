@@ -1,9 +1,4 @@
 const Uiedit_contractNew = function (rec) {
-  const apiBgBaseUrl = "https://eis.nmu.ac.th/api-nmu";
-  const apiBgAmount = function (value) {
-    return String(value == null ? 0 : value).replace(/,/g, "");
-  };
-
   Ext.SpHoliday = new Ext.data.JsonStore({
     autoLoad: true,
     storeId: "myStoreCost",
@@ -121,7 +116,7 @@ const Uiedit_contractNew = function (rec) {
     dc_budget_type_id = Ext.selectRow.get("dc_expense_budget_type_id");
 
     var link =
-      apiBgBaseUrl +
+      Ext.session.IPAPIBG +
       "/?/bg/mn_BgReserveMoney/mode/POST" +
       "/i_sys/1" +
       "/pr_id/" +
@@ -143,7 +138,7 @@ const Uiedit_contractNew = function (rec) {
       "/i_last/" +
       (Ext.selectRow.get("i_type_contract") == 3 ? 0 : 1) +
       "/f_amt/" +
-      apiBgAmount(v);
+      v;
 
     Ext.Ajax.request({
       url: link,
@@ -274,7 +269,7 @@ const Uiedit_contractNew = function (rec) {
     dc_budget_type_id = Ext.selectRow.get("dc_expense_budget_type2_id");
 
     var link =
-      apiBgBaseUrl +
+      Ext.session.IPAPIBG +
       "/?/bg/mn_BgReserveMoney/mode/POST" +
       "/i_sys/1" +
       "/pr_id/" +
@@ -296,7 +291,7 @@ const Uiedit_contractNew = function (rec) {
       "/i_last/" +
       (Ext.selectRow.get("i_type_contract") == 3 ? 0 : 1) +
       "/f_amt/" +
-      apiBgAmount(v);
+      v;
     Ext.Ajax.request({
       url: link,
       method: "GET", //POST
@@ -331,7 +326,7 @@ const Uiedit_contractNew = function (rec) {
     dc_budget_type_id = Ext.selectRow.get("dc_expense_budget_type3_id");
 
     var link =
-      apiBgBaseUrl +
+      Ext.session.IPAPIBG +
       "/?/bg/mn_BgReserveMoney/mode/POST" +
       "/i_sys/1" +
       "/pr_id/" +
@@ -353,7 +348,7 @@ const Uiedit_contractNew = function (rec) {
       "/i_last/" +
       (Ext.selectRow.get("i_type_contract") == 3 ? 0 : 1) +
       "/f_amt/" +
-      apiBgAmount(v);
+      v;
     Ext.Ajax.request({
       url: link,
       method: "GET", //POST
@@ -395,7 +390,7 @@ const Uiedit_contractNew = function (rec) {
     }
 
     var link =
-      apiBgBaseUrl +
+      Ext.session.IPAPIBG +
       "/?/bg/mn_BgReserveMoney/mode/PUT" +
       "/bg_reserve_money_id/" +
       bg_reserve_money_id +
@@ -407,7 +402,7 @@ const Uiedit_contractNew = function (rec) {
       Ext.selectRow.get("po_expense_id") +
       "/i_last/1" +
       "/f_amt/" +
-      apiBgAmount(v);
+      v;
     Ext.Ajax.request({
       url: link,
       method: "GET", //POST
@@ -626,7 +621,7 @@ const Uiedit_contractNew = function (rec) {
                   switch (event) {
                     case "c_overlap":
                       link =
-                        apiBgBaseUrl +
+                        Ext.session.IPAPIBG +
                         "/?/bg/BgBudgetAllSupplies" +
                         "/i_year/" +
                         rec.get("i_yyyy_overlap") +
@@ -642,7 +637,7 @@ const Uiedit_contractNew = function (rec) {
                       break;
                     case "c_overlap_book":
                       link =
-                        apiBgBaseUrl +
+                        Ext.session.IPAPIBG +
                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                         "/i_sys/1" +
                         "/pr_id/" +
@@ -666,7 +661,7 @@ const Uiedit_contractNew = function (rec) {
                         "/c_code_overlap/" +
                         encodeURIComponent(rec.get("c_overlap")) +
                         "/f_amt/" +
-                        apiBgAmount(rec.get("f_total_amt"));
+                        rec.get("f_total_amt");
                       break;
                   }
                   return link;
