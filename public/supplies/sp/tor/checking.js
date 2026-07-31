@@ -3,10 +3,6 @@ Ext.isBook = null;
         Ext.isOverlap = null;
         Ext.formSubmitHistory = [];
         Ext.submod = "";
-        Ext.apiBgBaseUrl = "https://eis.nmu.ac.th/api-nmu";
-        Ext.getApiBgAmount = function (value) {
-                return String(value == null ? 0 : value).replace(/,/g, "");
-        };
         Ext.confirmSessionRenewal = function (action) {
         var result = action && action.result ? action.result : {};
                 var message = String(result.msg || "");
@@ -4056,34 +4052,34 @@ Ext.isBook = null;
                                                                                                                                                                 }
                                                                                                                                                                 };
                                                                                                                                                                 Ext.editHistoryAp = (statusx) => {
-                                                                                                                                                                if (!Ext.selectRow || typeof Ext.selectRow.get !== "function") {
-                                                                                                                                                                Ext.Msg.alert("แจ้งเตือน", "ไม่พบรายการที่ต้องการแก้ไข กรุณาเลือกรายการใหม่");
-                                                                                                                                                                        return;
-                                                                                                                                                                }
-                                                                                                                                                                var selectedItemName = Ext.selectRow.get("c_name")
-                                                                                                                                                                        || Ext.selectRow.get("c_name_dtl")
-                                                                                                                                                                        || "";
+                                                                                                                                                        if (!Ext.selectRow || typeof Ext.selectRow.get !== "function") {
+                                                                                                                                                        Ext.Msg.alert("แจ้งเตือน", "ไม่พบรายการที่ต้องการแก้ไข กรุณาเลือกรายการใหม่");
+                                                                                                                                                                return;
+                                                                                                                                                        }
+                                                                                                                                                        var selectedItemName = Ext.selectRow.get("c_name")
+                                                                                                                                                                || Ext.selectRow.get("c_name_dtl")
+                                                                                                                                                                || "";
                                                                                                                                                                 var existingPeriodWindow = Ext.getCmp("winPeriodHdrID");
                                                                                                                                                                 if (existingPeriodWindow) {
-                                                                                                                                                                existingPeriodWindow.destroy();
-                                                                                                                                                                }
-                                                                                                                                                                Ext.currentEditHistoryStatus = statusx || "edit";
+                                                                                                                                                        existingPeriodWindow.destroy();
+                                                                                                                                                        }
+                                                                                                                                                        Ext.currentEditHistoryStatus = statusx || "edit";
                                                                                                                                                                 var periodWindow = Ext.AppPoStore(Ext.currentEditHistoryStatus);
                                                                                                                                                                 if (!periodWindow) {
-                                                                                                                                                                Ext.Msg.alert("แจ้งเตือน", "ไม่สามารถสร้างหน้าต่างแก้ไขรายการได้");
-                                                                                                                                                                        return;
-                                                                                                                                                                }
-                                                                                                                                                                periodWindow.show();
+                                                                                                                                                        Ext.Msg.alert("แจ้งเตือน", "ไม่สามารถสร้างหน้าต่างแก้ไขรายการได้");
+                                                                                                                                                                return;
+                                                                                                                                                        }
+                                                                                                                                                        periodWindow.show();
                                                                                                                                                                 var chequeTabs = Ext.getCmp("winChequeID");
                                                                                                                                                                 var editForm = chequeTabs && chequeTabs.items && chequeTabs.items.items
-                                                                                                                                                                        ? chequeTabs.items.items[0]
-                                                                                                                                                                        : null;
+                                                                                                                                                                ? chequeTabs.items.items[0]
+                                                                                                                                                                : null;
                                                                                                                                                                 if (!editForm || typeof editForm.getForm !== "function") {
-                                                                                                                                                                periodWindow.destroy();
-                                                                                                                                                                        Ext.Msg.alert("แจ้งเตือน", "ไม่พบแบบฟอร์มรายละเอียดการตรวจรับ");
-                                                                                                                                                                        return;
-                                                                                                                                                                }
-                                                                                                                                                                Ext.resetTransfTotal(false);
+                                                                                                                                                        periodWindow.destroy();
+                                                                                                                                                                Ext.Msg.alert("แจ้งเตือน", "ไม่พบแบบฟอร์มรายละเอียดการตรวจรับ");
+                                                                                                                                                                return;
+                                                                                                                                                        }
+                                                                                                                                                        Ext.resetTransfTotal(false);
                                                                                                                                                                 periodWindow.getEl().mask("Please wait...", "x-mask-loading");
                                                                                                                                                                 editForm.getForm().loadRecord(Ext.selectRow);
                                                                                                                                                                 Ext.HDR_ID = Ext.selectRow.data.po_working_hdr_id;
@@ -4119,12 +4115,12 @@ Ext.isBook = null;
                                                                                                                                                         var failedPeriodWindow = Ext.getCmp("winPeriodHdrID");
                                                                                                                                                                 if (failedPeriodWindow && failedPeriodWindow.getEl()) {
                                                                                                                                                         failedPeriodWindow.getEl().unmask();
-                                                                                                                                                                }
-                                                                                                                                                                Ext.Msg.alert(
-                                                                                                                                                                        "แจ้งเตือน",
-                                                                                                                                                                        success
-                                                                                                                                                                                ? "ไม่พบข้อมูลรายละเอียดงวดที่ต้องการแก้ไข"
-                                                                                                                                                                                : "ไม่สามารถโหลดข้อมูลรายละเอียดงวดได้ กรุณาลองใหม่"
+                                                                                                                                                        }
+                                                                                                                                                        Ext.Msg.alert(
+                                                                                                                                                                "แจ้งเตือน",
+                                                                                                                                                                success
+                                                                                                                                                                ? "ไม่พบข้อมูลรายละเอียดงวดที่ต้องการแก้ไข"
+                                                                                                                                                                : "ไม่สามารถโหลดข้อมูลรายละเอียดงวดได้ กรุณาลองใหม่"
                                                                                                                                                                 );
                                                                                                                                                                 return;
                                                                                                                                                         }
@@ -4154,11 +4150,11 @@ Ext.isBook = null;
                                                                                                                                                                 if (success) {
                                                                                                                                                         Ext.getCmp("winPeriodHdrID").getEl().unmask();
                                                                                                                                                                 if (Ext.isEmpty(rec[0].get("c_name"))) {
-                                                                                                                                                                rec[0].data.c_name = selectedItemName
-                                                                                                                                                                        || rec[0].get("c_name_dtl")
-                                                                                                                                                                        || "";
-                                                                                                                                                                }
-                                                                                                                                                                Ext.getCmp("gridSub2ID").isController("editMaingrid", rec[0]);
+                                                                                                                                                        rec[0].data.c_name = selectedItemName
+                                                                                                                                                                || rec[0].get("c_name_dtl")
+                                                                                                                                                                || "";
+                                                                                                                                                        }
+                                                                                                                                                        Ext.getCmp("gridSub2ID").isController("editMaingrid", rec[0]);
                                                                                                                                                                 if (statusx === "edit") {
                                                                                                                                                         Ext.getCmp("c_name_dtlID").setValue(rec[0].data.c_name_dtl + rec[0].data.c_i_perod);
                                                                                                                                                         }
@@ -4275,12 +4271,12 @@ Ext.isBook = null;
                                                                                                                                                         Ext.getCmp("c_booking_radiogroup").hide();
                                                                                                                                                         }
                                                                                                                                                         Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                                                                                                                                                                 if (Ext.selectRow.data.po_working_hdr_id_edit == "0" && statusx === "editMaingrid" && [null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
+                                                                                                                                                                if (Ext.selectRow.data.po_working_hdr_id_edit == "0" && statusx === "editMaingrid" && [null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
                                                                                                                                                         console.log(64);
                                                                                                                                                                 var editCommentWindow = Ext.getCmp("winEditComentID");
                                                                                                                                                                 if (editCommentWindow) {
-                                                                                                                                                                editCommentWindow.destroy();
-                                                                                                                                                                }
+                                                                                                                                                        editCommentWindow.destroy();
+                                                                                                                                                        }
                                                                                                                                                         }
                                                                                                                                                         }
                                                                                                                                                         },
@@ -4521,7 +4517,7 @@ Ext.isBook = null;
                                                                                                                                                                                         success: function (form, action) {
                                                                                                                                                                                         //แจ้งเตือน
                                                                                                                                                                                         Ext.editHistoryAp(statusx);
-                                                                                                                                                                                        // Ext.getCmp("winEditComentID").destroy();
+                                                                                                                                                                                                // Ext.getCmp("winEditComentID").destroy();
 //                                Ext.senMsgToProcure(99, "ดำเนินการ แก้ไขหน้าตรวจรับ", Ext.session.dc_cost_id);
                                                                                                                                                                                         },
                                                                                                                                                                                         failure: function (form, action) {
@@ -5214,7 +5210,7 @@ Ext.isBook = null;
                                                                                                                                                                         switch (event) {
                                                                                                                                                                 case "c_overlap":
                                                                                                                                                                         link =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/BgBudgetAllSupplies2" +
                                                                                                                                                                         "/i_year/" +
                                                                                                                                                                         (parseInt(rec.get("i_yyyy")) - setYear - 543) + //((parseInt(rec.get('i_yyyy')) - setYear)-543)   test +1
@@ -5230,7 +5226,7 @@ Ext.isBook = null;
                                                                                                                                                                         break;
                                                                                                                                                                         case "c_overlap_book":
                                                                                                                                                                         link =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5256,11 +5252,11 @@ Ext.isBook = null;
                                                                                                                                                                         "/c_code_overlap/" +
                                                                                                                                                                         encodeURIComponent(useContractOverlap2 ? selectedOverlapCode : Ext.getCmp("c_bookingID").lastSelectionText) +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
+                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
                                                                                                                                                                         break;
                                                                                                                                                                         case "c_overlap_close":
                                                                                                                                                                         link =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5286,7 +5282,7 @@ Ext.isBook = null;
                                                                                                                                                                         "/c_code_overlap/" +
                                                                                                                                                                         encodeURIComponent(useContractOverlap2 ? selectedOverlapCode : rec.c_contract_overlap) +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
+                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
                                                                                                                                                                         break;
                                                                                                                                                                 }
                                                                                                                                                                 return link;
@@ -5477,7 +5473,7 @@ Ext.isBook = null;
                                                                                                                                                                         if (i === 1) {
                                                                                                                                                                 //get Money
                                                                                                                                                                 link =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/BgBudgetAllSupplies3" +
                                                                                                                                                                         "/i_year/" +
                                                                                                                                                                         Ext.perioidHdr.get("i_yyyy") +
@@ -5490,7 +5486,7 @@ Ext.isBook = null;
                                                                                                                                                                 } else if (i === 2) {
                                                                                                                                                                 // Req Money
                                                                                                                                                                 link =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/mn_BgRequestMoneyIncome/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5506,10 +5502,10 @@ Ext.isBook = null;
                                                                                                                                                                         "/bg_expense_id/" +
                                                                                                                                                                         Ext.perioidHdr.get("po_expense_id") +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
+                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
                                                                                                                                                                 } else if (i === 3) {
                                                                                                                                                                 link =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5534,10 +5530,10 @@ Ext.isBook = null;
                                                                                                                                                                         "/" +
                                                                                                                                                                         Ext.perioidHdr.get("i_is_last") +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
+                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
                                                                                                                                                                 } else if (i === 4) {
                                                                                                                                                                 link =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5560,7 +5556,7 @@ Ext.isBook = null;
                                                                                                                                                                         "/" +
                                                                                                                                                                         Ext.perioidHdr.get("i_is_last") +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
+                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
                                                                                                                                                                 }
                                                                                                                                                                 return link;
                                                                                                                                                                 };
@@ -5593,7 +5589,7 @@ Ext.isBook = null;
                                                                                                                                                                         var dc_budget_type_id = Ext.currentExpenseBudgetTypeId ||
                                                                                                                                                                         (budgetTypeField ? budgetTypeField.getValue() : Ext.perioidHdr.get("dc_expense_budget_type_id"));
                                                                                                                                                                         var link2 =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/BgBudgetAllSupplies4" +
                                                                                                                                                                         "/i_year/" +
                                                                                                                                                                         Ext.perioidHdr.get("i_yyyy") +
@@ -5605,7 +5601,7 @@ Ext.isBook = null;
                                                                                                                                                                         Ext.perioidHdr.get("po_expense_id"); // ลิ้งเช็คเงิน PR
 
                                                                                                                                                                         var link3 =
-                                                                                                                                                                        Ext.apiBgBaseUrl +
+                                                                                                                                                                        Ext.session.IPAPIBG +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5628,7 +5624,7 @@ Ext.isBook = null;
                                                                                                                                                                         "/i_last/" +
                                                                                                                                                                         (Ext.perioidHdr.get("i_type_contract") == 3 ? 0 : 1) +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
+                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
                                                                                                                                                                         if (
                                                                                                                                                                                 Ext.perioidHdr.data.pr_bg_reserve_money1_id == 0 &&
                                                                                                                                                                                 Ext.perioidHdr.data.pr_bg_reserve_money2_id == 0 &&
@@ -11212,8 +11208,8 @@ Ext.isBook = null;
                                                                                                                                                                                                                                                         sp_check_period_hdr_id: selectedRecord.get("sp_check_period_hdr_id"),
                                                                                                                                                                                                                                                                 sp_tor_hdr_period_id: selectedRecord.get("sp_tor_hdr_period_id"),
                                                                                                                                                                                                                                                                 booking_code: bookingCode,
-                                                                                                                                                                                                                                                                booking_url: bookingCode && !isNaN(bookingYear) && Ext.apiBgBaseUrl
-                                                                                                                                                                                                                                                                ? Ext.apiBgBaseUrl + "/?/bg/BgBudgetAllSupplies2/i_year/" + (bookingYear - 543)
+                                                                                                                                                                                                                                                                booking_url: bookingCode && !isNaN(bookingYear) && Ext.session.IPAPIBG
+                                                                                                                                                                                                                                                                ? Ext.session.IPAPIBG + "/?/bg/BgBudgetAllSupplies2/i_year/" + (bookingYear - 543)
                                                                                                                                                                                                                                                                 + "/i_sys/" + Ext.session.i_sys
                                                                                                                                                                                                                                                                 + "/dc_cost_id/" + selectedRecord.get("dc_cost_id")
                                                                                                                                                                                                                                                                 + "/bg_expense_id/" + selectedRecord.get("po_expense_id")
