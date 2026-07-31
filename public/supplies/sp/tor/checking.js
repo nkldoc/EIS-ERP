@@ -4,7 +4,14 @@ Ext.isBook = null;
         Ext.formSubmitHistory = [];
         Ext.submod = "";
         Ext.getApiBgBaseUrl = function () {
-                return String(Ext.session.IPAPIBG || "").replace(/:443(?=\/|$)/, "");
+                var baseUrl = String(Ext.session.IPAPIBG || "").trim();
+                var protocolIndex = baseUrl.search(/https?:\/\//i);
+                if (protocolIndex > 0) {
+                        baseUrl = baseUrl.substring(protocolIndex);
+                }
+                return baseUrl
+                        .replace(/:443(?=\/|$)/i, "")
+                        .replace(/\/+$/, "");
         };
         Ext.getApiBgAmount = function (value) {
                 return String(value == null ? 0 : value).replace(/,/g, "");
