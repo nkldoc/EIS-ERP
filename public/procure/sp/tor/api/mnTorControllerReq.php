@@ -30,7 +30,7 @@ $mode = $_REQUEST["mode"];
 ////Java Session
 //require_once("../../../java/Java.inc");
 //$session = procure_java_session();
-//$dc_cost_id = java_values($session->get("dc_cost_id"));
+$dc_cost_id = $_SESSION['dc_cost_id']; //java_values($session->get("dc_cost_id"));
 
 $table = "dbo.sp_tor";
 $keyName = "tor_id";
