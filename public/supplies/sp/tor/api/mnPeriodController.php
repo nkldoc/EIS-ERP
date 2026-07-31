@@ -131,8 +131,8 @@ switch ($mode) {
         //    exit();
         //echo $db->debugSql($sqlMain, $arrParam);
         //exit();
-        error_log("SQL LISTTORDTL: " . $sqlMain);
-        error_log("Params LISTTORDTL: " . print_r($arrParam, true));
+        // error_log("SQL LISTTORDTL: " . $sqlMain);
+        // error_log("Params LISTTORDTL: " . print_r($arrParam, true));
         $stmt = $db->QueryParam($sqlMain, $arrParam);
         $i = @$start + 1;
         while ($row = $db->Fetch($stmt)) {
@@ -247,8 +247,8 @@ switch ($mode) {
             ORDER BY a.i_period";
 
         $arrParam[] = $_REQUEST['sp_tor_contract_id'];
-        error_log("SQL LIST_PERIOD: " . $sqlMain);
-        error_log("Params LIST_PERIOD: " . print_r($arrParam, true));
+      //  error_log("SQL LIST_PERIOD: " . $sqlMain);
+     //   error_log("Params LIST_PERIOD: " . print_r($arrParam, true));
         $stmt = $db->QueryParam($sqlMain, $arrParam);
         $i = @$start + 1;
         while ($row = $db->Fetch($stmt)) {
