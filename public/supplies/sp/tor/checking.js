@@ -3,6 +3,10 @@ Ext.isBook = null;
         Ext.isOverlap = null;
         Ext.formSubmitHistory = [];
         Ext.submod = "";
+        Ext.apiBgBaseUrl = "https://eis.nmu.ac.th/api-nmu";
+        Ext.getApiBgAmount = function (value) {
+                return String(value == null ? 0 : value).replace(/,/g, "");
+        };
         Ext.confirmSessionRenewal = function (action) {
         var result = action && action.result ? action.result : {};
                 var message = String(result.msg || "");
@@ -5210,7 +5214,7 @@ Ext.isBook = null;
                                                                                                                                                                         switch (event) {
                                                                                                                                                                 case "c_overlap":
                                                                                                                                                                         link =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/BgBudgetAllSupplies2" +
                                                                                                                                                                         "/i_year/" +
                                                                                                                                                                         (parseInt(rec.get("i_yyyy")) - setYear - 543) + //((parseInt(rec.get('i_yyyy')) - setYear)-543)   test +1
@@ -5226,7 +5230,7 @@ Ext.isBook = null;
                                                                                                                                                                         break;
                                                                                                                                                                         case "c_overlap_book":
                                                                                                                                                                         link =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5252,11 +5256,11 @@ Ext.isBook = null;
                                                                                                                                                                         "/c_code_overlap/" +
                                                                                                                                                                         encodeURIComponent(useContractOverlap2 ? selectedOverlapCode : Ext.getCmp("c_bookingID").lastSelectionText) +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
+                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
                                                                                                                                                                         break;
                                                                                                                                                                         case "c_overlap_close":
                                                                                                                                                                         link =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5282,7 +5286,7 @@ Ext.isBook = null;
                                                                                                                                                                         "/c_code_overlap/" +
                                                                                                                                                                         encodeURIComponent(useContractOverlap2 ? selectedOverlapCode : rec.c_contract_overlap) +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
+                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
                                                                                                                                                                         break;
                                                                                                                                                                 }
                                                                                                                                                                 return link;
@@ -5473,7 +5477,7 @@ Ext.isBook = null;
                                                                                                                                                                         if (i === 1) {
                                                                                                                                                                 //get Money
                                                                                                                                                                 link =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/BgBudgetAllSupplies3" +
                                                                                                                                                                         "/i_year/" +
                                                                                                                                                                         Ext.perioidHdr.get("i_yyyy") +
@@ -5486,7 +5490,7 @@ Ext.isBook = null;
                                                                                                                                                                 } else if (i === 2) {
                                                                                                                                                                 // Req Money
                                                                                                                                                                 link =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/mn_BgRequestMoneyIncome/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5502,10 +5506,10 @@ Ext.isBook = null;
                                                                                                                                                                         "/bg_expense_id/" +
                                                                                                                                                                         Ext.perioidHdr.get("po_expense_id") +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
+                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
                                                                                                                                                                 } else if (i === 3) {
                                                                                                                                                                 link =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5530,10 +5534,10 @@ Ext.isBook = null;
                                                                                                                                                                         "/" +
                                                                                                                                                                         Ext.perioidHdr.get("i_is_last") +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
+                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
                                                                                                                                                                 } else if (i === 4) {
                                                                                                                                                                 link =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5556,7 +5560,7 @@ Ext.isBook = null;
                                                                                                                                                                         "/" +
                                                                                                                                                                         Ext.perioidHdr.get("i_is_last") +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
+                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
                                                                                                                                                                 }
                                                                                                                                                                 return link;
                                                                                                                                                                 };
@@ -5589,7 +5593,7 @@ Ext.isBook = null;
                                                                                                                                                                         var dc_budget_type_id = Ext.currentExpenseBudgetTypeId ||
                                                                                                                                                                         (budgetTypeField ? budgetTypeField.getValue() : Ext.perioidHdr.get("dc_expense_budget_type_id"));
                                                                                                                                                                         var link2 =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/BgBudgetAllSupplies4" +
                                                                                                                                                                         "/i_year/" +
                                                                                                                                                                         Ext.perioidHdr.get("i_yyyy") +
@@ -5601,7 +5605,7 @@ Ext.isBook = null;
                                                                                                                                                                         Ext.perioidHdr.get("po_expense_id"); // ลิ้งเช็คเงิน PR
 
                                                                                                                                                                         var link3 =
-                                                                                                                                                                        Ext.session.IPAPIBG +
+                                                                                                                                                                        Ext.apiBgBaseUrl +
                                                                                                                                                                         "/?/bg/mn_BgReserveMoney/mode/POST" +
                                                                                                                                                                         "/i_sys/" +
                                                                                                                                                                         Ext.session.i_sys +
@@ -5624,7 +5628,7 @@ Ext.isBook = null;
                                                                                                                                                                         "/i_last/" +
                                                                                                                                                                         (Ext.perioidHdr.get("i_type_contract") == 3 ? 0 : 1) +
                                                                                                                                                                         "/f_amt/" +
-                                                                                                                                                                        Ext.getCmp("f_totalID").getValue();
+                                                                                                                                                                        Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
                                                                                                                                                                         if (
                                                                                                                                                                                 Ext.perioidHdr.data.pr_bg_reserve_money1_id == 0 &&
                                                                                                                                                                                 Ext.perioidHdr.data.pr_bg_reserve_money2_id == 0 &&
@@ -11208,8 +11212,8 @@ Ext.isBook = null;
                                                                                                                                                                                                                                                         sp_check_period_hdr_id: selectedRecord.get("sp_check_period_hdr_id"),
                                                                                                                                                                                                                                                                 sp_tor_hdr_period_id: selectedRecord.get("sp_tor_hdr_period_id"),
                                                                                                                                                                                                                                                                 booking_code: bookingCode,
-                                                                                                                                                                                                                                                                booking_url: bookingCode && !isNaN(bookingYear) && Ext.session.IPAPIBG
-                                                                                                                                                                                                                                                                ? Ext.session.IPAPIBG + "/?/bg/BgBudgetAllSupplies2/i_year/" + (bookingYear - 543)
+                                                                                                                                                                                                                                                                booking_url: bookingCode && !isNaN(bookingYear) && Ext.apiBgBaseUrl
+                                                                                                                                                                                                                                                                ? Ext.apiBgBaseUrl + "/?/bg/BgBudgetAllSupplies2/i_year/" + (bookingYear - 543)
                                                                                                                                                                                                                                                                 + "/i_sys/" + Ext.session.i_sys
                                                                                                                                                                                                                                                                 + "/dc_cost_id/" + selectedRecord.get("dc_cost_id")
                                                                                                                                                                                                                                                                 + "/bg_expense_id/" + selectedRecord.get("po_expense_id")
