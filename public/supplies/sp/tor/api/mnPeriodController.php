@@ -406,7 +406,7 @@ switch ($mode) {
 
         $arrParam[] = $_REQUEST['sp_contract_po_id'];
 
-      //  error_log("SQL LIST_PERIOD_IN_SPMNCONTRACT: " . $sqlMain);
+      ////  error_log("SQL LIST_PERIOD_IN_SPMNCONTRACT: " . $sqlMain);
        // error_log("Params LIST_PERIOD_IN_SPMNCONTRACT: " . print_r($arrParam, true));
 
         $stmt = $db->QueryParam($sqlMain, $arrParam);
