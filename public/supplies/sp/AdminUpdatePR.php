@@ -1,7 +1,8 @@
 <?php
 include("../conf/config.php");
 if (!isset($_SESSION['user_id'])) {
-    echo "<script>window.top.location.href =\"../access/signin.php\"</script>";
+    $signinUrl = defined('ADMIN_UPDATE_PR_DIRECTORY_ENTRY') ? '../../access/signin.php' : '../access/signin.php';
+    echo '<script>window.top.location.href = ' . json_encode($signinUrl) . ';</script>';
     exit;
 }
 ?>
@@ -12,11 +13,15 @@ if (!isset($_SESSION['user_id'])) {
     <head>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <title><?php echo COMPANY_NAME; ?></title>
+        <?php if (defined('ADMIN_UPDATE_PR_DIRECTORY_ENTRY')) { ?>
+            <base href="../" />
+        <?php } ?>
         <!-- System ERP :: Src js  -->
         <?php include("../lib/loadJs.php"); ?>
         <?php include("../lib/loadCss.php"); ?>
         <!-- System ERP :: -->
-        <script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?= __VPRODUCT_; ?>&f=<?php echo $_SERVER["PHP_SELF"]; ?>"></script>
+        <?php $permissionDir = defined('ADMIN_UPDATE_PR_DIRECTORY_ENTRY') ? dirname(dirname($_SERVER["PHP_SELF"])) : dirname($_SERVER["PHP_SELF"]); ?>
+        <script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?= __VPRODUCT_; ?>&f=<?php echo $permissionDir; ?>/AdminUpdatePR.php"></script>
         <!-- System ERP :: -->
         <script type="text/javascript">
             if (!Ext.isEmpty(Ext.session)) {

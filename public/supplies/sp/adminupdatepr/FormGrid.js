@@ -461,7 +461,11 @@ Ext.onReady(function () {
             deferEmptyText: true,
             getRowClass: function (record, rowIndex, rowParams, store) {
                 // ดึงค่า i_enabled ออกมาเช็ก (แปลงเป็น Number เพื่อความชัวร์)
-                var iEnabled = Number(record.get('i_enabled'));
+                var iEnabledValue = record.get("i_enabled");
+                if (iEnabledValue === null || iEnabledValue === undefined || iEnabledValue === "") {
+                    iEnabledValue = record.get("i_enable");
+                }
+                var iEnabled = Number(iEnabledValue);
                 // ถ้า i_enabled ไม่เท่ากับ 1 ให้ใส่ class เส้นคาดสีแดง
                 if (iEnabled !== 1) {
                     return 'row-disabled-strike';
@@ -1068,7 +1072,7 @@ Ext.onReady(function () {
                 sortable: true,
                 width: 115,
                 align: "center",
-                dataIndex: "d_due_thsss",
+                dataIndex: "d_due_th",
                 renderer: function (value, metaData, record, rowIndex, colIndex, store) {
                     return value;
                 },
@@ -1078,7 +1082,7 @@ Ext.onReady(function () {
         bbar: Ext.pagingBar,
     }); //gridMain
     /*====================== CENTER ======================*/
-    center = new Ext.TabPanel({
+    var center = new Ext.TabPanel({
         region: "center",
         border: false,
         //activeTab: 0, //default Tab
