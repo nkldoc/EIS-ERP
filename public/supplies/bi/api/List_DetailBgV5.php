@@ -217,9 +217,22 @@ function List_QueryParam()
 							,b2.c_name AS po_name
 							,b2.c_code AS po_code
 							,CASE WHEN
-									({$bg_expense_id} = 0 OR x.bg_expense_id = {$bg_expense_id})
-								AND ({$dc_expense_budget_type_id} = 0 OR x.dc_budget_type_id = {$dc_expense_budget_type_id})
-								THEN 1 ELSE 0 END AS i_own_match
+									{$dc_expense_budget_type_id} > 0
+								AND ({$bg_expense_id} = 0 OR x.bg_expense_id = {$bg_expense_id})
+								AND x.dc_budget_type_id = {$dc_expense_budget_type_id}
+									THEN 1 ELSE 0 END AS i_own_match
+							-- [FIX-BKK4 2026-07-31] เดิมเงื่อนไขนี้ยอมให้ i_own_match = 1 ได้แม้ไม่มีการระบุ
+							-- dc_expense_budget_type_id มาเลย (เช่น {$dc_expense_budget_type_id} = 0 => เงื่อนไข
+							-- เป็นจริงเสมอ) ซึ่งใช้ได้ตอนที่ระบบยังกรองทีละแหล่งเงินเดียวที่ server เท่านั้น
+							-- แต่หลัง FIX3 (รองรับเลือกหลายแหล่งเงิน) ฝั่ง JS เลิกส่ง dc_expense_budget_type_id
+							-- มาแล้ว (ดึงข้อมูลทั้งหมดมากรองฝั่ง client) ทำให้พารามิเตอร์นี้เป็น 0 เสมอ ผลคือ
+							-- PO กำพร้า จาก #temp_1 (ที่ไม่เคยอยู่ใน #temp_bg_reserve_money เลย จึงไม่เคยถูกนับ
+							-- ในยอด จองเงินแล้ว ที่มาจาก SP_BG_BUDGET_SUM) ถูกนับเป็น own-match เสมอ ทำให้ยอด
+							-- PO ถูกบวกเกินยอด จองเงินแล้ว จริง (เช่น แหล่งเงินกทม. id=4)
+							-- แก้ให้ i_own_match = 1 ได้เฉพาะกรณีที่ระบุ dc_expense_budget_type_id มาจริง ๆ
+							-- (ใช้กับหน้า drilldown ทีละแหล่งเงิน เช่น Rep_DetailByTypeV5.php) ถ้าไม่ระบุ (โหมด
+							-- multi-select ของ dashboard) ให้ถือว่าเป็น cross-type เสมอ (แสดงเพื่อความโปร่งใส
+							-- แต่ไม่นับรวมยอด)
 						FROM #temp_1 x
 						INNER JOIN NMU_ERP..sp_Tor b2 ON x.po_id = b2.tor_id
 						WHERE x.i_reserve = 2

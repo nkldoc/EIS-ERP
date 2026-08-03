@@ -164,7 +164,10 @@
             });
 
         // PO rows
-        poRows.forEach((r) => {
+        // [FIX-BKK4] ห้ามนับ PO ที่เป็น cross budget_type (is_cross_type=true / i_own_match=0)
+        // เพราะ PO เหล่านี้ถูกดึงมาแสดงเพื่อความโปร่งใสเท่านั้น แต่ไม่ได้เป็นของแหล่งเงินนี้จริง
+        // (ดูคอมเมนต์ "แก้ไข 5" ใน List_DetailBgV5.php — ตัวอย่างที่พบคือแหล่งเงินกทม. id=4)
+        poRows.filter((r) => !r.is_cross_type).forEach((r) => {
             const key = r.bg_expense_id + "_" + (r.bg_expense || "");
             if (!map.has(key)) {
                 const bg = budgetMap.get(String(r.bg_expense_id)) || {};
@@ -238,13 +241,27 @@
         const prOnlyRows = prRows.filter((r) => Number(r.has_po) === 0);
         const prWithPoRows = prRows.filter((r) => Number(r.has_po) > 0);  // ← เพิ่ม
         const fPr        = prOnlyRows.reduce((s, r) => s + (Number(r.f_amt) || 0), 0);
-        // คำนวณกลับจาก fReserve เพราะ f_amt ใน PR-with-PO rows อาจ = 0
-        // สูตร: fReserve = fPr(only) + fPrWithPo + fContract
-        const fPrWithPo = Math.max(0, fReserve - fPr - fContract);
         const prCount    = prOnlyRows.length;
         const prWithPoCount = prWithPoRows.length;  // ← เพิ่ม
 
-        const poCount = Array.isArray(data.contract) ? data.contract.length : 0;
+        // [FIX-BKK4 2026-07-31] "หัก ณ จองเงินในสัญญาแล้ว" = ผลรวม f_amt ของ PR ที่มี PO แล้ว
+        // (has_po > 0) — Result Set 1 คืนยอดจองปัจจุบัน ณ สถานะล่าสุดของ PR นั้นให้ตรงอยู่แล้ว
+        // (ไม่ต้องพึ่งการจับคู่กับ PO cross-type ซึ่งเปราะบางกว่า และตรงกับสูตรใน Rep_PrPoListV5.php)
+        //   fPr + fPrDeducted  =  fReserve (จองเงินแล้ว)
+        const fPrDeducted   = prWithPoRows.reduce((s, r) => s + (Number(r.f_amt) || 0), 0);
+        const deductedCount = prWithPoCount;
+
+        const allPoRows = Array.isArray(data.contract) ? data.contract : [];
+        const poOwnRows = allPoRows.filter((r) => !r.is_cross_type);
+        const poCount   = poOwnRows.length;
+
+        // เช็คผลรวมเทียบกับ "จองเงินแล้ว" เพื่อโชว์เป็น checksum ให้ตรวจสอบง่าย
+        // [FIX-CHECKSUM] เดิมบวก fContract (ยอดมูลค่าสัญญาจริงจาก Result Set 3 อีกชุดข้อมูลหนึ่ง)
+        // เข้าไปด้วย ทำให้นับซ้ำกับ fPrDeducted ซึ่งเป็นยอดเดียวกัน (ดูคอมเมนต์การ์ด "จองสัญญา (PO)"
+        // ด้านล่าง) จริง ๆ แล้ว fPr + fPrDeducted ก็เท่ากับ fReserve ("จองเงินแล้ว") พอดีอยู่แล้ว
+        const sumCheck  = fPr + fPrDeducted;
+        const diffCheck = fReserve - sumCheck;
+        const isMatched = Math.abs(diffCheck) < 1; // เผื่อ rounding ไม่เกิน 1 บาท
 
         const pctUsed = fBudget > 0 ? ((fReserve / fBudget) * 100).toFixed(2) : "0.00";
         // ← เพิ่ม 4 บรรทัดนี้
@@ -286,17 +303,27 @@
             <div class="col-3 d-flex">
                 <div class="pr-po-card clickable" style="${cardBase} ${clickable} padding:16px 6px;background:#fff8e6;border-left:4px solid #f4a300;"
                     onclick="window.open('/supplies/bi/reports/Rep_PrPoListV5.php?col=pr&year_en=${yearEn}&year_th=${yearTh}&dc_cost_id=${dcCostId}&dc_expense_budget_type_id=${dcTypeId}','_blank')">
-                    <div class="small text-muted pr-po-label">จอง PR (ยังไม่มี PO) <span>▶</span></div>
+                    <div class="small text-muted pr-po-label">จอง PR<span>▶</span></div>
                     <div class="font-weight-bold pr-po-value" style="font-size:13px;color:#c17f00;">${fmt(fPr)}</div>
                     <div class="small text-muted">${prCount} รายการ</div>
+                    ${fPrDeducted > 0 ? `
+                    <div class="small" style="margin-top:6px;padding-top:6px;border-top:1px dashed #e8c98a;color:#9a6a00;">
+                        หัก ณ จองในสัญญาแล้ว<br/>
+                        <b>${fmt(fPrDeducted)}</b><br/>
+                        (${deductedCount} รายการ)
+                    </div>` : ``}
                 </div>
             </div>
             <div class="col-3 d-flex">
                 <div class="pr-po-card clickable" style="${cardBase} ${clickable} padding:16px 6px;background:#fdeef0;border-left:4px solid #e0526b;"
                     onclick="window.open('/supplies/bi/reports/Rep_PrPoListV5.php?col=po&year_en=${yearEn}&year_th=${yearTh}&dc_cost_id=${dcCostId}&dc_expense_budget_type_id=${dcTypeId}','_blank')">
                     <div class="small text-muted pr-po-label">จองสัญญา (PO) <span>▶</span></div>
-                    <div class="font-weight-bold pr-po-value" style="font-size:13px;color:#c22a45;">${fmt(fContract)}</div>
-                    <div class="small text-muted">${poCount} รายการ</div>
+                    <!-- [FIX-CHECKSUM] ใช้ fPrDeducted/deductedCount (= "หัก ณ จองในสัญญาแล้ว" ฝั่ง PR,
+                         Result Set 1) แทน fContract/poCount (Result Set 3 แยกต่างหาก) เพราะเป็นยอด/
+                         จำนวนรายการเดียวกัน แต่ Result Set 3 มีบางรายการไม่มีเลขที่/ชื่อ PO บันทึกไว้
+                         ทำให้นับได้ไม่ครบ และยอดก็ไม่ตรงกับที่หน้า Rep_PrPoListV5.php?col=po แสดงจริง -->
+                    <div class="font-weight-bold pr-po-value" style="font-size:13px;color:#c22a45;">${fmt(fPrDeducted)}</div>
+                    <div class="small text-muted">${deductedCount} รายการ</div>
                 </div>
             </div>
             <div class="col-3 d-flex">
@@ -313,6 +340,8 @@
                 </div>
             </div>
         </div>
+
+        
 
         <div class="row g-3 text-center align-items-stretch pr-po-row-total">
             <div class="col-12 d-flex">
@@ -560,12 +589,13 @@ _chartBar.on("click", function (params) {
                 .filter((r) => Number(r.has_po) === 0)
                 .reduce((s, r) => s + (Number(r.f_amt) || 0), 0);
 
-            // [FIX3] contract total ต้องคำนวณใหม่จาก _poRows ที่กรองแล้ว
-            //        แทนการใช้ data.f_contract_total ซึ่งเป็นยอดรวมทั้งหมดแบบไม่กรอง
-            _contractTotal = _poRows.reduce(
-                (s, r) => s + (Number(r.f_amt_contract) || 0),
-                0
-            );
+            // [FIX-CHECKSUM] ใช้ยอด "หัก ณ จองในสัญญาแล้ว" จาก _prRows (has_po > 0) แทนยอดมูลค่า
+            // สัญญาจริงจาก _poRows/f_amt_contract เดิม ให้ตรงกับตัวเลข "จองสัญญา (PO)" ที่การ์ดสรุป
+            // และหน้า Rep_PrPoListV5.php?col=po แสดง (_prTotal + _contractTotal จึงรวมได้เท่ากับ
+            // ยอดจองเงินแล้วของ PR ทั้งหมดพอดี แทนที่จะเป็นคนละยอดกันแบบเดิม)
+            _contractTotal = _prRows
+                .filter((r) => Number(r.has_po) > 0)
+                .reduce((s, r) => s + (Number(r.f_amt) || 0), 0);
 
             // [FIX2] สร้าง budgetMap จาก Result Set 2 (budget_detail) ที่กรองแล้ว
             const budgetMap = buildBudgetMap(filteredBudgetDetail);
