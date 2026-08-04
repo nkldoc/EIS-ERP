@@ -454,6 +454,7 @@ if ($type == "WITHDRAW") {
                         , f_vat_amt
                         , s.dc_user_create_id
                         , f_total_add_vat_amt
+                        , s.f_total
                         ,  (select i_type_bg from sp_tor where tor_id  =  (select sp_tor_id from sp_tor_contract where sp_tor_contract_id = s.sp_tor_contract_id )) as i_type_bg
                         , isnull((select sp_check_period_hdr_id from dbo.sp_withdraw where i_enable = 1 and sp_check_period_hdr_id=a.sp_check_period_hdr_id),0) as i_status
             "
@@ -500,7 +501,7 @@ if ($type == "WITHDRAW") {
             "bl_code" => $row["bl_code"],
             "f_vat_amt" => $row["f_vat_amt"],
             "f_total_add_vat_amt" => $row["f_total_add_vat_amt"],
-            "f_total_amt" => number_format(floatval($row["f_vat_amt"] + $row["f_total_add_vat_amt"]), 2),
+            "f_total_amt" => number_format($row["f_total"], 2),
             "url_link_doc" => $row["url_link_doc"],
             "c_comment" => $row["c_comment"],
             "c_doc_ref" => $row["c_doc_ref"],
