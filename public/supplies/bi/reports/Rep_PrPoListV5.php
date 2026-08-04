@@ -5,7 +5,8 @@ include("../../lib/export/exportUtil.php");
 
 $year_en = isset($_REQUEST["year_en"]) ? intval($_REQUEST["year_en"]) : intval(date('Y'));
 $year_th = $year_en + 543;
-$col     = in_array($_REQUEST["col"] ?? "", ["pr", "po"]) ? $_REQUEST["col"] : "pr";
+// [เพิ่ม] รองรับ col=pr_open สำหรับหน้า "PR ที่ยังไม่ได้ทำสัญญา" (has_po=0 เท่านั้น)
+$col     = in_array($_REQUEST["col"] ?? "", ["pr", "po", "pr_open"]) ? $_REQUEST["col"] : "pr";
 $dc_cost_id = isset($_REQUEST["dc_cost_id"]) ? intval($_REQUEST["dc_cost_id"]) : 38;
 
 // [FIX] รองรับเลือกได้หลายแหล่งเงินพร้อมกัน (ค่าที่ส่งมาอาจเป็น "5,4")
@@ -75,17 +76,28 @@ $f_checksum_sum  = $f_pr_remaining_total + $f_pr_deducted_total;
 $f_checksum_diff = $f_reserve_total_ref - $f_checksum_sum;
 $is_checksum_ok  = abs($f_checksum_diff) < 1;
 
-$is_pr = ($col === "pr");
+// [เพิ่ม] pr_open ใช้ตาราง/สไตล์แบบเดียวกับ pr (เหลือง) แต่กรองเฉพาะแถวที่ยังไม่มี PO
+$is_pr = in_array($col, ["pr", "pr_open"], true);
 // [FIX] ตาราง PR แสดงทุกแถว (ทั้งที่มี/ไม่มี PO) เพื่อให้เห็นภาพรวมการหักเงินไปจองสัญญา
 // [FIX-CHECKSUM] หน้า "รายการจองสัญญา (PO)" เปลี่ยนมาใช้ $pr_with_po (Result Set 1, has_po=1)
 // เป็นแหล่งข้อมูลโดยตรง แทนตาราง PO/สัญญาแยกต่างหาก ($po_own_match, Result Set 3) เพราะเป็น
 // รายการเดียวกันกับ "หัก ณ จองในสัญญาแล้ว" ของฝั่ง PR ทุกประการ (ยอดรวม/จำนวนรายการตรงกันเป๊ะ)
 // ในขณะที่ Result Set 3 บางรายการไม่มีเลขที่/ชื่อ PO บันทึกไว้ (ขึ้น "-") ทำให้จำนวนที่แสดงไม่ครบ
-$rows  = $is_pr ? $pr_rows : $pr_with_po;
-$title_page = $is_pr ? "รายการจอง PR" : "รายการจองสัญญา (PO)";
+// [เพิ่ม] pr_open แสดงเฉพาะ $pr_only (has_po=0) — คือรายการ "PR ที่ยังไม่ได้ทำสัญญา" ล้วนๆ
+if ($col === "pr_open") {
+    $rows = $pr_only;
+} elseif ($is_pr) {
+    $rows = $pr_rows;
+} else {
+    $rows = $pr_with_po;
+}
+$title_page = $col === "pr_open" ? "รายการ PR ที่ยังไม่ได้ทำสัญญา" : ($is_pr ? "รายการจอง PR" : "รายการจองสัญญา (PO)");
 $rows_count  = count($rows);
-$total_amt   = $is_pr ? ($f_pr_remaining_total + $f_pr_deducted_total) : $f_pr_deducted_total;
+$total_amt   = $col === "pr_open" ? $f_pr_remaining_total : ($is_pr ? ($f_pr_remaining_total + $f_pr_deducted_total) : $f_pr_deducted_total);
 $total_count = $rows_count;
+// [เพิ่ม] มุมมอง pr_open มีแต่แถว has_po=0 ทุกแถว คอลัมน์ "หัก ณ จองในสัญญา" จะเป็น 0.00 เสมอ
+// จึงไม่มีประโยชน์ ตัดออกจากตาราง/ export ของมุมมองนี้
+$show_deduct_col = ($col !== "pr_open");
 
 function thaiDate($d) {
     if (!$d || $d === '0000-00-00') return '-';
@@ -158,10 +170,10 @@ function thaiDate($d) {
                 <div class="small text-muted"><?= number_format($total_count) ?> รายการ</div>
             </div>
         </div>
-        <?php if ($is_pr): ?>
+        <?php if ($col === "pr"): ?>
         <div class="col-md-6 mb-3">
             <div class="stat-card" style="border-left-color:#f6c23e;">
-                <div class="stat-title">คงเหลือ (ยังไม่มี PO)</div>
+                <div class="stat-title">PR ที่ยังไม่ได้ทำสัญญา</div>
                 <div class="stat-value text-warning"><?= number_format($f_pr_remaining_total, 2) ?> บาท</div>
                 <div class="small text-muted"><?= number_format(count($pr_only)) ?> รายการ</div>
             </div>
@@ -173,6 +185,7 @@ function thaiDate($d) {
                 <div class="small text-muted"><?= number_format(count($pr_with_po)) ?> รายการ</div>
             </div>
         </div>
+        <?php endif; ?>
         <!-- [FIX] ตัดการ์ด "จองสัญญา (PO)" สีแดงออก เพราะเป็นยอดมูลค่าสัญญาจริง (คนละยอดกับ
              ยอดที่ถูกหักจองไว้จริงในระบบงบประมาณ) การแสดงคู่กับ "คงเหลือ" และ "หัก ณ จองในสัญญาแล้ว"
              ทำให้ดูเหมือนต้องบวกรวมกันได้ ทั้งที่ คงเหลือ + หัก ณ จองในสัญญาแล้ว = รายการจอง PR
@@ -184,7 +197,6 @@ function thaiDate($d) {
                 <?= $is_checksum_ok ? '' : ' ส่วนต่าง ' . number_format($f_checksum_diff, 2) ?>
             </div> -->
         </div>
-        <?php endif; ?>
     </div>
 
     <!-- ตาราง -->
@@ -224,7 +236,7 @@ function thaiDate($d) {
                         <th>ผู้รับผิดชอบ</th>
                         <th>สายงาน</th>
                         <th class="text-right">เงินจอง PR (บาท)</th>
-                        <th class="text-right">หัก ณ จองในสัญญา (บาท)</th>
+                        <?php if ($show_deduct_col): ?><th class="text-right">หัก ณ จองในสัญญา (บาท)</th><?php endif; ?>
                         <th class="text-right">คงเหลือ PR (บาท)</th>
                     </tr>
                 </thead>
@@ -262,19 +274,19 @@ function thaiDate($d) {
                             <td><?= htmlspecialchars($row['sp_emp'] ?? '-') ?></td>
                             <td><?= htmlspecialchars($row['dc_department'] ?? '-') ?></td>
                             <td class="text-right font-weight-bold"><?= number_format($f_amt, 2) ?></td>
-                            <td class="text-right font-weight-bold" style="color:#6f42c1;"><?= number_format($deduct, 2) ?></td>
+                            <?php if ($show_deduct_col): ?><td class="text-right font-weight-bold" style="color:#6f42c1;"><?= number_format($deduct, 2) ?></td><?php endif; ?>
                             <td class="text-right font-weight-bold text-warning"><?= number_format($remain, 2) ?></td>
                         </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="13" class="text-center py-5 text-muted">ไม่พบข้อมูล</td></tr>
+                        <tr><td colspan="<?= $show_deduct_col ? 13 : 12 ?>" class="text-center py-5 text-muted">ไม่พบข้อมูล</td></tr>
                     <?php endif; ?>
                 </tbody>
                 <tfoot>
                     <tr style="background:#f8f9fc;font-weight:700;">
                         <td colspan="10" class="text-right">รวม</td>
-                        <td class="text-right"><?= number_format($f_pr_remaining_total + $f_pr_deducted_total, 2) ?></td>
-                        <td class="text-right" style="color:#6f42c1;"><?= number_format($f_pr_deducted_total, 2) ?></td>
+                        <td class="text-right"><?= number_format($total_amt, 2) ?></td>
+                        <?php if ($show_deduct_col): ?><td class="text-right" style="color:#6f42c1;"><?= number_format($f_pr_deducted_total, 2) ?></td><?php endif; ?>
                         <td class="text-right text-warning"><?= number_format($f_pr_remaining_total, 2) ?></td>>
                     </tr>
                 </tfoot>
@@ -349,17 +361,21 @@ document.getElementById("searchInput").addEventListener("input", function() {
 function exportToExcel() {
     var X = XLSX;
     var isPr  = <?= $is_pr ? 'true' : 'false' ?>;
+    var showDeductCol = <?= $show_deduct_col ? 'true' : 'false' ?>;
     var yearTh = <?= $year_th ?>;
     var totalAmt = <?= $total_amt ?>;
     var numFmt = '#,##0.00';
 
     var headers = isPr
-        ? ["#","เลขที่ PR","ชื่อรายการ","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","สถานะการจอง","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจอง PR (บาท)","หัก ณ จองในสัญญา (บาท)","คงเหลือ PR (บาท)"]
+        ? (showDeductCol
+            ? ["#","เลขที่ PR","ชื่อรายการ","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","สถานะการจอง","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจอง PR (บาท)","หัก ณ จองในสัญญา (บาท)","คงเหลือ PR (บาท)"]
+            : ["#","เลขที่ PR","ชื่อรายการ","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","สถานะการจอง","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจอง PR (บาท)","คงเหลือ PR (บาท)"])
         : ["#","เลขที่ PR","ชื่อรายการ","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจองสัญญา (บาท)"];
 
     var colCount = headers.length;
-    // [FIX] ตาราง PR มี 3 คอลัมน์ยอดเงิน (เงินจอง PR / หัก ณ จองในสัญญา / คงเหลือ PR) ส่วน PO มี 1 คอลัมน์
-    var amtCols = isPr ? [colCount - 3, colCount - 2, colCount - 1] : [colCount - 1];
+    // [FIX] ตาราง PR ปกติมี 3 คอลัมน์ยอดเงิน (เงินจอง PR / หัก ณ จองในสัญญา / คงเหลือ PR)
+    // มุมมอง pr_open ไม่มี "หัก ณ จองในสัญญา" จึงเหลือ 2 คอลัมน์ยอดเงิน ส่วน PO มี 1 คอลัมน์
+    var amtCols = isPr ? (showDeductCol ? [colCount - 3, colCount - 2, colCount - 1] : [colCount - 2, colCount - 1]) : [colCount - 1];
 
     function cs(bgHex, fontHex, bold, numFmtCode, h) {
         var s = {
@@ -387,7 +403,7 @@ function exportToExcel() {
     var sumBg  = isPr ? 'FFF3CD' : 'FADBD8';
     var sumFc  = isPr ? '856404' : '922B21';
     var stripe = isPr ? 'FFFDE7' : 'FFF5F5';
-    var titleLabel = isPr ? 'รายการจอง PR' : 'รายการจองสัญญา (PO)';
+    var titleLabel = <?= json_encode($title_page, JSON_UNESCAPED_UNICODE) ?>;
 
     var aoa = [];
 
@@ -437,7 +453,10 @@ function exportToExcel() {
         if (amtCols.indexOf(i) !== -1) {
             var v;
             if (isPr) {
-                if (i === amtCols[0]) v = <?= (float)($f_pr_remaining_total + $f_pr_deducted_total) ?>;      // เงินจอง PR รวม
+                if (!showDeductCol) {
+                    // pr_open: มีแค่ [เงินจอง PR รวม, คงเหลือ PR] และทั้งสองค่าเท่ากัน (ไม่มี PO)
+                    v = (i === amtCols[0]) ? totalAmt : totalAmt;
+                } else if (i === amtCols[0]) v = <?= (float)($f_pr_remaining_total + $f_pr_deducted_total) ?>;      // เงินจอง PR รวม
                 else if (i === amtCols[1]) v = <?= (float)$f_pr_deducted_total ?>;                            // หัก ณ จองในสัญญา
                 else v = <?= (float)$f_pr_remaining_total ?>;                                                 // คงเหลือ PR
             } else {
@@ -462,7 +481,9 @@ function exportToExcel() {
 
     // Column widths
     var wch = isPr
-        ? [{wch:5},{wch:18},{wch:55},{wch:35},{wch:22},{wch:20},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:18},{wch:20}]
+        ? (showDeductCol
+            ? [{wch:5},{wch:18},{wch:55},{wch:35},{wch:22},{wch:20},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:18},{wch:20}]
+            : [{wch:5},{wch:18},{wch:55},{wch:35},{wch:22},{wch:20},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:20}])
         : [{wch:5},{wch:18},{wch:55},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:18}];
     ws['!cols'] = wch;
     ws['!freeze'] = {xSplit:0, ySplit:4};

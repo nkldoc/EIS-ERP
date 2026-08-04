@@ -281,6 +281,7 @@
             .pr-po-card .pr-po-value{margin-bottom:6px;line-height:1.25;white-space:nowrap;}
             .pr-po-row-2{min-height:135px;}
             .pr-po-row-4{min-height:190px;}
+            .pr-po-row-5{min-height:190px;}
             .pr-po-row-total{min-height:110px;}
         </style>
         <div class="row g-3 text-center mb-3 align-items-stretch pr-po-row-2">
@@ -299,22 +300,24 @@
             </div>
         </div>
 
-        <div class="row g-2 text-center mb-3 align-items-stretch pr-po-row-4">
-            <div class="col-3 d-flex">
-                <div class="pr-po-card clickable" style="${cardBase} ${clickable} padding:16px 6px;background:#fff8e6;border-left:4px solid #f4a300;"
+        <div class="row g-2 text-center mb-3 align-items-stretch pr-po-row-5">
+            <div class="col d-flex">
+                <div class="pr-po-card clickable" style="${cardBase} ${clickable} padding:16px 6px;background:#fdf3e3;border-left:4px solid #d99a1b;"
                     onclick="window.open('/supplies/bi/reports/Rep_PrPoListV5.php?col=pr&year_en=${yearEn}&year_th=${yearTh}&dc_cost_id=${dcCostId}&dc_expense_budget_type_id=${dcTypeId}','_blank')">
                     <div class="small text-muted pr-po-label">จอง PR<span>▶</span></div>
-                    <div class="font-weight-bold pr-po-value" style="font-size:13px;color:#c17f00;">${fmt(fPr)}</div>
-                    <div class="small text-muted">${prCount} รายการ</div>
-                    ${fPrDeducted > 0 ? `
-                    <div class="small" style="margin-top:6px;padding-top:6px;border-top:1px dashed #e8c98a;color:#9a6a00;">
-                        หัก ณ จองในสัญญาแล้ว<br/>
-                        <b>${fmt(fPrDeducted)}</b><br/>
-                        (${deductedCount} รายการ)
-                    </div>` : ``}
+                    <div class="font-weight-bold pr-po-value" style="font-size:13px;color:#9a6a00;">${fmt(fPr + fPrDeducted)}</div>
+                    <div class="small text-muted">${prCount + deductedCount} รายการ</div>
                 </div>
             </div>
-            <div class="col-3 d-flex">
+            <div class="col d-flex">
+                <div class="pr-po-card clickable" style="${cardBase} ${clickable} padding:16px 6px;background:#fff8e6;border-left:4px solid #f4a300;"
+                    onclick="window.open('/supplies/bi/reports/Rep_PrPoListV5.php?col=pr_open&year_en=${yearEn}&year_th=${yearTh}&dc_cost_id=${dcCostId}&dc_expense_budget_type_id=${dcTypeId}','_blank')">
+                    <div class="small text-muted pr-po-label">PR ที่ยังไม่ได้ทำสัญญา<span>▶</span></div>
+                    <div class="font-weight-bold pr-po-value" style="font-size:13px;color:#c17f00;">${fmt(fPr)}</div>
+                    <div class="small text-muted">${prCount} รายการ</div>
+                </div>
+            </div>
+            <div class="col d-flex">
                 <div class="pr-po-card clickable" style="${cardBase} ${clickable} padding:16px 6px;background:#fdeef0;border-left:4px solid #e0526b;"
                     onclick="window.open('/supplies/bi/reports/Rep_PrPoListV5.php?col=po&year_en=${yearEn}&year_th=${yearTh}&dc_cost_id=${dcCostId}&dc_expense_budget_type_id=${dcTypeId}','_blank')">
                     <div class="small text-muted pr-po-label">จองสัญญา (PO) <span>▶</span></div>
@@ -326,13 +329,13 @@
                     <div class="small text-muted">${deductedCount} รายการ</div>
                 </div>
             </div>
-            <div class="col-3 d-flex">
+            <div class="col d-flex">
                 <div class="pr-po-card" style="${cardBase} padding:16px 6px;background:#f3ecfb;border-left:4px solid #6f42c1;">
                     <div class="small text-muted pr-po-label">เงินจองตรวจรับ</div>
                     <div class="font-weight-bold pr-po-value" style="font-size:13px;color:#6f42c1;">${fmt(fInsp)}</div>
                 </div>
             </div>
-            <div class="col-3 d-flex">
+            <div class="col d-flex">
                 <div class="pr-po-card clickable" style="${cardBase} ${clickable} padding:16px 6px;background:#eafaf0;border-left:4px solid #34b566;"
                     onclick="window.open('/supplies/bi/reports/Rep_Sup_ReserveMoney.php?i_reserve=3&i_year=${yearEn}&dc_cost_acc_id=${dcCostId}&dc_cost_id=${dcCostId}&dc_expense_budget_type_id=${dcTypeId}&i_expense=1&bg_expense_id_lv1=0&i_level=1&bg_expense_id=0&d_date_start=${Number(yearEn)-1}-10-01&d_date_end=${yearEn}-09-30','_blank')">
                     <div class="small text-muted pr-po-label">เบิกจ่ายแล้ว <span>▶</span></div>
