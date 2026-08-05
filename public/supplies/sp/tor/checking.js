@@ -2,7 +2,94 @@
 Ext.isBook = null;
         Ext.isOverlap = null;
         Ext.formSubmitHistory = [];
-      
+        Ext.arrEdit = [];
+     function encodeLogData(data) {
+    return Ext.encode({
+        subject: data.subject || '',
+        module: data.module || '',
+        referenceId: data.referenceId || '',
+        referenceCode: data.referenceCode || '',
+        detailHtml: data.detailHtml || '',
+        detailText: htmlToPlainText(data.detailHtml || ''),
+        currentUrl: window.location.href,
+        browser: navigator.userAgent,
+        createdAtClient: new Date().toISOString()
+    });
+}
+ Ext.checkingSearchHistory = {
+storageKey: "supplies.checking.searchHistory",
+maxItems: 20,
+load: function () {
+   try {
+      var items = Ext.decode(window.localStorage.getItem(this.storageKey) || "[]");
+      return Object.prototype.toString.call(items) === "[object Array]" ? items : [];
+   } catch (e) {
+      return [];
+   }
+},
+save: function (value) {
+   value = String(value == null ? "" : value).replace(/^\s+|\s+$/g, "");
+   if (!value) return;
+   var items = this.load();
+   var result = [value];
+   var normalized = value.toLowerCase();
+   for (var i = 0; i < items.length && result.length < this.maxItems; i++) {
+      var item = String(items[i]);
+      if (item.toLowerCase() !== normalized) result.push(item);
+   }
+   try {
+      window.localStorage.setItem(this.storageKey, Ext.encode(result));
+   } catch (e) { }
+   this.refresh();
+},
+refresh: function () {
+   var combo = Ext.getCmp("value-box");
+   if (!combo || !combo.store) return;
+   combo.store.loadData(this.toStoreData());
+},
+toStoreData: function () {
+   var items = this.load();
+   var data = [];
+   for (var i = 0; i < items.length; i++) data.push([items[i]]);
+   return data;
+},
+};
+Ext.getApiBgBaseUrl = function () {
+var baseUrl = String(Ext.session.IPAPIBG || "").trim();
+var protocolIndex = baseUrl.search(/https?:\/\//i);
+if (protocolIndex > 0) {
+   baseUrl = baseUrl.substring(protocolIndex);
+}
+return baseUrl.replace(/:443(?=\/|$)/i, "").replace(/\/+$/, "");
+};
+Ext.getApiBgAmount = function (value) {
+return String(value == null ? 0 : value).replace(/,/g, "");
+};
+Ext.confirmSessionRenewal = function (action) {
+var result = action && action.result ? action.result : {};
+var message = String(result.msg || "");
+var isExpired = result.session_expired === true || result.reval == 1 || /Session\s*หมดอายุ/i.test(message);
+if (!isExpired) {
+   return false;
+}
+
+if (Ext.sessionRenewalConfirmVisible) {
+   return true;
+}
+
+Ext.sessionRenewalConfirmVisible = true;
+Ext.Msg.confirm(
+   "ยืนยันการต่ออายุ Session",
+   "Session หมดอายุ คุณต้องการต่ออายุโดยเข้าสู่ระบบใหม่หรือไม่?",
+   function (btn) {
+      Ext.sessionRenewalConfirmVisible = false;
+      if (btn === "yes") {
+         window.top.location.reload();
+      }
+   },
+);
+return true;
+};
         Ext.submod = "";
         const edit_bg = function (data) {
 let msg = "";
@@ -5638,22 +5725,6 @@ Ext.getCmp("f_inv_vat").setValue(date_rec.data.f_net_total_price);
         .replace(/^\s+|\s+$/g, '');
 }
 
-function encodeLogData(data) {
-    return Ext.encode({
-        subject: data.subject || '',
-        module: data.module || '',
-        referenceId: data.referenceId || '',
-        referenceCode: data.referenceCode || '',
-        detailHtml: data.detailHtml || '',
-        detailText: htmlToPlainText(data.detailHtml || ''),
-        currentUrl: window.location.href,
-        browser: navigator.userAgent,
-        createdAtClient: new Date().toISOString()
-    });
-}
-
-
-
 
 Ext.auditBoong = function (i) {
     var link = Ext.genLink(3, 0);
@@ -5848,30 +5919,7 @@ var editorWindow = new Ext.Window({
         }
     }]
 });
-                      editorWindow.show();
-//                                            var editorWindow = new Ext.Window({
-//                                                                        title: 'ข้อมูลการจอง สำหรับไว้ตรวจสอบเงินจอง',
-//                                                                        width: 600,
-//                                                                        height: 350,
-//                                                                        layout: 'fit',
-//                                                                        modal: true,
-//                                                                        items: [{
-//                                                                            xtype: 'htmleditor',
-//                                                                            id: 'popupEditor',
-//                                                                            value: link
-//                                                                        }],
-//                                                                        buttons: [{
-//                                                                            text: 'บันทึกแจ้ง admin/เจ้าหน้าที่ผู้ดูแลระบบ',
-//                                                                            handler: function() {
-//                                                                                var content = Ext.getCmp('popupEditor').getValue();
-//                                                                                
-//                                                                                // นำค่า content ไปใช้งานต่อ หรือส่งลง Database
-//                                                                                editorWindow.close();
-//                                                                            }
-//                                                                        }]
-//                                                                      }); 
-//                                                                      // สั่งเปิด Pop-up
-//                                                                      editorWindow.show();
+   editorWindow.show(); 
                         }); 
                     }
                     return false;
@@ -10967,12 +11015,25 @@ Ext.storeTransf.setBaseParam("sp_check_period_hdr_id", Ext.selectRow.get("sp_che
                                                                                                                                                                                                                                         },
                                                                                                                                                                                                                                         {xtype: "tbspacer", width: 4},
                                                                                                                                                                                                                                         {
-                                                                                                                                                                                                                                        xtype: "textfield",
-                                                                                                                                                                                                                                                id: "value-box",
-                                                                                                                                                                                                                                                width: 196,
-                                                                                                                                                                                                                                                fieldLabel: "fieldLabel",
-                                                                                                                                                                                                                                                emptyText: "คำที่ต้องการค้นหา",
-                                                                                                                                                                                                                                        },
+                           xtype: "combo",
+                           id: "value-box",
+                           mode: "local",
+                           store: new Ext.data.SimpleStore({
+                              fields: ["term"],
+                              data: Ext.checkingSearchHistory.toStoreData(),
+                           }),
+                           valueField: "term",
+                           displayField: "term",
+                           editable: true,
+                           forceSelection: false,
+                           triggerAction: "all",
+                           typeAhead: true,
+                           minChars: 0,
+                           selectOnFocus: true,
+                           width: 196,
+                           fieldLabel: "fieldLabel",
+                           emptyText: "คำที่ต้องการค้นหา",
+                        },
                                                                                                                                                                                                                                         ],
                                                                                                                                                                                                                                 },
                                                                                                                                                                                                                                 {
