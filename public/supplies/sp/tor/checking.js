@@ -2,6 +2,7 @@
 Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
+Ext.arrEdit = [];
 Ext.submod = "";
 Ext.checkingSearchHistory = {
 storageKey: "supplies.checking.searchHistory",
