@@ -4,9 +4,30 @@ Ext.ns('Ext.receiveValidation');
 Ext.receiveValidation.openWindow = function (context, onContinue) {
     var api = 'tor/receive-validation/api/', encoded = Ext.encode(context || {});
     Ext.currentExpenseBudgetTypeId = context ? context.dc_expense_budget_type_id : null;
+    var validationFailureHandled = false;
     var store = new Ext.data.JsonStore({url: api + 'validateReceive.php', root: 'rows', idProperty: 'sp_check_fix_case_id',
         baseParams: {context: encoded}, fields: ['sp_check_fix_case_id', 'c_case_code', 'c_case_name', 'c_case_description', 'data',
-            {name: 'i_severity', type: 'int'}, {name: 'i_require_confirm', type: 'bool'}, {name: 'i_allow_update', type: 'bool'}]});
+            {name: 'i_severity', type: 'int'}, {name: 'i_require_confirm', type: 'bool'}, {name: 'i_allow_update', type: 'bool'}],
+        listeners: {loadexception: function (proxy, options, response) {
+                handleValidationFailure(response);
+            }}});
+    function handleValidationFailure(response) {
+        if (validationFailureHandled)
+            return;
+        validationFailureHandled = true;
+        var message = 'ไม่สามารถตรวจสอบข้อมูลก่อนตรวจรับได้';
+        try {
+            var result = Ext.decode(response && response.responseText ? response.responseText : '{}');
+            if (result.message || result.msg)
+                message += '<br>' + Ext.util.Format.htmlEncode(result.message || result.msg);
+        } catch (e) {
+        }
+        Ext.Msg.alert('ตรวจสอบข้อมูลไม่สำเร็จ', message + '<br><br>ระบบจะข้ามขั้นตอนตรวจสอบและบันทึกรายการต่อ', function () {
+            win.close();
+            if (typeof onContinue === 'function')
+                onContinue();
+        });
+    }
     function syncFixedValueToUi(caseCode) {
         if (caseCode !== 'RV-CURRENT-YEAR-EXPENSE-FUND-49')
             return;
@@ -226,7 +247,14 @@ Ext.receiveValidation.openWindow = function (context, onContinue) {
                 }}
         ]});
     win.show();
-    store.load({callback: function () {
+    store.load({callback: function (records, options, success) {
+            var responseData = store.reader && store.reader.jsonData ? store.reader.jsonData : null;
+            if (success === false || (responseData && responseData.success === false)) {
+                handleValidationFailure(options && options.response ? options.response : {
+                    responseText: responseData ? Ext.encode(responseData) : ''
+                });
+                return;
+            }
             if (store.getCount() === 0) {
                 win.close();
                 Ext.Msg.alert('ผลตรวจสอบ', 'ไม่พบเงื่อนไขผิดปกติ', function () {

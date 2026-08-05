@@ -2071,27 +2071,27 @@ Ext.isBook = null;
                         var result = [];
                         Ext.each(chkContainer.items.items, function (item, index) {
                         if (item.xtype === "checkbox" && item.checked) {
-                        // checkbox ปกติ
+// checkbox ปกติ
                         result.push({
                         id: index + 1,
                                 label: item.boxLabel,
                         });
                         } else if (item.xtype === "container") {
-                        // container ย่อย เช่น container ที่มี checkbox "อื่น ๆ" กับ textfield
+// container ย่อย เช่น container ที่มี checkbox "อื่น ๆ" กับ textfield
                         Ext.each(item.items.items, function (subItem) {
                         if (subItem.xtype === "checkbox" && subItem.checked) {
                         if (subItem.boxLabel.trim() === "อื่น ๆ") {
                         var otherField = Ext.getCmp("otherReasonField");
                                 var val = "อื่น ๆ : " + otherField.getValue();
                                 if (val && val.trim() !== "") {
-                        // ใช้ id ตามตำแหน่งของ container หลัก + 1 (หรือปรับได้ตามต้องการ)
+// ใช้ id ตามตำแหน่งของ container หลัก + 1 (หรือปรับได้ตามต้องการ)
                         result.push({
                         id: index + 1,
                                 label: val,
                         });
                         }
                         } else {
-                        // checkbox ปกติใน container ย่อย (ถ้ามี)
+// checkbox ปกติใน container ย่อย (ถ้ามี)
                         result.push({
                         id: index + 1,
                                 label: subItem.boxLabel,
@@ -2125,8 +2125,8 @@ Ext.isBook = null;
 // --- กรณี UNCHECK (false) ---
 // เซตหน้าจอให้แสดงเป็น 0
         rec.set("f_vat_amt", 0);
-                // Keep zero as an explicitly selected VAT value. Without this flag,
-                // save payloads convert f_vat_amt to null and the backend cannot persist 0.
+// Keep zero as an explicitly selected VAT value. Without this flag,
+// save payloads convert f_vat_amt to null and the backend cannot persist 0.
                 rec._vatManual = true;
                 vatVal = 0;
         } else {
@@ -2137,7 +2137,7 @@ Ext.isBook = null;
         if (rec.modified && rec.modified.hasOwnProperty('f_vat_amt')) {
 // คืนค่าเดิมจากระบบของ ExtJS Record
         rec.set("f_vat_amt", rec.modified['f_vat_amt']);
-                // ล้างสถานะ modified ของฟิลด์นี้ออก เพื่อไม่ให้ค้าง
+// ล้างสถานะ modified ของฟิลด์นี้ออก เพื่อไม่ให้ค้าง
                 delete rec.modified['f_vat_amt'];
         }
 
@@ -2150,17 +2150,17 @@ Ext.isBook = null;
         var net = parseFloat((rec.get("f_net_total") || "0").toString().replace(/,/g, "")) || 0;
                 if (net > 0) {
         vatVal = Math.round((net / 1.07) * 0.07 * 100) / 100;
-                // อัปเดตค่ากลับเข้าไปใน Store ให้เห็นบนหน้าจอ
+// อัปเดตค่ากลับเข้าไปใน Store ให้เห็นบนหน้าจอ
                 rec.set("f_vat_amt", vatVal);
         }
         }
         }
         totalVat += vatVal;
         });
-                // ปัดเศษทศนิยม 2 ตำแหน่งสำหรับผลรวมทั้งหมด
+// ปัดเศษทศนิยม 2 ตำแหน่งสำหรับผลรวมทั้งหมด
                 totalVat = Math.round(totalVat * 100) / 100;
-                // (เพิ่มเติม) นำค่า totalVat ไปใส่ในฟิลด์รวมสุทธิ (ถ้ามี) เช่น:
-                // Ext.getCmp('totalVatFieldID').setValue(totalVat);
+// (เพิ่มเติม) นำค่า totalVat ไปใส่ในฟิลด์รวมสุทธิ (ถ้ามี) เช่น:
+// Ext.getCmp('totalVatFieldID').setValue(totalVat);
         };
                 function showCustomEditForm(rec) {
                 try {
@@ -6619,6 +6619,200 @@ Ext.isBook = null;
                                                                                                                                                                         },
                                                                                                                                                                         failure: function (response) {
                                                                                                                                                                         console.error('Failed to save modify date:', response);
+                                                                                                                                                                        }
+                                                                                                                                                                });
+                                                                                                                                                                }
+                                                                                                                                                                }; function controller(rec, status) {
+                                                                                                                                                        if (status === "processUpdate") {
+                                                                                                                                                        Ext.Msg.minWidth = 200;
+                                                                                                                                                                Ext.Msg.buttonText = {
+                                                                                                                                                                ok: "ตกลง",
+                                                                                                                                                                        cancel: "ยกเลิก",
+                                                                                                                                                                        yes: "ผ่านรายการ",
+                                                                                                                                                                        no: "ไม่",
+                                                                                                                                                                };
+                                                                                                                                                                //        -------------------POST-------------------------------------------
+
+                                                                                                                                                                if (rec.get("c_contract_code") == "" || rec.get("c_contract_code") == null || rec.get("d_checking_date") == "") {
+                                                                                                                                                        Ext.Msg.alert("แจ้งเตือน", "ต้องออกเลขตรวจรับในระบบก่อน", function (bu, action) {
+                                                                                                                                                        return false;
+                                                                                                                                                        });
+                                                                                                                                                                //        } else if (rec.get("i_step") == 0) {
+                                                                                                                                                                //            Ext.Msg.alert("แจ้งเตือน"
+                                                                                                                                                                //                    , "<span style='white-space: nowrap;'>กรุณาบันทึกรายการก่อนผ่านรายการ</span><br>" + rec.get("i_step")
+                                                                                                                                                                //                    , function (bu, action) {
+                                                                                                                                                                //                        return false;
+                                                                                                                                                                //                    });
+                                                                                                                                                                //            return;
+                                                                                                                                                        } else {
+                                                                                                                                                        Ext.Msg.buttonText = {
+                                                                                                                                                        ok: "ตกลง",
+                                                                                                                                                                cancel: "ยกเลิก",
+                                                                                                                                                                yes: "ผ่านรายการ",
+                                                                                                                                                                no: "ไม่",
+                                                                                                                                                        };
+                                                                                                                                                                if (rec.data.i_type_bg == 4 || rec.data.i_type_bg == 3) {
+                                                                                                                                                        BillingwinProcess(rec);
+                                                                                                                                                        } else {
+                                                                                                                                                        Ext.Msg.alert("แจ้งเตือน", "รายการนี้ไม้ใช่รายการกันเหลื่อมไม่สามารถทำรายการวางบิลได้", function (bu, action) {
+                                                                                                                                                        return false;
+                                                                                                                                                        });
+                                                                                                                                                        }
+                                                                                                                                                        }
+
+                                                                                                                                                        // if (Ext.isEmpty(Ext.getCmp("reasonID").getValue()))
+                                                                                                                                                        //     Ext.getCmp("reasonID").setValue('');
+                                                                                                                                                        } else if (status === "editEmpTorID") {
+                                                                                                                                                        Ext.storeDepartment = new Ext.data.JsonStore({
+                                                                                                                                                        storeId: "storeDepartment",
+                                                                                                                                                                autoLoad: true,
+                                                                                                                                                                url: "api/All.php",
+                                                                                                                                                                root: "data",
+                                                                                                                                                                baseParams: {type: "storeSpEmp", start: 0, limit: 20, mode: null, dc_department_id: 4}, //Permission i_read
+                                                                                                                                                                idProperty: "id",
+                                                                                                                                                                totalProperty: "totalCount",
+                                                                                                                                                                fields: ["id", "c_code", "c_name"],
+                                                                                                                                                        });
+                                                                                                                                                                var wind = new Ext.Window({
+                                                                                                                                                                title: "แก้ไขผู้รับผิดชอบงาน",
+                                                                                                                                                                        width: Ext.getCmp("contenterCenter").getWidth() - 450,
+                                                                                                                                                                        height: Ext.getCmp("contenterCenter").getHeight() - 350,
+                                                                                                                                                                        id: "winEmpTorID",
+                                                                                                                                                                        modal: true,
+                                                                                                                                                                        plain: true,
+                                                                                                                                                                        collapsible: true,
+                                                                                                                                                                        maximizable: true,
+                                                                                                                                                                        items: new Ext.FormPanel({
+                                                                                                                                                                        height: 500,
+                                                                                                                                                                                id: "frmEditSpEmpID",
+                                                                                                                                                                                url: "tor/api/mnCheckCode.php",
+                                                                                                                                                                                defaults: {width: 430},
+                                                                                                                                                                                defaultType: "textfield",
+                                                                                                                                                                                labelWidth: 150,
+                                                                                                                                                                                items: [
+                                                                                                                                                                                {
+                                                                                                                                                                                xtype: "hidden",
+                                                                                                                                                                                        name: "id",
+                                                                                                                                                                                },
+                                                                                                                                                                                {
+                                                                                                                                                                                xtype: "hidden",
+                                                                                                                                                                                        name: "sp_emp_id",
+                                                                                                                                                                                        id: "sp_emp_id2ID",
+                                                                                                                                                                                },
+                                                                                                                                                                                {
+                                                                                                                                                                                xtype: "hidden",
+                                                                                                                                                                                        value: "UPDATE_EMP",
+                                                                                                                                                                                        name: "mode",
+                                                                                                                                                                                },
+                                                                                                                                                                                {
+                                                                                                                                                                                xtype: "textarea",
+                                                                                                                                                                                        fieldLabel: "หมายเหตุ",
+                                                                                                                                                                                        width: 400,
+                                                                                                                                                                                        name: "c_comment",
+                                                                                                                                                                                },
+                                                                                                                                                                                ],
+                                                                                                                                                                        }),
+                                                                                                                                                                        buttonAlign: "left",
+                                                                                                                                                                        buttons: [
+                                                                                                                                                                        {
+                                                                                                                                                                        text: "บันทึกรายการ3",
+                                                                                                                                                                                id: "buSavePopSubID",
+                                                                                                                                                                                iconCls: "icon-save",
+                                                                                                                                                                                listeners: {
+                                                                                                                                                                                afterrender: function () {
+                                                                                                                                                                                Ext.getCmp("buSavePopSubID").hide();
+                                                                                                                                                                                },
+                                                                                                                                                                                },
+                                                                                                                                                                                handler: function () {
+                                                                                                                                                                                var formSubmit = function () {
+                                                                                                                                                                                form.submit({
+                                                                                                                                                                                waitMsg: "Saving Data...",
+                                                                                                                                                                                        success: function (form, action) {
+                                                                                                                                                                                        Ext.Msg.alert("Success", action.result.msg, function (form, action) {
+                                                                                                                                                                                        Ext.getCmp("tabpanel1").getStore().reload();
+                                                                                                                                                                                                Ext.getCmp("winEmpTorID").destroy();
+                                                                                                                                                                                        });
+                                                                                                                                                                                        },
+                                                                                                                                                                                        failure: function (form, action) {
+                                                                                                                                                                                        switch (action.failureType) {
+                                                                                                                                                                                        case Ext.form.Action.CLIENT_INVALID:
+                                                                                                                                                                                                Ext.Msg.alert("Failure", "Form fields may not be submitted with invalid values");
+                                                                                                                                                                                                break;
+                                                                                                                                                                                                case Ext.form.Action.CONNECT_FAILURE:
+                                                                                                                                                                                                Ext.Msg.alert("Failure", "พลข้อผิดพลาดในการเชื่อต่อเครือข่าย");
+                                                                                                                                                                                                break;
+                                                                                                                                                                                                case Ext.form.Action.SERVER_INVALID:
+                                                                                                                                                                                                Ext.Msg.alert("Failure", action.result.msg);
+                                                                                                                                                                                        }
+                                                                                                                                                                                        },
+                                                                                                                                                                                });
+                                                                                                                                                                                }; //END
+                                                                                                                                                                                        var form = Ext.getCmp("frmEditSpEmpID").getForm();
+                                                                                                                                                                                        if (form.isValid()) {
+                                                                                                                                                                                formSubmit(form);
+                                                                                                                                                                                }
+                                                                                                                                                                                },
+                                                                                                                                                                                //haddler
+                                                                                                                                                                        },
+                                                                                                                                                                        {
+                                                                                                                                                                        text: Ext.GLOBAL_BU_BACK_TH,
+                                                                                                                                                                                handler: function () {
+                                                                                                                                                                                Ext.getCmp("winEmpTorID").hide();
+                                                                                                                                                                                        Ext.getCmp("winEmpTorID").destroy();
+                                                                                                                                                                                },
+                                                                                                                                                                        },
+                                                                                                                                                                        ],
+                                                                                                                                                                });
+                                                                                                                                                                wind.show();
+                                                                                                                                                                Ext.getCmp("frmEditSpEmpID").getForm().loadRecord(Ext.selectRow);
+                                                                                                                                                        }
+                                                                                                                                                        } // Controller
+                                                                                                                                                        var cellClick2 = function (grid, rowIndex, columnIndex, e) {
+                                                                                                                                                        console.log(this.selModel);
+                                                                                                                                                                console.log(this.selModel.selection);
+                                                                                                                                                                Ext.selectRow3 = this.selModel.selection.record;
+                                                                                                                                                                if (columnIndex === grid.getColumnModel().getIndexById("print")) {
+                                                                                                                                                        PrintPreview(Ext.selectRow3.data.id);
+                                                                                                                                                        }
+                                                                                                                                                        };
+// Helper function to update d_update field with current date
+// Helper function to save current d_update value to database without modifying it
+                                                                                                                                                                var saveCurrentModifyDate = function () {
+                                                                                                                                                                if (!Ext.selectRow) {
+                                                                                                                                                                return;
+                                                                                                                                                                }
+
+                                                                                                                                                                // ดึงค่า d_update จากแท็บแรกที่มีค่า
+                                                                                                                                                                var currentValue = '';
+                                                                                                                                                                        var tabPanel = Ext.getCmp('tabpanel-edit-custom');
+                                                                                                                                                                        if (tabPanel) {
+                                                                                                                                                                Ext.each(tabPanel.items.items, function (tab) {
+                                                                                                                                                                if (tab.getForm && !currentValue) {
+                                                                                                                                                                var field = tab.getForm().findField('d_update');
+                                                                                                                                                                        if (field) {
+                                                                                                                                                                currentValue = field.getValue() || '';
+                                                                                                                                                                }
+                                                                                                                                                                }
+                                                                                                                                                                });
+                                                                                                                                                                }
+
+                                                                                                                                                                // ถ้ามีค่า ให้บันทึกลงฐานข้อมูล
+                                                                                                                                                                if (currentValue) {
+                                                                                                                                                                Ext.Ajax.request({
+                                                                                                                                                                url: "tor/api/mnCheckingController.php",
+                                                                                                                                                                        method: 'POST',
+                                                                                                                                                                        params: {
+                                                                                                                                                                        mode: 'updateModifyDate',
+                                                                                                                                                                                action: 'updateModifyDate',
+                                                                                                                                                                                d_update: currentValue,
+                                                                                                                                                                                sp_tor_id: Ext.selectRow.get('sp_tor_id'),
+                                                                                                                                                                                sp_tor_contract_id: Ext.selectRow.get('sp_tor_contract_id')
+                                                                                                                                                                        },
+                                                                                                                                                                        success: function (response) {
+                                                                                                                                                                        console.log('Modify date saved on close');
+                                                                                                                                                                        },
+                                                                                                                                                                        failure: function (response) {
+                                                                                                                                                                        console.error('Failed to save modify date on close:', response);
                                                                                                                                                                         }
                                                                                                                                                                 });
                                                                                                                                                                 }
@@ -11101,11 +11295,11 @@ Ext.isBook = null;
                                                                                                                                                                                                                                         autoEl: {
                                                                                                                                                                                                                                         tag: "div",
                                                                                                                                                                                                                                                 html: `
-                    <label class="switch">
-                      <input type="checkbox" id="toggle_my_status" />
-                      <span class="slider"></span>
-                    </label>
-                  `,
+<label class="switch">
+<input type="checkbox" id="toggle_my_status" />
+<span class="slider"></span>
+</label>
+`,
                                                                                                                                                                                                                                         },
                                                                                                                                                                                                                                         style: "line-height: 26px; padding: 2px 0;", // เพิ่มความสูง
                                                                                                                                                                                                                                         listeners: {
