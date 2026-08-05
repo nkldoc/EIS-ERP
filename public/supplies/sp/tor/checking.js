@@ -4471,29 +4471,7 @@ Ext.storeTransf.reload({
          );
          return;
       }
-      Ext.perioidHdr = rec[0];
-      Ext.selHdrPeriod = rec[0];
-      Ext.c_arrive_code = rec[0].data.c_arrive_code;
-      Ext.dc_creditor_transfer_id = rec[0].data.dc_creditor_transfer_id;
-      Ext.dc_bank_acc_creditor_id = rec[0].data.dc_bank_acc_creditor_id;
-      //                        Ext.dc_bank_acc_creditor_id = rec[0].data.c_name_dtl;
-      Ext.check_pdf = rec[0].data.check_pdf;
-      Ext.i_status_checking = rec[0].data.i_status_checking;
-      Ext.dc_bank_acc_creditor.setBaseParam("dc_creditor_id", Ext.dc_creditor_transfer_id);
-      Ext.dc_bank_acc_creditor.load({
-         // params: { dc_creditor_id: Ext.dc_creditor_transfer_id },
-         callback: function (recordx, operation, success) {
-            if (Ext.dc_bank_acc_creditor.totalLength > 1) {
-               var dc_bank_acc_creditor_id = Ext.dc_bank_acc_creditor_id;
-               var index = dc_bank_acc_creditor_id > 0 ? dc_bank_acc_creditor_id : 0;
-               Ext.getCmp("dc_bank_acc_creditor_id").setValue(index);
-               Ext.getCmp("dc_creditor_idID").setValue(Ext.selectRow.get("dc_creditor_id"));
-            } else {
-               Ext.getCmp("dc_bank_acc_creditor_id").setValue(0);
-            }
-            Ext.getCmp("winPeriodHdrID").getEl().unmask();
-         },
-      });
+        
       if (success) {
          Ext.getCmp("winPeriodHdrID").getEl().unmask();
          if (Ext.isEmpty(rec[0].get("c_name"))) {
@@ -5672,7 +5650,7 @@ var budgetTypeField = Ext.getCmp("dc_expense_budget_type_idTxtID");
 var dc_budget_type_id =
    Ext.currentExpenseBudgetTypeId ||
    (budgetTypeField ? budgetTypeField.getValue() : Ext.perioidHdr.get("dc_expense_budget_type_id"));
-Ext.perioidHdr;
+//Ext.perioidHdr;
 // var ip = 'localhost';
 if (i === 1) {
    //get Money
@@ -6108,6 +6086,10 @@ Ext.Ajax.request({
 });
 };
 Ext.getMoney = function (rs) {
+ Ext.perioidHdr = rs[0];
+  
+   console.log("Ext.perioidHdr",Ext.perioidHdr);
+   console.log("rs r",rs[0]);
 if (Ext.perioidHdr.data.i_type_bg == 8) {
    if (
       Ext.perioidHdr.data.i_period == 1 ||
@@ -6137,7 +6119,7 @@ if (Ext.perioidHdr.data.i_type_bg == 9) {
 }
 // return ;
 // if (Ext.perioidHdr.data.pr_bg_reserve_money1_id >= 0 && Ext.perioidHdr.data.po_bg_reserve_money1_id >= 0  ) {
-Ext.perioidHdr = rs;
+//Ext.perioidHdr = rs;
 Ext.auditBoong(rs);
 };
 Ext.reqMoney = function (id, req, f) {
@@ -6581,19 +6563,17 @@ new Ext.Window({
                alert_text += "Time : " + new Date().toLocaleString("en-ZA") + "\n";
                alert_text += "Host : " + location.host + "\n";
                alert_text += "File : sp/tor/checking.js \n";
-               alert_text +=
-                  "จำนวนเงินที่คืนทางงบประมาณ : " +
-                  floatRenderer(floatMinus(String(sum_check_out).replace(/,/g, ""), 2)) +
-                  "\n";
+               alert_text +=  "จำนวนเงินที่คืนทางงบประมาณ : " +  floatRenderer(floatMinus(String(sum_check_out).replace(/,/g, ""), 2)) +  "\n";
                alert_text += "ชื่อผู้ทำรายการ : " + record.user_name + "\n";
+               //@ts-expect-error TODO แจ้งเตือน
                if (sum_check_out > 10000) {
-                  Ext.Ajax.request({
-                     url: Ext.session.Notif_line,
-                     method: "POST",
-                     params: {
-                        msg: alert_text,
-                     },
-                  });
+                  // Ext.Ajax.request({
+                  //    url: Ext.session.Notif_line,
+                  //    method: "POST",
+                  //    params: {
+                  //       msg: alert_text,
+                  //    },
+                  // });
                }
             }
          },
@@ -10412,7 +10392,7 @@ Ext.bg_budget_year = new Ext.data.JsonStore({
    fields: ["id", "i_year_ad", "i_year_be", "i_status", "i_enable"],
 });
 Ext.storePeriodHdr = new Ext.data.JsonStore({
-   storeId: "myStore2",
+   storeId: "storePeriodHdr",
    autoDestroy: false,
    autoLoad: false,
    url: "tor/api/mnCheckingController.php",
@@ -10534,6 +10514,7 @@ Ext.storePeriodHdr.on("load", function (store) {
    if (pid) {
       var rec = store.findRecord("sp_tor_hdr_period_id", parseInt(pid, 10)) || store.getById(pid);
       if (rec) {
+          Ext.storePeriodHdr = rec;
          showCustomEditForm(rec);
       }
    }
@@ -17210,6 +17191,8 @@ Ext.AppPoStore = function () {
                                                                "upload_pdf1",
                                                             ).getValue();
                                                          Ext.check_pdf = 1;
+                                                         Ext.storePeriodHdr = record;
+                                                                               console.log(Ext.storePeriodHdr);
                                                          Ext.storeDtl.reload();
                                                          Ext.getCmp("frmUplaodID").destroy();
                                                          Ext.getCmp("groupUploadID").insert(
@@ -17402,30 +17385,30 @@ Ext.AppPoStore = function () {
                      // ===== เพิ่มตรงนี้ =====
                      // หากผู้ใช้แก้ไข "f_vat" โดยตรง (Ext.vatEdit == true)
                      // ให้เก็บค่าที่ผู้ใช้ตั้งไว้และอย่าให้การคำนวณจากรายการย่อยมาทับค่า
-                     // if (!Ext.isEmpty(Ext.vatEdit)) {
-                     //    var totalVatFromGrid = 0;
-                     //    Ext.getCmp("gridSub4ID")
-                     //       .getStore()
-                     //       .each(function (rec) {
-                     //          var v = 0;
-                     //          if (rec._vatManual) {
-                     //             v =
-                     //                parseFloat(
-                     //                   (rec.get("f_vat_amt") || "0").toString().replace(/,/g, ""),
-                     //                ) || 0;
-                     //          } else {
-                     //             var net =
-                     //                parseFloat(
-                     //                   (rec.get("f_net_total") || "0").toString().replace(/,/g, ""),
-                     //                ) || 0;
-                     //             if (net > 0) v = Math.round((net / 1.07) * 0.07 * 100) / 100;
-                     //          }
-                     //          totalVatFromGrid += v;
-                     //       });
-                     //    Ext.getCmp("f_vat").setValue(
-                     //       floatRenderer(floatMinus(totalVatFromGrid.toFixed(2), 2)),
-                     //    );
-                     // }
+                      if (!Ext.isEmpty(Ext.vatEdit)) {
+                         var totalVatFromGrid = 0;
+                         Ext.getCmp("gridSub4ID")
+                            .getStore()
+                            .each(function (rec) {
+                               var v = 0;
+                               if (rec._vatManual) {
+                                  v =
+                                     parseFloat(
+                                        (rec.get("f_vat_amt") || "0").toString().replace(/,/g, ""),
+                                     ) || 0;
+                               } else {
+                                  var net =
+                                     parseFloat(
+                                        (rec.get("f_net_total") || "0").toString().replace(/,/g, ""),
+                                     ) || 0;
+                                  if (net > 0) v = Math.round((net / 1.07) * 0.07 * 100) / 100;
+                               }
+                               totalVatFromGrid += v;
+                            });
+                         Ext.getCmp("f_vat").setValue(
+                            floatRenderer(floatMinus(totalVatFromGrid.toFixed(2), 2)),
+                         );
+                      }
                      // ===== จบส่วนที่เพิ่ม =====
 
                      var msg = ""; // ← ต้องมีบรรทัดนี้ต่อทันที
@@ -17459,6 +17442,7 @@ Ext.AppPoStore = function () {
                               return net > 0 ? Math.round((net / 1.07) * 0.07 * 100) / 100 : 0;
                            })(),
                         });
+                       
                         if (Arr_month_group.find((e) => e == v.data.i_month) == undefined) {
                            Arr_month_group.push(v.data.i_month);
                         }
@@ -17486,7 +17470,7 @@ Ext.AppPoStore = function () {
                         }
                         if (Ext.getCmp("upload_pdf1").getValue() == "") {
                            //@TO
-                           //  msg += "กรุณาอัพโหลดไฟล์เอกสาร";
+                            msg += "กรุณาอัพโหลดไฟล์เอกสาร";
                         }
                         if (
                            Ext.getCmp("i_type_transfer").getValue().inputValue == 1 &&
@@ -17502,9 +17486,7 @@ Ext.AppPoStore = function () {
                            msg += "กรุณาอัพโหลดไฟล์เอกสาร";
                         }
                         // if(Ext.selectRow.data.i_chk_bg == 1)
-                        if (
-                           Ext.selectRow.data.c_checking_code != null &&
-                           Ext.getCmp("submodeID").getValue() !== "modeEditAp"
+                        if (  Ext.selectRow.data.c_checking_code != null &&  Ext.getCmp("submodeID").getValue() !== "modeEditAp"
                         ) {
                            msg += "ออกเลขตรวจรับแล้ว ไม่สามารถทำรายการซ้ำได้";
                         }
@@ -17551,6 +17533,7 @@ Ext.AppPoStore = function () {
                         }, 6000);
                         return;
                      } else {
+       console.log("update no c_code");                 
                         var form = Ext.getCmp("tabpanelMain3ID").getForm();
                         form.url = urlUpload;
                         form.submit({
@@ -17561,90 +17544,64 @@ Ext.AppPoStore = function () {
                                  Ext.storePeriodHdr.reload({
                                     callback: function (record, operation, success) {
                                        if (success) {
+//                                          console.log("mnCheckingController no UPDATE_DCACC"); 
+//                                            console.log('bg_expense_id',Ext.getCmp("po_expense_idID").getValue()); 
+// console.log('originalText',originalText); 
+//                                              console.log('trimmedText',trimmedText); 
+//
+//                                                console.log('dc_acc_arr',  JSON.stringify(jsonArr)); 
                                           Ext.Ajax.request({
                                              url: "tor/api/mnCheckingController.php",
                                              method: "POST",
                                              params: {
                                                 mode: "UPDATE_DCACC",
                                                 // sp_tor_id : 159,
-                                                bg_expense_id:
-                                                   Ext.getCmp("po_expense_idID").getValue(),
+                                                bg_expense_id:  Ext.getCmp("po_expense_idID").getValue(),
                                                 bg_expense: originalText,
                                                 bg_expense_name: trimmedText,
                                                 dc_acc_arr: JSON.stringify(jsonArr),
                                              },
                                              success: function (result, request) {
-                                                calculateAndUpdateTotal(
-                                                   "gridSub4ID",
-                                                   "f_sum_Transf",
-                                                );
-                                                Ext.getCmp("contenterCenter").getEl().unmask();
-                                                let json = Ext.util.JSON.decode(
-                                                   result.responseText,
-                                                ); //decode json
-                                                Ext.Msg.alert("แจ้งเตือน", json.msg);
+
+                                                  console.log("mnCheckingController no c_code"); 
+                                                // calculateAndUpdateTotal(
+                                                //    "gridSub4ID",
+                                                //    "f_sum_Transf",
+                                                // );
+                                                 Ext.getCmp("contenterCenter").getEl().unmask();
+                                                 let json = Ext.util.JSON.decode(
+                                                    result.responseText,
+                                                 ); //decode json
+                                                // Ext.Msg.alert("แจ้งเตือน", json.msg);
                                                 // Ext.getCmp("win-sp_gl_monthly").destroy();
-                                                Ext.storeDtl.reload();
-                                                Ext.storePeriodDtl.reload();
-                                                let itemStore = Ext.getCmp("gridSub4ID").getStore();
-                                                itemStore.reload(); // Reload ข้อมูลหลังเพิ่มสำเร็จ
-                                                if (json.success == "Success") {
+                                                // Ext.storeDtl.reload();
+                                                // Ext.storePeriodDtl.reload();
+                                                // let itemStore = Ext.getCmp("gridSub4ID").getStore();
+                                                // itemStore.reload(); // Reload ข้อมูลหลังเพิ่มสำเร็จ
+                                              
                                                    var msg = "";
-                                                   var form =
-                                                      Ext.getCmp("tabpanelMain3ID").getForm();
+                                                   var form = Ext.getCmp("tabpanelMain3ID").getForm();
                                                    form.url = "tor/api/mnCheckingController.php";
                                                    var formSubmit = function () {
-                                                      // Ext.genCode(record);
-                                                      // Ext.c_overlap_close(record, "c_overlap_close");
-                                                      // return;
-                                                      Ext.bookingOverall = function (
-                                                         record,
-                                                         txt,
-                                                         rs,
-                                                      ) {
-                                                         Ext.selectRow.set(
-                                                            "i_yyyy",
-                                                            parseInt(
-                                                               Ext.selectRow.get("i_yyyy"),
-                                                            ) - 1,
-                                                         );
-                                                         rec = record[0].data;
-                                                         if (
-                                                            [1, 5, 6, 7].includes(
-                                                               rec.i_type_bg,
-                                                            ) &&
-                                                            rec.i_overlap == 0
-                                                         ) {
+//                                                       Ext.genCode(record);
+//                                                       Ext.c_overlap_close(record, "c_overlap_close");
+//                                                       return;
+                                                      Ext.bookingOverall = function ( record, txt,  rs ) {
+                                                         Ext.selectRow.set(  "i_yyyy",   parseInt(   Ext.selectRow.get("i_yyyy"),    ) - 1);
+                                                         var rec = record[0].data;
+                                                         if ([1, 5, 6, 7].includes( rec.i_type_bg) && rec.i_overlap == 0) {
                                                             // ปีงบปัจจุบัน
-                                                            if (
-                                                               rec.i_type_bg == 8 &&
-                                                               rec.i_overlap == 0
-                                                            ) {
+                                                            if ( rec.i_type_bg == 8 &&  rec.i_overlap == 0) {
                                                                // 1 "ยิง 3 link PR,PO,AP"  i_chk_bg
-                                                               txt =
-                                                                  "i_type_bg ==8 ยิง 3 link PR,PO,AP";
+                                                               txt =  "i_type_bg ==8 ยิง 3 link PR,PO,AP";
                                                             } else {
-                                                               if (
-                                                                  rec.bg_checking_money_id ==
-                                                                  0 &&
-                                                                  Ext.getCmp("i_status_checkingID").getValue().inputValue == 1 && Ext.getCmp( "submodeID").getValue() !== "modeEditAp" ) {
-                                                                  var i_is_last =
-                                                                     rec.i_is_last;
-                                                                  var f_net_total =
-                                                                     parseFloat(
-                                                                        String(
-                                                                           rec.f_net_total_price ==
-                                                                              null
-                                                                              ? 0
-                                                                              : rec.f_net_total_price,
-                                                                        ).replace(/,/g, ""),
-                                                                     ) || 0; // เงินที่กำลังจะตรวจรับ
+                                                                                    console.log("log modeEditAp");
+                                                               if (rec.bg_checking_money_id ===   0 &&  Ext.getCmp("i_status_checkingID").getValue().inputValue === 1 && Ext.getCmp( "submodeID").getValue() != "modeEditAp" ) {
+                                                                  var i_is_last = rec.i_is_last;
+                                                                  var f_net_total = parseFloat(String( rec.f_net_total_price == null  ? 0  : rec.f_net_total_price).replace(/,/g, "")) || 0; // เงินที่กำลังจะตรวจรับ
                                                                   var i_period = rec.i_period;
                                                                   if (i_is_last == 1) {
-                                                                     Ext.storeSUMcontract.setBaseParam(
-                                                                        "sp_tor_contract_id",
-                                                                        rec.sp_tor_contract_id,
-                                                                     );
+                                                                     Ext.storeSUMcontract.setBaseParam(   "sp_tor_contract_id",  rec.sp_tor_contract_id );
                                                                      Ext.storeSUMcontract.load(
                                                                         {
                                                                            callback:
@@ -17653,103 +17610,37 @@ Ext.AppPoStore = function () {
                                                                                  operation,
                                                                                  success,
                                                                               ) {
-                                                                                 if (
-                                                                                    success
-                                                                                 ) {
-                                                                                    var rec =
-                                                                                       record[0];
-                                                                                    var count_period =
-                                                                                       rec
-                                                                                          .data
-                                                                                          .sum_period;
-                                                                                    var sum_period =
-                                                                                       parseFloat(
-                                                                                          String(
-                                                                                             rec
-                                                                                                .data
-                                                                                                .f_total_amt ==
-                                                                                                null
-                                                                                                ? 0
-                                                                                                : rec
-                                                                                                   .data
-                                                                                                   .f_total_amt,
-                                                                                          ).replace(
-                                                                                             /,/g,
-                                                                                             "",
-                                                                                          ),
-                                                                                       ) ||
-                                                                                       0; // เงินของทุกงวด || เงินสัญญา
-                                                                                    var sum_check =
-                                                                                       parseFloat(
-                                                                                          String(
-                                                                                             rec
-                                                                                                .data
-                                                                                                .sum_check ==
-                                                                                                null
-                                                                                                ? 0
-                                                                                                : rec
-                                                                                                   .data
-                                                                                                   .sum_check,
-                                                                                          ).replace(
-                                                                                             /,/g,
-                                                                                             "",
-                                                                                          ),
-                                                                                       ) ||
-                                                                                       0; // จำนวนเงินที่เคยตรวจรับ
-                                                                                    var sum_check_now =
-                                                                                       sum_check +
-                                                                                       f_net_total;
-                                                                                    var sum_check2 =
-                                                                                       rec.data; //
-                                                                                    if (
-                                                                                       Math.round(
-                                                                                          sum_check_now *
-                                                                                          100,
-                                                                                       ) !==
-                                                                                       Math.round(
-                                                                                          sum_period *
-                                                                                          100,
-                                                                                       ) &&
-                                                                                       i_period ==
-                                                                                       count_period
-                                                                                    ) {
-                                                                                       winProcess(
-                                                                                          record,
-                                                                                       );
-                                                                                    } else if (
-                                                                                       i_period !=
-                                                                                       count_period
-                                                                                    ) {
-                                                                                       Ext.MessageBox.alert(
-                                                                                          "Notification",
-                                                                                          "งวดสุดท้ายกับงวดที่มีไม่ตรงกัน ",
-                                                                                          function () {
-                                                                                             return false;
-                                                                                          },
-                                                                                       );
+                                                                                 if ( success  ) {
+                                                                                    var rec =   record[0];
+                                                                                                              console.log(rec);
+                                                                                    var count_period = rec.data.sum_period;
+                                                                                    var sum_period =   parseFloat(  String( rec .data  .f_total_amt === null ? 0  : rec  .data  .f_total_amt  ).replace(  /,/g,   "")) || 0; // เงินของทุกงวด || 
+                                                                                    var sum_check =   parseFloat( String(  rec.data.sum_check === null   ? 0  : rec  .data  .sum_check  ).replace( /,/g, "",  )  ) ||   0; // จำนวนเงินที่เคยตรวจรับ
+                                                                                    var sum_check_now =  sum_check +  f_net_total;
+                                                                                    var sum_check2 = rec.data; //
+                                                                                
+                                                                                    if (i_period !== count_period) {
+                                                                                       Ext.MessageBox.alert( "งวดสุดท้ายกับงวดที่มีไม่ตรงกัน ",  function () {  return false;  });
+                                                                                        
                                                                                     } else {
-                                                                                       // return false ;
-                                                                                       var record =
-                                                                                          Ext.perioidHdr;
-                                                                                       Ext.getMoney(
-                                                                                          record,
-                                                                                       ); // ออกเลขตรวจรับ
+                                                                                       // return false ; 
+                                                                                       var record = Ext.perioidHdr;
+                                                                                       
+                                                                               console.log("perioidHdr",record);
+                                                                                       Ext.getMoney(record); // ออกเลขตรวจรับ
                                                                                     }
                                                                                  }
                                                                               },
                                                                         },
                                                                      );
                                                                   } else {
-                                                                     // return ;
-                                                                     var record =
-                                                                        Ext.perioidHdr;
+                                                                     // return ;    
+                                                                     var record = Ext.perioidHdr; console.log("perioidHdr",record);
                                                                      Ext.getMoney(record); // ออกเลขตรวจรับ
                                                                   }
-                                                               } else if (
-                                                                  rec.c_code != null &&
-                                                                  rec.c_code != "" &&
-                                                         Ext.getCmp( "submodeID").getValue() !== "modeEditAp" ) {
-                                                                  console.log("")
+
+                                                               } else if (  rec.c_code != null &&  rec.c_code != "" &&  Ext.getCmp( "submodeID").getValue() !== "modeEditAp" ) {
+                                                             
                                                                   Ext.MessageBox.alert(
                                                                      "Notification",
                                                                      "มีเลขCHK ไม่สามารถออกเลขซ้ำได้ ",
@@ -17758,10 +17649,7 @@ Ext.AppPoStore = function () {
                                                                      },
                                                                   );
                                                                } else if (
-                                                                  rec.bg_checking_money_id !=
-                                                                  0 &&
-                                                                  rec.c_code == null &&
-                                                                 Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
+                                                                  rec.bg_checking_money_id !=  0 &&   rec.c_code == null &&  Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
                                                                   Ext.genCode(rec);
                                                                   return false;
                                                                } else {
@@ -17774,23 +17662,13 @@ Ext.AppPoStore = function () {
                                                                   );
                                                                }
                                                             }
-                                                         } else if (
-                                                            [3, 4].includes(
-                                                               Ext.selectRow.data.i_chk_bg,
-                                                            )
+                                                         } else if (  [3, 4].includes( Ext.selectRow.data.i_chk_bg     )
                                                          ) {
                                                             // 2 "ก่อหนี้แล้วไม่ให้เลือกใบกัน
-                                                            Ext.c_overlap_close(
-                                                               rec,
-                                                               "c_overlap_close",
-                                                            );
+                                                            Ext.c_overlap_close(  rec,   "c_overlap_close",  );
                                                          } else if (
-                                                            Ext.selectRow.data.i_chk_bg == 2 &&
-                                                     Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
-                                                            Ext.c_overlap_close(
-                                                               rec,
-                                                               "c_overlap_book",
-                                                            );
+                                                            Ext.selectRow.data.i_chk_bg == 2 && Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
+                                                            Ext.c_overlap_close(   rec,  "c_overlap_book");
                                                          } else if (
                                                             Ext.selectRow.data.i_chk_bg == 5 && Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
                                                             Ext.genCode(Ext.selectRow.data);
@@ -17800,11 +17678,7 @@ Ext.AppPoStore = function () {
                                                             Ext.getCmp("winPeriodHdrID")
                                                                .getEl()
                                                                .unmask();
-                                                            if (
-                                                               Ext.selectRow.data
-                                                                  .dc_expense_budget_type_id ==
-                                                               2
-                                                            ) {
+                                                            if ( Ext.selectRow.data.dc_expense_budget_type_id ==  2 ) {
                                                                Ext.MessageBox.alert(
                                                                   "Notification",
                                                                   " ต้องเป็นแหล่งเงินรายได้ส่วนงาน 49 update sp_tor_hdr_period set dc_expense_budget_type_id=49 where sp_tor_contract_id = " +
@@ -17871,70 +17745,33 @@ Ext.AppPoStore = function () {
                                                                                                    )
                                                                                                       .getEl()
                                                                                                       .unmask();
-                                                                                                   if (Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
-                                                                                                      Ext.Msg.alert(
-                                                                                                         "บันทีกการตรวจรับ",
-                                                                                                         action
-                                                                                                            .result
-                                                                                                            .msg,
-                                                                                                         function (
-                                                                                                            form,
-                                                                                                            action,
-                                                                                                         ) {
-                                                                                                            Ext.storeDtl.reload(
-                                                                                                               {
-                                                                                                                  callback:
-                                                                                                                     function (
-                                                                                                                        rs,
-                                                                                                                        operation,
-                                                                                                                        success,
-                                                                                                                     ) {
-                                                                                                                        if (
-                                                                                                                           success
-                                                                                                                        ) {
-                                                                                                                           //                                                                 Ext.getCmp('winChequeID').remove(Ext.getCmp('tabpanelMain3ID'), true) || {};
-                                                                                                                           Ext.getCmp(
-                                                                                                                              "winPeriodHdrID",
-                                                                                                                           ).destroy();
-                                                                                                                           if (
-                                                                                                                              Ext.reopenAfterReceiveValidationSave &&
-                                                                                                                              !Ext.reopeningPeriodHdr
-                                                                                                                           ) {
-                                                                                                                              Ext.reopeningPeriodHdr = true;
-                                                                                                                              Ext.reopenAfterReceiveValidationSave = false;
-                                                                                                                              Ext.defer(
-                                                                                                                                 function () {
-                                                                                                                                    Ext.editHistoryAp(
-                                                                                                                                       Ext.currentEditHistoryStatus ||
-                                                                                                                                       "edit",
-                                                                                                                                    );
-                                                                                                                                    Ext.reopeningPeriodHdr = false;
-                                                                                                                                 },
-                                                                                                                                 300,
-                                                                                                                              );
-                                                                                                                           }
-                                                                                                                           if (
-                                                                                                                              !Ext.isEmpty(
-                                                                                                                                 Ext.getCmp(
-                                                                                                                                    "winEditComentID",
-                                                                                                                                 ),
-                                                                                                                              )
-                                                                                                                           )
-                                                                                                                              Ext.getCmp(
-                                                                                                                                 "winEditComentID",
-                                                                                                                              ).destroy();
-                                                                                                                        }
-                                                                                                                     },
-                                                                                                               },
-                                                                                                            );
-                                                                                                         },
-                                                                                                      );
-                                                                                                   } else {
-                                                                                                      Ext.bookingOverall(
-                                                                                                         record,
-                                                                                                         rec,
-                                                                                                      );
-                                                                                                   }
+                                           if (Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
+                                                      Ext.storeDtl.reload(
+                                                         {
+                                                            callback: function (rs, operation, success) {
+                                                               if (success) {
+                                                                  Ext.getCmp("winPeriodHdrID").destroy(); // ปิด window ทันที ไม่ต้องรอกด OK
+                                                                  if (Ext.reopenAfterReceiveValidationSave && !Ext.reopeningPeriodHdr) {
+                                                                     Ext.reopeningPeriodHdr = true;
+                                                                     Ext.reopenAfterReceiveValidationSave = false;
+                                                                     Ext.defer(function () {
+                                                                        Ext.editHistoryAp(Ext.currentEditHistoryStatus || "edit");
+                                                                        Ext.reopeningPeriodHdr = false;
+                                                                     }, 300);
+                                                                  }
+                                                                  if (!Ext.isEmpty(Ext.getCmp("winEditComentID")))
+                                                                     Ext.getCmp("winEditComentID").destroy();
+                                                               }
+                                                            },
+                                                         },
+                                                      );
+                                                      Ext.getMoney(record); // ออกเลขตรวจรับ - ไม่ต้องรอ Msg.alert ปิดไปแล้ว
+                                                   } else {
+                                                      Ext.bookingOverall(
+                                                         record,
+                                                         rec,
+                                                      );
+                                                   }
                                                                                                 }
                                                                                              },
                                                                                        },
@@ -17997,7 +17834,7 @@ Ext.AppPoStore = function () {
                                                       });
                                                    };
                                                    formSubmit(form);
-                                                }
+                                              
                                              },
                                              failure: function (result, request) {
                                                 Ext.MessageBox.alert("Failed", result.responseText); // connect error

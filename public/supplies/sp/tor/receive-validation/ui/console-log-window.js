@@ -2239,89 +2239,89 @@ Ext.isBook = null;
                         });
                         return Ext.encode(result);
                 }
-        const disable_acc = function (data) {
-        let msg = "";
-                if (msg == "") {
-        var win = new Ext.Window({
-        id: "MessageBox_re",
-                title: "ยืนยันยกเลิกคำร้อง ",
-                modal: true,
-                maximizable: false,
-                resizable: false,
-                width: 310,
-                items: [
-                {
-                xtype: "form",
-                        frame: true,
-                        labelAlign: "right",
-                        labelWidth: 0.1,
-                        bodyStyle: { padding: "10px 20px" },
-                        defaults: { anchor: "100%", msgTarget: "side" },
-                        items: [
-                        {
-                        xtype: "displayfield",
-                                id: "displaytext",
-                                width: 200,
-                                value: "ยืนยันคำร้องยกเลิกบันทึกบัญชี",
-                                style: "text-align: center;",
-                        },
-                        ],
-                },
-                ],
-                buttonAlign: "left",
-                buttons: [
-                {
-                text: "ยืนยัน",
-                        id: "btn_save-MessageBox_re",
-                        icon: "../images/icons/delete.png",
-                        listeners: {
-                        afterrender: function () {
-                        btn_set_color(this, "red"); //color : green, red, yellow, orange
-                        },
-                        },
-                        handler: function () {
-                        let msg = "";
-                                if (msg == "") {
-                        Ext.Msg.wait("Uploading...");
-                                Ext.getCmp("json_select_field").setValue(getCheckedLabelsAsJson());
-                                const form = Ext.getCmp("form-pop").getForm(); // ต้องใช้ id ของ FormPanel
-                                var url_acc = "../sp/checking/mnUploadDocAcc.php";
-                                form.submit({
-                                url: url_acc,
-                                        waitMsg: "Uploading...",
-                                        success: function (form, action) {
-                                        const res = Ext.decode(action.response.responseText); // ✅ ใช้ responseText แทน result
-
-                                                Ext.Msg.alert("สำเร็จ", res.msg || "บันทึกเรียบร้อย");
-                                                Ext.getCmp("MessageBox_re").hide();
-                                                Ext.getCmp("MessageBox_re").destroy();
-                                                Ext.getCmp("win-pop").hide();
-                                                Ext.storeDtl.load();
-                                                Ext.getCmp("win-pop").destroy();
-                                        },
-                                        failure: function () {
-                                        Ext.Msg.alert("ล้มเหลว", "ไม่สามารถอัปโหลดไฟล์ได้");
-                                        },
-                                });
-                        } else {
-                        Ext.Msg.alert("แจ้งเตือนddd", msg);
-                        }
-                        },
-                },
-                { xtype: "tbfill" },
-                {
-                text: "ย้อนกลับ",
-                        handler: function () {
-                        Ext.getCmp("MessageBox_re").hide();
-                                Ext.getCmp("MessageBox_re").destroy();
-                        },
-                },
-                ],
-        }).show();
-        } else {
-        Ext.Msg.alert("แจ้งเตือน", msg);
-        }
-        }; // reStatus
+//        const disable_acc = function (data) {
+//        let msg = "";
+//                if (msg == "") {
+//        var win = new Ext.Window({
+//        id: "MessageBox_re",
+//                title: "ยืนยันยกเลิกคำร้อง ",
+//                modal: true,
+//                maximizable: false,
+//                resizable: false,
+//                width: 310,
+//                items: [
+//                {
+//                xtype: "form",
+//                        frame: true,
+//                        labelAlign: "right",
+//                        labelWidth: 0.1,
+//                        bodyStyle: { padding: "10px 20px" },
+//                        defaults: { anchor: "100%", msgTarget: "side" },
+//                        items: [
+//                        {
+//                        xtype: "displayfield",
+//                                id: "displaytext",
+//                                width: 200,
+//                                value: "ยืนยันคำร้องยกเลิกบันทึกบัญชี",
+//                                style: "text-align: center;",
+//                        },
+//                        ],
+//                },
+//                ],
+//                buttonAlign: "left",
+//                buttons: [
+//                {
+//                text: "ยืนยัน",
+//                        id: "btn_save-MessageBox_re",
+//                        icon: "../images/icons/delete.png",
+//                        listeners: {
+//                        afterrender: function () {
+//                        btn_set_color(this, "red"); //color : green, red, yellow, orange
+//                        },
+//                        },
+//                        handler: function () {
+//                        let msg = "";
+//                                if (msg == "") {
+//                        Ext.Msg.wait("Uploading...");
+//                                Ext.getCmp("json_select_field").setValue(getCheckedLabelsAsJson());
+//                                const form = Ext.getCmp("form-pop").getForm(); // ต้องใช้ id ของ FormPanel
+//                                var url_acc = "../sp/checking/mnUploadDocAcc.php";
+//                                form.submit({
+//                                url: url_acc,
+//                                        waitMsg: "Uploading...",
+//                                        success: function (form, action) {
+//                                        const res = Ext.decode(action.response.responseText); // ✅ ใช้ responseText แทน result
+//
+//                                                Ext.Msg.alert("สำเร็จ", res.msg || "บันทึกเรียบร้อย");
+//                                                Ext.getCmp("MessageBox_re").hide();
+//                                                Ext.getCmp("MessageBox_re").destroy();
+//                                                Ext.getCmp("win-pop").hide();
+//                                                Ext.storeDtl.load();
+//                                                Ext.getCmp("win-pop").destroy();
+//                                        },
+//                                        failure: function () {
+//                                        Ext.Msg.alert("ล้มเหลว", "ไม่สามารถอัปโหลดไฟล์ได้");
+//                                        },
+//                                });
+//                        } else {
+//                        Ext.Msg.alert("แจ้งเตือนddd", msg);
+//                        }
+//                        },
+//                },
+//                { xtype: "tbfill" },
+//                {
+//                text: "ย้อนกลับ",
+//                        handler: function () {
+//                        Ext.getCmp("MessageBox_re").hide();
+//                                Ext.getCmp("MessageBox_re").destroy();
+//                        },
+//                },
+//                ],
+//        }).show();
+//        } else {
+//        Ext.Msg.alert("แจ้งเตือน", msg);
+//        }
+//        }; // reStatus
 // Custom form for i_is_editID (opens independently of i_is_workID)
 // ฟังก์ชันเสริม: สร้างไว้เรียกตอนปิด Window หรือกดยกเลิก เพื่อสั่งล้างหน่วยความจำ
                 Ext.clearVatMemory = () => {
