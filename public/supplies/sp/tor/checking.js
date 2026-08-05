@@ -11719,7 +11719,7 @@ Ext.extend(
                   } else if (statusx === "edit") {
                      console.log("edit", 99);
                      Ext.editHistoryAp(statusx);
-                     Ext.arrEdit = "checking";
+                    
                      // 1,2,3,9 แก้ไขได้
                      // 4,5,6 แก้ไขไม่ได้
                      // [1,2,3,9].includes(Ext.selectRow.data.i_send_gl_dr)
