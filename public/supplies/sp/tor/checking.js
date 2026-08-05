@@ -940,12 +940,21 @@ var winAssetConfirm = new Ext.Window({
                                  params: { mode: "DEL_CHECKING_DTL", id: record.json.id, i_enabled: 2 },
                                  method: "POST", //POST
                                  success: function (result, request) {
-                                    var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                                    var jsonData;
+                                    try {
+                                       jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                                    } catch (e) {
+                                       Ext.MessageBox.alert(
+                                          "ผิดพลาด",
+                                          "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                                       );
+                                       return;
+                                    }
                                     if (jsonData.success) {
                                        // f_sum_traf_item()
                                        calculateAndUpdateTotal("gridSub4ID", "f_sum_Transf");
                                        Ext.MessageBox.alert(
-                                          "Success",
+                                          "สำเร็จ",
                                           "ทำการลบรายการเรียบร้อยแล้ว",
                                           function () {
                                              Ext.storeDtl.reload();
@@ -958,7 +967,7 @@ var winAssetConfirm = new Ext.Window({
                                           },
                                        );
                                     } else {
-                                       Ext.MessageBox.alert("Failed", jsonData.msg); // alert massage error
+                                       Ext.MessageBox.alert("ผิดพลาด", jsonData.msg || "เกิดข้อผิดพลาด ไม่ทราบสาเหตุ"); // alert massage error
                                     }
                                  },
                                  failure: function (result, request) {
@@ -1048,8 +1057,17 @@ var winAssetConfirm = new Ext.Window({
                               success: function (result, request) {
                                  calculateAndUpdateTotal("gridSub4ID", "f_sum_Transf");
                                  Ext.getCmp("contenterCenter").getEl().unmask();
-                                 let json = Ext.util.JSON.decode(result.responseText); //decode json
-                                 Ext.Msg.alert("แจ้งเตือน", json.msg);
+                                 let json;
+                                 try {
+                                    json = Ext.util.JSON.decode(result.responseText); //decode json
+                                 } catch (e) {
+                                    Ext.MessageBox.alert(
+                                       "ผิดพลาด",
+                                       "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                                    );
+                                    return;
+                                 }
+                                 Ext.Msg.alert("แจ้งเตือน", json.msg || "เกิดข้อผิดพลาด ไม่ทราบสาเหตุ");
                                  // Ext.getCmp("win-sp_gl_monthly").destroy();
                                  Ext.storeDtl.reload();
                                  Ext.storePeriodDtl.reload();
@@ -1060,7 +1078,7 @@ var winAssetConfirm = new Ext.Window({
                                  }
                               },
                               failure: function (result, request) {
-                                 Ext.MessageBox.alert("Failed", result.responseText); // connect error
+                                 Ext.MessageBox.alert("ผิดพลาด", result.responseText); // connect error
                               },
                            });
                         } else {
@@ -5292,7 +5310,17 @@ Ext.Ajax.request({
    method: "GET", //POST
    disableCaching: false,
    success: function (result, request) {
-      let jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      let jsonData;
+      try {
+         jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      } catch (e) {
+         Ext.getCmp("winChequeID").getEl().unmask();
+         Ext.MessageBox.alert(
+            "ผิดพลาด",
+            "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+         );
+         return;
+      }
       if (ii === 2) {
          Ext.Ajax.request({
             url: "tor/api/mnTorController.php",
@@ -5308,7 +5336,7 @@ Ext.Ajax.request({
                Ext.storePeriodHdr.reload();
             },
             failure: function (result, request) {
-               Ext.MessageBox.alert("Failed", result.responseText); // connect error
+               Ext.MessageBox.alert("ผิดพลาด", result.responseText); // connect error
             },
          });
       } else {
@@ -5588,12 +5616,21 @@ return new Ext.Window({
                                  });
                                  Ext.getCmp("transfermoney").getEl().unmask();
                                  // Ext.getCmp("bg_budget_overlap_idID").getEl().unmask();
-                                 let json = Ext.util.JSON.decode(result.responseText);
+                                 let json;
+                                 try {
+                                    json = Ext.util.JSON.decode(result.responseText);
+                                 } catch (e) {
+                                    Ext.MessageBox.alert(
+                                       "ผิดพลาด",
+                                       "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                                    );
+                                    return;
+                                 }
                                  Ext.getCmp("transfermoney").destroy();
                                  if (json.success == "Success") {
                                     Ext.Msg.alert("แจ้งเตือน", "บันทึกรายการเรียบร้อย");
                                  } else {
-                                    Ext.Msg.alert("Error", "ผิดพลาด", json.msg);
+                                    Ext.Msg.alert("ผิดพลาด", json.msg || "เกิดข้อผิดพลาด ไม่ทราบสาเหตุ");
                                  }
                               }
                            });
@@ -5602,7 +5639,7 @@ return new Ext.Window({
                   });
                },
                failure: function (result, request) {
-                  Ext.MessageBox.alert("Failed", result.responseText);
+                  Ext.MessageBox.alert("ผิดพลาด", result.responseText);
                },
             });
          },
@@ -5733,18 +5770,27 @@ Ext.Ajax.request({
    method: "GET", //POST
    disableCaching: false,
    success: function (result, request) {
-      var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      var jsonData;
+      try {
+         jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      } catch (e) {
+         Ext.MessageBox.alert(
+            "ผิดพลาด",
+            "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+         );
+         return;
+      }
       if (jsonData.success) {
-         Ext.MessageBox.alert("Success", "เรียบร้อยแล้ว", function () {
+         Ext.MessageBox.alert("สำเร็จ", "เรียบร้อยแล้ว", function () {
             Ext.upMoneyCheckingId(jsonData.bg_reserve_money_id);
          });
       } else {
-         Ext.MessageBox.alert("Failed", "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg);
+         Ext.MessageBox.alert("ผิดพลาด", "ข้อมูลผิดพลาด ติดต่อ admin <br>" + (jsonData.msg || "ไม่ทราบสาเหตุ"));
       }
       return false;
    },
    failure: function (result, request) {
-      Ext.MessageBox.alert("Failed", result.responseText); // connect error
+      Ext.MessageBox.alert("ผิดพลาด", result.responseText); // connect error
    },
 });
 };
@@ -5856,7 +5902,16 @@ Ext.Ajax.request({
    method: "GET", //POST
    disableCaching: false,
    success: function (result, request) {
-      var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      var jsonData;
+      try {
+         jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      } catch (e) {
+         Ext.MessageBox.alert(
+            "ผิดพลาด",
+            "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+         );
+         return;
+      }
       if (jsonData.totalCount > 0) {
          var f_amt = 0;
          var cheVal = Ext.perioidHdr.get("f_net_total_price").replace(/,/g, "") / 1;
@@ -5868,7 +5923,16 @@ Ext.Ajax.request({
                   method: "GET", //POST
                   disableCaching: false,
                   success: function (result, request) {
-                     var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                     var jsonData;
+                     try {
+                        jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                     } catch (e) {
+                        Ext.MessageBox.alert(
+                           "ผิดพลาด",
+                           "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                        );
+                        return;
+                     }
                      if (jsonData.success) {
                         // Ext.MessageBox.alert("Success", "ทำการเรียบร้อยแล้ว", function () {
                         purchase2(Ext.perioidHdr.get("sp_tor_id"), jsonData.bg_reserve_money_id, ii);
@@ -5878,7 +5942,17 @@ Ext.Ajax.request({
                            method: "GET", //POST
                            disableCaching: false,
                            success: function (result, request) {
-                              var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                              var jsonData;
+                              try {
+                                 jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                              } catch (e) {
+                                 Ext.MessageBox.alert(
+                                    "ผิดพลาด",
+                                    "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                                 );
+                                 Ext.getCmp("formDcExpTypeDddID").getEl().unmask();
+                                 return;
+                              }
                               if (jsonData.success) {
                                  // Ext.MessageBox.alert("Success", "ทำการเรียบร้อยแล้ว", function () {
                                  updateBookingContract(
@@ -5956,9 +6030,19 @@ Ext.Ajax.request({
    method: "GET", //POST
    disableCaching: false,
    success: function (result, request) {
-      var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      var jsonData;
+      try {
+         jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      } catch (e) {
+         Ext.getCmp("winPeriodHdrID").getEl().unmask();
+         Ext.MessageBox.alert(
+            "ผิดพลาด",
+            "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+         );
+         return;
+      }
       if (jsonData.success) {
-         Ext.MessageBox.alert("Success", "เรียบร้อยแล้ว", function () {
+         Ext.MessageBox.alert("สำเร็จ", "เรียบร้อยแล้ว", function () {
             Ext.Ajax.request({
                url: "tor/api/mnPeriodController.php",
                method: "POST",
@@ -5978,7 +6062,16 @@ Ext.Ajax.request({
                },
                success: function (result, request) {
                   Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                  let json = Ext.util.JSON.decode(result.responseText);
+                  let json;
+                  try {
+                     json = Ext.util.JSON.decode(result.responseText);
+                  } catch (e) {
+                     Ext.MessageBox.alert(
+                        "ผิดพลาด",
+                        "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                     );
+                     return;
+                  }
                   if (edit != "edit_bg") {
                      Ext.genCode(rec);
                   } else {
@@ -5989,7 +6082,7 @@ Ext.Ajax.request({
                   }
                },
                failure: function (result, request) {
-                  Ext.MessageBox.alert("Failed", result.responseText);
+                  Ext.MessageBox.alert("ผิดพลาด", "การปิดงวด ตรวจ");
                },
             });
             // id, req, f, bgid
@@ -6002,13 +6095,14 @@ Ext.Ajax.request({
          Ext.MessageBox.alert("แจ้งเตือน", "ยอดเงินใบไม่เพียงพอ ติดต่องบประมาณ");
       } else {
          Ext.getCmp("winPeriodHdrID").getEl().unmask();
-         Ext.MessageBox.alert("Failed", "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg);
+         Ext.MessageBox.alert("ผิดพลาด", "ข้อมูลผิดพลาด ติดต่อ admin <br>" + (jsonData.msg || "ไม่ทราบสาเหตุ"));
       }
 
       return false;
    },
    failure: function (result, request) {
-      Ext.MessageBox.alert("Failed", result.responseText); // connect error
+      console.log("rec", rec);
+      Ext.MessageBox.alert("ผิดพลาด", "event " + event + " edit " + edit); // connect error
    },
 });
 };
@@ -6052,15 +6146,24 @@ Ext.Ajax.request({
    method: "GET", //POST
    disableCaching: false,
    success: function (result, request) {
-      var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      var jsonData;
+      try {
+         jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+      } catch (e) {
+         Ext.MessageBox.alert(
+            "ผิดพลาด",
+            "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+         );
+         return;
+      }
       if (jsonData.success) {
          Ext.upMoneyId(Ext.perioidHdr.get("id"), 1, f, jsonData.bg_request_money_income_id);
       } else {
-         Ext.MessageBox.alert("Failed", "ข้อมูลผิดพลาด ติดต่อ admin<br>" + jsonData.msg);
+         Ext.MessageBox.alert("ผิดพลาด", "ข้อมูลผิดพลาด ติดต่อ admin<br>" + (jsonData.msg || "ไม่ทราบสาเหตุ"));
       }
    },
    failure: function (result, request) {
-      Ext.MessageBox.alert("Failed", result.responseText); // connect error
+      Ext.MessageBox.alert("ผิดพลาด", result.responseText); // connect error
    },
 });
 };
@@ -6078,14 +6181,23 @@ Ext.Ajax.request({
    },
    success: function (result, request) {
       Ext.getCmp("winPeriodHdrID").getEl().unmask();
-      let json = Ext.util.JSON.decode(result.responseText);
+      let json;
+      try {
+         json = Ext.util.JSON.decode(result.responseText);
+      } catch (e) {
+         Ext.MessageBox.alert(
+            "ผิดพลาด",
+            "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+         );
+         return;
+      }
       if (request.success) {
          Ext.getCmp("winPeriodHdrID").hide();
          Ext.getCmp("winPeriodHdrID").destroy();
       }
    },
    failure: function (result, request) {
-      Ext.MessageBox.alert("Failed", result.responseText);
+      Ext.MessageBox.alert("ผิดพลาด", result.responseText);
    },
 });
 };
@@ -6112,7 +6224,7 @@ Ext.Ajax.request({
       }
    },
    failure: function (result, request) {
-      Ext.MessageBox.alert("Failed", result.responseText);
+      Ext.MessageBox.alert("ผิดพลาด", result.responseText);
    },
 });
 };
@@ -6131,7 +6243,16 @@ Ext.Ajax.request({
    },
    success: function (result, request) {
       Ext.getCmp("winPeriodHdrID").getEl().unmask();
-      let json = Ext.util.JSON.decode(result.responseText);
+      let json;
+      try {
+         json = Ext.util.JSON.decode(result.responseText);
+      } catch (e) {
+         Ext.MessageBox.alert(
+            "ผิดพลาด",
+            "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+         );
+         return;
+      }
       Ext.genCode(Ext.perioidHdr.data);
       //            if (request.success) {
       //                Ext.getCmp("winPeriodHdrID").hide();
@@ -6139,7 +6260,7 @@ Ext.Ajax.request({
       //            }
    },
    failure: function (result, request) {
-      Ext.MessageBox.alert("Failed", result.responseText);
+      Ext.MessageBox.alert("ผิดพลาด", result.responseText);
    },
 });
 };
@@ -13631,12 +13752,21 @@ Ext.AppPoStore = function () {
                                        },
                                        method: "POST", //POST
                                        success: function (result, request) {
-                                          var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                                          var jsonData;
+                                          try {
+                                             jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                                          } catch (e) {
+                                             Ext.MessageBox.alert(
+                                                "ผิดพลาด",
+                                                "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                                             );
+                                             return;
+                                          }
                                           if (jsonData.success) {
                                              // f_sum_traf_item()
                                              calculateAndUpdateTotal("gridSub4ID", "f_sum_Transf");
                                              Ext.MessageBox.alert(
-                                                "Success",
+                                                "สำเร็จ",
                                                 "ทำการลบรายการเรียบร้อยแล้ว",
                                                 function () {
                                                    Ext.storeDtl.reload();
@@ -13650,11 +13780,11 @@ Ext.AppPoStore = function () {
                                                 },
                                              );
                                           } else {
-                                             Ext.MessageBox.alert("Failed", jsonData.msg); // alert massage error
+                                             Ext.MessageBox.alert("ผิดพลาด", jsonData.msg || "เกิดข้อผิดพลาด ไม่ทราบสาเหตุ"); // alert massage error
                                           }
                                        },
                                        failure: function (result, request) {
-                                          Ext.MessageBox.alert("Failed", result.responseText); // connect error
+                                          Ext.MessageBox.alert("ผิดพลาด", result.responseText); // connect error
                                        },
                                     });
                                  }
@@ -13756,8 +13886,17 @@ Ext.AppPoStore = function () {
                                     success: function (result, request) {
                                        calculateAndUpdateTotal("gridSub4ID", "f_sum_Transf");
                                        Ext.getCmp("contenterCenter").getEl().unmask();
-                                       let json = Ext.util.JSON.decode(result.responseText); //decode json
-                                       Ext.Msg.alert("แจ้งเตือน", json.msg);
+                                       let json;
+                                       try {
+                                          json = Ext.util.JSON.decode(result.responseText); //decode json
+                                       } catch (e) {
+                                          Ext.MessageBox.alert(
+                                             "ผิดพลาด",
+                                             "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                                          );
+                                          return;
+                                       }
+                                       Ext.Msg.alert("แจ้งเตือน", json.msg || "เกิดข้อผิดพลาด ไม่ทราบสาเหตุ");
                                        // Ext.getCmp("win-sp_gl_monthly").destroy();
                                        Ext.storeDtl.reload();
                                        Ext.storePeriodDtl.reload();
@@ -13768,7 +13907,7 @@ Ext.AppPoStore = function () {
                                        }
                                     },
                                     failure: function (result, request) {
-                                       Ext.MessageBox.alert("Failed", result.responseText); // connect error
+                                       Ext.MessageBox.alert("ผิดพลาด", result.responseText); // connect error
                                     },
                                  });
                               } else {
@@ -14483,8 +14622,7 @@ Ext.AppPoStore = function () {
                                                    record.data.bg_expense_id !=
                                                    Ext.getCmp("po_expense_idID").getValue() ||
                                                    record.data.dc_cost_id !=
-                                                   Ext.getCmp("dc_cost_idID").getValue()) &&
-                                                Ext.arrEdit[0] != "Edit_bg"
+                                                   Ext.getCmp("dc_cost_idID").getValue()) && Ext.arrEdit[0] != "Edit_bg"
                                              ) {
                                                 var index = Ext.dc_expense_budget_type.findExact(
                                                    "id",
@@ -17240,11 +17378,26 @@ Ext.AppPoStore = function () {
                      }
                   } //End IF
 
-                  console.log("Edit_bg", Ext.arrEdit);
+                   
+               
+// Ext.Msg.alert('สถานะรายการ','ต้องการแก้ไขข้อมูล',function(){
+//       Ext.Array.insert(arrEdit, 0, ["Edit_bg"])
+//    return true;
+// });
+
+//  Ext.arrEdit = Ext.arrEdit || [];
+
+//  Ext.arrEdit.unshift("Edit_bg");
+// console.log(Ext.arrEdit);
+
+
                   if (Ext.arrEdit.includes("Edit_bg")) {
                      Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                      Ext.c_overlap_close(Ext.selectRow.data, "c_overlap_book", "edit_bg");
                   } else {
+      Ext.vatEditTxt = "add vat";
+ Ext.vatEdit = true;                
+     console.log("Edit Vat",Ext.arrEdit);                 
                      // ===== เพิ่มตรงนี้ =====
                      // หากผู้ใช้แก้ไข "f_vat" โดยตรง (Ext.vatEdit == true)
                      // ให้เก็บค่าที่ผู้ใช้ตั้งไว้และอย่าให้การคำนวณจากรายการย่อยมาทับค่า
@@ -17473,15 +17626,7 @@ Ext.AppPoStore = function () {
                                                                if (
                                                                   rec.bg_checking_money_id ==
                                                                   0 &&
-                                                                  Ext.getCmp(
-                                                                     "i_status_checkingID",
-                                                                  ).getValue().inputValue ==
-                                                                  1 &&
-                                                                  Ext.getCmp(
-                                                                     "submodeID",
-                                                                  ).getValue() !==
-                                                                  "modeEditAp"
-                                                               ) {
+                                                                  Ext.getCmp("i_status_checkingID").getValue().inputValue == 1 && Ext.getCmp( "submodeID").getValue() !== "modeEditAp" ) {
                                                                   var i_is_last =
                                                                      rec.i_is_last;
                                                                   var f_net_total =
@@ -17602,11 +17747,8 @@ Ext.AppPoStore = function () {
                                                                } else if (
                                                                   rec.c_code != null &&
                                                                   rec.c_code != "" &&
-                                                                  Ext.getCmp(
-                                                                     "submodeID",
-                                                                  ).getValue() !==
-                                                                  "modeEditAp"
-                                                               ) {
+                                                         Ext.getCmp( "submodeID").getValue() !== "modeEditAp" ) {
+                                                                  console.log("")
                                                                   Ext.MessageBox.alert(
                                                                      "Notification",
                                                                      "มีเลขCHK ไม่สามารถออกเลขซ้ำได้ ",
@@ -17618,11 +17760,7 @@ Ext.AppPoStore = function () {
                                                                   rec.bg_checking_money_id !=
                                                                   0 &&
                                                                   rec.c_code == null &&
-                                                                  Ext.getCmp(
-                                                                     "submodeID",
-                                                                  ).getValue() !==
-                                                                  "modeEditAp"
-                                                               ) {
+                                                                 Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
                                                                   Ext.genCode(rec);
                                                                   return false;
                                                                } else {
@@ -17647,20 +17785,13 @@ Ext.AppPoStore = function () {
                                                             );
                                                          } else if (
                                                             Ext.selectRow.data.i_chk_bg == 2 &&
-                                                            Ext.getCmp(
-                                                               "submodeID",
-                                                            ).getValue() !== "modeEditAp"
-                                                         ) {
+                                                     Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
                                                             Ext.c_overlap_close(
                                                                rec,
                                                                "c_overlap_book",
                                                             );
                                                          } else if (
-                                                            Ext.selectRow.data.i_chk_bg == 5 &&
-                                                            Ext.getCmp(
-                                                               "submodeID",
-                                                            ).getValue() !== "modeEditAp"
-                                                         ) {
+                                                            Ext.selectRow.data.i_chk_bg == 5 && Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
                                                             Ext.genCode(Ext.selectRow.data);
                                                             // } else if (Ext.selectRow.data.i_chk_bg){
                                                             // Ext.genCode(Ext.selectRow.data);
@@ -17739,12 +17870,7 @@ Ext.AppPoStore = function () {
                                                                                                    )
                                                                                                       .getEl()
                                                                                                       .unmask();
-                                                                                                   if (
-                                                                                                      Ext.getCmp(
-                                                                                                         "submodeID",
-                                                                                                      ).getValue() ==
-                                                                                                      "modeEditAp"
-                                                                                                   ) {
+                                                                                                   if (Ext.getCmp("submodeID").getValue() !== "modeEditAp" ) {
                                                                                                       Ext.Msg.alert(
                                                                                                          "บันทีกการตรวจรับ",
                                                                                                          action
@@ -18644,10 +18770,20 @@ Ext.AppPoStore = function () {
                                                 Ext.selectRow.get("sp_tor_hdr_period_id"),
                                           },
                                           success: function (result, request) {
-                                             let json = Ext.util.JSON.decode(result.responseText);
+                                             let json;
+                                             try {
+                                                json = Ext.util.JSON.decode(result.responseText);
+                                             } catch (e) {
+                                                Ext.getCmp("gridSub2ID").getEl().unmask();
+                                                Ext.MessageBox.alert(
+                                                   "ผิดพลาด",
+                                                   "เซิร์ฟเวอร์ตอบกลับข้อมูลไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง หรือแจ้งผู้ดูแลระบบ",
+                                                );
+                                                return;
+                                             }
                                              if (json) {
                                                 Ext.MessageBox.alert(
-                                                   "Success",
+                                                   "สำเร็จ",
                                                    "บันทึกและตรวจรับการตั้งค่าใช้จ่าย",
                                                    function () {
                                                       Ext.getCmp("gridSub2ID").getEl().unmask();
@@ -18656,8 +18792,9 @@ Ext.AppPoStore = function () {
                                                    },
                                                 );
                                              } else {
+                                                Ext.getCmp("gridSub2ID").getEl().unmask();
                                                 Ext.MessageBox.alert(
-                                                   "Failed",
+                                                   "ผิดพลาด",
                                                    "การส่งข้อมูลปลายทางมีปัญหา",
                                                 );
                                                 //                                                            Ext.getCmp('formDcExpTypeDddID').getEl().unmask();
@@ -18665,7 +18802,8 @@ Ext.AppPoStore = function () {
                                              }
                                           },
                                           failure: function (result, request) {
-                                             Ext.MessageBox.alert("Failed", result.responseText);
+                                             Ext.getCmp("gridSub2ID").getEl().unmask();
+                                             Ext.MessageBox.alert("ผิดพลาด", result.responseText);
                                           },
                                        });
                                     };
