@@ -17398,34 +17398,34 @@ Ext.AppPoStore = function () {
                   } else {
 //       Ext.vatEditTxt = "add vat";
 //  Ext.vatEdit = true;                
-     console.log("Edit Vat",Ext.arrEdit);                 
+     console.log("Edit.arrEdit",Ext.arrEdit);                 
                      // ===== เพิ่มตรงนี้ =====
                      // หากผู้ใช้แก้ไข "f_vat" โดยตรง (Ext.vatEdit == true)
                      // ให้เก็บค่าที่ผู้ใช้ตั้งไว้และอย่าให้การคำนวณจากรายการย่อยมาทับค่า
-                     if (!Ext.vatEdit) {
-                        var totalVatFromGrid = 0;
-                        Ext.getCmp("gridSub4ID")
-                           .getStore()
-                           .each(function (rec) {
-                              var v = 0;
-                              if (rec._vatManual) {
-                                 v =
-                                    parseFloat(
-                                       (rec.get("f_vat_amt") || "0").toString().replace(/,/g, ""),
-                                    ) || 0;
-                              } else {
-                                 var net =
-                                    parseFloat(
-                                       (rec.get("f_net_total") || "0").toString().replace(/,/g, ""),
-                                    ) || 0;
-                                 if (net > 0) v = Math.round((net / 1.07) * 0.07 * 100) / 100;
-                              }
-                              totalVatFromGrid += v;
-                           });
-                        Ext.getCmp("f_vat").setValue(
-                           floatRenderer(floatMinus(totalVatFromGrid.toFixed(2), 2)),
-                        );
-                     }
+                     // if (!Ext.isEmpty(Ext.vatEdit)) {
+                     //    var totalVatFromGrid = 0;
+                     //    Ext.getCmp("gridSub4ID")
+                     //       .getStore()
+                     //       .each(function (rec) {
+                     //          var v = 0;
+                     //          if (rec._vatManual) {
+                     //             v =
+                     //                parseFloat(
+                     //                   (rec.get("f_vat_amt") || "0").toString().replace(/,/g, ""),
+                     //                ) || 0;
+                     //          } else {
+                     //             var net =
+                     //                parseFloat(
+                     //                   (rec.get("f_net_total") || "0").toString().replace(/,/g, ""),
+                     //                ) || 0;
+                     //             if (net > 0) v = Math.round((net / 1.07) * 0.07 * 100) / 100;
+                     //          }
+                     //          totalVatFromGrid += v;
+                     //       });
+                     //    Ext.getCmp("f_vat").setValue(
+                     //       floatRenderer(floatMinus(totalVatFromGrid.toFixed(2), 2)),
+                     //    );
+                     // }
                      // ===== จบส่วนที่เพิ่ม =====
 
                      var msg = ""; // ← ต้องมีบรรทัดนี้ต่อทันที
