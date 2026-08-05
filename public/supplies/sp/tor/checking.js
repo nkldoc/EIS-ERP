@@ -2,7 +2,975 @@
 Ext.isBook = null;
         Ext.isOverlap = null;
         Ext.formSubmitHistory = [];
+      
         Ext.submod = "";
+        const edit_bg = function (data) {
+let msg = "";
+        if (msg == "") {
+var win = new Ext.Window({
+id: "MessageBox_re",
+        title: "ยืนยันการบันทึกกันเหลื่อมก่อหนี้แล้ว ",
+        modal: true,
+        maximizable: false,
+        resizable: false,
+        width: 310,
+        items: [
+        {
+        xtype: "form",
+                frame: true,
+                labelAlign: "right",
+                labelWidth: 0.1,
+                bodyStyle: {padding: "10px 20px"},
+                defaults: {anchor: "100%", msgTarget: "side"},
+                items: [
+                {
+                xtype: "displayfield",
+                        id: "displaytext",
+                        width: 200,
+                        value: "ยืนยันการบันทึกรายการกันเหลื่อม",
+                        style: "text-align: center;",
+                },
+                ],
+        },
+        ],
+        buttonAlign: "left",
+        buttons: [
+        {
+        text: "ยืนยัน",
+                id: "btn_save-MessageBox_bg",
+                icon: "../images/icons/accept.png",
+                listeners: {
+                afterrender: function () {
+                btn_set_color(this, "yellow"); //color : green, red, yellow, orange
+                },
+                },
+                handler: function () {
+                let msg = "";
+                        if (msg == "") {
+                Ext.Msg.wait("Uploading...");
+                        // Ext.getCmp("json_select_field").setValue(getCheckedLabelsAsJson());
+                        const form = Ext.getCmp("form-pop_edit_bg").getForm(); // ต้องใช้ id ของ FormPanel  UPDATE_OVERLAP2
+                        var url_acc = "../sp/tor/api/mnTorController.php";
+                        form.submit({
+                        url: url_acc,
+                                waitMsg: "Uploading...",
+                                success: function (form, action) {
+                                const res = Ext.decode(action.response.responseText); // ✅ ใช้ responseText แทน result
+
+                                        Ext.Msg.alert("สำเร็จ", res.msg || "บันทึกเรียบร้อย");
+                                        Ext.getCmp("MessageBox_re").hide();
+                                        Ext.getCmp("MessageBox_re").destroy();
+                                        Ext.getCmp("win-pop").hide();
+                                        Ext.storeDtl.load();
+                                        Ext.getCmp("win-pop").destroy();
+                                },
+                                failure: function () {
+                                Ext.Msg.alert("ล้มเหลว", "ไม่สามารถอัปโหลดไฟล์ได้");
+                                },
+                        });
+                } else {
+                Ext.Msg.alert("แจ้งเตือนddd", msg);
+                }
+                },
+        },
+        {xtype: "tbfill"},
+        {
+        text: "ย้อนกลับ",
+                handler: function () {
+                Ext.getCmp("MessageBox_re").hide();
+                        Ext.getCmp("MessageBox_re").destroy();
+                },
+        },
+        ],
+}).show();
+} else {
+Ext.Msg.alert("แจ้งเตือน", msg);
+}
+};
+const win_request_disable_acc = function (rec) {
+new Ext.Window({
+title: "ร้องขอยกเลิกการบันทึกบัญชี",
+        id: "win-pop",
+        layout: "fit",
+        modal: true,
+        fileUpload: true, // ✅ ตรงนี้เท่านั้น
+        plain: true,
+        border: false,
+        stripeRows: true,
+        loadMask: true,
+        items: [
+        {
+        xtype: "form",
+                id: "form-pop",
+                fileUpload: true,
+                frame: true,
+                labelAlign: "right",
+                labelWidth: 150,
+                width: 800,
+                height: 400,
+                autoScroll: true, // <-- สำคัญ
+                bodyStyle: {padding: "10px 20px"},
+                defaults: {anchor: "100%", msgTarget: "side", allowBlank: false},
+                items: [
+                {
+                xtype: "container",
+                        layout: "hbox",
+                        align: "stretch",
+                        RemoveHeight: true,
+                        defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
+                        items: [
+                        {
+                        title: "ร้องขอยกเลิกการบันทึกบัญชี : " + rec.data.c_checking_code,
+                                RemoveCls: "x-box-item",
+                                collapsible: false,
+                                collapsed: false,
+                                defaults: {allowBlank: true},
+                                items: [
+                                {
+                                xtype: "hidden",
+                                        value: rec.data.sp_check_period_hdr_id,
+                                        name: "sp_check_period_hdr_id",
+                                },
+                                {
+                                xtype: "hidden",
+                                        name: "json_select",
+                                        id: "json_select_field",
+                                },
+                                {
+                                xtype: "textfield",
+                                        fieldLabel: "เลขที่ตรวจรับ",
+                                        style: "font-weight: bold;color: red;",
+                                        width: 200,
+                                        readOnly: true,
+                                        name: "c_checking_code",
+                                        value: rec.data.c_checking_code,
+                                        style: {background: "#EEEEEE", "font-weight": "bold", color: "red"},
+                                },
+                                {
+                                xtype: "datefield",
+                                        fieldLabel: "วันที่ทำรายการ",
+                                        name: "d_doc_date",
+                                        id: "disable_acc_d_doc_date",
+                                        readOnly: true,
+                                        // format: "Y-m-d", // ✅ ฟอร์แมตแสดงบนฟิลด์
+                                        // submitFormat: "Y-m-d", // ✅ ฟอร์แมตตอน submit
+                                        // value: rec.data.c_checking_code,
+                                        value: new Date(),
+                                        // format: "Y-m-d",
+                                        submitFormat: "Y-m-d",
+                                        style: {background: "#EEEEEE", "font-weight": "bold"},
+                                        // value: addY(543),
+                                },
+                                        // {
+                                                //   xtype: "fileuploadfield",
+                                                        //   name: "d_doc_date",
+                                                                //   id: "i_is_upload_acc",
+                                                                        //   width: 300,
+                                                                                //   emptyText: "เลือกไฟล์ (.pdf)",
+                                                                                        //   fieldLabel: "เอกสารบันทึกคำร้อง (PDF)",
+                                                                                                //   name: "upload_pdfAcc",
+                                                                                                        //   buttonText: "",
+                                                                                                                //   buttonCfg: {
+                                                                                                                        //     iconCls: "icon-pdf",
+                                                                                                                                //   },
+                                                                                                                                        //   listeners: {
+                                                                                                                                                //     beforerender: function () {
+                                                                                                                                                        //       // this.setValue(Ext.selectRow.data.i_is_upload_chk);
+                                                                                                                                                                //     },
+                                                                                                                                                                        //   },
+                                                                                                                                                                                // },
+                                                                                                                                                                                {
+                                                                                                                                                                                xtype: "container",
+                                                                                                                                                                                        layout: "anchor", // หรือใช้ "anchor" ก็ได้
+                                                                                                                                                                                        align: "stretch",
+                                                                                                                                                                                        name: "c_comment",
+                                                                                                                                                                                        id: "Container_po_reason_protest_acc",
+                                                                                                                                                                                        RemoveHeight: true,
+                                                                                                                                                                                        style: "padding-left: 145px;",
+                                                                                                                                                                                        width: 680,
+                                                                                                                                                                                        listeners: {
+                                                                                                                                                                                        afterrender: function () {
+                                                                                                                                                                                        // if (Ext.dataSelect.pdf_hdr == undefined) {
+                                                                                                                                                                                        //   Ext.getCmp("ContainerEditPDF").hide();
+                                                                                                                                                                                        // }
+                                                                                                                                                                                        },
+                                                                                                                                                                                        },
+                                                                                                                                                                                        defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
+                                                                                                                                                                                        items: [
+                                                                                                                                                                                        {
+                                                                                                                                                                                        title: "ข้อสาเหตุ (ใช้เป็นสาเหตุที่ยกเลิกบัญชี) ",
+                                                                                                                                                                                                RemoveCls: "x-box-item", //*--
+                                                                                                                                                                                                collapsible: false,
+                                                                                                                                                                                                collapsed: false,
+                                                                                                                                                                                                defaults: {labelStyle: "width:200px;", allowBlank: true},
+                                                                                                                                                                                                items: [
+                                                                                                                                                                                                {
+                                                                                                                                                                                                xtype: "container",
+                                                                                                                                                                                                        anchor: "100%",
+                                                                                                                                                                                                        id: "chkContainer",
+                                                                                                                                                                                                        layout: "anchor",
+                                                                                                                                                                                                        listeners: {
+                                                                                                                                                                                                        afterrender: function () {
+                                                                                                                                                                                                        this.check_items = function () {
+                                                                                                                                                                                                        let json_date = getCheckedLabelsAsJson();
+                                                                                                                                                                                                                if (typeof json_date === "string") {
+                                                                                                                                                                                                        json_date = JSON.parse(json_date);
+                                                                                                                                                                                                        }
+                                                                                                                                                                                                        const text = json_date.map((item) => `- ${item.label}`).join("\n");
+                                                                                                                                                                                                                Ext.getCmp("disable_acc_c_comment").setValue(text);
+                                                                                                                                                                                                        };
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        items: [
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                        xtype: "checkbox",
+                                                                                                                                                                                                                boxLabel: "แหล่งเงิน งปม./ปีงบประมาณ/เลขที่กันเงินหรือเลขที่ขยายกันเงิน",
+                                                                                                                                                                                                                inputValue: 1,
+                                                                                                                                                                                                                checked: false,
+                                                                                                                                                                                                                listeners: {
+                                                                                                                                                                                                                check: function (combo, newValue) {
+                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                        xtype: "checkbox",
+                                                                                                                                                                                                                boxLabel: "รหัสงบประมาณ/ประเภทรายจ่าย/รายการค่าใช้จ่าย",
+                                                                                                                                                                                                                inputValue: 1,
+                                                                                                                                                                                                                checked: false,
+                                                                                                                                                                                                                listeners: {
+                                                                                                                                                                                                                check: function (combo, newValue) {
+                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                        xtype: "checkbox",
+                                                                                                                                                                                                                boxLabel: "รายการบัญชี",
+                                                                                                                                                                                                                inputValue: 1,
+                                                                                                                                                                                                                checked: false,
+                                                                                                                                                                                                                listeners: {
+                                                                                                                                                                                                                check: function (combo, newValue) {
+                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                        xtype: "checkbox",
+                                                                                                                                                                                                                boxLabel: "จำนวนเงิน",
+                                                                                                                                                                                                                inputValue: 1,
+                                                                                                                                                                                                                checked: false,
+                                                                                                                                                                                                                listeners: {
+                                                                                                                                                                                                                check: function (combo, newValue) {
+                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                        xtype: "checkbox",
+                                                                                                                                                                                                                boxLabel: "ชื่อเจ้าหนี้/เลขที่บัญชีธนาคาร",
+                                                                                                                                                                                                                inputValue: 1,
+                                                                                                                                                                                                                checked: false,
+                                                                                                                                                                                                                listeners: {
+                                                                                                                                                                                                                check: function (combo, newValue) {
+                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                        xtype: "container",
+                                                                                                                                                                                                                layout: "hbox",
+                                                                                                                                                                                                                style: "margin-bottom: 5px;",
+                                                                                                                                                                                                                items: [
+                                                                                                                                                                                                                {
+                                                                                                                                                                                                                xtype: "checkbox",
+                                                                                                                                                                                                                        boxLabel: "อื่น ๆ",
+                                                                                                                                                                                                                        inputValue: 1,
+                                                                                                                                                                                                                        checked: false,
+                                                                                                                                                                                                                        listeners: {
+                                                                                                                                                                                                                        check: function (cb, checked) {
+                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
+                                                                                                                                                                                                                                const textField = cb.ownerCt.getComponent("otherReasonField");
+                                                                                                                                                                                                                                textField.setDisabled(!checked);
+                                                                                                                                                                                                                                if (!checked)
+                                                                                                                                                                                                                                textField.setValue("");
+                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                                {
+                                                                                                                                                                                                                xtype: "textfield",
+                                                                                                                                                                                                                        id: "otherReasonField",
+                                                                                                                                                                                                                        disabled: true,
+                                                                                                                                                                                                                        enableKeyEvents: true,
+                                                                                                                                                                                                                        hideLabel: true,
+                                                                                                                                                                                                                        width: 300,
+                                                                                                                                                                                                                        style: "margin-left: 5px;",
+                                                                                                                                                                                                                        emptyText: "กรุณาระบุสาเหตุ",
+                                                                                                                                                                                                                        listeners: {
+                                                                                                                                                                                                                        keyup: function (combo, newValue) {
+                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
+                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                        },
+                                                                                                                                                                                                                },
+                                                                                                                                                                                                                ],
+                                                                                                                                                                                                        },
+                                                                                                                                                                                                        ],
+                                                                                                                                                                                                },
+                                                                                                                                                                                                ],
+                                                                                                                                                                                        },
+                                                                                                                                                                                        ],
+                                                                                                                                                                                },
+                                                                                                                                                                        {
+                                                                                                                                                                        xtype: "textarea",
+                                                                                                                                                                                fieldLabel: "หมายเหตุ",
+                                                                                                                                                                                id: "disable_acc_c_comment",
+                                                                                                                                                                                width: 530,
+                                                                                                                                                                                height: 100,
+                                                                                                                                                                        },
+                                                                                                                                                                        ],
+                                                                                                                                                                        },
+                                                                                                                                                                ],
+                                                                                                                                                                },
+                                                                                                                                                        ],
+                                                                                                                                                                buttonAlign: "left",
+                                                                                                                                                                buttons: [
+                                                                                                                                                                {
+                                                                                                                                                                text: "&nbsp;ส่งขอร้อง&nbsp;",
+                                                                                                                                                                        icon: "../images/icons/delete.png",
+                                                                                                                                                                        listeners: {
+                                                                                                                                                                        afterrender: function () {
+                                                                                                                                                                        btn_set_color(this, "red"); //color : green, red, yellow, orange
+                                                                                                                                                                        },
+                                                                                                                                                                        },
+                                                                                                                                                                        handler: function () {
+                                                                                                                                                                        var msg = "";
+                                                                                                                                                                                // if (Ext.getCmp("i_is_upload_acc").getValue() == "") {
+                                                                                                                                                                                //   msg += "กรุณาอัพโหลดไฟล์เอกสาร";
+                                                                                                                                                                                // }
+                                                                                                                                                                                if (Ext.getCmp("disable_acc_c_comment").getValue() == "") {
+                                                                                                                                                                        msg += "กรุณาระบุเหตุผล";
+                                                                                                                                                                        }
+
+                                                                                                                                                                        if (msg != "") {
+                                                                                                                                                                        Ext.example.msg("แจ้งเตือน", msg, 1);
+                                                                                                                                                                                $(this).next("text copied");
+                                                                                                                                                                                setTimeout(function () {
+                                                                                                                                                                                $(this).next().remove();
+                                                                                                                                                                                }, 6000);
+                                                                                                                                                                                return;
+                                                                                                                                                                        } else {
+                                                                                                                                                                        disable_acc(rec.data);
+                                                                                                                                                                        }
+                                                                                                                                                                        },
+                                                                                                                                                                },
+                                                                                                                                                                {
+                                                                                                                                                                text: Ext.GLOBAL_BU_BACK_TH,
+                                                                                                                                                                        handler: function () {
+                                                                                                                                                                        Ext.getCmp("win-pop").destroy();
+                                                                                                                                                                        },
+                                                                                                                                                                },
+                                                                                                                                                                ],
+                                                                                                                                                        },
+                                                                                                                                                ],
+                                                                                                                                                }).show();
+                                                                                                                                        };
+const win_edit_admin = function (rec) {
+new Ext.Window({
+title: "รายการแก้ไข สำหรับ Admin",
+        id: "win-pop",
+        layout: "fit",
+        modal: true,
+        fileUpload: true, // ✅ ตรงนี้เท่านั้น
+        plain: true,
+        border: false,
+        stripeRows: true,
+        loadMask: true,
+        items: [
+        {
+        xtype: "form",
+                id: "form-pop",
+                fileUpload: true,
+                frame: true,
+                labelAlign: "right",
+                labelWidth: 150,
+                width: 800,
+                height: 400,
+                autoScroll: true, // <-- สำคัญ
+                bodyStyle: {padding: "10px 20px"},
+                defaults: {anchor: "100%", msgTarget: "side", allowBlank: false},
+                items: [
+                {
+                xtype: "container",
+                        layout: "hbox",
+                        align: "stretch",
+                        RemoveHeight: true,
+                        defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
+                        items: [
+                        {
+                        title: "ร้องขอยกเลิกการบันทึกบัญชี : " + rec.data.c_checking_code,
+                                RemoveCls: "x-box-item",
+                                collapsible: false,
+                                collapsed: false,
+                                defaults: {allowBlank: true},
+                                items: [
+                                {
+                                xtype: "hidden",
+                                        value: rec.data.sp_check_period_hdr_id,
+                                        name: "sp_check_period_hdr_id",
+                                },
+                                {
+                                xtype: "hidden",
+                                        name: "json_select",
+                                        id: "json_select_field",
+                                },
+                                {
+                                xtype: "textfield",
+                                        fieldLabel: "เลขที่ตรวจรับ",
+                                        style: "font-weight: bold;color: red;",
+                                        width: 200,
+                                        readOnly: true,
+                                        name: "c_checking_code",
+                                        value: rec.data.c_checking_code,
+                                        style: {background: "#EEEEEE", "font-weight": "bold", color: "red"},
+                                },
+                                {
+                                xtype: "datefield",
+                                        fieldLabel: "วันที่ทำรายการ",
+                                        name: "d_doc_date",
+                                        id: "disable_acc_d_doc_date",
+                                        readOnly: true,
+                                        // format: "Y-m-d", // ✅ ฟอร์แมตแสดงบนฟิลด์
+                                        // submitFormat: "Y-m-d", // ✅ ฟอร์แมตตอน submit
+                                        // value: rec.data.c_checking_code,
+                                        value: new Date(),
+                                        // format: "Y-m-d",
+                                        submitFormat: "Y-m-d",
+                                        style: {background: "#EEEEEE", "font-weight": "bold"},
+                                        // value: addY(543),
+                                },
+                                {
+                                xtype: "datefield",
+                                        fieldLabel: "วันที่ตรวจรับ",
+                                        name: "d_checking_date_edit_admin",
+                                        id: "d_checking_date_edid_adminID",
+                                        // readOnly: true,
+                                        // format: "Y-m-d", // ✅ ฟอร์แมตแสดงบนฟิลด์
+                                        // submitFormat: "Y-m-d", // ✅ ฟอร์แมตตอน submit
+                                        // value: rec.data.c_checking_code,
+                                        value: new Date(),
+                                        // format: "Y-m-d",
+                                        submitFormat: "Y-m-d",
+                                        style: {background: "#EEEEEE", "font-weight": "bold"},
+                                        // value: addY(543),
+                                },
+                                {
+                                xtype: "container",
+                                        layout: "anchor", // หรือใช้ "anchor" ก็ได้
+                                        align: "stretch",
+                                        name: "c_comment",
+                                        id: "Container_po_reason_protest_acc",
+                                        RemoveHeight: true,
+                                        style: "padding-left: 145px;",
+                                        width: 680,
+                                        listeners: {
+                                        afterrender: function () {
+                                        // if (Ext.dataSelect.pdf_hdr == undefined) {
+                                        //   Ext.getCmp("ContainerEditPDF").hide();
+                                        // }
+                                        },
+                                        },
+                                        defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
+                                        items: [
+                                        {
+                                        title: "ข้อสาเหตุ (ใช้เป็นสาเหตุที่แก้ไขข้อมูลการตรวจรับ) ",
+                                                RemoveCls: "x-box-item", //*--
+                                                collapsible: false,
+                                                collapsed: false,
+                                                defaults: {labelStyle: "width:200px;", allowBlank: true},
+                                                items: [
+                                                {
+                                                xtype: "container",
+                                                        anchor: "100%",
+                                                        id: "chkContainer",
+                                                        layout: "anchor",
+                                                        listeners: {
+                                                        afterrender: function () {
+                                                        this.check_items = function () {
+                                                        let json_date = getCheckedLabelsAsJson();
+                                                                if (typeof json_date === "string") {
+                                                        json_date = JSON.parse(json_date);
+                                                        }
+                                                        const text = json_date.map((item) => `- ${item.label}`).join("\n");
+                                                                Ext.getCmp("disable_acc_c_comment").setValue(text);
+                                                        };
+                                                        },
+                                                        },
+                                                        items: [
+                                                        {
+                                                        xtype: "checkbox",
+                                                                boxLabel: "ผู้ใช้งานระบบทำระบุข้อมูลผิด (แจ้งหัวหน้าฝ่ายแล้ว)",
+                                                                inputValue: 1,
+                                                                checked: false,
+                                                                listeners: {
+                                                                check: function (combo, newValue) {
+                                                                Ext.getCmp("chkContainer").check_items();
+                                                                },
+                                                                },
+                                                        },
+                                                        {
+                                                        xtype: "checkbox",
+                                                                boxLabel: "รหัสงบประมาณ/ประเภทรายจ่าย/รายการค่าใช้จ่าย",
+                                                                inputValue: 1,
+                                                                checked: false,
+                                                                listeners: {
+                                                                check: function (combo, newValue) {
+                                                                Ext.getCmp("chkContainer").check_items();
+                                                                },
+                                                                },
+                                                        },
+                                                        {
+                                                        xtype: "checkbox",
+                                                                boxLabel: "รายการบัญชี",
+                                                                inputValue: 1,
+                                                                checked: false,
+                                                                listeners: {
+                                                                check: function (combo, newValue) {
+                                                                Ext.getCmp("chkContainer").check_items();
+                                                                },
+                                                                },
+                                                        },
+                                                        {
+                                                        xtype: "checkbox",
+                                                                boxLabel: "จำนวนเงิน",
+                                                                inputValue: 1,
+                                                                checked: false,
+                                                                listeners: {
+                                                                check: function (combo, newValue) {
+                                                                Ext.getCmp("chkContainer").check_items();
+                                                                },
+                                                                },
+                                                        },
+                                                        {
+                                                        xtype: "checkbox",
+                                                                boxLabel: "ชื่อเจ้าหนี้/เลขที่บัญชีธนาคาร",
+                                                                inputValue: 1,
+                                                                checked: false,
+                                                                listeners: {
+                                                                check: function (combo, newValue) {
+                                                                Ext.getCmp("chkContainer").check_items();
+                                                                },
+                                                                },
+                                                        },
+                                                        {
+                                                        xtype: "container",
+                                                                layout: "hbox",
+                                                                style: "margin-bottom: 5px;",
+                                                                items: [
+                                                                {
+                                                                xtype: "checkbox",
+                                                                        boxLabel: "อื่น ๆ",
+                                                                        inputValue: 1,
+                                                                        checked: false,
+                                                                        listeners: {
+                                                                        check: function (cb, checked) {
+                                                                        Ext.getCmp("chkContainer").check_items();
+                                                                                const textField = cb.ownerCt.getComponent("otherReasonField");
+                                                                                textField.setDisabled(!checked);
+                                                                                if (!checked)
+                                                                                textField.setValue("");
+                                                                        },
+                                                                        },
+                                                                },
+                                                                {
+                                                                xtype: "textfield",
+                                                                        id: "otherReasonField",
+                                                                        disabled: true,
+                                                                        enableKeyEvents: true,
+                                                                        hideLabel: true,
+                                                                        width: 300,
+                                                                        style: "margin-left: 5px;",
+                                                                        emptyText: "กรุณาระบุสาเหตุ",
+                                                                        listeners: {
+                                                                        keyup: function (combo, newValue) {
+                                                                        Ext.getCmp("chkContainer").check_items();
+                                                                        },
+                                                                        },
+                                                                },
+                                                                ],
+                                                        },
+                                                        ],
+                                                },
+                                                ],
+                                        },
+                                        ],
+                                },
+                                {
+                                xtype: "textarea",
+                                        fieldLabel: "หมายเหตุ",
+                                        id: "disable_acc_c_comment",
+                                        width: 530,
+                                        height: 100,
+                                },
+                                ],
+                        },
+                        ],
+                },
+                ],
+                buttonAlign: "left",
+                buttons: [
+                {
+                text: "&nbsp;ส่งขอร้อง&nbsp;",
+                        icon: "../images/icons/delete.png",
+                        listeners: {
+                        afterrender: function () {
+                        btn_set_color(this, "red"); //color : green, red, yellow, orange
+                        },
+                        },
+                        handler: function () {
+                        var msg = "";
+                                // if (Ext.getCmp("i_is_upload_acc").getValue() == "") {
+                                //   msg += "กรุณาอัพโหลดไฟล์เอกสาร";
+                                // }
+                                if (Ext.getCmp("disable_acc_c_comment").getValue() == "") {
+                        msg += "กรุณาระบุเหตุผล";
+                        }
+
+                        if (msg != "") {
+                        Ext.example.msg("แจ้งเตือน", msg, 1);
+                                $(this).next("text copied");
+                                setTimeout(function () {
+                                $(this).next().remove();
+                                }, 6000);
+                                return;
+                        } else {
+                        disable_acc(rec.data);
+                        }
+                        },
+                },
+                {
+                text: Ext.GLOBAL_BU_BACK_TH,
+                        handler: function () {
+                        Ext.getCmp("win-pop").destroy();
+                        },
+                },
+                ],
+        },
+        ],
+}).show();
+};
+const win_request_edit_bg = function (rec) {
+new Ext.Window({
+title: "ยืนยันกันเหลื่อมก่อหนี้แล้ว",
+        id: "win-pop",
+        layout: "fit",
+        modal: true,
+        fileUpload: true, // ✅ ตรงนี้เท่านั้น
+        plain: true,
+        border: false,
+        stripeRows: true,
+        loadMask: true,
+        listeners: {
+        beforender: function () {
+        Ext.getCmp("form-pop_edit_bg").getForm().loadRecord(rec); // ทำต่อ ให้ load rec เข้า UI ฟั่งชั่น
+        },
+        },
+        items: [
+        {
+        xtype: "form",
+                id: "form-pop_edit_bg",
+                fileUpload: true,
+                frame: true,
+                labelAlign: "right",
+                labelWidth: 150,
+                width: 700,
+                height: 300,
+                autoScroll: true, // <-- สำคัญ
+                bodyStyle: {padding: "10px 20px"},
+                defaults: {anchor: "100%", msgTarget: "side", allowBlank: false},
+                items: [
+                {
+                xtype: "container",
+                        layout: "hbox",
+                        align: "stretch",
+                        RemoveHeight: true,
+                        defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
+                        items: [
+                        {
+                        title: "เลขที่สัญญายืนยันกันเหลื่อมก่อหนี้ : ",
+                                RemoveCls: "x-box-item",
+                                collapsible: false,
+                                collapsed: false,
+                                defaults: {allowBlank: true},
+                                items: [
+                                {
+                                xtype: "hidden",
+                                        value: rec.data.sp_check_period_hdr_id,
+                                        name: "sp_check_period_hdr_id",
+                                },
+                                {
+                                xtype: "hidden",
+                                        value: "EDIT_UPDATE_OVERLAP",
+                                        name: "mode",
+                                },
+                                {
+                                xtype: "hidden",
+                                        value: rec.data.sp_tor_id,
+                                        name: "id",
+                                },
+                                {
+                                xtype: "hidden",
+                                        value: 2,
+                                        name: "i_is_overlap",
+                                },
+                                {
+                                xtype: "hidden",
+                                        value: 3,
+                                        name: "i_overlap",
+                                },
+                                {
+                                xtype: "hidden",
+                                        value: 2,
+                                        name: "confirm_overlap",
+                                },
+                                {
+                                xtype: "hidden",
+                                        value: rec.data.sp_tor_contract_id,
+                                        name: "sp_tor_contract_id",
+                                },
+                                {
+                                xtype: "hidden",
+                                        name: "json_select",
+                                        id: "json_select_field",
+                                },
+                                {
+                                xtype: "hidden",
+                                        name: "i_type_bg",
+                                        value: 4,
+                                        id: "i_type_bgID",
+                                },
+                                {
+                                xtype: "hidden",
+                                        name: "dc_expense_budget_type_id",
+                                        value: rec.data.dc_expense_budget_type_id,
+                                        // id: "i_type_bgID",
+                                },
+                                {
+                                xtype: "hidden",
+                                        name: "po_expense_id",
+                                        value: rec.data.po_expense_id,
+                                        // id: "i_type_bgID",
+                                },
+                                {
+                                xtype: "textfield",
+                                        fieldLabel: "เลขที่สัญญา",
+                                        style: "font-weight: bold;color: red;",
+                                        width: 200,
+                                        readOnly: true,
+                                        name: "c_code",
+                                        value: rec.data.c_code,
+                                        style: {background: "#EEEEEE", "font-weight": "bold", color: "red"},
+                                },
+                                {
+                                xtype: "textfield",
+                                        fieldLabel: "ผู้ขายผู้รับจ้าง",
+                                        style: "font-weight: bold;color: red;",
+                                        width: 250,
+                                        readOnly: true,
+                                        name: "dc_creditor_name",
+                                        value: rec.data.dc_creditor_name,
+                                        style: {background: "#EEEEEE", "font-weight": "bold"},
+                                },
+                                {
+                                fieldLabel: "แหล่งเงิน",
+                                        xtype: "textfield",
+                                        name: "budget_type_edit_bg",
+                                        value: rec.data.budget_type,
+                                        width: 450,
+                                },
+                                {
+                                fieldLabel: "หมวดค่าใช้จ่าย",
+                                        name: "expense_name_edit_bg",
+                                        xtype: "textfield",
+                                        value: rec.data.expense_name,
+                                        width: 450,
+                                },
+                                        new Ext.form.ComboBox({
+                                        mode: "local",
+                                                // allowBlank: false, ReadOnly_set
+                                                fieldLabel: "ปีงบประมาณ",
+                                                submitValue: true,
+                                                allowBlank: false,
+                                                id: "i_budget_year_edit_bg",
+                                                hiddenName: "i_budget_year",
+                                                name: "i_budget_yearTxt",
+                                                store: Ext.store_year,
+                                                valueField: "id",
+                                                displayField: "c_name",
+                                                value: rec.data.i_yyyy,
+                                                triggerAction: "all",
+                                                forceSelection: true,
+                                                selectOnFocus: true,
+                                                typeAhead: false,
+                                                emptyText: "กรุณาเลือกปีงบประมาณ...",
+                                                config: {
+                                                requireMe: false,
+                                                },
+                                                listeners: {
+                                                afterrender: function () {
+                                                // ReadOnly_set("i_budget_year_edit_bg", true);
+                                                // this.ReadOnly_set = function (set) {
+                                                //   this.setReadOnly(set);
+                                                //   this.getEl().dom.style.background = set ? "#EEEEEE" : "";
+                                                // };
+                                                this.fn = function () {};
+                                                        this.select_value = function () {};
+                                                },
+                                                        select: function () {
+                                                        this.select_value();
+                                                        },
+                                                        Change: function () {
+                                                        this.fn();
+                                                                this.select_value();
+                                                        },
+                                                        beforequery: function (q) {
+                                                        if (q.query) {
+                                                        var length = q.query.length;
+                                                                q.query = new RegExp(Ext.escapeRe(q.query));
+                                                                q.query.length = length;
+                                                        }
+                                                        },
+                                                        blur: function () {
+                                                        this.getStore().clearFilter();
+                                                        },
+                                                },
+                                        }),
+                                {
+                                xtype: "datefield",
+                                        fieldLabel: "วันที่ทำรายการ",
+                                        name: "d_doc_date",
+                                        id: "disable_acc_d_doc_date",
+                                        readOnly: true,
+                                        // format: "Y-m-d", // ✅ ฟอร์แมตแสดงบนฟิลด์
+                                        // submitFormat: "Y-m-d", // ✅ ฟอร์แมตตอน submit
+                                        // value: rec.data.c_checking_code,
+                                        value: new Date(),
+                                        // format: "Y-m-d",
+                                        submitFormat: "Y-m-d",
+                                        style: {background: "#EEEEEE", "font-weight": "bold"},
+                                        // value: addY(543),
+                                },
+                                {
+                                xtype: "container",
+                                        layout: "anchor", // หรือใช้ "anchor" ก็ได้
+                                        align: "stretch",
+                                        name: "c_comment",
+                                        hidden: true,
+                                        id: "Container_po_reason_protest_acc",
+                                        RemoveHeight: true,
+                                        style: "padding-left: 145px;",
+                                        width: 680,
+                                        listeners: {
+                                        afterrender: function () {
+                                        // if (Ext.dataSelect.pdf_hdr == undefined) {
+                                        //   Ext.getCmp("ContainerEditPDF").hide();
+                                        // }
+                                        },
+                                        },
+                                        defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
+                                },
+                                {
+                                xtype: "textarea",
+                                        fieldLabel: "หมายเหตุ",
+                                        id: "disable_acc_c_comment",
+                                        hidden: true,
+                                        width: 530,
+                                        height: 100,
+                                },
+                                ],
+                        },
+                        ],
+                },
+                ],
+                buttonAlign: "left",
+                buttons: [
+                {
+                text: "&nbsp;ส่งขอร้อง&nbsp;",
+                        icon: "../images/icons/accept.png",
+                        listeners: {
+                        afterrender: function () {
+                        btn_set_color(this, "yellow"); //color : green, red, yellow, orange
+                        },
+                        },
+                        handler: function () {
+                        var msg = "";
+                                // if (Ext.getCmp("i_is_upload_acc").getValue() == "") {
+                                //   msg += "กรุณาอัพโหลดไฟล์เอกสาร";   UPDATE_OVERLAP2
+                                // }
+                                // if (Ext.getCmp("disable_acc_c_comment").getValue() == "") {
+                                //   msg += "กรุณาระบุเหตุผล";
+                                // }
+
+                                if (msg != "") {
+                        Ext.example.msg("แจ้งเตือน", msg, 1);
+                                $(this).next("text copied");
+                                setTimeout(function () {
+                                $(this).next().remove();
+                                }, 6000);
+                                return;
+                        } else {
+                        edit_bg(rec.data);
+                        }
+                        },
+                },
+                {
+                text: Ext.GLOBAL_BU_BACK_TH,
+                        handler: function () {
+                        Ext.getCmp("win-pop").destroy();
+                        },
+                },
+                ],
+        },
+        ],
+}).show();
+};
+Ext.checkingSearchHistory = {
+storageKey: "supplies.checking.searchHistory",
+maxItems: 20,
+load: function () {
+   try {
+      var items = Ext.decode(window.localStorage.getItem(this.storageKey) || "[]");
+      return Object.prototype.toString.call(items) === "[object Array]" ? items : [];
+   } catch (e) {
+      return [];
+   }
+},
+save: function (value) {
+   value = String(value == null ? "" : value).replace(/^\s+|\s+$/g, "");
+   if (!value) return;
+   var items = this.load();
+   var result = [value];
+   var normalized = value.toLowerCase();
+   for (var i = 0; i < items.length && result.length < this.maxItems; i++) {
+      var item = String(items[i]);
+      if (item.toLowerCase() !== normalized) result.push(item);
+   }
+   try {
+      window.localStorage.setItem(this.storageKey, Ext.encode(result));
+   } catch (e) { }
+   this.refresh();
+},
+refresh: function () {
+   var combo = Ext.getCmp("value-box");
+   if (!combo || !combo.store) return;
+   combo.store.loadData(this.toStoreData());
+},
+toStoreData: function () {
+   var items = this.load();
+   var data = [];
+   for (var i = 0; i < items.length; i++) data.push([items[i]]);
+   return data;
+},
+};
         Ext.getApiBgBaseUrl = function () {
         var baseUrl = String(Ext.session.IPAPIBG || "").trim();
                 var protocolIndex = baseUrl.search(/https?:\/\//i);
@@ -194,6 +1162,24 @@ Ext.isBook = null;
                         };
                         document.getElementsByTagName("head")[0].appendChild(script);
                 };
+Ext.loadConsoleLogWindowUi = function (callback) {
+if (window.__consoleLogWindowInstalled) {
+   callback && callback();
+   return;
+}
+var script = document.createElement("script");
+script.type = "text/javascript";
+script.src = "tor/receive-validation/ui/console-log-window.js?v=" + new Date().getTime();
+script.onload = function () {
+   callback && callback();
+};
+script.onerror = function () {
+   console.warn("ไม่สามารถโหลดหน้าต่าง Console Log ได้");
+};
+document.getElementsByTagName("head")[0].appendChild(script);
+};
+// เปิดหน้าต่าง Console Log อัตโนมัติทันทีที่โหลดหน้านี้
+Ext.loadConsoleLogWindowUi();
                 let yearsSearch = [];
                 yearsSearch.push({id: "0", c_name: "- เลือกทั้งหมด -"});
                 let currentTime = new Date();
@@ -846,8 +1832,9 @@ Ext.isBook = null;
                                                                                         let itemStore = Ext.getCmp("gridSub4ID").getStore();
                                                                                         itemStore.reload(); // Reload ข้อมูลหลังเพิ่มสำเร็จ
                                                                                         Ext.chkBgfn(false, 0, 0);
-                                                                                        Ext.storeTransf.reload();
+                                                                                       
                                                                                         Ext.storePeriodDtlLoad();
+                                                                                         
                                                                                 });
                                                                         } else {
                                                                         Ext.MessageBox.alert("Failed", jsonData.msg); // alert massage error
@@ -2403,1027 +3390,82 @@ Ext.isBook = null;
         Ext.Msg.alert("แจ้งเตือน", msg);
         }
         }; // reStatus
-                const edit_bg = function (data) {
-                let msg = "";
-                        if (msg == "") {
-                var win = new Ext.Window({
-                id: "MessageBox_re",
-                        title: "ยืนยันการบันทึกกันเหลื่อมก่อหนี้แล้ว ",
-                        modal: true,
-                        maximizable: false,
-                        resizable: false,
-                        width: 310,
-                        items: [
-                        {
-                        xtype: "form",
-                                frame: true,
-                                labelAlign: "right",
-                                labelWidth: 0.1,
-                                bodyStyle: {padding: "10px 20px"},
-                                defaults: {anchor: "100%", msgTarget: "side"},
-                                items: [
-                                {
-                                xtype: "displayfield",
-                                        id: "displaytext",
-                                        width: 200,
-                                        value: "ยืนยันการบันทึกรายการกันเหลื่อม",
-                                        style: "text-align: center;",
-                                },
-                                ],
-                        },
-                        ],
-                        buttonAlign: "left",
-                        buttons: [
-                        {
-                        text: "ยืนยัน",
-                                id: "btn_save-MessageBox_bg",
-                                icon: "../images/icons/accept.png",
-                                listeners: {
-                                afterrender: function () {
-                                btn_set_color(this, "yellow"); //color : green, red, yellow, orange
-                                },
-                                },
-                                handler: function () {
-                                let msg = "";
-                                        if (msg == "") {
-                                Ext.Msg.wait("Uploading...");
-                                        // Ext.getCmp("json_select_field").setValue(getCheckedLabelsAsJson());
-                                        const form = Ext.getCmp("form-pop_edit_bg").getForm(); // ต้องใช้ id ของ FormPanel  UPDATE_OVERLAP2
-                                        var url_acc = "../sp/tor/api/mnTorController.php";
-                                        form.submit({
-                                        url: url_acc,
-                                                waitMsg: "Uploading...",
-                                                success: function (form, action) {
-                                                const res = Ext.decode(action.response.responseText); // ✅ ใช้ responseText แทน result
 
-                                                        Ext.Msg.alert("สำเร็จ", res.msg || "บันทึกเรียบร้อย");
-                                                        Ext.getCmp("MessageBox_re").hide();
-                                                        Ext.getCmp("MessageBox_re").destroy();
-                                                        Ext.getCmp("win-pop").hide();
-                                                        Ext.storeDtl.load();
-                                                        Ext.getCmp("win-pop").destroy();
-                                                },
-                                                failure: function () {
-                                                Ext.Msg.alert("ล้มเหลว", "ไม่สามารถอัปโหลดไฟล์ได้");
-                                                },
-                                        });
-                                } else {
-                                Ext.Msg.alert("แจ้งเตือนddd", msg);
-                                }
-                                },
-                        },
-                        {xtype: "tbfill"},
-                        {
-                        text: "ย้อนกลับ",
-                                handler: function () {
-                                Ext.getCmp("MessageBox_re").hide();
-                                        Ext.getCmp("MessageBox_re").destroy();
-                                },
-                        },
-                        ],
-                }).show();
-                } else {
-                Ext.Msg.alert("แจ้งเตือน", msg);
-                }
-                };
-                const win_request_disable_acc = function (rec) {
-                new Ext.Window({
-                title: "ร้องขอยกเลิกการบันทึกบัญชี",
-                        id: "win-pop",
-                        layout: "fit",
-                        modal: true,
-                        fileUpload: true, // ✅ ตรงนี้เท่านั้น
-                        plain: true,
-                        border: false,
-                        stripeRows: true,
-                        loadMask: true,
-                        items: [
-                        {
-                        xtype: "form",
-                                id: "form-pop",
-                                fileUpload: true,
-                                frame: true,
-                                labelAlign: "right",
-                                labelWidth: 150,
-                                width: 800,
-                                height: 400,
-                                autoScroll: true, // <-- สำคัญ
-                                bodyStyle: {padding: "10px 20px"},
-                                defaults: {anchor: "100%", msgTarget: "side", allowBlank: false},
-                                items: [
-                                {
-                                xtype: "container",
-                                        layout: "hbox",
-                                        align: "stretch",
-                                        RemoveHeight: true,
-                                        defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
-                                        items: [
-                                        {
-                                        title: "ร้องขอยกเลิกการบันทึกบัญชี : " + rec.data.c_checking_code,
-                                                RemoveCls: "x-box-item",
-                                                collapsible: false,
-                                                collapsed: false,
-                                                defaults: {allowBlank: true},
-                                                items: [
-                                                {
-                                                xtype: "hidden",
-                                                        value: rec.data.sp_check_period_hdr_id,
-                                                        name: "sp_check_period_hdr_id",
-                                                },
-                                                {
-                                                xtype: "hidden",
-                                                        name: "json_select",
-                                                        id: "json_select_field",
-                                                },
-                                                {
-                                                xtype: "textfield",
-                                                        fieldLabel: "เลขที่ตรวจรับ",
-                                                        style: "font-weight: bold;color: red;",
-                                                        width: 200,
-                                                        readOnly: true,
-                                                        name: "c_checking_code",
-                                                        value: rec.data.c_checking_code,
-                                                        style: {background: "#EEEEEE", "font-weight": "bold", color: "red"},
-                                                },
-                                                {
-                                                xtype: "datefield",
-                                                        fieldLabel: "วันที่ทำรายการ",
-                                                        name: "d_doc_date",
-                                                        id: "disable_acc_d_doc_date",
-                                                        readOnly: true,
-                                                        // format: "Y-m-d", // ✅ ฟอร์แมตแสดงบนฟิลด์
-                                                        // submitFormat: "Y-m-d", // ✅ ฟอร์แมตตอน submit
-                                                        // value: rec.data.c_checking_code,
-                                                        value: new Date(),
-                                                        // format: "Y-m-d",
-                                                        submitFormat: "Y-m-d",
-                                                        style: {background: "#EEEEEE", "font-weight": "bold"},
-                                                        // value: addY(543),
-                                                },
-                                                        // {
-                                                                //   xtype: "fileuploadfield",
-                                                                        //   name: "d_doc_date",
-                                                                                //   id: "i_is_upload_acc",
-                                                                                        //   width: 300,
-                                                                                                //   emptyText: "เลือกไฟล์ (.pdf)",
-                                                                                                        //   fieldLabel: "เอกสารบันทึกคำร้อง (PDF)",
-                                                                                                                //   name: "upload_pdfAcc",
-                                                                                                                        //   buttonText: "",
-                                                                                                                                //   buttonCfg: {
-                                                                                                                                        //     iconCls: "icon-pdf",
-                                                                                                                                                //   },
-                                                                                                                                                        //   listeners: {
-                                                                                                                                                                //     beforerender: function () {
-                                                                                                                                                                        //       // this.setValue(Ext.selectRow.data.i_is_upload_chk);
-                                                                                                                                                                                //     },
-                                                                                                                                                                                        //   },
-                                                                                                                                                                                                // },
-                                                                                                                                                                                                {
-                                                                                                                                                                                                xtype: "container",
-                                                                                                                                                                                                        layout: "anchor", // หรือใช้ "anchor" ก็ได้
-                                                                                                                                                                                                        align: "stretch",
-                                                                                                                                                                                                        name: "c_comment",
-                                                                                                                                                                                                        id: "Container_po_reason_protest_acc",
-                                                                                                                                                                                                        RemoveHeight: true,
-                                                                                                                                                                                                        style: "padding-left: 145px;",
-                                                                                                                                                                                                        width: 680,
-                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                        afterrender: function () {
-                                                                                                                                                                                                        // if (Ext.dataSelect.pdf_hdr == undefined) {
-                                                                                                                                                                                                        //   Ext.getCmp("ContainerEditPDF").hide();
-                                                                                                                                                                                                        // }
-                                                                                                                                                                                                        },
-                                                                                                                                                                                                        },
-                                                                                                                                                                                                        defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
-                                                                                                                                                                                                        items: [
-                                                                                                                                                                                                        {
-                                                                                                                                                                                                        title: "ข้อสาเหตุ (ใช้เป็นสาเหตุที่ยกเลิกบัญชี) ",
-                                                                                                                                                                                                                RemoveCls: "x-box-item", //*--
-                                                                                                                                                                                                                collapsible: false,
-                                                                                                                                                                                                                collapsed: false,
-                                                                                                                                                                                                                defaults: {labelStyle: "width:200px;", allowBlank: true},
-                                                                                                                                                                                                                items: [
-                                                                                                                                                                                                                {
-                                                                                                                                                                                                                xtype: "container",
-                                                                                                                                                                                                                        anchor: "100%",
-                                                                                                                                                                                                                        id: "chkContainer",
-                                                                                                                                                                                                                        layout: "anchor",
-                                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                                        afterrender: function () {
-                                                                                                                                                                                                                        this.check_items = function () {
-                                                                                                                                                                                                                        let json_date = getCheckedLabelsAsJson();
-                                                                                                                                                                                                                                if (typeof json_date === "string") {
-                                                                                                                                                                                                                        json_date = JSON.parse(json_date);
-                                                                                                                                                                                                                        }
-                                                                                                                                                                                                                        const text = json_date.map((item) => `- ${item.label}`).join("\n");
-                                                                                                                                                                                                                                Ext.getCmp("disable_acc_c_comment").setValue(text);
-                                                                                                                                                                                                                        };
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        items: [
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        xtype: "checkbox",
-                                                                                                                                                                                                                                boxLabel: "แหล่งเงิน งปม./ปีงบประมาณ/เลขที่กันเงินหรือเลขที่ขยายกันเงิน",
-                                                                                                                                                                                                                                inputValue: 1,
-                                                                                                                                                                                                                                checked: false,
-                                                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                                                check: function (combo, newValue) {
-                                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        xtype: "checkbox",
-                                                                                                                                                                                                                                boxLabel: "รหัสงบประมาณ/ประเภทรายจ่าย/รายการค่าใช้จ่าย",
-                                                                                                                                                                                                                                inputValue: 1,
-                                                                                                                                                                                                                                checked: false,
-                                                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                                                check: function (combo, newValue) {
-                                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        xtype: "checkbox",
-                                                                                                                                                                                                                                boxLabel: "รายการบัญชี",
-                                                                                                                                                                                                                                inputValue: 1,
-                                                                                                                                                                                                                                checked: false,
-                                                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                                                check: function (combo, newValue) {
-                                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        xtype: "checkbox",
-                                                                                                                                                                                                                                boxLabel: "จำนวนเงิน",
-                                                                                                                                                                                                                                inputValue: 1,
-                                                                                                                                                                                                                                checked: false,
-                                                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                                                check: function (combo, newValue) {
-                                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        xtype: "checkbox",
-                                                                                                                                                                                                                                boxLabel: "ชื่อเจ้าหนี้/เลขที่บัญชีธนาคาร",
-                                                                                                                                                                                                                                inputValue: 1,
-                                                                                                                                                                                                                                checked: false,
-                                                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                                                check: function (combo, newValue) {
-                                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        xtype: "container",
-                                                                                                                                                                                                                                layout: "hbox",
-                                                                                                                                                                                                                                style: "margin-bottom: 5px;",
-                                                                                                                                                                                                                                items: [
-                                                                                                                                                                                                                                {
-                                                                                                                                                                                                                                xtype: "checkbox",
-                                                                                                                                                                                                                                        boxLabel: "อื่น ๆ",
-                                                                                                                                                                                                                                        inputValue: 1,
-                                                                                                                                                                                                                                        checked: false,
-                                                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                                                        check: function (cb, checked) {
-                                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                                const textField = cb.ownerCt.getComponent("otherReasonField");
-                                                                                                                                                                                                                                                textField.setDisabled(!checked);
-                                                                                                                                                                                                                                                if (!checked)
-                                                                                                                                                                                                                                                textField.setValue("");
-                                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                {
-                                                                                                                                                                                                                                xtype: "textfield",
-                                                                                                                                                                                                                                        id: "otherReasonField",
-                                                                                                                                                                                                                                        disabled: true,
-                                                                                                                                                                                                                                        enableKeyEvents: true,
-                                                                                                                                                                                                                                        hideLabel: true,
-                                                                                                                                                                                                                                        width: 300,
-                                                                                                                                                                                                                                        style: "margin-left: 5px;",
-                                                                                                                                                                                                                                        emptyText: "กรุณาระบุสาเหตุ",
-                                                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                                                        keyup: function (combo, newValue) {
-                                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                ],
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        ],
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                ],
-                                                                                                                                                                                                        },
-                                                                                                                                                                                                        ],
-                                                                                                                                                                                                },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "textarea",
-                                                                                                                                                                                                fieldLabel: "หมายเหตุ",
-                                                                                                                                                                                                id: "disable_acc_c_comment",
-                                                                                                                                                                                                width: 530,
-                                                                                                                                                                                                height: 100,
-                                                                                                                                                                                        },
-                                                                                                                                                                                        ],
-                                                                                                                                                                                        },
-                                                                                                                                                                                ],
-                                                                                                                                                                                },
-                                                                                                                                                                        ],
-                                                                                                                                                                                buttonAlign: "left",
-                                                                                                                                                                                buttons: [
-                                                                                                                                                                                {
-                                                                                                                                                                                text: "&nbsp;ส่งขอร้อง&nbsp;",
-                                                                                                                                                                                        icon: "../images/icons/delete.png",
-                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                        afterrender: function () {
-                                                                                                                                                                                        btn_set_color(this, "red"); //color : green, red, yellow, orange
-                                                                                                                                                                                        },
-                                                                                                                                                                                        },
-                                                                                                                                                                                        handler: function () {
-                                                                                                                                                                                        var msg = "";
-                                                                                                                                                                                                // if (Ext.getCmp("i_is_upload_acc").getValue() == "") {
-                                                                                                                                                                                                //   msg += "กรุณาอัพโหลดไฟล์เอกสาร";
-                                                                                                                                                                                                // }
-                                                                                                                                                                                                if (Ext.getCmp("disable_acc_c_comment").getValue() == "") {
-                                                                                                                                                                                        msg += "กรุณาระบุเหตุผล";
-                                                                                                                                                                                        }
-
-                                                                                                                                                                                        if (msg != "") {
-                                                                                                                                                                                        Ext.example.msg("แจ้งเตือน", msg, 1);
-                                                                                                                                                                                                $(this).next("text copied");
-                                                                                                                                                                                                setTimeout(function () {
-                                                                                                                                                                                                $(this).next().remove();
-                                                                                                                                                                                                }, 6000);
-                                                                                                                                                                                                return;
-                                                                                                                                                                                        } else {
-                                                                                                                                                                                        disable_acc(rec.data);
-                                                                                                                                                                                        }
-                                                                                                                                                                                        },
-                                                                                                                                                                                },
-                                                                                                                                                                                {
-                                                                                                                                                                                text: Ext.GLOBAL_BU_BACK_TH,
-                                                                                                                                                                                        handler: function () {
-                                                                                                                                                                                        Ext.getCmp("win-pop").destroy();
-                                                                                                                                                                                        },
-                                                                                                                                                                                },
-                                                                                                                                                                                ],
-                                                                                                                                                                        },
-                                                                                                                                                                ],
-                                                                                                                                                                }).show();
-                                                                                                                                                        };
-                                                                                                                                                        const win_edit_admin = function (rec) {
-                                                                                                                                                        new Ext.Window({
-                                                                                                                                                        title: "รายการแก้ไข สำหรับ Admin",
-                                                                                                                                                                id: "win-pop",
-                                                                                                                                                                layout: "fit",
-                                                                                                                                                                modal: true,
-                                                                                                                                                                fileUpload: true, // ✅ ตรงนี้เท่านั้น
-                                                                                                                                                                plain: true,
-                                                                                                                                                                border: false,
-                                                                                                                                                                stripeRows: true,
-                                                                                                                                                                loadMask: true,
-                                                                                                                                                                items: [
-                                                                                                                                                                {
-                                                                                                                                                                xtype: "form",
-                                                                                                                                                                        id: "form-pop",
-                                                                                                                                                                        fileUpload: true,
-                                                                                                                                                                        frame: true,
-                                                                                                                                                                        labelAlign: "right",
-                                                                                                                                                                        labelWidth: 150,
-                                                                                                                                                                        width: 800,
-                                                                                                                                                                        height: 400,
-                                                                                                                                                                        autoScroll: true, // <-- สำคัญ
-                                                                                                                                                                        bodyStyle: {padding: "10px 20px"},
-                                                                                                                                                                        defaults: {anchor: "100%", msgTarget: "side", allowBlank: false},
-                                                                                                                                                                        items: [
-                                                                                                                                                                        {
-                                                                                                                                                                        xtype: "container",
-                                                                                                                                                                                layout: "hbox",
-                                                                                                                                                                                align: "stretch",
-                                                                                                                                                                                RemoveHeight: true,
-                                                                                                                                                                                defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
-                                                                                                                                                                                items: [
-                                                                                                                                                                                {
-                                                                                                                                                                                title: "ร้องขอยกเลิกการบันทึกบัญชี : " + rec.data.c_checking_code,
-                                                                                                                                                                                        RemoveCls: "x-box-item",
-                                                                                                                                                                                        collapsible: false,
-                                                                                                                                                                                        collapsed: false,
-                                                                                                                                                                                        defaults: {allowBlank: true},
-                                                                                                                                                                                        items: [
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                value: rec.data.sp_check_period_hdr_id,
-                                                                                                                                                                                                name: "sp_check_period_hdr_id",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                name: "json_select",
-                                                                                                                                                                                                id: "json_select_field",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "textfield",
-                                                                                                                                                                                                fieldLabel: "เลขที่ตรวจรับ",
-                                                                                                                                                                                                style: "font-weight: bold;color: red;",
-                                                                                                                                                                                                width: 200,
-                                                                                                                                                                                                readOnly: true,
-                                                                                                                                                                                                name: "c_checking_code",
-                                                                                                                                                                                                value: rec.data.c_checking_code,
-                                                                                                                                                                                                style: {background: "#EEEEEE", "font-weight": "bold", color: "red"},
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "datefield",
-                                                                                                                                                                                                fieldLabel: "วันที่ทำรายการ",
-                                                                                                                                                                                                name: "d_doc_date",
-                                                                                                                                                                                                id: "disable_acc_d_doc_date",
-                                                                                                                                                                                                readOnly: true,
-                                                                                                                                                                                                // format: "Y-m-d", // ✅ ฟอร์แมตแสดงบนฟิลด์
-                                                                                                                                                                                                // submitFormat: "Y-m-d", // ✅ ฟอร์แมตตอน submit
-                                                                                                                                                                                                // value: rec.data.c_checking_code,
-                                                                                                                                                                                                value: new Date(),
-                                                                                                                                                                                                // format: "Y-m-d",
-                                                                                                                                                                                                submitFormat: "Y-m-d",
-                                                                                                                                                                                                style: {background: "#EEEEEE", "font-weight": "bold"},
-                                                                                                                                                                                                // value: addY(543),
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "datefield",
-                                                                                                                                                                                                fieldLabel: "วันที่ตรวจรับ",
-                                                                                                                                                                                                name: "d_checking_date_edit_admin",
-                                                                                                                                                                                                id: "d_checking_date_edid_adminID",
-                                                                                                                                                                                                // readOnly: true,
-                                                                                                                                                                                                // format: "Y-m-d", // ✅ ฟอร์แมตแสดงบนฟิลด์
-                                                                                                                                                                                                // submitFormat: "Y-m-d", // ✅ ฟอร์แมตตอน submit
-                                                                                                                                                                                                // value: rec.data.c_checking_code,
-                                                                                                                                                                                                value: new Date(),
-                                                                                                                                                                                                // format: "Y-m-d",
-                                                                                                                                                                                                submitFormat: "Y-m-d",
-                                                                                                                                                                                                style: {background: "#EEEEEE", "font-weight": "bold"},
-                                                                                                                                                                                                // value: addY(543),
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "container",
-                                                                                                                                                                                                layout: "anchor", // หรือใช้ "anchor" ก็ได้
-                                                                                                                                                                                                align: "stretch",
-                                                                                                                                                                                                name: "c_comment",
-                                                                                                                                                                                                id: "Container_po_reason_protest_acc",
-                                                                                                                                                                                                RemoveHeight: true,
-                                                                                                                                                                                                style: "padding-left: 145px;",
-                                                                                                                                                                                                width: 680,
-                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                afterrender: function () {
-                                                                                                                                                                                                // if (Ext.dataSelect.pdf_hdr == undefined) {
-                                                                                                                                                                                                //   Ext.getCmp("ContainerEditPDF").hide();
-                                                                                                                                                                                                // }
-                                                                                                                                                                                                },
-                                                                                                                                                                                                },
-                                                                                                                                                                                                defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
-                                                                                                                                                                                                items: [
-                                                                                                                                                                                                {
-                                                                                                                                                                                                title: "ข้อสาเหตุ (ใช้เป็นสาเหตุที่แก้ไขข้อมูลการตรวจรับ) ",
-                                                                                                                                                                                                        RemoveCls: "x-box-item", //*--
-                                                                                                                                                                                                        collapsible: false,
-                                                                                                                                                                                                        collapsed: false,
-                                                                                                                                                                                                        defaults: {labelStyle: "width:200px;", allowBlank: true},
-                                                                                                                                                                                                        items: [
-                                                                                                                                                                                                        {
-                                                                                                                                                                                                        xtype: "container",
-                                                                                                                                                                                                                anchor: "100%",
-                                                                                                                                                                                                                id: "chkContainer",
-                                                                                                                                                                                                                layout: "anchor",
-                                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                                afterrender: function () {
-                                                                                                                                                                                                                this.check_items = function () {
-                                                                                                                                                                                                                let json_date = getCheckedLabelsAsJson();
-                                                                                                                                                                                                                        if (typeof json_date === "string") {
-                                                                                                                                                                                                                json_date = JSON.parse(json_date);
-                                                                                                                                                                                                                }
-                                                                                                                                                                                                                const text = json_date.map((item) => `- ${item.label}`).join("\n");
-                                                                                                                                                                                                                        Ext.getCmp("disable_acc_c_comment").setValue(text);
-                                                                                                                                                                                                                };
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                items: [
-                                                                                                                                                                                                                {
-                                                                                                                                                                                                                xtype: "checkbox",
-                                                                                                                                                                                                                        boxLabel: "ผู้ใช้งานระบบทำระบุข้อมูลผิด (แจ้งหัวหน้าฝ่ายแล้ว)",
-                                                                                                                                                                                                                        inputValue: 1,
-                                                                                                                                                                                                                        checked: false,
-                                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                                        check: function (combo, newValue) {
-                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                {
-                                                                                                                                                                                                                xtype: "checkbox",
-                                                                                                                                                                                                                        boxLabel: "รหัสงบประมาณ/ประเภทรายจ่าย/รายการค่าใช้จ่าย",
-                                                                                                                                                                                                                        inputValue: 1,
-                                                                                                                                                                                                                        checked: false,
-                                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                                        check: function (combo, newValue) {
-                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                {
-                                                                                                                                                                                                                xtype: "checkbox",
-                                                                                                                                                                                                                        boxLabel: "รายการบัญชี",
-                                                                                                                                                                                                                        inputValue: 1,
-                                                                                                                                                                                                                        checked: false,
-                                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                                        check: function (combo, newValue) {
-                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                {
-                                                                                                                                                                                                                xtype: "checkbox",
-                                                                                                                                                                                                                        boxLabel: "จำนวนเงิน",
-                                                                                                                                                                                                                        inputValue: 1,
-                                                                                                                                                                                                                        checked: false,
-                                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                                        check: function (combo, newValue) {
-                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                {
-                                                                                                                                                                                                                xtype: "checkbox",
-                                                                                                                                                                                                                        boxLabel: "ชื่อเจ้าหนี้/เลขที่บัญชีธนาคาร",
-                                                                                                                                                                                                                        inputValue: 1,
-                                                                                                                                                                                                                        checked: false,
-                                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                                        check: function (combo, newValue) {
-                                                                                                                                                                                                                        Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                {
-                                                                                                                                                                                                                xtype: "container",
-                                                                                                                                                                                                                        layout: "hbox",
-                                                                                                                                                                                                                        style: "margin-bottom: 5px;",
-                                                                                                                                                                                                                        items: [
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        xtype: "checkbox",
-                                                                                                                                                                                                                                boxLabel: "อื่น ๆ",
-                                                                                                                                                                                                                                inputValue: 1,
-                                                                                                                                                                                                                                checked: false,
-                                                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                                                check: function (cb, checked) {
-                                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                        const textField = cb.ownerCt.getComponent("otherReasonField");
-                                                                                                                                                                                                                                        textField.setDisabled(!checked);
-                                                                                                                                                                                                                                        if (!checked)
-                                                                                                                                                                                                                                        textField.setValue("");
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        {
-                                                                                                                                                                                                                        xtype: "textfield",
-                                                                                                                                                                                                                                id: "otherReasonField",
-                                                                                                                                                                                                                                disabled: true,
-                                                                                                                                                                                                                                enableKeyEvents: true,
-                                                                                                                                                                                                                                hideLabel: true,
-                                                                                                                                                                                                                                width: 300,
-                                                                                                                                                                                                                                style: "margin-left: 5px;",
-                                                                                                                                                                                                                                emptyText: "กรุณาระบุสาเหตุ",
-                                                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                                                keyup: function (combo, newValue) {
-                                                                                                                                                                                                                                Ext.getCmp("chkContainer").check_items();
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                                },
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        ],
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                ],
-                                                                                                                                                                                                        },
-                                                                                                                                                                                                        ],
-                                                                                                                                                                                                },
-                                                                                                                                                                                                ],
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "textarea",
-                                                                                                                                                                                                fieldLabel: "หมายเหตุ",
-                                                                                                                                                                                                id: "disable_acc_c_comment",
-                                                                                                                                                                                                width: 530,
-                                                                                                                                                                                                height: 100,
-                                                                                                                                                                                        },
-                                                                                                                                                                                        ],
-                                                                                                                                                                                },
-                                                                                                                                                                                ],
-                                                                                                                                                                        },
-                                                                                                                                                                        ],
-                                                                                                                                                                        buttonAlign: "left",
-                                                                                                                                                                        buttons: [
-                                                                                                                                                                        {
-                                                                                                                                                                        text: "&nbsp;ส่งขอร้อง&nbsp;",
-                                                                                                                                                                                icon: "../images/icons/delete.png",
-                                                                                                                                                                                listeners: {
-                                                                                                                                                                                afterrender: function () {
-                                                                                                                                                                                btn_set_color(this, "red"); //color : green, red, yellow, orange
-                                                                                                                                                                                },
-                                                                                                                                                                                },
-                                                                                                                                                                                handler: function () {
-                                                                                                                                                                                var msg = "";
-                                                                                                                                                                                        // if (Ext.getCmp("i_is_upload_acc").getValue() == "") {
-                                                                                                                                                                                        //   msg += "กรุณาอัพโหลดไฟล์เอกสาร";
-                                                                                                                                                                                        // }
-                                                                                                                                                                                        if (Ext.getCmp("disable_acc_c_comment").getValue() == "") {
-                                                                                                                                                                                msg += "กรุณาระบุเหตุผล";
-                                                                                                                                                                                }
-
-                                                                                                                                                                                if (msg != "") {
-                                                                                                                                                                                Ext.example.msg("แจ้งเตือน", msg, 1);
-                                                                                                                                                                                        $(this).next("text copied");
-                                                                                                                                                                                        setTimeout(function () {
-                                                                                                                                                                                        $(this).next().remove();
-                                                                                                                                                                                        }, 6000);
-                                                                                                                                                                                        return;
-                                                                                                                                                                                } else {
-                                                                                                                                                                                disable_acc(rec.data);
-                                                                                                                                                                                }
-                                                                                                                                                                                },
-                                                                                                                                                                        },
-                                                                                                                                                                        {
-                                                                                                                                                                        text: Ext.GLOBAL_BU_BACK_TH,
-                                                                                                                                                                                handler: function () {
-                                                                                                                                                                                Ext.getCmp("win-pop").destroy();
-                                                                                                                                                                                },
-                                                                                                                                                                        },
-                                                                                                                                                                        ],
-                                                                                                                                                                },
-                                                                                                                                                                ],
-                                                                                                                                                        }).show();
-                                                                                                                                                        };
-                                                                                                                                                        const win_request_edit_bg = function (rec) {
-                                                                                                                                                        new Ext.Window({
-                                                                                                                                                        title: "ยืนยันกันเหลื่อมก่อหนี้แล้ว",
-                                                                                                                                                                id: "win-pop",
-                                                                                                                                                                layout: "fit",
-                                                                                                                                                                modal: true,
-                                                                                                                                                                fileUpload: true, // ✅ ตรงนี้เท่านั้น
-                                                                                                                                                                plain: true,
-                                                                                                                                                                border: false,
-                                                                                                                                                                stripeRows: true,
-                                                                                                                                                                loadMask: true,
-                                                                                                                                                                listeners: {
-                                                                                                                                                                beforender: function () {
-                                                                                                                                                                Ext.getCmp("form-pop_edit_bg").getForm().loadRecord(rec); // ทำต่อ ให้ load rec เข้า UI ฟั่งชั่น
-                                                                                                                                                                },
-                                                                                                                                                                },
-                                                                                                                                                                items: [
-                                                                                                                                                                {
-                                                                                                                                                                xtype: "form",
-                                                                                                                                                                        id: "form-pop_edit_bg",
-                                                                                                                                                                        fileUpload: true,
-                                                                                                                                                                        frame: true,
-                                                                                                                                                                        labelAlign: "right",
-                                                                                                                                                                        labelWidth: 150,
-                                                                                                                                                                        width: 700,
-                                                                                                                                                                        height: 300,
-                                                                                                                                                                        autoScroll: true, // <-- สำคัญ
-                                                                                                                                                                        bodyStyle: {padding: "10px 20px"},
-                                                                                                                                                                        defaults: {anchor: "100%", msgTarget: "side", allowBlank: false},
-                                                                                                                                                                        items: [
-                                                                                                                                                                        {
-                                                                                                                                                                        xtype: "container",
-                                                                                                                                                                                layout: "hbox",
-                                                                                                                                                                                align: "stretch",
-                                                                                                                                                                                RemoveHeight: true,
-                                                                                                                                                                                defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
-                                                                                                                                                                                items: [
-                                                                                                                                                                                {
-                                                                                                                                                                                title: "เลขที่สัญญายืนยันกันเหลื่อมก่อหนี้ : ",
-                                                                                                                                                                                        RemoveCls: "x-box-item",
-                                                                                                                                                                                        collapsible: false,
-                                                                                                                                                                                        collapsed: false,
-                                                                                                                                                                                        defaults: {allowBlank: true},
-                                                                                                                                                                                        items: [
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                value: rec.data.sp_check_period_hdr_id,
-                                                                                                                                                                                                name: "sp_check_period_hdr_id",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                value: "EDIT_UPDATE_OVERLAP",
-                                                                                                                                                                                                name: "mode",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                value: rec.data.sp_tor_id,
-                                                                                                                                                                                                name: "id",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                value: 2,
-                                                                                                                                                                                                name: "i_is_overlap",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                value: 3,
-                                                                                                                                                                                                name: "i_overlap",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                value: 2,
-                                                                                                                                                                                                name: "confirm_overlap",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                value: rec.data.sp_tor_contract_id,
-                                                                                                                                                                                                name: "sp_tor_contract_id",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                name: "json_select",
-                                                                                                                                                                                                id: "json_select_field",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                name: "i_type_bg",
-                                                                                                                                                                                                value: 4,
-                                                                                                                                                                                                id: "i_type_bgID",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                name: "dc_expense_budget_type_id",
-                                                                                                                                                                                                value: rec.data.dc_expense_budget_type_id,
-                                                                                                                                                                                                // id: "i_type_bgID",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "hidden",
-                                                                                                                                                                                                name: "po_expense_id",
-                                                                                                                                                                                                value: rec.data.po_expense_id,
-                                                                                                                                                                                                // id: "i_type_bgID",
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "textfield",
-                                                                                                                                                                                                fieldLabel: "เลขที่สัญญา",
-                                                                                                                                                                                                style: "font-weight: bold;color: red;",
-                                                                                                                                                                                                width: 200,
-                                                                                                                                                                                                readOnly: true,
-                                                                                                                                                                                                name: "c_code",
-                                                                                                                                                                                                value: rec.data.c_code,
-                                                                                                                                                                                                style: {background: "#EEEEEE", "font-weight": "bold", color: "red"},
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "textfield",
-                                                                                                                                                                                                fieldLabel: "ผู้ขายผู้รับจ้าง",
-                                                                                                                                                                                                style: "font-weight: bold;color: red;",
-                                                                                                                                                                                                width: 250,
-                                                                                                                                                                                                readOnly: true,
-                                                                                                                                                                                                name: "dc_creditor_name",
-                                                                                                                                                                                                value: rec.data.dc_creditor_name,
-                                                                                                                                                                                                style: {background: "#EEEEEE", "font-weight": "bold"},
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        fieldLabel: "แหล่งเงิน",
-                                                                                                                                                                                                xtype: "textfield",
-                                                                                                                                                                                                name: "budget_type_edit_bg",
-                                                                                                                                                                                                value: rec.data.budget_type,
-                                                                                                                                                                                                width: 450,
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        fieldLabel: "หมวดค่าใช้จ่าย",
-                                                                                                                                                                                                name: "expense_name_edit_bg",
-                                                                                                                                                                                                xtype: "textfield",
-                                                                                                                                                                                                value: rec.data.expense_name,
-                                                                                                                                                                                                width: 450,
-                                                                                                                                                                                        },
-                                                                                                                                                                                                new Ext.form.ComboBox({
-                                                                                                                                                                                                mode: "local",
-                                                                                                                                                                                                        // allowBlank: false, ReadOnly_set
-                                                                                                                                                                                                        fieldLabel: "ปีงบประมาณ",
-                                                                                                                                                                                                        submitValue: true,
-                                                                                                                                                                                                        allowBlank: false,
-                                                                                                                                                                                                        id: "i_budget_year_edit_bg",
-                                                                                                                                                                                                        hiddenName: "i_budget_year",
-                                                                                                                                                                                                        name: "i_budget_yearTxt",
-                                                                                                                                                                                                        store: Ext.store_year,
-                                                                                                                                                                                                        valueField: "id",
-                                                                                                                                                                                                        displayField: "c_name",
-                                                                                                                                                                                                        value: rec.data.i_yyyy,
-                                                                                                                                                                                                        triggerAction: "all",
-                                                                                                                                                                                                        forceSelection: true,
-                                                                                                                                                                                                        selectOnFocus: true,
-                                                                                                                                                                                                        typeAhead: false,
-                                                                                                                                                                                                        emptyText: "กรุณาเลือกปีงบประมาณ...",
-                                                                                                                                                                                                        config: {
-                                                                                                                                                                                                        requireMe: false,
-                                                                                                                                                                                                        },
-                                                                                                                                                                                                        listeners: {
-                                                                                                                                                                                                        afterrender: function () {
-                                                                                                                                                                                                        // ReadOnly_set("i_budget_year_edit_bg", true);
-                                                                                                                                                                                                        // this.ReadOnly_set = function (set) {
-                                                                                                                                                                                                        //   this.setReadOnly(set);
-                                                                                                                                                                                                        //   this.getEl().dom.style.background = set ? "#EEEEEE" : "";
-                                                                                                                                                                                                        // };
-                                                                                                                                                                                                        this.fn = function () {};
-                                                                                                                                                                                                                this.select_value = function () {};
-                                                                                                                                                                                                        },
-                                                                                                                                                                                                                select: function () {
-                                                                                                                                                                                                                this.select_value();
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                Change: function () {
-                                                                                                                                                                                                                this.fn();
-                                                                                                                                                                                                                        this.select_value();
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                beforequery: function (q) {
-                                                                                                                                                                                                                if (q.query) {
-                                                                                                                                                                                                                var length = q.query.length;
-                                                                                                                                                                                                                        q.query = new RegExp(Ext.escapeRe(q.query));
-                                                                                                                                                                                                                        q.query.length = length;
-                                                                                                                                                                                                                }
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                blur: function () {
-                                                                                                                                                                                                                this.getStore().clearFilter();
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                        },
-                                                                                                                                                                                                }),
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "datefield",
-                                                                                                                                                                                                fieldLabel: "วันที่ทำรายการ",
-                                                                                                                                                                                                name: "d_doc_date",
-                                                                                                                                                                                                id: "disable_acc_d_doc_date",
-                                                                                                                                                                                                readOnly: true,
-                                                                                                                                                                                                // format: "Y-m-d", // ✅ ฟอร์แมตแสดงบนฟิลด์
-                                                                                                                                                                                                // submitFormat: "Y-m-d", // ✅ ฟอร์แมตตอน submit
-                                                                                                                                                                                                // value: rec.data.c_checking_code,
-                                                                                                                                                                                                value: new Date(),
-                                                                                                                                                                                                // format: "Y-m-d",
-                                                                                                                                                                                                submitFormat: "Y-m-d",
-                                                                                                                                                                                                style: {background: "#EEEEEE", "font-weight": "bold"},
-                                                                                                                                                                                                // value: addY(543),
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "container",
-                                                                                                                                                                                                layout: "anchor", // หรือใช้ "anchor" ก็ได้
-                                                                                                                                                                                                align: "stretch",
-                                                                                                                                                                                                name: "c_comment",
-                                                                                                                                                                                                hidden: true,
-                                                                                                                                                                                                id: "Container_po_reason_protest_acc",
-                                                                                                                                                                                                RemoveHeight: true,
-                                                                                                                                                                                                style: "padding-left: 145px;",
-                                                                                                                                                                                                width: 680,
-                                                                                                                                                                                                listeners: {
-                                                                                                                                                                                                afterrender: function () {
-                                                                                                                                                                                                // if (Ext.dataSelect.pdf_hdr == undefined) {
-                                                                                                                                                                                                //   Ext.getCmp("ContainerEditPDF").hide();
-                                                                                                                                                                                                // }
-                                                                                                                                                                                                },
-                                                                                                                                                                                                },
-                                                                                                                                                                                                defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
-                                                                                                                                                                                        },
-                                                                                                                                                                                        {
-                                                                                                                                                                                        xtype: "textarea",
-                                                                                                                                                                                                fieldLabel: "หมายเหตุ",
-                                                                                                                                                                                                id: "disable_acc_c_comment",
-                                                                                                                                                                                                hidden: true,
-                                                                                                                                                                                                width: 530,
-                                                                                                                                                                                                height: 100,
-                                                                                                                                                                                        },
-                                                                                                                                                                                        ],
-                                                                                                                                                                                },
-                                                                                                                                                                                ],
-                                                                                                                                                                        },
-                                                                                                                                                                        ],
-                                                                                                                                                                        buttonAlign: "left",
-                                                                                                                                                                        buttons: [
-                                                                                                                                                                        {
-                                                                                                                                                                        text: "&nbsp;ส่งขอร้อง&nbsp;",
-                                                                                                                                                                                icon: "../images/icons/accept.png",
-                                                                                                                                                                                listeners: {
-                                                                                                                                                                                afterrender: function () {
-                                                                                                                                                                                btn_set_color(this, "yellow"); //color : green, red, yellow, orange
-                                                                                                                                                                                },
-                                                                                                                                                                                },
-                                                                                                                                                                                handler: function () {
-                                                                                                                                                                                var msg = "";
-                                                                                                                                                                                        // if (Ext.getCmp("i_is_upload_acc").getValue() == "") {
-                                                                                                                                                                                        //   msg += "กรุณาอัพโหลดไฟล์เอกสาร";   UPDATE_OVERLAP2
-                                                                                                                                                                                        // }
-                                                                                                                                                                                        // if (Ext.getCmp("disable_acc_c_comment").getValue() == "") {
-                                                                                                                                                                                        //   msg += "กรุณาระบุเหตุผล";
-                                                                                                                                                                                        // }
-
-                                                                                                                                                                                        if (msg != "") {
-                                                                                                                                                                                Ext.example.msg("แจ้งเตือน", msg, 1);
-                                                                                                                                                                                        $(this).next("text copied");
-                                                                                                                                                                                        setTimeout(function () {
-                                                                                                                                                                                        $(this).next().remove();
-                                                                                                                                                                                        }, 6000);
-                                                                                                                                                                                        return;
-                                                                                                                                                                                } else {
-                                                                                                                                                                                edit_bg(rec.data);
-                                                                                                                                                                                }
-                                                                                                                                                                                },
-                                                                                                                                                                        },
-                                                                                                                                                                        {
-                                                                                                                                                                        text: Ext.GLOBAL_BU_BACK_TH,
-                                                                                                                                                                                handler: function () {
-                                                                                                                                                                                Ext.getCmp("win-pop").destroy();
-                                                                                                                                                                                },
-                                                                                                                                                                        },
-                                                                                                                                                                        ],
-                                                                                                                                                                },
-                                                                                                                                                                ],
-                                                                                                                                                        }).show();
-                                                                                                                                                        };
-                                                                                                                                                        const search = function () {
-                                                                                                                                                        var msg = "";
-                                                                                                                                                                if (msg == "") {
-                                                                                                                                                        Ext.storeDtl.setBaseParam("mode", "LIST_SUB_PERIOD_HDR");
-                                                                                                                                                                Ext.storeDtl.setBaseParam("type", "SEARCH");
-                                                                                                                                                                Ext.storeDtl.setBaseParam("filter", Ext.getCmp("filter").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("value", Ext.getCmp("value-box").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_type_contract", Ext.getCmp("i_type_contract").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_budget_year", Ext.getCmp("s_i_budget_year").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_budget_year_overlap", Ext.getCmp("s_i_budget_year_overlap").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_year_contract", Ext.getCmp("s_i_year_contract").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_enable", Ext.getCmp("s_i_enable").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_enabled", Ext.getCmp("i_enabled").getValue() ? 2 : 1);
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_product_type", Ext.getCmp("s_i_product_typeID").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_status", Ext.getCmp("s_i_statusID").getValue());
-                                                                                                                                                                Ext.storeDtl.setBaseParam("i_show", Ext.get("toggle_my_status").dom.checked ? 1 : 0);
-                                                                                                                                                                // Ext.storeDtl.setBaseParam("userid", Ext.getCmp("userid-ID").getValue());
-                                                                                                                                                                Ext.getCmp("tabpanel1").getStore().load();
-                                                                                                                                                        } else {
-                                                                                                                                                        Ext.Msg.alert("แจ้งเตือน", msg);
-                                                                                                                                                        }
-                                                                                                                                                        Ext.storeDtl.load();
-                                                                                                                                                        };
-                                                                                                                                                        set_text_by_rec = function (date_rec, type_save) {
-                                                                                                                                                        if (type_save == 1) {
-                                                                                                                                                        setTimeout(function () {
-                                                                                                                                                        Ext.getCmp("f_inv_vat").setValue(date_rec.data.f_net_total_price);
-                                                                                                                                                                // รายการที่บันทึกแล้ว
-                                                                                                                                                                if (!["", "0.00", 0, null, undefined].includes(date_rec.data.f_vat_amt)) {
-                                                                                                                                                        // ไม่เท่ากับ
-                                                                                                                                                        var checkbox = Ext.getCmp("i_vat_amtID");
-                                                                                                                                                                var checkHandler = checkbox.initialConfig.listeners.check;
-                                                                                                                                                                checkbox.un("check", checkHandler);
-                                                                                                                                                                checkbox.setValue(true);
-                                                                                                                                                                checkbox.on("check", checkHandler);
+const search = function () {
+var msg = "";
+        if (msg == "") {
+Ext.storeDtl.setBaseParam("mode", "LIST_SUB_PERIOD_HDR");
+        Ext.storeDtl.setBaseParam("type", "SEARCH");
+        Ext.storeDtl.setBaseParam("filter", Ext.getCmp("filter").getValue());
+        Ext.storeDtl.setBaseParam("value", Ext.getCmp("value-box").getValue());
+        Ext.storeDtl.setBaseParam("i_type_contract", Ext.getCmp("i_type_contract").getValue());
+        Ext.storeDtl.setBaseParam("i_budget_year", Ext.getCmp("s_i_budget_year").getValue());
+        Ext.storeDtl.setBaseParam("i_budget_year_overlap", Ext.getCmp("s_i_budget_year_overlap").getValue());
+        Ext.storeDtl.setBaseParam("i_year_contract", Ext.getCmp("s_i_year_contract").getValue());
+        Ext.storeDtl.setBaseParam("i_enable", Ext.getCmp("s_i_enable").getValue());
+        Ext.storeDtl.setBaseParam("i_enabled", Ext.getCmp("i_enabled").getValue() ? 2 : 1);
+        Ext.storeDtl.setBaseParam("i_product_type", Ext.getCmp("s_i_product_typeID").getValue());
+        Ext.storeDtl.setBaseParam("i_status", Ext.getCmp("s_i_statusID").getValue());
+        Ext.storeDtl.setBaseParam("i_show", Ext.get("toggle_my_status").dom.checked ? 1 : 0);
+        // Ext.storeDtl.setBaseParam("userid", Ext.getCmp("userid-ID").getValue());
+        Ext.getCmp("tabpanel1").getStore().load();
+} else {
+Ext.Msg.alert("แจ้งเตือน", msg);
+}
+Ext.storeDtl.load();
+};
+set_text_by_rec = function (date_rec, type_save) {
+if (type_save == 1) {
+setTimeout(function () {
+Ext.getCmp("f_inv_vat").setValue(date_rec.data.f_net_total_price);
+        // รายการที่บันทึกแล้ว
+        if (!["", "0.00", 0, null, undefined].includes(date_rec.data.f_vat_amt)) {
+// ไม่เท่ากับ
+var checkbox = Ext.getCmp("i_vat_amtID");
+        var checkHandler = checkbox.initialConfig.listeners.check;
+        checkbox.un("check", checkHandler);
+        checkbox.setValue(true);
+        checkbox.on("check", checkHandler);
 //                Ext.getCmp("f_vat").setReadOnly(false);
-                                                                                                                                                                Ext.getCmp("f_vat").el.setStyle("background", "#fff");
-                                                                                                                                                        } else {
-                                                                                                                                                        var checkbox = Ext.getCmp("i_vat_amtID");
-                                                                                                                                                                var checkHandler = checkbox.initialConfig.listeners.check;
-                                                                                                                                                                checkbox.un("check", checkHandler);
-                                                                                                                                                                checkbox.setValue(false);
-                                                                                                                                                                checkbox.on("check", checkHandler);
-                                                                                                                                                                Ext.getCmp("f_vat").setReadOnly(true);
-                                                                                                                                                                Ext.getCmp("f_vat").el.setStyle("background", "#eee");
-                                                                                                                                                        }
-                                                                                                                                                        if (!["", "0.00", 0, null, undefined].includes(date_rec.data.f_tax_personal)) {
-                                                                                                                                                        var checkbox = Ext.getCmp("i_tax_personalID");
-                                                                                                                                                                var checkHandler = checkbox.initialConfig.listeners.check;
-                                                                                                                                                                checkbox.un("check", checkHandler);
-                                                                                                                                                                checkbox.setValue(true);
-                                                                                                                                                                checkbox.on("check", checkHandler);
-                                                                                                                                                                Ext.getCmp("f_tax_personalID2").setReadOnly(false);
-                                                                                                                                                                Ext.getCmp("f_tax_personalID2").el.setStyle("background", "#fff");
-                                                                                                                                                        } else {
-                                                                                                                                                        var checkbox = Ext.getCmp("i_tax_personalID");
-                                                                                                                                                                var checkHandler = checkbox.initialConfig.listeners.check;
-                                                                                                                                                                checkbox.un("check", checkHandler);
-                                                                                                                                                                checkbox.setValue(false);
-                                                                                                                                                                checkbox.on("check", checkHandler);
-                                                                                                                                                                Ext.getCmp("f_tax_personalID2").setReadOnly(true);
-                                                                                                                                                                Ext.getCmp("f_tax_personalID2").el.setStyle("background", "#eee");
-                                                                                                                                                        }
+        Ext.getCmp("f_vat").el.setStyle("background", "#fff");
+} else {
+var checkbox = Ext.getCmp("i_vat_amtID");
+        var checkHandler = checkbox.initialConfig.listeners.check;
+        checkbox.un("check", checkHandler);
+        checkbox.setValue(false);
+        checkbox.on("check", checkHandler);
+        Ext.getCmp("f_vat").setReadOnly(true);
+        Ext.getCmp("f_vat").el.setStyle("background", "#eee");
+}
+if (!["", "0.00", 0, null, undefined].includes(date_rec.data.f_tax_personal)) {
+var checkbox = Ext.getCmp("i_tax_personalID");
+        var checkHandler = checkbox.initialConfig.listeners.check;
+        checkbox.un("check", checkHandler);
+        checkbox.setValue(true);
+        checkbox.on("check", checkHandler);
+        Ext.getCmp("f_tax_personalID2").setReadOnly(false);
+        Ext.getCmp("f_tax_personalID2").el.setStyle("background", "#fff");
+} else {
+var checkbox = Ext.getCmp("i_tax_personalID");
+        var checkHandler = checkbox.initialConfig.listeners.check;
+        checkbox.un("check", checkHandler);
+        checkbox.setValue(false);
+        checkbox.on("check", checkHandler);
+        Ext.getCmp("f_tax_personalID2").setReadOnly(true);
+        Ext.getCmp("f_tax_personalID2").el.setStyle("background", "#eee");
+}
 
-                                                                                                                                                        // if (!["","0.00",0,null,undefined].includes(date_rec.data.f_tax_personal) ) {
-                                                                                                                                                        //   var checkbox = Ext.getCmp("i_rateID");
-                                                                                                                                                        //   var checkHandler = checkbox.initialConfig.listeners.check;
-                                                                                                                                                        //   checkbox.un("check", checkHandler);
-                                                                                                                                                        //   checkbox.setValue(false);
-                                                                                                                                                        //   checkbox.on("check", checkHandler);
-                                                                                                                                                        //   Ext.getCmp("f_tax_personal").setReadOnly(true);
-                                                                                                                                                        //   Ext.getCmp("f_tax_personal").el.setStyle("background", "#eee");
-                                                                                                                                                        // } else {
-                                                                                                                                                        //   var checkbox = Ext.getCmp("i_rateID");
-                                                                                                                                                        //   var checkHandler = checkbox.initialConfig.listeners.check;
-                                                                                                                                                        //   checkbox.un("check", checkHandler);
-                                                                                                                                                        //   checkbox.setValue(true);
-                                                                                                                                                        //   checkbox.on("check", checkHandler);
-                                                                                                                                                        //   Ext.getCmp("f_tax_personal").setReadOnly(false);
-                                                                                                                                                        //   Ext.getCmp("f_tax_personal").el.setStyle("background", "#fff");
-                                                                                                                                                        // }
-                                                                                                                                                        }, 500);
-                                                                                                                                                        } else {
-                                                                                                                                                        // ยังไม่ถูกบันทึก
-                                                                                                                                                        setTimeout(function () {
-                                                                                                                                                        Ext.getCmp("f_inv_vat").setValue(date_rec.data.f_net_total_price);
-                                                                                                                                                                Ext.getCmp("i_vat_amtID").setValue(true);
-                                                                                                                                                                Ext.getCmp("i_tax_personalID").setValue(true);
-                                                                                                                                                                Ext.getCmp("i_rateID").setValue(false);
-                                                                                                                                                        }, 500);
-                                                                                                                                                        }
-                                                                                                                                                        };
+}, 500);
+} else {
+// ยังไม่ถูกบันทึก
+setTimeout(function () {
+Ext.getCmp("f_inv_vat").setValue(date_rec.data.f_net_total_price);
+        Ext.getCmp("i_vat_amtID").setValue(true);
+        Ext.getCmp("i_tax_personalID").setValue(true);
+        Ext.getCmp("i_rateID").setValue(false);
+}, 500);
+}
+};
                                                                                                                                                         f_per_pay_sum = function () {
                                                                                                                                                         var f_per_pay =
                                                                                                                                                                 Ext.getCmp("f_inv_vat").getValue().replace(/,/g, "") -
@@ -4064,7 +4106,8 @@ Ext.isBook = null;
                                                                                                                                                                         return;
                                                                                                                                                                 }
                                                                                                                                                                 };
-                                                                                                                                                                Ext.editHistoryAp = (statusx) => {
+ Ext.editHistoryAp = (statusx) => {
+                   
                                                                                                                                                         if (!Ext.selectRow || typeof Ext.selectRow.get !== "function") {
                                                                                                                                                         Ext.Msg.alert("แจ้งเตือน", "ไม่พบรายการที่ต้องการแก้ไข กรุณาเลือกรายการใหม่");
                                                                                                                                                                 return;
@@ -4092,208 +4135,207 @@ Ext.isBook = null;
                                                                                                                                                                 Ext.Msg.alert("แจ้งเตือน", "ไม่พบแบบฟอร์มรายละเอียดการตรวจรับ");
                                                                                                                                                                 return;
                                                                                                                                                         }
-                                                                                                                                                        Ext.resetTransfTotal(false);
-                                                                                                                                                                periodWindow.getEl().mask("Please wait...", "x-mask-loading");
-                                                                                                                                                                editForm.getForm().loadRecord(Ext.selectRow);
-                                                                                                                                                                Ext.HDR_ID = Ext.selectRow.data.po_working_hdr_id;
-                                                                                                                                                                Ext.storeTransf.setBaseParam("sp_check_period_hdr_id", Ext.selectRow.get("sp_check_period_hdr_id"));
-                                                                                                                                                                Ext.storeTransf.removeAll();
-                                                                                                                                                                Ext.storeTransf.reload({
-                                                                                                                                                                callback: function (record, operation, success) {
-                                                                                                                                                                if (!success) {
-                                                                                                                                                                Ext.resetTransfTotal(false);
-                                                                                                                                                                }
-                                                                                                                                                                Ext.defer(function () {
-                                                                                                                                                                Ext.resetTransfTotal(true);
-                                                                                                                                                                }, 100);
-                                                                                                                                                                },
-                                                                                                                                                                });
-                                                                                                                                                                Ext.storePeriodHdr.setBaseParam("sp_tor_hdr_period_id", Ext.selectRow.get("sp_tor_hdr_period_id"));
-                                                                                                                                                                Ext.storePeriodHdr.setBaseParam("id", Ext.selectRow.get("id"));
-                                                                                                                                                                Ext.storePeriodHdr.setBaseParam("sp_tor_contract_id", Ext.selectRow.get("sp_tor_contract_id"));
-                                                                                                                                                                Ext.storePeriodHdr.setBaseParam("i_is_po", Ext.selectRow.get("i_is_po"));
-                                                                                                                                                                if (Ext.selectRow.data.i_product_type == 1) {
-                                                                                                                                                        Ext.dc_acc.setBaseParam("i_product_type", Ext.selectRow.data.i_product_type);
-                                                                                                                                                                Ext.dc_acc.load();
-                                                                                                                                                        }
-                                                                                                                                                        if (Ext.selectRow.data.c_checking_code == null) {
-                                                                                                                                                        Ext.booking_store.setBaseParam("dc_cost_id", Ext.selectRow.data.dc_cost_id);
-                                                                                                                                                                Ext.booking_store.setBaseParam("i_yyyy_overlap", Ext.selectRow.data.i_yyyy_overlap);
-                                                                                                                                                                Ext.booking_store.setBaseParam("dc_expense_budget_type_id", Ext.selectRow.data.dc_expense_budget_type_id);
-                                                                                                                                                                Ext.booking_store.load();
-                                                                                                                                                        }
-                                                                                                                                                        Ext.storePeriodHdr.reload({
-                                                                                                                                                        callback: function (rec, operation, success) {
-                                                                                                                                                        if (!success || !rec || rec.length === 0) {
-                                                                                                                                                        var failedPeriodWindow = Ext.getCmp("winPeriodHdrID");
-                                                                                                                                                                if (failedPeriodWindow && failedPeriodWindow.getEl()) {
-                                                                                                                                                        failedPeriodWindow.getEl().unmask();
-                                                                                                                                                        }
-                                                                                                                                                        Ext.Msg.alert(
-                                                                                                                                                                "แจ้งเตือน",
-                                                                                                                                                                success
-                                                                                                                                                                ? "ไม่พบข้อมูลรายละเอียดงวดที่ต้องการแก้ไข"
-                                                                                                                                                                : "ไม่สามารถโหลดข้อมูลรายละเอียดงวดได้ กรุณาลองใหม่"
-                                                                                                                                                                );
-                                                                                                                                                                return;
-                                                                                                                                                        }
-                                                                                                                                                        Ext.perioidHdr = rec[0];
-                                                                                                                                                                Ext.selHdrPeriod = rec[0];
-                                                                                                                                                                Ext.c_arrive_code = rec[0].data.c_arrive_code;
-                                                                                                                                                                Ext.dc_creditor_transfer_id = rec[0].data.dc_creditor_transfer_id;
-                                                                                                                                                                Ext.dc_bank_acc_creditor_id = rec[0].data.dc_bank_acc_creditor_id;
-                                                                                                                                                                //                        Ext.dc_bank_acc_creditor_id = rec[0].data.c_name_dtl;
-                                                                                                                                                                Ext.check_pdf = rec[0].data.check_pdf;
-                                                                                                                                                                Ext.i_status_checking = rec[0].data.i_status_checking;
-                                                                                                                                                                Ext.dc_bank_acc_creditor.setBaseParam("dc_creditor_id", Ext.dc_creditor_transfer_id);
-                                                                                                                                                                Ext.dc_bank_acc_creditor.load({
-                                                                                                                                                                // params: { dc_creditor_id: Ext.dc_creditor_transfer_id },
-                                                                                                                                                                callback: function (recordx, operation, success) {
-                                                                                                                                                                if (Ext.dc_bank_acc_creditor.totalLength > 1) {
-                                                                                                                                                                var dc_bank_acc_creditor_id = Ext.dc_bank_acc_creditor_id;
-                                                                                                                                                                        var index = dc_bank_acc_creditor_id > 0 ? dc_bank_acc_creditor_id : 0;
-                                                                                                                                                                        Ext.getCmp("dc_bank_acc_creditor_id").setValue(index);
-                                                                                                                                                                        Ext.getCmp("dc_creditor_idID").setValue(Ext.selectRow.get("dc_creditor_id"));
-                                                                                                                                                                } else {
-                                                                                                                                                                Ext.getCmp("dc_bank_acc_creditor_id").setValue(0);
-                                                                                                                                                                }
-                                                                                                                                                                Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                                                                                                                                                                },
-                                                                                                                                                                });
-                                                                                                                                                                if (success) {
-                                                                                                                                                        Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                                                                                                                                                                if (Ext.isEmpty(rec[0].get("c_name"))) {
-                                                                                                                                                        rec[0].data.c_name = selectedItemName
-                                                                                                                                                                || rec[0].get("c_name_dtl")
-                                                                                                                                                                || "";
-                                                                                                                                                        }
-                                                                                                                                                        Ext.getCmp("gridSub2ID").isController("editMaingrid", rec[0]);
-                                                                                                                                                                if (statusx === "edit") {
-                                                                                                                                                        Ext.getCmp("c_name_dtlID").setValue(rec[0].data.c_name_dtl + rec[0].data.c_i_perod);
-                                                                                                                                                        }
-                                                                                                                                                        if (statusx === "editMaingrid") {
-                                                                                                                                                        // Ext.getCmp("modeEditID(intval($row["i_period"]) ==  1  && intval($row["i_is_last"]) == 1  )").getValue()
-                                                                                                                                                        // var  arrEdit = Ext.getCmp("modeEditID").getValue()
-                                                                                                                                                        // if()
-                                                                                                                                                        if (Ext.selectRow.data.po_working_hdr_id_edit == "0") {
-                                                                                                                                                        Ext.arrEdit = Ext.getCmp("modeEditID").getValue().split(",");
-                                                                                                                                                        } else if (Ext.selectRow.data.po_working_hdr_id_edit > 0) {
-                                                                                                                                                        Ext.arrEdit = "showID";
-                                                                                                                                                        } else if ([null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
-                                                                                                                                                        Ext.arrEdit = "Edit_glID"; // test
-                                                                                                                                                        } else if (Ext.selectRow.data.c_overlap == null && Ext.selectRow.data.i_overlap == 3) {
-                                                                                                                                                        Ext.arrEdit = "Edit_bg";
-                                                                                                                                                        } else if ([4, 5, 6].includes(Ext.selectRow.data.i_send_gl_dr)) {
-                                                                                                                                                        Ext.arrEdit = "Edit_glID";
-                                                                                                                                                        } else {
-                                                                                                                                                        Ext.arrEdit = "showID";
-                                                                                                                                                        }
+                        Ext.defer(function () {  Ext.resetTransfTotal(true); }, 100);  
+                        Ext.resetTransfTotal(false);
+                        periodWindow.getEl().mask("Please wait...", "x-mask-loading");
+                        editForm.getForm().loadRecord(Ext.selectRow);
+                        Ext.HDR_ID = Ext.selectRow.data.po_working_hdr_id;
+                        Ext.storeTransf.setBaseParam("sp_check_period_hdr_id", Ext.selectRow.get("sp_check_period_hdr_id"));
+                        Ext.storeTransf.removeAll();
+                        Ext.storeTransf.reload({
+                        callback: function (record, operation, success) {
+                                    if (!success) {  Ext.resetTransfTotal(false);  }
+                                    Ext.defer(function () {  Ext.resetTransfTotal(true); }, 100);
+                                    
+                            },
+                        });
+                        Ext.storePeriodHdr.setBaseParam("sp_tor_hdr_period_id", Ext.selectRow.get("sp_tor_hdr_period_id"));
+                        Ext.storePeriodHdr.setBaseParam("id", Ext.selectRow.get("id"));
+                        Ext.storePeriodHdr.setBaseParam("sp_tor_contract_id", Ext.selectRow.get("sp_tor_contract_id"));
+                        Ext.storePeriodHdr.setBaseParam("i_is_po", Ext.selectRow.get("i_is_po"));
+                if (Ext.selectRow.data.i_product_type == 1) {
+                        Ext.dc_acc.setBaseParam("i_product_type", Ext.selectRow.data.i_product_type);
+                        Ext.dc_acc.load();
+                }
+                if (Ext.selectRow.data.c_checking_code == null) {
+                Ext.booking_store.setBaseParam("dc_cost_id", Ext.selectRow.data.dc_cost_id);
+                        Ext.booking_store.setBaseParam("i_yyyy_overlap", Ext.selectRow.data.i_yyyy_overlap);
+                        Ext.booking_store.setBaseParam("dc_expense_budget_type_id", Ext.selectRow.data.dc_expense_budget_type_id);
+                        Ext.booking_store.load();
+                }
+               Ext.storePeriodHdr.reload({
+                        callback: function (rec, operation, success) {
+                        if (!success || !rec || rec.length === 0) {
 
-                                                                                                                                                        Ext.getCmp("submodeID").setValue("modeEditAp");
-                                                                                                                                                                Ext.setFieldCollapse("groupProductTypeID");
-                                                                                                                                                                Ext.setFieldCollapse("fsHdrItemsID");
-                                                                                                                                                                Ext.setFieldCollapse("fscheckBgID");
-                                                                                                                                                                Ext.setFieldCollapse("groupUploadID");
-                                                                                                                                                                // fscheckBgID
-                                                                                                                                                                Ext.formSubmitHistory.forEach(function (v) {});
-                                                                                                                                                                window.setTimeout(function () {
-                                                                                                                                                                myGrid = Ext.getCmp("gridSub4ID");
-                                                                                                                                                                        Ext.getCmp("ButtonsproductID").hide();
-                                                                                                                                                                        Ext.getCmp("upload_pdf1").hide();
-                                                                                                                                                                        // Ext.getCmp("panelBgID").setDisabled(true);   // ล็อก UI
-                                                                                                                                                                        Ext.getCmp("gridSub4ID").setDisabled(true); // ล็อก UI
-                                                                                                                                                                        Ext.getCmp("formProductType").setDisabled(true); // ล็อก UI
-                                                                                                                                                                        // formProductType
-                                                                                                                                                                        var cm = myGrid.getColumnModel();
-                                                                                                                                                                        var idx = cm.getIndexById("griddel"); // find column index by its id
-                                                                                                                                                                        // cm.setHidden(idx, true);  // hide the column
-                                                                                                                                                                        if (Ext.arrEdit.includes("Edit_i_product_type") && Ext.getCmp("fsHdrItemsID")) {
-                                                                                                                                                                Ext.getCmp("ButtonsproductID").show();
-                                                                                                                                                                        Ext.getCmp("gridSub4ID").setDisabled(false);
-                                                                                                                                                                        Ext.getCmp("formProductType").setDisabled(false);
-                                                                                                                                                                        cm.setHidden(idx, false);
-                                                                                                                                                                        Ext.getCmp("fsHdrItemsID").expand();
-                                                                                                                                                                        Ext.getCmp("fsHdrItemsID").doLayout();
-                                                                                                                                                                        Ext.getCmp("groupProductTypeID").expand();
-                                                                                                                                                                        Ext.getCmp("groupProductTypeID").doLayout();
-                                                                                                                                                                }
-                                                                                                                                                                if (Ext.arrEdit.includes("Edit_i_fine_amt") && Ext.getCmp("fscheckBgID")) {
-                                                                                                                                                                Ext.getCmp("fscheckBgID").expand();
-                                                                                                                                                                        Ext.getCmp("fscheckBgID").doLayout();
-                                                                                                                                                                        Ext.getCmp("panelBgID").setDisabled(false);
-                                                                                                                                                                }
-                                                                                                                                                                if (Ext.arrEdit.includes("Edit_bg") && Ext.getCmp("fscheckBgID")) {
-                                                                                                                                                                Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
-                                                                                                                                                                        Ext.booking_store.load({
-                                                                                                                                                                        params: {dc_cost_id: Ext.selectRow.data.dc_cost_id, i_yyyy_overlap: Ext.selectRow.data.i_yyyy_overlap, dc_expense_budget_type_id: Ext.selectRow.data.dc_expense_budget_type_id},
-                                                                                                                                                                                callback: function (record, operation, success) {
-                                                                                                                                                                                if (success) {
-                                                                                                                                                                                Ext.getCmp("fscheckBgID").expand();
-                                                                                                                                                                                        Ext.getCmp("fscheckBgID").doLayout();
-                                                                                                                                                                                        Ext.getCmp("panelBgID").setDisabled(false);
-                                                                                                                                                                                        Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                                                                                                                                                                                }
-                                                                                                                                                                                },
-                                                                                                                                                                        });
-                                                                                                                                                                }
-                                                                                                                                                                if (Ext.arrEdit.includes("editPDF") && Ext.getCmp("groupUploadID")) {
-                                                                                                                                                                Ext.getCmp("groupUploadID").expand();
-                                                                                                                                                                        Ext.getCmp("upload_pdf1").show();
-                                                                                                                                                                        Ext.getCmp("groupUploadID").doLayout();
-                                                                                                                                                                }
-                                                                                                                                                                if (Ext.arrEdit.includes("Edit_glID")) {
-                                                                                                                                                                Ext.getCmp("groupUploadID").expand();
-                                                                                                                                                                        Ext.getCmp("upload_pdf1").hide();
-                                                                                                                                                                        Ext.getCmp("groupUploadID").doLayout();
-                                                                                                                                                                        Ext.getCmp("fscheckBgID").expand();
-                                                                                                                                                                        // Ext.getCmp("fscheckBgID").doLayout();
-                                                                                                                                                                        Ext.getCmp("ButtonsproductID").hide();
-                                                                                                                                                                        cm.setHidden(idx, false);
-                                                                                                                                                                        Ext.getCmp("fsHdrItemsID").expand();
-                                                                                                                                                                        Ext.getCmp("fsHdrItemsID").doLayout();
-                                                                                                                                                                        Ext.getCmp("groupProductTypeID").expand();
-                                                                                                                                                                        Ext.getCmp("groupProductTypeID").doLayout();
-                                                                                                                                                                }
-                                                                                                                                                                if (Ext.arrEdit.includes("showID")) {
-                                                                                                                                                                console.log(9);
-                                                                                                                                                                        Ext.getCmp("groupUploadID").expand();
-                                                                                                                                                                        Ext.getCmp("upload_pdf1").show();
-                                                                                                                                                                        Ext.getCmp("groupUploadID").doLayout();
-                                                                                                                                                                        Ext.getCmp("fscheckBgID").expand();
-                                                                                                                                                                        Ext.getCmp("fscheckBgID").doLayout();
-                                                                                                                                                                        Ext.getCmp("ButtonsproductID").hide();
-                                                                                                                                                                        Ext.getCmp("buSaveSub3ID").hide();
-                                                                                                                                                                        cm.setHidden(idx, false);
-                                                                                                                                                                        Ext.getCmp("fsHdrItemsID").expand();
-                                                                                                                                                                        Ext.getCmp("fsHdrItemsID").doLayout();
-                                                                                                                                                                        // fsHdrItemsID
-                                                                                                                                                                        Ext.getCmp("groupProductTypeID").expand();
-                                                                                                                                                                        Ext.getCmp("groupProductTypeID").doLayout();
-                                                                                                                                                                }
-                                                                                                                                                                }, 1000);
-                                                                                                                                                        }
-                                                                                                                                                        let date = new Date(); // วันที่ปัจจุบัน
-                                                                                                                                                                let month = date.getMonth() + 1; // getMonth() คืนค่า 0-11 จึงต้อง +1
-                                                                                                                                                                let year = date.getFullYear(); // ดึงค่าปีในรูปแบบ 4 หลัก
-                                                                                                                                                                Ext.BudgetYear = month > 9 ? year + 1 : year;
-                                                                                                                                                                i_yyyy_overlap = Ext.selectRow.data.i_yyyy_overlap * 1;
-                                                                                                                                                                if (i_yyyy_overlap != Ext.BudgetYear && i_yyyy_overlap != 0) {
-                                                                                                                                                        Ext.getCmp("c_booking_radiogroup").show();
-                                                                                                                                                                Ext.getCmp("c_bookingID").setReadOnly(Ext.selectRow.data.c_overlap);
-                                                                                                                                                        } else {
-                                                                                                                                                        Ext.getCmp("c_booking_radiogroup").hide();
-                                                                                                                                                        }
-                                                                                                                                                        Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                                                                                                                                                                if (Ext.selectRow.data.po_working_hdr_id_edit == "0" && statusx === "editMaingrid" && [null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
-                                                                                                                                                        console.log(64);
-                                                                                                                                                                var editCommentWindow = Ext.getCmp("winEditComentID");
-                                                                                                                                                                if (editCommentWindow) {
-                                                                                                                                                        editCommentWindow.destroy();
-                                                                                                                                                        }
-                                                                                                                                                        }
-                                                                                                                                                        }
-                                                                                                                                                        },
-                                                                                                                                                        });
+                        var failedPeriodWindow = Ext.getCmp("winPeriodHdrID");
+                                if (failedPeriodWindow && failedPeriodWindow.getEl()) {
+                        failedPeriodWindow.getEl().unmask();
+                        }
+                        Ext.Msg.alert(
+                                "แจ้งเตือน",
+                                success
+                                ? "ไม่พบข้อมูลรายละเอียดงวดที่ต้องการแก้ไข"
+                                : "ไม่สามารถโหลดข้อมูลรายละเอียดงวดได้ กรุณาลองใหม่"
+                                );
+                                return;
+                        }
+                        Ext.perioidHdr = rec[0];
+                                Ext.selHdrPeriod = rec[0];
+                                Ext.c_arrive_code = rec[0].data.c_arrive_code;
+                                Ext.dc_creditor_transfer_id = rec[0].data.dc_creditor_transfer_id;
+                                Ext.dc_bank_acc_creditor_id = rec[0].data.dc_bank_acc_creditor_id;
+                                //                        Ext.dc_bank_acc_creditor_id = rec[0].data.c_name_dtl;
+                                Ext.check_pdf = rec[0].data.check_pdf;
+                                Ext.i_status_checking = rec[0].data.i_status_checking;
+                                Ext.dc_bank_acc_creditor.setBaseParam("dc_creditor_id", Ext.dc_creditor_transfer_id);
+                                Ext.dc_bank_acc_creditor.load({
+                                // params: { dc_creditor_id: Ext.dc_creditor_transfer_id },
+                                callback: function (recordx, operation, success) {
+                                if (Ext.dc_bank_acc_creditor.totalLength > 1) {
+                                var dc_bank_acc_creditor_id = Ext.dc_bank_acc_creditor_id;
+                                        var index = dc_bank_acc_creditor_id > 0 ? dc_bank_acc_creditor_id : 0;
+                                        Ext.getCmp("dc_bank_acc_creditor_id").setValue(index);
+                                        Ext.getCmp("dc_creditor_idID").setValue(Ext.selectRow.get("dc_creditor_id"));
+                                } else {
+                                Ext.getCmp("dc_bank_acc_creditor_id").setValue(0);
+                                }
+                                Ext.getCmp("winPeriodHdrID").getEl().unmask();
+                                },
+                                });
+                                if (success) {
+                        Ext.getCmp("winPeriodHdrID").getEl().unmask();
+                                if (Ext.isEmpty(rec[0].get("c_name"))) {
+                        rec[0].data.c_name = selectedItemName
+                                || rec[0].get("c_name_dtl")
+                                || "";
+                        }
+                        Ext.getCmp("gridSub2ID").isController("editMaingrid", rec[0]);
+                                if (statusx === "edit") {
+                        Ext.getCmp("c_name_dtlID").setValue(rec[0].data.c_name_dtl + rec[0].data.c_i_perod);
+                        }
+                        if (statusx === "editMaingrid") {
+                        // Ext.getCmp("modeEditID(intval($row["i_period"]) ==  1  && intval($row["i_is_last"]) == 1  )").getValue()
+                        // var  arrEdit = Ext.getCmp("modeEditID").getValue()
+                        // if()
+                        if (Ext.selectRow.data.po_working_hdr_id_edit == "0") {
+                        Ext.arrEdit = Ext.getCmp("modeEditID").getValue().split(",");
+                        } else if (Ext.selectRow.data.po_working_hdr_id_edit > 0) {
+                        Ext.arrEdit = "showID";
+                        } else if ([null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
+                        Ext.arrEdit = "Edit_glID"; // test
+                        } else if (Ext.selectRow.data.c_overlap == null && Ext.selectRow.data.i_overlap == 3) {
+                        Ext.arrEdit = "Edit_bg";
+                        } else if ([4, 5, 6].includes(Ext.selectRow.data.i_send_gl_dr)) {
+                        Ext.arrEdit = "Edit_glID";
+                        } else {
+                        Ext.arrEdit = "showID";
+                        }
+
+                        Ext.getCmp("submodeID").setValue("modeEditAp");
+                                Ext.setFieldCollapse("groupProductTypeID");
+                                Ext.setFieldCollapse("fsHdrItemsID");
+                                Ext.setFieldCollapse("fscheckBgID");
+                                Ext.setFieldCollapse("groupUploadID");
+                                // fscheckBgID
+                                Ext.formSubmitHistory.forEach(function (v) {});
+                                window.setTimeout(function () {
+                                myGrid = Ext.getCmp("gridSub4ID");
+                                        Ext.getCmp("ButtonsproductID").hide();
+                                        Ext.getCmp("upload_pdf1").hide();
+                                        // Ext.getCmp("panelBgID").setDisabled(true);   // ล็อก UI
+                                        Ext.getCmp("gridSub4ID").setDisabled(true); // ล็อก UI
+                                        Ext.getCmp("formProductType").setDisabled(true); // ล็อก UI
+                                        // formProductType
+                                        var cm = myGrid.getColumnModel();
+                                        var idx = cm.getIndexById("griddel"); // find column index by its id
+                                        // cm.setHidden(idx, true);  // hide the column
+                                        if (Ext.arrEdit.includes("Edit_i_product_type") && Ext.getCmp("fsHdrItemsID")) {
+                                Ext.getCmp("ButtonsproductID").show();
+                                        Ext.getCmp("gridSub4ID").setDisabled(false);
+                                        Ext.getCmp("formProductType").setDisabled(false);
+                                        cm.setHidden(idx, false);
+                                        Ext.getCmp("fsHdrItemsID").expand();
+                                        Ext.getCmp("fsHdrItemsID").doLayout();
+                                        Ext.getCmp("groupProductTypeID").expand();
+                                        Ext.getCmp("groupProductTypeID").doLayout();
+                                }
+                                if (Ext.arrEdit.includes("Edit_i_fine_amt") && Ext.getCmp("fscheckBgID")) {
+                                Ext.getCmp("fscheckBgID").expand();
+                                        Ext.getCmp("fscheckBgID").doLayout();
+                                        Ext.getCmp("panelBgID").setDisabled(false);
+                                }
+                                if (Ext.arrEdit.includes("Edit_bg") && Ext.getCmp("fscheckBgID")) {
+                                Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
+                                        Ext.booking_store.load({
+                                        params: {dc_cost_id: Ext.selectRow.data.dc_cost_id, i_yyyy_overlap: Ext.selectRow.data.i_yyyy_overlap, dc_expense_budget_type_id: Ext.selectRow.data.dc_expense_budget_type_id},
+                                                callback: function (record, operation, success) {
+                                                if (success) {
+                                                Ext.getCmp("fscheckBgID").expand();
+                                                        Ext.getCmp("fscheckBgID").doLayout();
+                                                        Ext.getCmp("panelBgID").setDisabled(false);
+                                                        Ext.getCmp("winPeriodHdrID").getEl().unmask();
+                                                }
+                                                },
+                                        });
+                                }
+                                if (Ext.arrEdit.includes("editPDF") && Ext.getCmp("groupUploadID")) {
+                                Ext.getCmp("groupUploadID").expand();
+                                        Ext.getCmp("upload_pdf1").show();
+                                        Ext.getCmp("groupUploadID").doLayout();
+                                }
+                                if (Ext.arrEdit.includes("Edit_glID")) {
+                                Ext.getCmp("groupUploadID").expand();
+                                        Ext.getCmp("upload_pdf1").hide();
+                                        Ext.getCmp("groupUploadID").doLayout();
+                                        Ext.getCmp("fscheckBgID").expand();
+                                        // Ext.getCmp("fscheckBgID").doLayout();
+                                        Ext.getCmp("ButtonsproductID").hide();
+                                        cm.setHidden(idx, false);
+                                        Ext.getCmp("fsHdrItemsID").expand();
+                                        Ext.getCmp("fsHdrItemsID").doLayout();
+                                        Ext.getCmp("groupProductTypeID").expand();
+                                        Ext.getCmp("groupProductTypeID").doLayout();
+                                }
+                                if (Ext.arrEdit.includes("showID")) {
+                                console.log(9);
+                                        Ext.getCmp("groupUploadID").expand();
+                                        Ext.getCmp("upload_pdf1").show();
+                                        Ext.getCmp("groupUploadID").doLayout();
+                                        Ext.getCmp("fscheckBgID").expand();
+                                        Ext.getCmp("fscheckBgID").doLayout();
+                                        Ext.getCmp("ButtonsproductID").hide();
+                                        Ext.getCmp("buSaveSub3ID").hide();
+                                        cm.setHidden(idx, false);
+                                        Ext.getCmp("fsHdrItemsID").expand();
+                                        Ext.getCmp("fsHdrItemsID").doLayout();
+                                        // fsHdrItemsID
+                                        Ext.getCmp("groupProductTypeID").expand();
+                                        Ext.getCmp("groupProductTypeID").doLayout();
+                                }
+                                }, 1000);
+                        }
+                        let date = new Date(); // วันที่ปัจจุบัน
+                                let month = date.getMonth() + 1; // getMonth() คืนค่า 0-11 จึงต้อง +1
+                                let year = date.getFullYear(); // ดึงค่าปีในรูปแบบ 4 หลัก
+                                Ext.BudgetYear = month > 9 ? year + 1 : year;
+                                i_yyyy_overlap = Ext.selectRow.data.i_yyyy_overlap * 1;
+                                if (i_yyyy_overlap != Ext.BudgetYear && i_yyyy_overlap != 0) {
+                        Ext.getCmp("c_booking_radiogroup").show();
+                                Ext.getCmp("c_bookingID").setReadOnly(Ext.selectRow.data.c_overlap);
+                        } else {
+                        Ext.getCmp("c_booking_radiogroup").hide();
+                        }
+                        Ext.getCmp("winPeriodHdrID").getEl().unmask();
+                                if (Ext.selectRow.data.po_working_hdr_id_edit == "0" && statusx === "editMaingrid" && [null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
+                        console.log(64);
+                                var editCommentWindow = Ext.getCmp("winEditComentID");
+                                if (editCommentWindow) {
+                        editCommentWindow.destroy();
+                        }
+                        }
+                        }
+                        },
+                        });
                                                                                                                                                         };
                                                                                                                                                                 Ext.winEditHistory = (statusx) => {
                                                                                                                                                         let Date_now = new Date();
@@ -5575,28 +5617,271 @@ Ext.isBook = null;
                                                                                                                                                                 }
                                                                                                                                                                 return link;
                                                                                                                                                                 };
-                                                                                                                                                                Ext.auditBoong = function (i) {
-                                                                                                                                                                var link = Ext.genLink(3, 0);
-                                                                                                                                                                        Ext.Ajax.request({
-                                                                                                                                                                        url: link, //record,linkGetMoney
-                                                                                                                                                                                method: "GET", //POST
-                                                                                                                                                                                disableCaching: false,
-                                                                                                                                                                                success: function (result, request) {
-                                                                                                                                                                                var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-                                                                                                                                                                                        if (jsonData.success) {
-                                                                                                                                                                                Ext.MessageBox.alert("Success", "เรียบร้อยแล้ว", function () {
-                                                                                                                                                                                Ext.upMoneyCheckingId(jsonData.bg_reserve_money_id);
-                                                                                                                                                                                });
-                                                                                                                                                                                } else {
-                                                                                                                                                                                Ext.MessageBox.alert("Failed", "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg);
-                                                                                                                                                                                }
-                                                                                                                                                                                return false;
-                                                                                                                                                                                },
-                                                                                                                                                                                failure: function (result, request) {
-                                                                                                                                                                                Ext.MessageBox.alert("Failed", result.responseText); // connect error
-                                                                                                                                                                                },
-                                                                                                                                                                        });
-                                                                                                                                                                };
+                                                                                                                                                                function htmlToPlainText(html) {
+    var div = document.createElement('div');
+    div.innerHTML = html || '';
+
+    // ป้องกัน script/style ถูกนำไปบันทึก
+    var scripts = div.getElementsByTagName('script');
+    while (scripts.length > 0) {
+        scripts[0].parentNode.removeChild(scripts[0]);
+    }
+
+    var styles = div.getElementsByTagName('style');
+    while (styles.length > 0) {
+        styles[0].parentNode.removeChild(styles[0]);
+    }
+
+    return (div.textContent || div.innerText || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/^\s+|\s+$/g, '');
+}
+
+function encodeLogData(data) {
+    return Ext.encode({
+        subject: data.subject || '',
+        module: data.module || '',
+        referenceId: data.referenceId || '',
+        referenceCode: data.referenceCode || '',
+        detailHtml: data.detailHtml || '',
+        detailText: htmlToPlainText(data.detailHtml || ''),
+        currentUrl: window.location.href,
+        browser: navigator.userAgent,
+        createdAtClient: new Date().toISOString()
+    });
+}
+
+
+
+
+Ext.auditBoong = function (i) {
+    var link = Ext.genLink(3, 0);
+            Ext.Ajax.request({
+            url: link, //record,linkGetMoney
+                    method: "GET", //POST
+                    disableCaching: false,
+                    success: function (result, request) {
+                    var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                        if (jsonData.success) {
+                        Ext.MessageBox.alert("Success", "เรียบร้อยแล้ว", function () {
+                        Ext.upMoneyCheckingId(jsonData.bg_reserve_money_id);
+                        });
+                    } else {
+                            Ext.MessageBox.alert("Failed", "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg, function(){  
+                            Ext.getCmp("winPeriodHdrID").getEl().unmask();
+var editorWindow = new Ext.Window({
+    title: 'ข้อมูลการจอง สำหรับไว้ตรวจสอบเงินจอง',
+    width: 700,
+    height: 420,
+    layout: 'border',
+    modal: true,
+    closeAction: 'close',
+
+    items: [{
+        region: 'north',
+        xtype: 'panel',
+        height: 48,
+        border: false,
+        bodyStyle: 'padding:8px 10px 4px 10px;',
+        layout: 'form',
+        items: [{
+            xtype: 'textfield',
+            id: 'adminLogSubject',
+            fieldLabel: 'หัวข้อ',
+            anchor: '98%',
+            maxLength: 500,
+            value: 'แจ้งตรวจสอบข้อมูลการจอง'
+        }]
+    }, {
+        region: 'center',
+        xtype: 'htmleditor',
+        id: 'popupEditor',
+        value: link,
+        listeners: {
+            afterrender: function (editor) {
+                var toolbar = editor.getToolbar();
+                toolbar.add('-');
+                ['H1', 'H2', 'H3'].forEach(function (heading) {
+                    toolbar.addButton({
+                        text: heading,
+                        tooltip: 'รูปแบบหัวเรื่อง ' + heading,
+                        handler: function () {
+                            editor.relayCmd('formatblock', heading.toLowerCase());
+                        }
+                    });
+                });
+                toolbar.addButton({
+                    text: 'แนบรูป',
+                    tooltip: 'แนบรูป PNG, JPG, GIF หรือ WebP (ไม่เกิน 2 MB ต่อรูป)',
+                    handler: function () {
+                        if (!window.FileReader) {
+                            Ext.Msg.alert('ไม่รองรับ', 'Browser นี้ไม่รองรับการแนบรูปจากเครื่อง');
+                            return;
+                        }
+                        var input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/png,image/jpeg,image/gif,image/webp';
+                        input.style.display = 'none';
+                        document.body.appendChild(input);
+                        input.onchange = function () {
+                            var file = input.files && input.files[0];
+                            if (!file) {
+                                document.body.removeChild(input);
+                                return;
+                            }
+                            if (!/^image\/(png|jpeg|gif|webp)$/i.test(file.type) || file.size > 2 * 1024 * 1024) {
+                                Ext.Msg.alert('แนบรูปไม่ได้', 'รองรับ PNG, JPG, GIF หรือ WebP ขนาดไม่เกิน 2 MB ต่อรูป');
+                                document.body.removeChild(input);
+                                return;
+                            }
+                            var reader = new FileReader();
+                            reader.onload = function (event) {
+                                editor.relayCmd('insertimage', event.target.result);
+                                document.body.removeChild(input);
+                            };
+                            reader.readAsDataURL(file);
+                        };
+                        input.click();
+                    }
+                });
+                toolbar.doLayout();
+            }
+        }
+    }],
+
+    buttons: [{
+        text: 'บันทึกแจ้ง Admin/เจ้าหน้าที่ผู้ดูแลระบบ',
+        iconCls: 'icon-save',
+
+        handler: function () {
+            var editor = Ext.getCmp('popupEditor');
+            var subject = Ext.getCmp('adminLogSubject').getValue();
+            var contentHtml = editor.getValue();
+            var contentText = htmlToPlainText(contentHtml);
+
+            if (!contentText) {
+                Ext.Msg.alert('แจ้งเตือน', 'กรุณาระบุรายละเอียดที่ต้องการแจ้ง');
+                return;
+            }
+
+            Ext.Msg.confirm(
+                'ยืนยันการแจ้งผู้ดูแลระบบ',
+                'ต้องการบันทึกข้อมูลนี้เพื่อแจ้ง Admin ใช่หรือไม่?',
+                function (btn) {
+                    if (btn !== 'yes') {
+                        return;
+                    }
+
+                    editorWindow.getEl().mask('กำลังบันทึกข้อมูล...');
+
+                    var logData = encodeLogData({
+                        subject: subject,
+                        module: 'RESERVATION_CHECK',
+                        referenceId: typeof sp_tor_id !== 'undefined'
+                            ? sp_tor_id
+                            : '',
+                        referenceCode: typeof pr_code !== 'undefined'
+                            ? pr_code
+                            : '',
+                        detailHtml: contentHtml
+                    });
+
+                    Ext.Ajax.request({
+                        url: 'tor/api/adminSystemLogController.php',
+                        method: 'POST',
+
+                        params: {
+                            mode: 'CREATE_ADMIN_LOG',
+                            log_data: logData
+                        },
+
+                        success: function (response) {
+                            editorWindow.getEl().unmask();
+
+                            var result;
+
+                            try {
+                                result = Ext.decode(response.responseText);
+                            } catch (e) {
+                                Ext.Msg.alert(
+                                    'เกิดข้อผิดพลาด',
+                                    'รูปแบบข้อมูลตอบกลับจาก Server ไม่ถูกต้อง'
+                                );
+                                return;
+                            }
+
+                            if (result.success === true) {
+                                Ext.Msg.alert(
+                                    'สำเร็จ',
+                                    'ส่งข้อมูลให้ Admin เรียบร้อยแล้ว<br>' +
+                                    'เลขที่ Log: ' + result.log_id,
+                                    function () {
+                                        editorWindow.close();
+                                    }
+                                );
+                            } else {
+                                Ext.Msg.alert(
+                                    'ไม่สำเร็จ',
+                                    result.message || 'ไม่สามารถบันทึกข้อมูลได้'
+                                );
+                            }
+                        },
+
+                        failure: function (response) {
+                            editorWindow.getEl().unmask();
+
+                            Ext.Msg.alert(
+                                'เกิดข้อผิดพลาด',
+                                'ไม่สามารถเชื่อมต่อระบบบันทึก Log ได้<br>' +
+                                'HTTP Status: ' + response.status
+                            );
+                        }
+                    });
+                }
+            );
+        }
+    }, {
+        text: 'ยกเลิก',
+        handler: function () {
+            editorWindow.close();
+        }
+    }]
+});
+                      editorWindow.show();
+//                                            var editorWindow = new Ext.Window({
+//                                                                        title: 'ข้อมูลการจอง สำหรับไว้ตรวจสอบเงินจอง',
+//                                                                        width: 600,
+//                                                                        height: 350,
+//                                                                        layout: 'fit',
+//                                                                        modal: true,
+//                                                                        items: [{
+//                                                                            xtype: 'htmleditor',
+//                                                                            id: 'popupEditor',
+//                                                                            value: link
+//                                                                        }],
+//                                                                        buttons: [{
+//                                                                            text: 'บันทึกแจ้ง admin/เจ้าหน้าที่ผู้ดูแลระบบ',
+//                                                                            handler: function() {
+//                                                                                var content = Ext.getCmp('popupEditor').getValue();
+//                                                                                
+//                                                                                // นำค่า content ไปใช้งานต่อ หรือส่งลง Database
+//                                                                                editorWindow.close();
+//                                                                            }
+//                                                                        }]
+//                                                                      }); 
+//                                                                      // สั่งเปิด Pop-up
+//                                                                      editorWindow.show();
+                        }); 
+                    }
+                    return false;
+                    },
+                    failure: function (result, request) {
+                    Ext.MessageBox.alert("Failed", result.responseText); // connect error
+
+                    },
+            });
+    };
                                                                                                                                                                 Ext.genLink_type_bg = function (rec, getlink, type) {
                                                                                                                                                                 var ip = Ext.session.ip_booking; // 192
 
@@ -5727,11 +6012,11 @@ Ext.isBook = null;
                                                                                                                                                                                                         disableCaching: false,
                                                                                                                                                                                                         success: function (result, request) {
                                                                                                                                                                                                         var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-                                                                                                                                                                                                                if (jsonData.success) {
-                                                                                                                                                                                                        // Ext.MessageBox.alert("Success", "ทำการเรียบร้อยแล้ว", function () {
+                                                                                                                                                                                                     if (jsonData.success) {
+                                                                                                                                                                                                     Ext.MessageBox.alert("Success", "ทำการเรียบร้อยแล้ว", function () {
                                                                                                                                                                                                         updateBookingContract(Ext.selectRow.get("sp_tor_contract_id"), jsonData.bg_reserve_money_id, ii);
-                                                                                                                                                                                                                // Ext.getCmp('formDcExpTypeDddID').getEl().unmask();
-                                                                                                                                                                                                                // });
+                                                                                                                                                                                                                Ext.getCmp('formDcExpTypeDddID').getEl().unmask();
+                                                                                                                                                                                                             });
                                                                                                                                                                                                         } else {
                                                                                                                                                                                                         Ext.MessageBox.alert("Failed", jsonData.msg); // alert massage error
                                                                                                                                                                                                                 Ext.getCmp("formDcExpTypeDddID").getEl().unmask();
@@ -5744,10 +6029,12 @@ Ext.isBook = null;
                                                                                                                                                                                                 });
                                                                                                                                                                                         } else {
                                                                                                                                                                                         Ext.MessageBox.alert("Failed", jsonData.msg); // alert massage error
+                                                                                                                                                                                         Ext.getCmp("formDcExpTypeDddID").getEl().unmask();
                                                                                                                                                                                         }
                                                                                                                                                                                         },
                                                                                                                                                                                         failure: function (result, request) {
                                                                                                                                                                                         Ext.MessageBox.alert("Failed", result.responseText); // connect error
+                                                                                                                                                                                         Ext.getCmp("formDcExpTypeDddID").getEl().unmask();
                                                                                                                                                                                         },
                                                                                                                                                                                 });
                                                                                                                                                                                 } else {
@@ -5773,6 +6060,7 @@ Ext.isBook = null;
                                                                                                                                                                                         },
                                                                                                                                                                                         failure: function (result, request) {
                                                                                                                                                                                         Ext.MessageBox.alert("Failed", result.responseText); // connect error
+                                                                                                                                                                                        
                                                                                                                                                                                         },
                                                                                                                                                                                 });
                                                                                                                                                                                 }
@@ -10511,24 +10799,24 @@ Ext.isBook = null;
                                                                                                                                                                                                         Ext.loadStore = function (status, show) {
                                                                                                                                                                                                         var statusx = status;
                                                                                                                                                                                                                 Ext.statusx = statusx;
-                                                                                                                                                                                                                Ext.setDtlperioid = () => {
-                                                                                                                                                                                                        Ext.storeTransf.setBaseParam("sp_check_period_hdr_id", Ext.selectRow.get("sp_check_period_hdr_id"));
-                                                                                                                                                                                                                Ext.storeTransf.reload({
-                                                                                                                                                                                                                callback: function (record, success) {
-                                                                                                                                                                                                                if (success) {
-                                                                                                                                                                                                                Ext.storePeriodDtl.setBaseParam("sp_check_period_hdr_id", Ext.selectRow.get("sp_check_period_hdr_id"));
-                                                                                                                                                                                                                        Ext.storePeriodDtl.setBaseParam("sp_tor_hdr_period_id", Ext.selectRow.get("sp_tor_hdr_period_id"));
-                                                                                                                                                                                                                        Ext.storePeriodDtl.reload({
-                                                                                                                                                                                                                        callback: function (rec, operation, success) {
-                                                                                                                                                                                                                        if (success) {
-                                                                                                                                                                                                                        winWarranty(Ext.selectRow).show();
-                                                                                                                                                                                                                        }
-                                                                                                                                                                                                                        },
-                                                                                                                                                                                                                        });
-                                                                                                                                                                                                                }
-                                                                                                                                                                                                                },
-                                                                                                                                                                                                                });
-                                                                                                                                                                                                        };
+Ext.setDtlperioid = () => {
+Ext.storeTransf.setBaseParam("sp_check_period_hdr_id", Ext.selectRow.get("sp_check_period_hdr_id"));
+        Ext.storeTransf.reload({
+        callback: function (record, success) {
+                if (success) {
+                Ext.storePeriodDtl.setBaseParam("sp_check_period_hdr_id", Ext.selectRow.get("sp_check_period_hdr_id"));
+                        Ext.storePeriodDtl.setBaseParam("sp_tor_hdr_period_id", Ext.selectRow.get("sp_tor_hdr_period_id"));
+                        Ext.storePeriodDtl.reload({
+                        callback: function (rec, operation, success) {
+                        if (success) {
+                        winWarranty(Ext.selectRow).show();
+                        }
+                        },
+                        });
+                }
+        },
+        });
+};
                                                                                                                                                                                                                 if (statusx === "edit" && Ext.isEmpty(Ext.selectRow)) {
                                                                                                                                                                                                         Ext.Msg.alert("แจ้งเตือน", "กรุณา click เลือกข้อมูลที่จะแก้ไขใน data grid", function (form, action) {
                                                                                                                                                                                                         return false;
@@ -16102,7 +16390,7 @@ Ext.isBook = null;
                                                                                                                                                                                                                                                                                                         callback: function (record, operation, success) {
                                                                                                                                                                                                                                                                                                         if (success) {
                                                                                                                                                                                                                                                                                                         if (Ext.getCmp("sp_check_period_hdr_idID").getValue() != periodDtlRequestId) {
-                                                                                                                                                                                                                                                                                                        return;
+    Ext.storeTransf.reload();                                                                                                                                                                                                                                                                                                    return;
                                                                                                                                                                                                                                                                                                         }
                                                                                                                                                                                                                                                                                                         Ext.f_net_tranf_price = 0;
                                                                                                                                                                                                                                                                                                                 Ext.i_qty_tranf = 0;
@@ -16174,8 +16462,9 @@ Ext.isBook = null;
                                                                                                                                                                                                                                                                                                                 },
                                                                                                                                                                                                                                                                                                                 });
                                                                                                                                                                                                                                                                                                                 }; //End function
-                                                                                                                                                                                                                                                                                                                Ext.storeTransfLoad();
+                                                                                                                                                                                                                                                                                                           
                                                                                                                                                                                                                                                                                                                 Ext.storePeriodDtlLoad();
+                                                                                                                                                                                                                                                                                                                     Ext.storeTransfLoad();
                                                                                                                                                                                                                                                                                                         }
                                                                                                                                                                                                                                                                                                         };
                                                                                                                                                                                                                                                                                                         this.contextMenu = new Ext.menu.Menu({

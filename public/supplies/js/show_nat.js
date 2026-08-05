@@ -1568,6 +1568,44 @@ Ext.onReady(function () {
         }
     })();
     var isAdmin = (!!(Ext.session && String(Ext.session.user_id) === '1') || adminMenu);
+
+    // โหลดหน้าต่างรายการแจ้ง Admin เมื่อใช้งานครั้งแรกเท่านั้น
+    Ext.openAdminSystemLog = function () {
+        if (typeof Ext.showAdminSystemLogWindow === 'function') {
+            Ext.showAdminSystemLogWindow();
+            return;
+        }
+        if (Ext.adminSystemLogScriptLoading) {
+            Ext.Msg.wait('กำลังโหลดเมนูรายการแจ้ง Admin...', 'กรุณารอสักครู่');
+            return;
+        }
+
+        Ext.adminSystemLogScriptLoading = true;
+        var mask = Ext.Msg.wait('กำลังโหลดเมนูรายการแจ้ง Admin...', 'กรุณารอสักครู่');
+        var script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = '/supplies/sp/tor/receive-validation/ui/admin-log-window.js?v=20260805';
+        script.onload = script.onreadystatechange = function () {
+            if (script.readyState && script.readyState !== 'loaded' && script.readyState !== 'complete') {
+                return;
+            }
+            script.onload = script.onreadystatechange = null;
+            Ext.adminSystemLogScriptLoading = false;
+            mask.hide();
+            if (typeof Ext.showAdminSystemLogWindow === 'function') {
+                Ext.showAdminSystemLogWindow();
+            } else {
+                Ext.Msg.alert('เกิดข้อผิดพลาด', 'โหลดเมนูรายการแจ้ง Admin ไม่สำเร็จ');
+            }
+        };
+        script.onerror = function () {
+            Ext.adminSystemLogScriptLoading = false;
+            mask.hide();
+            Ext.Msg.alert('เกิดข้อผิดพลาด', 'ไม่พบไฟล์หน้าต่างรายการแจ้ง Admin');
+        };
+        document.getElementsByTagName('head')[0].appendChild(script);
+    };
+
     Ext.toogleTemp = new Ext.Button({
         text: (north.collapsed) ? 'ย่อ' : 'ขยาย',
         icon: "/supplies/images/icons/arrow_in.png",
@@ -1757,6 +1795,7 @@ Ext.onReady(function () {
                                     m.getComponent('mnPdfID').setVisible(isAdmin);
                                     m.getComponent('signPdfID').setVisible(isAdmin);
                                     m.getComponent('mnInsertPdfID').setVisible(isAdmin); //'mnRightID','mnPdfID','signPdfID', 'mnInsertPdfID',
+                                    m.getComponent('mnAdminSystemLogID').setVisible(isAdmin);
                                 }
                             },
                             menu: [{
@@ -1776,6 +1815,12 @@ Ext.onReady(function () {
                                     handler: function () {
                                         Ext.getCmp("content-panel").update('<iframe src="./ai/index.html" frameborder="0" width="100%" height="100%"></iframe>');
                                     }
+                                }, {
+                                    text: 'รายการแจ้ง Admin/Log ระบบ',
+                                    id: 'mnAdminSystemLogID',
+                                    hidden: !isAdmin,
+                                    icon: '/supplies/images/icons/application_view_list.png',
+                                    handler: Ext.openAdminSystemLog
                                 }, {
                                     text: 'จัดการเล่ม',
                                     id: 'mnBookMarksID', hidden: !isAdmin,

@@ -1,5 +1,4 @@
-<?php
-
+O<?php
 //-- mnCheckingController
 include("../../conf/config.php");
 include("../../lib/database/DatabaseServer.php");
