@@ -17395,8 +17395,8 @@ Ext.AppPoStore = function () {
                      Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                      Ext.c_overlap_close(Ext.selectRow.data, "c_overlap_book", "edit_bg");
                   } else {
-      Ext.vatEditTxt = "add vat";
- Ext.vatEdit = true;                
+//       Ext.vatEditTxt = "add vat";
+//  Ext.vatEdit = true;                
      console.log("Edit Vat",Ext.arrEdit);                 
                      // ===== เพิ่มตรงนี้ =====
                      // หากผู้ใช้แก้ไข "f_vat" โดยตรง (Ext.vatEdit == true)
