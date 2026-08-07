@@ -1,1 +1,0 @@
-Ext.loadStore = function (status, show, rec) { }; 
