@@ -1,0 +1,181 @@
+Ext.store = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "api/List_dcCreditor.php",
+  baseParams: { type: "dc_creditor", i_read: user_right_read }, // Permission i_read
+  root: "data",
+  idProperty: "id",
+  totalProperty: "totalCount",
+  fields: [
+    { name: "no" },
+    { name: "id" },
+    { name: "inv_name" },
+    { name: "c_tax_number_imp" },
+    { name: "c_name" },
+    { name: "c_map_vsn" },
+    { name: "c_map_ephis" },
+    { name: "c_map_vsn" },
+    { name: "c_map_ephis" },
+    { name: "c_tax_number_imp" },
+    { name: "dc_tax_customer_id" },
+    { name: "tax_c_title" },
+    { name: "tax_c_name" },
+    { name: "tax_c_last_name" },
+    { name: "tax_c_branch" },
+    { name: "tax_c_room_no" },
+    { name: "tax_c_floor" },
+    { name: "tax_c_village" },
+    { name: "tax_c_house_no" },
+    { name: "tax_c_village_no" },
+    { name: "tax_c_lane" },
+    { name: "tax_c_road" },
+    { name: "tax_c_province" },
+    { name: "tax_c_district" },
+    { name: "tax_c_tambon" },
+    { name: "tax_c_post_code" },
+    { name: "dc_tambon_id" },
+    { name: "c_tele_imp" },
+    { name: "tax_c_bldg" },
+    { name: "c_name_tax_income" },
+    { name: "c_email" },
+    { name: "i_key" },
+    { name: "c_comment" },
+    { name: "i_enable" },
+    { name: "dc_user_update_id" },
+    { name: "dc_user_update_cost_id" },
+    { name: "d_update" },
+  ],
+});
+Ext.creditor_taxdata = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: { type: "CREDITOR_TAXDATA" },
+  root: "data",
+  idProperty: "id",
+  fields: [
+    "id",
+    "c_tax_number_imp",
+    "dc_tax_customer_id",
+    "c_name_tax_customer",
+    "c_name_tax_income",
+    "tax_c_title",
+    "tax_c_name",
+    "tax_c_middle_name",
+    "tax_c_last_name",
+    "tax_c_branch",
+    "tax_c_bldg",
+    "tax_c_room_no",
+    "tax_c_floor",
+    "tax_c_village",
+    "tax_c_house_no",
+    "tax_c_village_no",
+    "tax_c_lane",
+    "tax_c_road",
+    "tax_c_province",
+    "tax_c_district",
+    "tax_c_tambon",
+    "tax_c_post_code",
+    "dc_tambon_id",
+    "c_email",
+    "c_tele_imp",
+    "dc_tambon_id",
+    "dc_district_id",
+    "dc_province_id",
+    "c_post_code_all",
+  ],
+});
+Ext.dc_tax_customer = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: {
+    type: "dc_tax_customer",
+  },
+  root: "data",
+  idProperty: "id",
+  fields: ["id", "c_name", "i_is_type", "i_dec_person", "i_type_tax", "dc_tax_income_id", "c_name_tax_income"],
+});
+Ext.dc_province = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: {
+    type: "dc_province",
+  },
+  root: "data",
+  idProperty: "id",
+  fields: ["id", "c_name"],
+});
+Ext.dc_district = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: {
+    type: "dc_district",
+  },
+  root: "data",
+  idProperty: "id",
+  fields: ["id", "c_name"],
+});
+Ext.dc_tambon = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: {
+    type: "dc_tambon",
+  },
+  root: "data",
+  idProperty: "id",
+  fields: ["id", "c_name", "c_post_code_all"],
+});
+Ext.dc_title = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: {
+    type: "dc_title",
+  },
+  root: "data",
+  idProperty: "id",
+  fields: ["id", "c_name"],
+});
+Ext.c_post_code = new Ext.data.JsonStore({
+  fields: ["c_code"],
+});
+Ext.dc_province = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: {
+    type: "dc_province",
+  },
+  root: "data",
+  idProperty: "id",
+  fields: ["id", "c_name"],
+});
+Ext.dc_district = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: {
+    type: "dc_district",
+  },
+  root: "data",
+  idProperty: "id",
+  fields: ["id", "c_name"],
+});
+Ext.dc_tambon = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "../po/api/All_PoWorkingImpHdrWork.php",
+  baseParams: {
+    type: "dc_tambon",
+  },
+  root: "data",
+  idProperty: "id",
+  fields: ["id", "c_name", "c_post_code_all"],
+});
+Ext.c_post_code = new Ext.data.JsonStore({
+  fields: ["c_code"],
+});

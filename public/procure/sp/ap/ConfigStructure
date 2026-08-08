@@ -1,0 +1,12 @@
+
+/app
+  /controller
+    - MainController.js
+  /model
+    - UserModel.js
+  /view
+    - AppView.js
+    - GridMain.js
+    - FormPanelMain.js
+    - FormDetail.js
+/app.js
