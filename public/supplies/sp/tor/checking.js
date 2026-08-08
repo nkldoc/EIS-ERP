@@ -17,7 +17,44 @@ return Ext.encode({
         createdAtClient: new Date().toISOString()
 });
 }
-
+Ext.checkingSearchHistory = {
+    storageKey: "supplies.checking.searchHistory",
+    maxItems: 20,
+    load: function () {
+            try {
+                    var items = Ext.decode(window.localStorage.getItem(this.storageKey) || "[]");
+                    return Object.prototype.toString.call(items) === "[object Array]" ? items : [];
+            } catch (e) {
+                    return [];
+            }
+    },
+    save: function (value) {
+            value = String(value == null ? "" : value).replace(/^\s+|\s+$/g, "");
+            if (!value) return;
+            var items = this.load();
+            var result = [value];
+            var normalized = value.toLowerCase();
+            for (var i = 0; i < items.length && result.length < this.maxItems; i++) {
+                    var item = String(items[i]);
+                    if (item.toLowerCase() !== normalized) result.push(item);
+            }
+            try {
+                    window.localStorage.setItem(this.storageKey, Ext.encode(result));
+            } catch (e) { }
+            this.refresh();
+    },
+    refresh: function () {
+            var combo = Ext.getCmp("value-box");
+            if (!combo || !combo.store) return;
+            combo.store.loadData(this.toStoreData());
+    },
+    toStoreData: function () {
+            var items = this.load();
+            var data = [];
+            for (var i = 0; i < items.length; i++) data.push([items[i]]);
+            return data;
+    },
+};
 Ext.getApiBgBaseUrl = function () {
 var baseUrl = String(Ext.session.IPAPIBG || "").trim();
 var protocolIndex = baseUrl.search(/https?:\/\//i);
