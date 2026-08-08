@@ -1,5 +1,9 @@
+<<<<<<< HEAD
+O<?php
+=======
 <?php
 
+>>>>>>> 262f23a (bi)
 //-- mnCheckingController
 include("../../conf/config.php");
 include("../../lib/database/DatabaseServer.php");

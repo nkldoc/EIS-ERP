@@ -1,4 +1,4 @@
- <html>
+<html>
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>แจ้งเตือน งวด/เบิก</title>
@@ -54,7 +54,6 @@
     <script type="text/javascript" src="../js/config.js?_dc=12927"></script>
     <script type="text/javascript" src="../js/InfoMainGrid.js?_dc=12927"></script>
     <script type="text/javascript" src="../js/Ext.ux.util.js?_dc=12927"></script>
-    <!--<script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?=__VPRODUCT_ ; ?>&f=<?php echo $_SERVER[ "PHP_SELF" ] ; ?>"></script>-->
     <!-- System ERP :: -->
 
 </head>

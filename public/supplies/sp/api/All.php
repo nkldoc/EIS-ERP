@@ -339,7 +339,7 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
     // echo $sql; exit;
     // /********************/
   //  $db->debugSql($sqlMain,$sqlMain);  
-    $stmt = $db->QueryParam($sqlMain, $sqlMain);
+    $stmt = $db->QueryParam($sqlMain, $arrParam);
     
     $i = $start + 1;
 
@@ -371,7 +371,7 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
         WHERE a.i_enable = 1 AND b.c_booking IS NOT NULL
         GROUP BY b.c_booking;
     select count(*) as totalCount from ({$sqlTempTable}) a";
-
+ $db->debugSql($sqlMain,$arrCountParam);  
     $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
     $debug = 'storeOverlap >>>';
 

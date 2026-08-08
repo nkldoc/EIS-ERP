@@ -148,9 +148,19 @@ Ext.onReady(function () {
                             triggerAction: 'all',
                             editable: false,
                             forceSelection: true,
+<<<<<<< HEAD
+                            allowBlank: false,
+                            listWidth: 260
+                        });
+                    };
+                    var isEmptyValue = function (value) {
+                        return value === null || value === undefined || String(value).replace(/^\s+|\s+$/g, '') === '';
+                    };
+=======
                             allowBlank: false
                         });
                     };
+>>>>>>> 262f23a (bi)
                     var buildPreviewSql = function (record) {
                         var tableName = record.get('table_name') || '[table]';
                         var idField = record.get('row_field') || '[id_field]';
@@ -491,9 +501,12 @@ Ext.onReady(function () {
                     // 2. สร้าง Grid Panel สำหรับแสดงรายการ Log
                     var logGrid = new Ext.grid.EditorGridPanel({
                         title: 'Edit Combo Table (CRUD Management)',
+<<<<<<< HEAD
+=======
                         renderTo: Ext.getBody(),
                         width: 1200,
                         height: 500,
+>>>>>>> 262f23a (bi)
                         store: logStore,
                         trackMouseOver: true,
                         loadMask: true,
@@ -511,10 +524,26 @@ Ext.onReady(function () {
                                     Ext.MessageBox.alert('ข้อมูลไม่ครบ', 'กรุณาเลือกชื่อตารางก่อนเลือกชื่อฟิวด์');
                                     return;
                                 }
+<<<<<<< HEAD
+                                if (fieldStore.baseParams.table !== selectedTable || fieldStore.getCount() === 0) {
+                                    event.cancel = true;
+                                    fieldStore.removeAll();
+                                    fieldStore.baseParams.table = selectedTable;
+                                    fieldStore.load({
+                                        callback: function (records, options, success) {
+                                            if (success && !logGrid.destroyed) {
+                                                logGrid.startEditing(event.row, event.column);
+                                            } else if (!success) {
+                                                Ext.MessageBox.alert('Load failed', 'ไม่สามารถโหลดรายชื่อฟิลด์ของตารางได้');
+                                            }
+                                        }
+                                    });
+=======
                                 if (fieldStore.baseParams.table !== selectedTable) {
                                     fieldStore.removeAll();
                                     fieldStore.baseParams.table = selectedTable;
                                     fieldStore.load();
+>>>>>>> 262f23a (bi)
                                 }
                             }
                         },
@@ -531,6 +560,10 @@ Ext.onReady(function () {
                                         var p = new NewRecord({
                                             date_create: new Date().format('Y-m-d H:i:s'),
                                             table_name: '',
+<<<<<<< HEAD
+                                            row_field: '',
+=======
+>>>>>>> 262f23a (bi)
                                             row_id: 0,
                                             field_name: '',
                                             old_value: '',
@@ -582,7 +615,11 @@ Ext.onReady(function () {
                                         var invalidRows = [];
                                         Ext.each(modified, function (record) {
                                             var row = record.data;
+<<<<<<< HEAD
+                                            if (isEmptyValue(row.table_name) || isEmptyValue(row.row_field) || isEmptyValue(row.row_id) || isEmptyValue(row.field_name)) {
+=======
                                             if (!row.table_name || !row.row_field || !row.row_id || !row.field_name) {
+>>>>>>> 262f23a (bi)
                                                 invalidRows.push((logStore.indexOf(record) + 1));
                                                 return;
                                             }
@@ -697,10 +734,34 @@ Ext.onReady(function () {
                                         }
 
                                         var data = [];
+<<<<<<< HEAD
+                                        var invalidRows = [];
+                                        Ext.each(modified, function (record) {
+                                            // เก็บค่าข้อมูลลง Array เพื่อส่งไปประมวลผลที่ Backend PHP
+                                            var row = record.data;
+                                            if (isEmptyValue(row.table_name) || isEmptyValue(row.row_field) || isEmptyValue(row.row_id) || isEmptyValue(row.field_name)) {
+                                                invalidRows.push(logStore.indexOf(record) + 1);
+                                                return;
+                                            }
+                                            data.push({
+                                                table_name: row.table_name,
+                                                row_field: row.row_field,
+                                                row_id: row.row_id,
+                                                field_name: row.field_name,
+                                                old_value: row.old_value,
+                                                new_value: row.new_value
+                                            });
+                                        });
+                                        if (invalidRows.length > 0) {
+                                            Ext.MessageBox.alert('ข้อมูลไม่ครบ', 'กรุณาระบุ Table, ID Field, ID Value และ Edit Field ให้ครบ (แถวที่ ' + invalidRows.join(', ') + ')');
+                                            return;
+                                        }
+=======
                                         Ext.each(modified, function (record) {
                                             // เก็บค่าข้อมูลลง Array เพื่อส่งไปประมวลผลที่ Backend PHP
                                             data.push(record.data);
                                         });
+>>>>>>> 262f23a (bi)
                                         // แสดงหน้าต่างยืนยันและรับเหตุผล (ตามฟังก์ชันตัวอย่างเดิมของคุณ)
                                         var logWin = new Ext.Window({
                                             title: 'ยืนยันการบันทึกข้อมูลแก้ไข',

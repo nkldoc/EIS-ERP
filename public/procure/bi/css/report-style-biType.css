@@ -1,0 +1,620 @@
+:root {
+  --bg: #f7f7fb;
+  --card: #fff;
+  --text: #222;
+  --muted: #6c757d;
+  --accent: #3f51b5;
+}
+
+body.dark-mode {
+  --bg: #0e1117;
+  --card: #161b22;
+  --text: #e6edf3;
+  --muted: #9aa7b2;
+  --accent: #90caf9;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Prompt", "Sarabun", "Tahoma", "Segoe UI", sans-serif !important;
+  font-size: 15px;
+  color: #222;
+}
+
+.card {
+  background: var(--card);
+  border: 0;
+  border-radius: 1rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  padding: 0.5rem 0 0.75rem;
+}
+
+.chart-box {
+  height: 420px;
+}
+
+.chart-box.tall {
+  height: 520px;
+}
+
+.legend-badges .badge {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-accent:hover {
+  filter: brightness(0.95);
+  color: #fff;
+}
+
+/* ========= DATA VIEW TABLE STYLE ========= */
+.dataview-wrap {
+  overflow: auto;
+}
+
+.table-dv {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  min-width: 1200px;
+}
+
+.table-dv th,
+.table-dv td {
+  padding: 0.55rem 0.6rem;
+  border: 1px solid #d9dbe0;
+}
+
+.table-dv thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #263f95;
+  color: #fff;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  font-size: 18px;
+}
+
+.table-dv thead tr:nth-child(2) th {
+  background: #334fb5;
+}
+
+.table-dv tbody tr:nth-child(even) {
+  background: #fafbff;
+}
+
+.table-dv tbody tr:hover {
+  background: rgba(63, 81, 181, 0.08);
+}
+
+.table-dv .text-right {
+  text-align: right;
+}
+
+.table-dv .neg {
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+table,
+th,
+td {
+  font-family: inherit !important;
+  font-size: 15px !important;
+}
+
+.group-income {
+  background: #123a7d !important;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+.group-bkk {
+  background: #123a7d !important;
+  white-space: nowrap !important;
+  overflow: hidden;
+  font-weight: bold;
+  text-align: center;
+  text-overflow: ellipsis;
+  vertical-align: middle !important;
+}
+
+.group-gov {
+  background: #123a7d !important;
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: middle !important;
+}
+
+.group-Savings {
+  background: #123a7d !important;
+  white-space: nowrap !important;
+  overflow: hidden;
+  font-weight: bold;
+  text-align: center;
+  text-overflow: ellipsis;
+  vertical-align: middle !important;
+}
+
+.col-income {
+  background: rgba(46, 75, 179, 0.06);
+}
+
+.col-bkk {
+  background: rgba(46, 75, 179, 0.06);
+}
+
+.col-gov {
+  background: rgba(123, 63, 125, 0.06);
+}
+
+.col-Savings {
+  background: rgba(123, 63, 125, 0.06);
+}
+
+.pct-badge {
+  display: inline-block;
+  min-width: 64px;
+  text-align: center;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.35rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #ffffff;
+}
+
+.pct-100 {
+  background: #e03131;
+}
+
+/* ≥100% แดงเข้ม */
+.pct-90 {
+  background: #f06595;
+}
+
+/* 90–99.99% ชมพู */
+.pct-75 {
+  background: #fab005;
+}
+
+/* 75–89.99% เหลือง */
+.pct-50 {
+  background: #4dabf7;
+}
+
+/* 50–74.99% ฟ้า */
+.pct-25 {
+  background: #68b455ff;
+}
+.pct-30 {
+  background: #68b455ff;
+}
+.pct-10 {
+  background: #68b455ff;
+}
+.pct-2 {
+  background: #68b455ff;
+}
+.pct-20 {
+  background: #68b455ff;
+}
+.pct-60 {
+  background: #68b455ff;
+}
+.pct-80 {
+  background: #68b455ff;
+}
+.pct-0 {
+  background: #899985ff;
+}
+.pct-40 {
+  background: #68b455ff;
+}
+/* <50% เทา */
+
+/* sticky first column */
+.table-dv .sticky-col {
+  font-size: 1rem;
+  /* ปรับขนาดตัวอักษรให้ใหญ่ขึ้น */
+  font-weight: 700;
+  /* หนักขึ้น */
+  text-transform: uppercase;
+  /* ตัวใหญ่ทั้งหมด (ถ้าต้องการ) */
+  padding: 8px 12px;
+  white-space: normal;
+  /* ให้ตัดบรรทัดถ้าข้อความยาว */
+  line-height: 1.4;
+}
+
+.table-dv thead .sticky-col {
+  z-index: 3;
+}
+
+th.sticky-col {
+  min-width: 350px;
+  height: 50px;
+  vertical-align: middle;
+}
+
+th.sticky-col {
+  min-width: 350px;
+  height: 50px;
+  vertical-align: middle;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 2px;
+  margin-right: 0.25rem;
+}
+
+.legend-income {
+  background: #2e4bb3;
+}
+
+.legend-bkk {
+  background: #1f6f6f;
+}
+
+.legend-gov {
+  background: #7b3f7d;
+}
+
+.page-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  font-size: 18px;
+  color: #333;
+}
+
+.spinner {
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #3f51b5;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* แถบตัวกรองด้านบน */
+.filter-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  /* <- ดึงให้อยู่กึ่งกลางแนวตั้ง */
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* กล่องแต่ละตัว (label + control) */
+.filter-group {
+  display: flex;
+  align-items: center;
+  /* <- label กับ control ระดับเดียวกัน */
+  gap: 6px;
+  margin: 0;
+}
+
+/* ทำให้ความสูงของ form-select และ bootstrap-select ใกล้เคียงกัน */
+.filter-bar .form-select,
+.filter-bar .bootstrap-select > .dropdown-toggle {
+  height: 32px;
+  /* คุมความสูงให้เท่ากัน */
+  padding: 2px 28px 2px 8px;
+  line-height: 28px;
+}
+
+/* ให้ข้อความภายในปุ่ม selectpicker จัดกลางแนวตั้ง */
+.filter-bar .bootstrap-select .dropdown-toggle .filter-option {
+  display: flex;
+  align-items: center;
+}
+
+/* label ไม่ต้องมี margin ล่าง */
+.filter-bar label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+/* จอเล็กให้จัดซ้ายจะใช้ง่ายกว่า */
+@media (max-width: 992px) {
+  .filter-bar {
+    justify-content: flex-start;
+  }
+}
+
+.summary-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 18px 10px;
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  font-family: inherit;
+}
+
+.summary-title {
+  font-weight: 700;
+  font-size: 16px;
+  margin-bottom: 6px;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.summary-cols {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.summary-item {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 6px 12px;
+  min-width: 160px;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.summary-value {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.summary-value.total {
+  color: #0f766e;
+}
+
+.summary-value.booked {
+  color: #2563eb;
+}
+
+.summary-value.remain {
+  color: #b45309;
+}
+
+/* รองรับ dark mode ของคุณ */
+.dark-mode .summary-card {
+  background: #1f2937;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .summary-item {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dark-mode .summary-title,
+.dark-mode .summary-label {
+  color: #e2e8f0;
+}
+
+/* กล่องห่อ Data View */
+.dv-wrapper {
+  max-height: 65vh; /* เลื่อนเฉพาะในกล่องนี้ */
+  overflow: auto;
+  border-radius: 14px;
+  background: #fff;
+}
+
+/* ตารางหลัก */
+.table-dv-main {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* หัวตารางให้ลอยตอนเลื่อนลง */
+.table-dv-main thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #123a7d; /* สีหัวที่พี่ใช้ */
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* เพราะเรามีคอลัมน์ล็อกซ้ายด้วย (ลำดับ / รหัส) */
+.table-dv-main .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 11; /* ต้องมากกว่าหัวธรรมดา */
+  background: #fff;
+}
+
+/* ถ้าจะให้หัวของแต่ละ group (น้ำเงิน เขียว ม่วง เหลือง) ลอยด้วย */
+.table-dv-main thead tr:nth-child(1) th {
+  top: 0;
+}
+.table-dv-main thead tr:nth-child(2) th {
+  top: 34px; /* ความสูงแถวแรก ถ้าแถวแรกสูงกว่านี้ก็เพิ่ม */
+}
+.table-dv-main thead th.sticky-col {
+  left: 0;
+  z-index: 20; /* สูงกว่าทั้ง body และหัวแถว 2 */
+}
+.table-dv-main thead th.sticky-col:nth-child(2) {
+  left: 60px; /* ระยะของคอลัมน์ลำดับ ปรับตามความกว้างจริง */
+}
+.dv-wrapper {
+  max-height: 65vh;
+  overflow: auto;
+  border-radius: 14px;
+  background: #fefefe;
+}
+
+.table-dv-main thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #123a7d;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ถ้ามีหัว 2 แถว */
+.table-dv-main thead tr:nth-child(2) th {
+  top: 34px; /* ปรับตามความสูงแถวแรก */
+}
+.table-dv-main .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 11;
+  background: #314dd9;
+}
+.table-dv-main thead th.sticky-col {
+  z-index: 20;
+}
+.table-dv-main thead th.sticky-col:nth-child(2) {
+  left: 60px; /* ความกว้างของคอลัมน์ลำดับ ปรับได้ */
+}
+
+/* ==== สีพื้นหลังของตาราง Data View ==== */
+.dv-wrapper tbody tr:nth-child(odd) td {
+  background-color: #f6f8fc !important; /* เทาอ่อน */
+}
+
+.dv-wrapper tbody tr:nth-child(even) td {
+  background-color: #e8eefc !important; /* ฟ้าอ่อน */
+}
+
+/* เวลาชี้เมาส์ */
+.dv-wrapper tbody tr:hover td {
+  background-color: #dce6ff !important; /* ฟ้าเข้มนิด */
+}
+
+/* ==== สีพื้นหลังของตาราง Data View (ฟ้า–เทาอ่อน) ==== */
+.dv-wrapper tbody tr:nth-child(odd) td {
+  background-color: #f6f8fc !important; /* เทาอ่อน */
+}
+
+.dv-wrapper tbody tr:nth-child(even) td {
+  background-color: #eaf0ff !important; /* ฟ้าอ่อน */
+}
+
+/* ==== เมื่อชี้เมาส์บนแถว ==== */
+.dv-wrapper tbody tr:hover td {
+  background-color: #d9e3ff !important; /* ฟ้าเข้มนิด */
+}
+
+/* ==== เพิ่มขอบคั่นแถวบาง ๆ ==== */
+.table-dv-main td {
+  border-bottom: 1px solid #c5c9d4;
+}
+
+/* ==== Sticky Columns (ลำดับ + หมวดค่าใช้จ่าย) ให้สีตรงกับแถว ==== */
+.table-dv-main tbody tr:nth-child(odd) .sticky-col {
+  background-color: #f6f8fc !important;
+}
+
+.table-dv-main tbody tr:nth-child(even) .sticky-col {
+  background-color: #eaf0ff !important;
+}
+
+/* ==== ล็อกหัวตาราง (หัวคอลัมน์) ==== */
+.table-dv-main thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #123a7d; /* หัวกรมเข้ม */
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ==== sticky column ด้านซ้าย ==== */
+.table-dv-main .sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 11;
+  background-color: inherit !important; /* กลืนสีแถว */
+}
+
+/* ==== หัวคอลัมน์ sticky ==== */
+.table-dv-main thead th.sticky-col {
+  z-index: 20;
+}
+
+/* ==== เฉพาะคอลัมน์ “รหัสงบประมาณ / หมวดค่าใช้จ่าย (LV.4)” ==== */
+.table-dv-main th:nth-child(2),
+.table-dv-main td:nth-child(2) {
+  background-color: #123a7d; /* ให้สีตามแถว */
+  color: #000;
+  text-align: center;
+  padding-left: 8px;
+}
+
+/* ==== เฉพาะคอลัมน์ “ที่ใช้ไป(จอง)” ==== */
+.table-dv-main td.col-income,
+.table-dv-main th.col-income {
+  background-color: inherit !important; /* ดึงสีเดียวกับแถว */
+}
+
+/* ==== ปรับ hover ให้หัวคอลัมน์ไม่เปลี่ยนสี ==== */
+.table-dv-main thead tr:hover th {
+  background: #c0d2bc !important;
+}
+
+/* เฉพาะหัวคอลัมน์ที่ 2 = รหัสงบประมาณ / หมวดค่าใช้จ่าย */
+.table-dv-main thead th:nth-child(2) {
+  color: #ffffff !important;            /* ตัวหนังสือดำ */
+  background: #123a7d !important;    /* หรือจะให้ขาวไปเลย */
+  text-align: center;
+  padding-left: 10px;
+}

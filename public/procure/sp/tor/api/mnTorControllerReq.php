@@ -27,10 +27,17 @@ if (empty($_SESSION['user_id'])) {
 }
 
 $mode = $_REQUEST["mode"];
+<<<<<<< HEAD
+////Java Session
+//require_once("../../../java/Java.inc");
+//$session = procure_java_session();
+$dc_cost_id = $_SESSION['dc_cost_id']; //java_values($session->get("dc_cost_id"));
+=======
 //Java Session
 require_once("../../../java/Java.inc");
 $session = procure_java_session();
 $dc_cost_id = java_values($session->get("dc_cost_id"));
+>>>>>>> 262f23a (bi)
 
 $table = "dbo.sp_tor";
 $keyName = "tor_id";

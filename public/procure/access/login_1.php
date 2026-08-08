@@ -9,7 +9,7 @@ if (isset($_REQUEST['ss_user_id'])) {
     // {} == dc_department_type_id department_type_name dc_department_id department_name
     $sql = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
                 , IIF(c.sp_emp_id is null, 0, IIF( a.dc_user_id = 1 , 2, 1)) as i_set_type_emp
-                , isnull(i_type_emp,0) as i_type_emp
+                , isnull(c.i_type_emp,0) as i_type_emp
                 , isnull((select top 1 c_name from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
                 , isnull((select top 1 c_code from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
                 ,(select top 1 dc_area_id from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id

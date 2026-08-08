@@ -1,0 +1,185 @@
+#main-wrapper,
+#pie-wrapper {
+  width: 100%;
+  background-color: #f2f2f2;
+  height: 500px;
+  /* ลดจาก 1000px เหลือ 400px */
+  overflow-y: auto;
+  margin-bottom: 30px;
+}
+#main,
+#chart {
+  width: 1900px;
+  /* กำหนดขนาดตายตัว */
+  height: 500px;
+  margin: 0 auto;
+  /* กึ่งกลาง */
+}
+
+#pie {
+  width: 100%;
+  background-color: #f2f2f2;
+  height: 500px;
+  /* ลดความสูง Pie ตาม */
+}
+#pie_start {
+  background-color: #f2f2f2; /* สีพื้นหลังตามต้องการ */
+  padding: 40px;
+  border-radius: 8px;
+  margin-bottom: 60px;
+}
+#bar_bg {
+  background-color: #f2f2f2; /* สีพื้นหลังตามต้องการ */
+  padding: 40px;
+  border-radius: 8px;
+  margin-bottom: 60px;
+}
+#main {
+  background-color: #f2f2f2; /* สีพื้นหลังตามต้องการ */
+  padding: 40px;
+  border-radius: 8px;
+  margin-bottom: 60px;
+}
+#pie_tor_type {
+  background-color: #f2f2f2; /* สีพื้นหลังตามต้องการ */
+  padding: 40px;
+  border-radius: 8px;
+  margin-bottom: 60px;
+}
+/* test */
+table {
+  width: 100%;
+  background-color: #f2f2f2;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+table,
+th,
+td {
+  border: 1px solid #ddd;
+}
+
+th,
+td {
+  padding: 8px;
+  text-align: center;
+}
+
+th {
+  background-color: #d1f2eb;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+}
+.pie-chart-canvas {
+  width: 400px; /* ขนาดที่แสดง */
+  height: 400px;
+  max-width: 100%;
+  display: block;
+  margin: 0 auto;
+}
+.chart-center {
+  display: block;
+  margin: 30px auto;
+}
+.chart-wrapper {
+  text-align: center;
+  margin-top: 30px;
+}
+.flex-center {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+}
+.table-title {
+  font-size: 28px;
+  font-weight: bold;
+  text-align: center;
+  margin: 30px 0 15px 0;
+  color: #333;
+}
+body {
+  margin: 0;
+  font-family: sans-serif;
+  transition: background 0.3s;
+}
+select {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
+  background-color: #fff;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg fill='black' height='16' width='16' viewBox='0 0 24 24'><path d='M7 10l5 5 5-5z'/></svg>");
+  background-repeat: no-repeat;
+  background-position-x: 95%;
+  background-position-y: center;
+}
+/* .button {
+  position: relative;
+  background: linear-gradient(145deg, #a855f7, #7c3aed);
+  border: none;
+  border-radius: 50px;
+  padding: 15px 30px;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+} */
+
+/* .button:hover {
+  transform: scale(1.05);
+} */
+
+/* .button::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  border-radius: 50px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2), transparent 70%);
+  z-index: 0;
+} */
+table {
+  font-family: "Tahoma", sans-serif;
+  font-size: 13px;
+  border-collapse: collapse;
+  width: 100%;
+}
+th {
+  background-color: #4caf50;
+  color: white;
+  padding: 8px;
+}
+td {
+  border: 1px solid #2a2626;
+  padding: 8px;
+}
+tr:nth-child(even) {
+  background-color: #060505;
+}
+tr:hover {
+  background-color: #645a5a;
+}
+.dv-header {
+  background: #3f51b5;
+  color: rgb(9, 3, 3);
+  padding: 6px;
+  font-size: 14px;
+  font-weight: bold;
+}
