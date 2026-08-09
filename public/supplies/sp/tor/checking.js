@@ -7066,11 +7066,112 @@ var updateModifyDate = function (fieldLabel) {
 };
 // lightweight custom edit form with tabpanel (added near cellClick to ensure scope)
 // =========================
-var win_edir_alldata = function (rec) {
-        if (!rec || !rec.get || !rec.get('sp_check_period_hdr_id')) {
-                Ext.Msg.alert('แจ้งเตือน', 'กรุณาเลือกรายการตรวจรับก่อนเปิดเครื่องมือ');
+var win_edir_alldata = function (rec, searchOptions) {
+        if (!searchOptions) {
+                // พฤติกรรมเดิม: ถ้าเรียกจากแถวใน Grid ให้เปิดรายการที่เลือกทันที
+                if (rec && rec.get && rec.get('sp_check_period_hdr_id')) {
+                        win_edir_alldata(rec, { use_selected: true, search_code: '' });
+                        return;
+                }
+                var openCentralLookup = function () {
+                        Ext.CheckingRelationLookup.open(function (selectedSearch) {
+                                win_edir_alldata(null, selectedSearch);
+                        });
+                };
+                if (Ext.CheckingRelationLookup && Ext.CheckingRelationLookup.open) {
+                        openCentralLookup();
+                } else {
+                        var lookupScript = document.createElement('script');
+                        var lookupOpened = false;
+                        var openLoadedLookup = function () {
+                                if (lookupOpened) { return; }
+                                lookupOpened = true;
+                                openCentralLookup();
+                        };
+                        lookupScript.type = 'text/javascript';
+                        lookupScript.src = 'tor/checking_relation_lookup.js?_dc=' + new Date().getTime();
+                        lookupScript.onload = openLoadedLookup;
+                        lookupScript.onreadystatechange = function () {
+                                if (this.readyState === 'loaded' || this.readyState === 'complete') {
+                                        this.onreadystatechange = null;
+                                        openLoadedLookup();
+                                }
+                        };
+                        lookupScript.onerror = function () {
+                                Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถโหลดไฟล์ตัวเลือกข้อมูลกลางได้');
+                        };
+                        document.getElementsByTagName('head')[0].appendChild(lookupScript);
+                }
+                return;
+                var searchTypeField = new Ext.form.ComboBox({
+                        fieldLabel: 'ค้นหาจาก',
+                        store: new Ext.data.ArrayStore({
+                                fields: ['value', 'text'],
+                                data: [
+                                        ['tor_code', 'เลขที่ TOR (sp_tor.c_code)'],
+                                        ['contract_code', 'เลขที่สัญญา (sp_tor_contract.c_code)']
+                                ]
+                        }),
+                        valueField: 'value',
+                        displayField: 'text',
+                        mode: 'local',
+                        triggerAction: 'all',
+                        editable: false,
+                        forceSelection: true,
+                        value: 'tor_code',
+                        anchor: '100%'
+                });
+                var searchCodeField = new Ext.form.TextField({
+                        fieldLabel: 'เลขที่เอกสาร',
+                        allowBlank: false,
+                        anchor: '100%'
+                });
+                var searchForm = new Ext.form.FormPanel({
+                        border: false,
+                        labelWidth: 95,
+                        bodyStyle: 'padding:15px;',
+                        items: [searchTypeField, searchCodeField]
+                });
+                var searchWindow = new Ext.Window({
+                        title: 'ค้นหาข้อมูลความสัมพันธ์',
+                        width: 500,
+                        height: 175,
+                        layout: 'fit',
+                        modal: true,
+                        items: searchForm,
+                        buttons: [{
+                                        text: 'ค้นหา',
+                                        iconCls: 'icon-magnifier',
+                                        handler: function () {
+                                                var searchCode = String(searchCodeField.getValue() || '').replace(/^\s+|\s+$/g, '');
+                                                if (!searchCode) {
+                                                        Ext.Msg.alert('แจ้งเตือน', 'กรุณาระบุเลขที่เอกสาร');
+                                                        return;
+                                                }
+                                                searchWindow.close();
+                                                win_edir_alldata(rec, {
+                                                        search_type: searchTypeField.getValue(),
+                                                        search_code: searchCode
+                                                });
+                                        }
+                                }, {
+                                        text: 'ยกเลิก',
+                                        handler: function () { searchWindow.close(); }
+                                }],
+                        listeners: {
+                                show: function () { searchCodeField.focus(false, 200); }
+                        }
+                });
+                searchWindow.show();
                 return;
         }
+        if ((!rec || !rec.get) && !searchOptions.search_code) {
+                Ext.Msg.alert('แจ้งเตือน', 'ไม่พบข้อมูลอ้างอิงสำหรับค้นหา');
+                return;
+        }
+        var getSelectedValue = function (fieldName) {
+                return rec && rec.get ? rec.get(fieldName) : null;
+        };
 
         var relationLogStore = null;
         var relationLogGrid = null;
@@ -7088,7 +7189,7 @@ var win_edir_alldata = function (rec) {
                 { label: 'ผู้ชนะการเสนอราคา', tables: ['sp_tor_victory'] },
                 { label: 'สัญญา', tables: ['sp_tor_contract'] },
                 { label: 'งวดตามสัญญา', tables: ['sp_tor_hdr_period', 'sp_tor_dtl_period'] },
-                { label: 'การส่งมอบตามสัญญา', tables: ['sp_mn_contract_hdr', 'sp_mn_contract_dtl'] },
+                { label: 'การส่งมอบตามสัญญา', tables: ['sp_mn_contract_hdr'] },
                 { label: 'การตรวจรับ', tables: ['sp_check_period_hdr', 'sp_check_period_dtl'] },
                 { label: 'การส่งบัญชี', tables: ['sp_tranf_hdr', 'sp_tranf_item'] }
         ];
@@ -7168,7 +7269,7 @@ var win_edir_alldata = function (rec) {
                                 if (selectedContractId && tableName === 'sp_tor_hdr_period') {
                                         return String(record.get('sp_tor_contract_id')) === String(selectedContractId);
                                 }
-                                if (selectedTorPeriodId && (tableName === 'sp_tor_dtl_period' || tableName === 'sp_mn_contract_dtl')) {
+                                if (selectedTorPeriodId && tableName === 'sp_tor_dtl_period') {
                                         return String(record.get('sp_tor_hdr_period_id')) === String(selectedTorPeriodId);
                                 }
                                 if (selectedTorPeriodId && tableName === 'sp_check_period_hdr') {
@@ -7208,7 +7309,9 @@ var win_edir_alldata = function (rec) {
                         }]
         });
         var relationWindow = new Ext.Window({
-                title: 'ข้อมูลเชื่อมโยงรายการตรวจรับ #' + rec.get('sp_check_period_hdr_id'),
+                title: searchOptions.search_code
+                        ? 'ข้อมูลเชื่อมโยง: ' + searchOptions.search_code
+                        : 'ข้อมูลเชื่อมโยงรายการตรวจรับ #' + getSelectedValue('sp_check_period_hdr_id'),
                 width: 1200,
                 height: 650,
                 layout: 'fit',
@@ -7222,6 +7325,13 @@ var win_edir_alldata = function (rec) {
                                 disabled: true,
                                 handler: function (button) {
                                         openNextRelationStep(button);
+                                }
+                        }, '-', {
+                                text: 'ค้นหาด้วยรหัส',
+                                iconCls: 'icon-magnifier',
+                                handler: function () {
+                                        relationWindow.close();
+                                        win_edir_alldata(null);
                                 }
                         }, '-', {
                                 text: 'Enabled = 1',
@@ -7244,32 +7354,39 @@ var win_edir_alldata = function (rec) {
                                 }
                         }]
         });
-        relationWindow.show();
-        relationWindow.getEl().mask('กำลังโหลดข้อมูล...');
-
         Ext.Ajax.request({
                 url: 'tor/api/mnCheckingController.php',
                 method: 'POST',
                 params: {
                         mode: 'GET_CHECKING_RELATIONS',
-                        sp_check_period_hdr_id: rec.get('sp_check_period_hdr_id'),
-                        sp_tor_hdr_period_id: rec.get('sp_tor_hdr_period_id'),
-                        sp_tor_contract_id: rec.get('sp_tor_contract_id'),
-                        sp_tor_id: rec.get('sp_tor_id')
+                        sp_check_period_hdr_id: getSelectedValue('sp_check_period_hdr_id'),
+                        sp_tor_hdr_period_id: getSelectedValue('sp_tor_hdr_period_id'),
+                        sp_tor_contract_id: getSelectedValue('sp_tor_contract_id'),
+                        sp_tor_id: getSelectedValue('sp_tor_id'),
+                        search_type: searchOptions.search_type,
+                        search_code: searchOptions.search_code
                 },
                 success: function (response) {
-                        relationWindow.getEl().unmask();
                         var result;
                         try {
                                 result = Ext.decode(response.responseText);
                         } catch (ex) {
-                                Ext.Msg.alert('ผิดพลาด', 'ข้อมูลที่ได้รับจากระบบไม่ถูกต้อง');
+                                Ext.Msg.alert('ผิดพลาด', 'ข้อมูลที่ได้รับจากระบบไม่ถูกต้อง', function () {
+                                        if (searchOptions.search_code) {
+                                                win_edir_alldata(null);
+                                        }
+                                });
                                 return;
                         }
                         if (!result.success) {
-                                Ext.Msg.alert('ผิดพลาด', result.msg || 'ไม่สามารถโหลดข้อมูลได้');
+                                Ext.Msg.alert('ไม่พบข้อมูล', result.msg || 'ไม่สามารถโหลดข้อมูลได้', function () {
+                                        if (searchOptions.search_code) {
+                                                win_edir_alldata(null);
+                                        }
+                                });
                                 return;
                         }
+                        relationWindow.show();
 
                         relationTabs.removeAll(true);
                         Ext.each(result.datasets || [], function (dataset) {
@@ -7690,7 +7807,7 @@ var win_edir_alldata = function (rec) {
                                                         iconCls: 'icon-refresh',
                                                         handler: function () {
                                                                 relationWindow.close();
-                                                                win_edir_alldata(rec);
+                                                                win_edir_alldata(rec, searchOptions);
                                                         }
                                                 }]
                                 });
@@ -7761,7 +7878,7 @@ var win_edir_alldata = function (rec) {
                                                 iconCls: 'icon-refresh',
                                                 handler: function () {
                                                         relationWindow.close();
-                                                        win_edir_alldata(rec);
+                                                        win_edir_alldata(rec, searchOptions);
                                                 }
                                         }]
                         });
@@ -7770,8 +7887,11 @@ var win_edir_alldata = function (rec) {
                         openNextRelationStep(nextStepButton);
                 },
                 failure: function () {
-                        relationWindow.getEl().unmask();
-                        Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถเชื่อมต่อข้อมูลตรวจรับได้');
+                        Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถเชื่อมต่อข้อมูลตรวจรับได้', function () {
+                                if (searchOptions.search_code) {
+                                        win_edir_alldata(null);
+                                }
+                        });
                 }
         });
 };

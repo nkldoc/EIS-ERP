@@ -208,6 +208,35 @@ function shouldUseWorkInProcessAccount($request, $db) {
 }
 
 switch ($mode) {
+    case "SEARCH_RELATION_CODES":
+        if (empty($_SESSION['user_id']) || intval($_SESSION['dc_center_user'] ?? 0) !== 1) {
+            echo json_encode(array("success" => false, "data" => array(), "msg" => "ไม่มีสิทธิ์เปิดเครื่องมือข้อมูล ADMIN"));
+            exit();
+        }
+        $lookupSource = ($_REQUEST['source'] ?? '') === 'contract' ? 'contract' : 'tor';
+        $lookupKeyword = trim($_REQUEST['keyword'] ?? '');
+        $lookupLike = '%' . $lookupKeyword . '%';
+        if ($lookupSource === 'contract') {
+            $lookupSql = "SELECT TOP 200 'contract' AS source,c.sp_tor_id AS tor_id,c.sp_tor_contract_id,
+                            c.c_code,c.c_name,c.i_enabled
+                          FROM dbo.sp_tor_contract c
+                          WHERE (?='' OR c.c_code LIKE ? OR c.c_name LIKE ?)
+                          ORDER BY c.sp_tor_contract_id DESC";
+        } else {
+            $lookupSql = "SELECT TOP 200 'tor' AS source,t.tor_id,CAST(NULL AS bigint) AS sp_tor_contract_id,
+                            t.c_code,t.c_name,t.i_enabled
+                          FROM dbo.sp_tor t
+                          WHERE (?='' OR t.c_code LIKE ? OR t.c_name LIKE ?)
+                          ORDER BY t.tor_id DESC";
+        }
+        $lookupResult = $db->QueryParam($lookupSql, array($lookupKeyword, $lookupLike, $lookupLike));
+        $lookupRows = array();
+        while ($lookupResult && ($lookupRow = $db->Fetch($lookupResult))) {
+            $lookupRows[] = $lookupRow;
+        }
+        echo json_encode(array("success" => true, "data" => $lookupRows));
+        exit();
+
     case "UPDATE_CHECKING_RELATIONS":
         if (empty($_SESSION['user_id']) || intval($_SESSION['dc_center_user'] ?? 0) !== 1) {
             echo json_encode(array("success" => false, "msg" => "ไม่มีสิทธิ์แก้ไขข้อมูล ADMIN"));
@@ -224,7 +253,6 @@ switch ($mode) {
             "sp_tor_dtl_period" => "sp_tor_dtl_period_id",
             "sp_tor_contract" => "sp_tor_contract_id",
             "sp_mn_contract_hdr" => "sp_mn_contract_hdr_id",
-            "sp_mn_contract_dtl" => "sp_mn_contract_dtl_id",
             "sp_tranf_hdr" => "sp_tranf_hdr_id",
             "sp_tranf_item" => "sp_tranf_item_id",
             "sp_tor" => "tor_id"
@@ -306,10 +334,9 @@ switch ($mode) {
             exit();
         }
         $checkPeriodHdrId = intval($_REQUEST['sp_check_period_hdr_id'] ?? 0);
-        if ($checkPeriodHdrId <= 0) {
-            echo json_encode(array("success" => false, "msg" => "ไม่พบรหัสรายการตรวจรับ"));
-            exit();
-        }
+        $requestedTorId = intval($_REQUEST['sp_tor_id'] ?? 0);
+        $searchType = trim($_REQUEST['search_type'] ?? '');
+        $searchCode = trim($_REQUEST['search_code'] ?? '');
 
         $fetchRows = function ($sql, $params) use ($db) {
             $rows = array();
@@ -332,7 +359,6 @@ switch ($mode) {
             "sp_tor_dtl_period" => "sp_tor_dtl_period_id",
             "sp_tor_contract" => "sp_tor_contract_id",
             "sp_mn_contract_hdr" => "sp_mn_contract_hdr_id",
-            "sp_mn_contract_dtl" => "sp_mn_contract_dtl_id",
             "sp_tranf_hdr" => "sp_tranf_hdr_id",
             "sp_tranf_item" => "sp_tranf_item_id",
             "sp_tor" => "tor_id"
@@ -367,25 +393,53 @@ switch ($mode) {
             );
         };
 
-        $hdrRows = $fetchRows(
+        $contractId = intval($_REQUEST['sp_tor_contract_id'] ?? 0);
+        if ($searchCode !== '') {
+            if ($searchType === 'contract_code') {
+                $searchRows = $fetchRows(
+                    "SELECT TOP 1 sp_tor_id,sp_tor_contract_id FROM dbo.sp_tor_contract
+                     WHERE LTRIM(RTRIM(c_code))=? ORDER BY sp_tor_contract_id DESC",
+                    array($searchCode)
+                );
+                if (count($searchRows) > 0) {
+                    $requestedTorId = intval($searchRows[0]['sp_tor_id']);
+                    $contractId = intval($searchRows[0]['sp_tor_contract_id']);
+                }
+            } else {
+                $contractId = 0;
+                $searchRows = $fetchRows(
+                    "SELECT TOP 1 tor_id FROM dbo.sp_tor WHERE LTRIM(RTRIM(c_code))=? ORDER BY tor_id DESC",
+                    array($searchCode)
+                );
+                if (count($searchRows) > 0) {
+                    $requestedTorId = intval($searchRows[0]['tor_id']);
+                }
+            }
+            if ($requestedTorId <= 0) {
+                echo json_encode(array("success" => false, "msg" => "ไม่พบข้อมูลจากเลขที่ " . $searchCode));
+                exit();
+            }
+        }
+        $hdrRows = $checkPeriodHdrId > 0 ? $fetchRows(
             "SELECT * FROM dbo.sp_check_period_hdr WHERE sp_check_period_hdr_id = ?",
             array($checkPeriodHdrId)
-        );
-        if (count($hdrRows) === 0) {
-            echo json_encode(array("success" => false, "msg" => "ไม่พบข้อมูล sp_check_period_hdr"));
-            exit();
-        }
-
-        $hdr = $hdrRows[0];
+        ) : array();
+        $hdr = count($hdrRows) > 0 ? $hdrRows[0] : array();
         $torPeriodId = intval($hdr['sp_tor_hdr_period_id'] ?? ($_REQUEST['sp_tor_hdr_period_id'] ?? 0));
-        $contractId = intval($hdr['sp_tor_contract_id'] ?? ($_REQUEST['sp_tor_contract_id'] ?? 0));
+        if ($contractId <= 0) {
+            $contractId = intval($hdr['sp_tor_contract_id'] ?? 0);
+        }
         $selectedContractRows = $contractId > 0 ? $fetchRows(
             "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ?",
             array($contractId)
         ) : array();
-        $torId = count($selectedContractRows) > 0
+        $torId = $requestedTorId > 0 ? $requestedTorId : (count($selectedContractRows) > 0
             ? intval($selectedContractRows[0]['sp_tor_id'] ?? ($selectedContractRows[0]['tor_id'] ?? 0))
-            : intval($_REQUEST['sp_tor_id'] ?? 0);
+            : 0);
+        if ($torId <= 0) {
+            echo json_encode(array("success" => false, "msg" => "ไม่พบข้อมูล TOR ที่เชื่อมโยง"));
+            exit();
+        }
         $torRows = $torId > 0 ? $fetchRows(
             "SELECT * FROM dbo.sp_tor WHERE tor_id = ?",
             array($torId)
@@ -420,12 +474,6 @@ switch ($mode) {
             "SELECT m.* FROM dbo.sp_mn_contract_hdr m
              INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=m.sp_contract_id
              WHERE c.sp_tor_id=? ORDER BY m.sp_mn_contract_hdr_id", array($torId)
-        ) : array();
-        $mnDtlRows = $torId > 0 ? $fetchRows(
-            "SELECT d.* FROM dbo.sp_mn_contract_dtl d
-             INNER JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=d.sp_mn_contract_hdr_id
-             INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=m.sp_contract_id
-             WHERE c.sp_tor_id=? ORDER BY d.sp_mn_contract_dtl_id", array($torId)
         ) : array();
         $checkHdrRows = $torId > 0 ? $fetchRows(
             "SELECT ch.* FROM dbo.sp_check_period_hdr ch
@@ -482,7 +530,6 @@ switch ($mode) {
             $makeDataset("sp_tor_hdr_period", "หัวข้องวด TOR", $torHdrRows),
             $makeDataset("sp_tor_dtl_period", "รายละเอียดงวด TOR", $torDtlRows),
             $makeDataset("sp_mn_contract_hdr", "หัวการส่งมอบตามสัญญา", $mnHdrRows),
-            $makeDataset("sp_mn_contract_dtl", "รายละเอียดการส่งมอบตามสัญญา", $mnDtlRows),
             $makeDataset("sp_check_period_hdr", "หัวรายการตรวจรับ", $checkHdrRows),
             $makeDataset("sp_check_period_dtl", "รายละเอียดตรวจรับ", $checkDtlRows),
             $makeDataset("sp_tranf_hdr", "หัวรายการส่งบัญชี", $tranfHdrRows),
