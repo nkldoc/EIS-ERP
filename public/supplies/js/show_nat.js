@@ -2569,27 +2569,69 @@ Ext.onReady(function () {
             });
             Ext.get("divID").update('<div id="logout">' + '<div id="userInfo" style="margin-top:0px; float:left;"></div>' + "</div>");
             Ext.get("userInfo").update(response.responseText);
+            var lastPageStorageKey = "supplies.lastPage";
+            var contentPanel = Ext.getCmp("content-panel");
+
+            function normalizeLocalPage(route) {
+                route = String(route || "").replace(/^\s+|\s+$/g, "");
+
+                // Only remember pages inside this application.
+                if (!route || /^(?:[a-z]+:)?\/\//i.test(route) ||
+                    route.indexOf("../") !== -1 || /["'<>]/.test(route)) {
+                    return "";
+                }
+
+                route = route.replace(/^\.\//, "");
+                return /^[A-Za-z0-9_./-]+(?:\?[^#]*)?$/.test(route) ? route : "";
+            }
+
+            function rememberPage(route) {
+                route = normalizeLocalPage(route);
+                if (!route) {
+                    return;
+                }
+
+                try {
+                    localStorage.setItem(lastPageStorageKey, route);
+                } catch (ignore) { }
+
+                // Keep the current page visible in the URL without adding a
+                // browser-history entry every time a menu is clicked.
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, document.title,
+                        window.location.pathname + window.location.search + "#" + route);
+                }
+            }
+
+            // Existing menus open pages by calling content-panel.update().
+            // Capture those calls centrally so every menu is remembered.
+            var originalContentUpdate = contentPanel.update;
+            contentPanel.update = function (html) {
+                var match = typeof html === "string" &&
+                    html.match(/<iframe\b[^>]*\bsrc=["']([^"']+)["']/i);
+                if (match) {
+                    rememberPage(match[1]);
+                }
+                return originalContentUpdate.apply(this, arguments);
+            };
+
             function openHashPage() {
                 var route = window.location.hash ?
                     window.location.hash.substring(1).replace(/^\s+|\s+$/g, "") : "";
 
                 if (!route) {
+                    try {
+                        route = localStorage.getItem(lastPageStorageKey) || "";
+                    } catch (ignore) { }
+                }
+
+                route = normalizeLocalPage(route);
+                if (!route) {
                     return;
                 }
 
-                // IIS serves PHP pages through extensionless URLs.  Keeping the
-                // iframe extensionless also avoids a redirect from *.php which
-                // used to make hash routes fail intermittently.
-                route = route.replace(/\.php(?=([?#]|$))/i, "");
-
-                // Hash routes are local application paths only.
-                if (!/^\.\/[A-Za-z0-9_./-]+(?:\?[^"'<>]*)?$/.test(route) ||
-                    route.indexOf("../") !== -1) {
-                    return;
-                }
-
-                Ext.getCmp("content-panel").update(
-                    '<iframe id="iframecontentID" src="' + route +
+                contentPanel.update(
+                    '<iframe id="iframecontentID" src="./' + route +
                     '" frameborder="0" width="100%" height="100%"></iframe>'
                 );
             }

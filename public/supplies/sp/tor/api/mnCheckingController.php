@@ -208,6 +208,196 @@ function shouldUseWorkInProcessAccount($request, $db) {
 }
 
 switch ($mode) {
+    case "UPDATE_CHECKING_RELATIONS":
+        if (empty($_SESSION['user_id']) || intval($_SESSION['dc_center_user'] ?? 0) !== 1) {
+            echo json_encode(array("success" => false, "msg" => "ไม่มีสิทธิ์แก้ไขข้อมูล ADMIN"));
+            exit();
+        }
+        $allowedTables = array(
+            "sp_check_period_hdr" => "sp_check_period_hdr_id",
+            "sp_check_period_dtl" => "sp_check_period_dtl_id",
+            "sp_tor_hdr_period" => "sp_tor_hdr_period_id",
+            "sp_tor_dtl_period" => "sp_tor_dtl_period_id",
+            "sp_tor_contract" => "sp_tor_contract_id",
+            "sp_tor" => "tor_id"
+        );
+        $blockedFields = array(
+            "dc_user_update_id", "dc_user_update_cost_id", "d_update",
+            "d_create", "act_user_id", "act_cost_id", "act_date_dt"
+        );
+        $changes = json_decode($_REQUEST['jsonData'] ?? '', true);
+        $remarks = trim($_REQUEST['remarks'] ?? '');
+        if (!is_array($changes) || count($changes) === 0 || $remarks === '') {
+            echo json_encode(array("success" => false, "msg" => "กรุณาระบุข้อมูลและเหตุผลในการแก้ไข"));
+            exit();
+        }
+        $updatedCount = 0;
+        try {
+            foreach ($changes as $change) {
+                $tableName = preg_replace('/[^a-zA-Z0-9_]/', '', $change['table_name'] ?? '');
+                $fieldName = preg_replace('/[^a-zA-Z0-9_]/', '', $change['field_name'] ?? '');
+                $rowId = $change['row_id'] ?? null;
+                if (!isset($allowedTables[$tableName]) || $rowId === null || $rowId === '' ||
+                    $fieldName === $allowedTables[$tableName] || in_array($fieldName, $blockedFields, true)) {
+                    throw new Exception("พบตาราง ฟิลด์ หรือรหัสแถวที่ไม่อนุญาต");
+                }
+                $metaStmt = $db->QueryParam(
+                    "SELECT ty.name AS data_type FROM sys.columns c
+                     INNER JOIN sys.types ty ON ty.user_type_id=c.user_type_id
+                     INNER JOIN sys.tables t ON t.object_id=c.object_id
+                     WHERE t.name=? AND c.name=?",
+                    array($tableName, $fieldName)
+                );
+                $meta = $metaStmt ? $db->Fetch($metaStmt) : false;
+                if (!$meta || in_array(strtolower($meta['data_type']), array('image', 'binary', 'varbinary', 'timestamp', 'rowversion'), true)) {
+                    throw new Exception("ฟิลด์ {$tableName}.{$fieldName} ไม่รองรับการแก้ไขผ่านเครื่องมือนี้");
+                }
+                $pk = $allowedTables[$tableName];
+                $oldStmt = $db->QueryParam(
+                    "SELECT CONVERT(nvarchar(max), [{$fieldName}]) AS old_value FROM dbo.[{$tableName}] WHERE [{$pk}] = ?",
+                    array($rowId)
+                );
+                $oldRow = $oldStmt ? $db->Fetch($oldStmt) : false;
+                if (!$oldRow) {
+                    throw new Exception("ไม่พบข้อมูล {$tableName} ID {$rowId}");
+                }
+                $oldValue = $oldRow['old_value'];
+                $newValue = $change['new_value'] ?? null;
+                $updateStmt = $db->QueryParam(
+                    "UPDATE dbo.[{$tableName}] SET [{$fieldName}] = ? WHERE [{$pk}] = ?",
+                    array($newValue === '' ? null : $newValue, $rowId)
+                );
+                if (!$updateStmt) {
+                    throw new Exception("ไม่สามารถแก้ไข {$tableName}.{$fieldName} ได้");
+                }
+                $logStmt = $db->QueryParam(
+                    "INSERT INTO NMU_ERPLOG..sys_log_change
+                     (table_name,row_id,row_field,field_name,old_value,new_value,user_id,date_create,remarks)
+                     VALUES (?,?,?,?,?,?,?,?,?)",
+                    array($tableName, $rowId, $pk, $fieldName, $oldValue, $newValue,
+                        $_SESSION['user_id'], date('Y-m-d H:i:s'), $remarks)
+                );
+                if (!$logStmt) {
+                    throw new Exception("แก้ไขข้อมูลแล้ว แต่บันทึกประวัติไม่สำเร็จ");
+                }
+                $updatedCount++;
+            }
+            echo json_encode(array("success" => true, "msg" => "แก้ไขและบันทึกประวัติ {$updatedCount} รายการแล้ว"));
+        } catch (Exception $ex) {
+            echo json_encode(array("success" => false, "msg" => $ex->getMessage()));
+        }
+        exit();
+
+    case "GET_CHECKING_RELATIONS":
+        $checkPeriodHdrId = intval($_REQUEST['sp_check_period_hdr_id'] ?? 0);
+        if ($checkPeriodHdrId <= 0) {
+            echo json_encode(array("success" => false, "msg" => "ไม่พบรหัสรายการตรวจรับ"));
+            exit();
+        }
+
+        $fetchRows = function ($sql, $params) use ($db) {
+            $rows = array();
+            $result = $db->QueryParam($sql, $params);
+            if ($result) {
+                while ($row = $db->Fetch($result)) {
+                    $rows[] = $row;
+                }
+            }
+            return $rows;
+        };
+        $primaryKeys = array(
+            "sp_check_period_hdr" => "sp_check_period_hdr_id",
+            "sp_check_period_dtl" => "sp_check_period_dtl_id",
+            "sp_tor_hdr_period" => "sp_tor_hdr_period_id",
+            "sp_tor_dtl_period" => "sp_tor_dtl_period_id",
+            "sp_tor_contract" => "sp_tor_contract_id",
+            "sp_tor" => "tor_id"
+        );
+        $makeDataset = function ($tableName, $title, $rows) use ($db, $primaryKeys) {
+            $columns = count($rows) > 0 ? array_keys($rows[0]) : array();
+            $editableColumns = array();
+            $metaResult = $db->QueryParam(
+                "SELECT c.name AS field_name, ty.name AS data_type FROM sys.columns c
+                 INNER JOIN sys.types ty ON ty.user_type_id=c.user_type_id
+                 INNER JOIN sys.tables t ON t.object_id=c.object_id WHERE t.name=?",
+                array($tableName)
+            );
+            $blocked = array($primaryKeys[$tableName], 'dc_user_update_id', 'dc_user_update_cost_id',
+                'd_update', 'd_create', 'act_user_id', 'act_cost_id', 'act_date_dt');
+            while ($metaResult && ($metaRow = $db->Fetch($metaResult))) {
+                if (!in_array($metaRow['field_name'], $blocked, true) &&
+                    !in_array(strtolower($metaRow['data_type']), array('image','binary','varbinary','timestamp','rowversion'), true)) {
+                    $editableColumns[] = $metaRow['field_name'];
+                }
+            }
+            return array(
+                "table" => $tableName,
+                "title" => $title,
+                "primary_key" => $primaryKeys[$tableName],
+                "columns" => $columns,
+                "editable_columns" => $editableColumns,
+                "rows" => $rows
+            );
+        };
+
+        $hdrRows = $fetchRows(
+            "SELECT * FROM dbo.sp_check_period_hdr WHERE sp_check_period_hdr_id = ?",
+            array($checkPeriodHdrId)
+        );
+        if (count($hdrRows) === 0) {
+            echo json_encode(array("success" => false, "msg" => "ไม่พบข้อมูล sp_check_period_hdr"));
+            exit();
+        }
+
+        $hdr = $hdrRows[0];
+        $torPeriodId = intval($hdr['sp_tor_hdr_period_id'] ?? ($_REQUEST['sp_tor_hdr_period_id'] ?? 0));
+        $contractId = intval($hdr['sp_tor_contract_id'] ?? ($_REQUEST['sp_tor_contract_id'] ?? 0));
+        $checkDtlRows = $fetchRows(
+            "SELECT * FROM dbo.sp_check_period_dtl WHERE sp_check_period_hdr_id = ? ORDER BY sp_check_period_dtl_id",
+            array($checkPeriodHdrId)
+        );
+        $torHdrRows = $torPeriodId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor_hdr_period WHERE sp_tor_hdr_period_id = ?",
+            array($torPeriodId)
+        ) : array();
+        if ($contractId <= 0 && count($torHdrRows) > 0) {
+            $contractId = intval($torHdrRows[0]['sp_tor_contract_id'] ?? 0);
+        }
+        $torDtlRows = $torPeriodId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor_dtl_period WHERE sp_tor_hdr_period_id = ? ORDER BY sp_tor_dtl_period_id",
+            array($torPeriodId)
+        ) : array();
+        $contractRows = $contractId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ?",
+            array($contractId)
+        ) : array();
+        $torId = count($contractRows) > 0
+            ? intval($contractRows[0]['sp_tor_id'] ?? ($contractRows[0]['tor_id'] ?? 0))
+            : intval($_REQUEST['sp_tor_id'] ?? 0);
+        $torRows = $torId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor WHERE tor_id = ?",
+            array($torId)
+        ) : array();
+
+        echo json_encode(array(
+            "success" => true,
+            "ids" => array(
+                "sp_check_period_hdr_id" => $checkPeriodHdrId,
+                "sp_tor_hdr_period_id" => $torPeriodId,
+                "sp_tor_contract_id" => $contractId,
+                "sp_tor_id" => $torId
+            ),
+            "datasets" => array(
+                $makeDataset("sp_check_period_hdr", "หัวรายการตรวจรับ", $hdrRows),
+                $makeDataset("sp_check_period_dtl", "รายละเอียดตรวจรับ", $checkDtlRows),
+                $makeDataset("sp_tor_hdr_period", "หัวข้องวด TOR", $torHdrRows),
+                $makeDataset("sp_tor_dtl_period", "รายละเอียดงวด TOR", $torDtlRows),
+                $makeDataset("sp_tor_contract", "สัญญา", $contractRows),
+                $makeDataset("sp_tor", "TOR", $torRows)
+            )
+        ));
+        exit();
+
     case "getTableList":
         $result = $db->QueryParam(
             "SELECT t.name AS table_name
