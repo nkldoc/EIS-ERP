@@ -290,8 +290,13 @@ Ext.onReady(function () {
             window._notifySocket.onclose = function () {
                 Ext.Toast.show({type: 'warning', title: 'WS', message: 'Connection closed'});
             };
+            // window._notifySocket.onerror = function (err) {
+            //     console.error('WS error', err);
+            // };
             window._notifySocket.onerror = function (err) {
-                console.error('WS error', err);
+                // Log the current state: 0 (CONNECTING), 2 (CLOSING), 3 (CLOSED)
+                console.error('WS error. Socket State:', window._notifySocket.readyState, err);
+                Ext.Toast.show({ type: 'error', title: 'WS Error', message: 'Could not connect to server.' });
             };
 
         }); // () autorun

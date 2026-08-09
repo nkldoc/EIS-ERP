@@ -1,4 +1,4 @@
-/* global Ext v-pro*/
+
 Ext.isBook = null;
         Ext.isOverlap = null;
         Ext.formSubmitHistory = [];
@@ -201,19 +201,32 @@ Ext.isBook = null;
                         document.getElementsByTagName("head")[0].appendChild(script);
                 };
                 Ext.loadConsoleLogWindowUi = function (callback) {
-                if (window.__consoleLogWindowInstalled) {
-                callback && callback();
-                        return;
-                }
-                var script = document.createElement("script");
+                        if (window.__consoleLogWindowInstalled) {
+                                callback && callback();
+                                return;
+                        }
+
+                        if (window.__consoleLogWindowLoading) {
+                                return;
+                        }
+
+                        window.__consoleLogWindowLoading = true;
+
+                        var script = document.createElement("script");
                         script.type = "text/javascript";
                         script.src = "tor/receive-validation/ui/console-log-window.js?v=" + new Date().getTime();
+
                         script.onload = function () {
-                        callback && callback();
-                        };
+            window.__consoleLogWindowLoading = false;
+            window.__consoleLogWindowInstalled = true;
+            callback && callback();
+    };
+
                         script.onerror = function () {
-                        console.warn("ไม่สามารถโหลดหน้าต่าง Console Log ได้");
-                        };
+            window.__consoleLogWindowLoading = false;
+            console.warn("ไม่สามารถโหลดหน้าต่าง Console Log ได้");
+    };
+
                         document.getElementsByTagName("head")[0].appendChild(script);
                 };
 // เปิดหน้าต่าง Console Log อัตโนมัติทันทีที่โหลดหน้านี้

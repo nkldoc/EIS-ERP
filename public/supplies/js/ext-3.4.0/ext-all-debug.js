@@ -48196,6 +48196,12 @@ Ext.grid.GridView = Ext.extend(Ext.util.Observable, {
         }
 
         row = this.getRow(rowIndex);
+
+        // Ensure the row element exists in the DOM before proceeding
+        if (!row) {
+            return;
+        }
+
         row.className = '';
 
         if (this.grid.stripeRows && ((rowIndex + 1) % 2 === 0)) {
@@ -51739,7 +51745,6 @@ Ext.grid.GroupingView = Ext.extend(Ext.grid.GridView, {
             this.isUpdating = false;
         }
     },
-
 
     beforeMenuShow: function () {
         var item, items = this.hmenu.items, disabled = this.cm.config[this.hdCtxIndex].groupable === false;
