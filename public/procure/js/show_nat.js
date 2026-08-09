@@ -148,19 +148,9 @@ Ext.onReady(function () {
                             triggerAction: 'all',
                             editable: false,
                             forceSelection: true,
-<<<<<<< HEAD
-                            allowBlank: false,
-                            listWidth: 260
-                        });
-                    };
-                    var isEmptyValue = function (value) {
-                        return value === null || value === undefined || String(value).replace(/^\s+|\s+$/g, '') === '';
-                    };
-=======
                             allowBlank: false
                         });
                     };
->>>>>>> 262f23a (bi)
                     var buildPreviewSql = function (record) {
                         var tableName = record.get('table_name') || '[table]';
                         var idField = record.get('row_field') || '[id_field]';
@@ -501,12 +491,9 @@ Ext.onReady(function () {
                     // 2. สร้าง Grid Panel สำหรับแสดงรายการ Log
                     var logGrid = new Ext.grid.EditorGridPanel({
                         title: 'Edit Combo Table (CRUD Management)',
-<<<<<<< HEAD
-=======
                         renderTo: Ext.getBody(),
                         width: 1200,
                         height: 500,
->>>>>>> 262f23a (bi)
                         store: logStore,
                         trackMouseOver: true,
                         loadMask: true,
@@ -524,26 +511,10 @@ Ext.onReady(function () {
                                     Ext.MessageBox.alert('ข้อมูลไม่ครบ', 'กรุณาเลือกชื่อตารางก่อนเลือกชื่อฟิวด์');
                                     return;
                                 }
-<<<<<<< HEAD
-                                if (fieldStore.baseParams.table !== selectedTable || fieldStore.getCount() === 0) {
-                                    event.cancel = true;
-                                    fieldStore.removeAll();
-                                    fieldStore.baseParams.table = selectedTable;
-                                    fieldStore.load({
-                                        callback: function (records, options, success) {
-                                            if (success && !logGrid.destroyed) {
-                                                logGrid.startEditing(event.row, event.column);
-                                            } else if (!success) {
-                                                Ext.MessageBox.alert('Load failed', 'ไม่สามารถโหลดรายชื่อฟิลด์ของตารางได้');
-                                            }
-                                        }
-                                    });
-=======
                                 if (fieldStore.baseParams.table !== selectedTable) {
                                     fieldStore.removeAll();
                                     fieldStore.baseParams.table = selectedTable;
                                     fieldStore.load();
->>>>>>> 262f23a (bi)
                                 }
                             }
                         },
@@ -560,10 +531,6 @@ Ext.onReady(function () {
                                         var p = new NewRecord({
                                             date_create: new Date().format('Y-m-d H:i:s'),
                                             table_name: '',
-<<<<<<< HEAD
-                                            row_field: '',
-=======
->>>>>>> 262f23a (bi)
                                             row_id: 0,
                                             field_name: '',
                                             old_value: '',
@@ -615,11 +582,7 @@ Ext.onReady(function () {
                                         var invalidRows = [];
                                         Ext.each(modified, function (record) {
                                             var row = record.data;
-<<<<<<< HEAD
-                                            if (isEmptyValue(row.table_name) || isEmptyValue(row.row_field) || isEmptyValue(row.row_id) || isEmptyValue(row.field_name)) {
-=======
                                             if (!row.table_name || !row.row_field || !row.row_id || !row.field_name) {
->>>>>>> 262f23a (bi)
                                                 invalidRows.push((logStore.indexOf(record) + 1));
                                                 return;
                                             }
@@ -734,34 +697,10 @@ Ext.onReady(function () {
                                         }
 
                                         var data = [];
-<<<<<<< HEAD
-                                        var invalidRows = [];
-                                        Ext.each(modified, function (record) {
-                                            // เก็บค่าข้อมูลลง Array เพื่อส่งไปประมวลผลที่ Backend PHP
-                                            var row = record.data;
-                                            if (isEmptyValue(row.table_name) || isEmptyValue(row.row_field) || isEmptyValue(row.row_id) || isEmptyValue(row.field_name)) {
-                                                invalidRows.push(logStore.indexOf(record) + 1);
-                                                return;
-                                            }
-                                            data.push({
-                                                table_name: row.table_name,
-                                                row_field: row.row_field,
-                                                row_id: row.row_id,
-                                                field_name: row.field_name,
-                                                old_value: row.old_value,
-                                                new_value: row.new_value
-                                            });
-                                        });
-                                        if (invalidRows.length > 0) {
-                                            Ext.MessageBox.alert('ข้อมูลไม่ครบ', 'กรุณาระบุ Table, ID Field, ID Value และ Edit Field ให้ครบ (แถวที่ ' + invalidRows.join(', ') + ')');
-                                            return;
-                                        }
-=======
                                         Ext.each(modified, function (record) {
                                             // เก็บค่าข้อมูลลง Array เพื่อส่งไปประมวลผลที่ Backend PHP
                                             data.push(record.data);
                                         });
->>>>>>> 262f23a (bi)
                                         // แสดงหน้าต่างยืนยันและรับเหตุผล (ตามฟังก์ชันตัวอย่างเดิมของคุณ)
                                         var logWin = new Ext.Window({
                                             title: 'ยืนยันการบันทึกข้อมูลแก้ไข',
@@ -1727,7 +1666,144 @@ Ext.onReady(function () {
                         {
                             xtype: "displayfield",
                             width: 50,
-//                            html: "<div style=\" font:bold 13px/10px 'Mitr', sans-serif;  color:#000;\">" + Ext.doMain + "</div>",
+                            id: "disNumberID",
+                            listeners: {
+                                beforerender: function () {
+                                    Ext.msgAllLoad = "";
+                                    Ext.localHistoryUserID = [];
+                                    // Message received from server
+                                    //                                    if (!Ext.isEmpty(Ext.session))
+                                    //                                        Ext.Ajax.request({
+                                    //                                            url: "./sp/tor/api/List_spLog.php",
+                                    //                                            //                                            url: "./php-notic/insertLoger.php",
+                                    //                                            method: "POST",
+                                    //                                            params: {mode: "LIST_LOG", user_id: Ext.session.user_id},
+                                    //                                            success: function (response) {
+                                    //                                                try {
+                                    //                                                    let obj = Ext.util.JSON.decode(response.responseText);
+                                    //                                                    //                                                    console.log(obj);
+                                    //                                                    if (!Ext.isEmpty(obj)) {
+                                    //                                                        obj.forEach(function (v) {
+                                    //                                                            Ext.msgAllLoad += v.datetime + ">" + v.cost_name + ">" + v.msg + "\n";
+                                    //                                                        });
+                                    //                                                    }
+                                    //                                                    const dropdownHTML = `
+                                    //                                                                <div class="dropdown-menu p-0 show" aria-labelledby="notifications-dropdown-toggle" data-popper-placement="bottom-end" style="position: absolute; inset: 0px 0px auto auto; margin: 0px; transform: translate3d(0px, 24.2087px, 0px);">
+                                    //                                                                    <div class="dropdown-menu-header p-3">
+                                    //                                                                        <h5 class="dropdown-menu-title mb-0">Notifications</h5>
+                                    //                                                                    </div><!--//dropdown-menu-title-->
+                                    //                                                                    <div class="dropdown-menu-content">
+                                    //                                                                        <div class="item p-3">
+                                    //                                                                            <div class="row gx-2 justify-content-between align-items-center">
+                                    //                                                                                <div class="col-auto">
+                                    //                                                                                    <img class="profile-image" src="assets/images/profiles/profile-1.png" alt="">
+                                    //                                                                                </div><!--//col-->
+                                    //                                                                                <div class="col">
+                                    //                                                                                    <div class="info">
+                                    //                                                                                        <div class="desc">Amy shared a file with you. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</div>
+                                    //                                                                                        <div class="meta"> 2 hrs ago</div>
+                                    //                                                                                    </div>
+                                    //                                                                                </div><!--//col-->
+                                    //                                                                            </div><!--//row-->
+                                    //                                                                            <a class="link-mask" href="notifications.html"></a>
+                                    //                                                                        </div><!--//item-->
+                                    //                                                                        <div class="item p-3">
+                                    //                                                                            <div class="row gx-2 justify-content-between align-items-center">
+                                    //                                                                                <div class="col-auto">
+                                    //                                                                                    <div class="app-icon-holder">
+                                    //                                                                                        <svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-receipt" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                    //                                                                                            <path fill-rule="evenodd" d="M1.92.506a.5.5 0 0 1 .434.14L3 1.293l.646-.647a.5.5 0 0 1 .708 0L5 1.293l.646-.647a.5.5 0 0 1 .708 0L7 1.293l.646-.647a.5.5 0 0 1 .708 0L9 1.293l.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .708 0l.646.647.646-.647a.5.5 0 0 1 .801.13l.5 1A.5.5 0 0 1 15 2v12a.5.5 0 0 1-.053.224l-.5 1a.5.5 0 0 1-.8.13L13 14.707l-.646.647a.5.5 0 0 1-.708 0L11 14.707l-.646.647a.5.5 0 0 1-.708 0L9 14.707l-.646.647a.5.5 0 0 1-.708 0L7 14.707l-.646.647a.5.5 0 0 1-.708 0L5 14.707l-.646.647a.5.5 0 0 1-.708 0L3 14.707l-.646.647a.5.5 0 0 1-.801-.13l-.5-1A.5.5 0 0 1 1 14V2a.5.5 0 0 1 .053-.224l.5-1a.5.5 0 0 1 .367-.27zm.217 1.338L2 2.118v11.764l.137.274.51-.51a.5.5 0 0 1 .707 0l.646.647.646-.646a.5.5 0 0 1 .708 0l.646.646.646-.646a.5.5 0 0 1 .708 0l.646.646.646-.646a.5.5 0 0 1 .708 0l.646.646.646-.646a.5.5 0 0 1 .708 0l.646.646.646-.646a.5.5 0 0 1 .708 0l.509.509.137-.274V2.118l-.137-.274-.51.51a.5.5 0 0 1-.707 0L12 1.707l-.646.647a.5.5 0 0 1-.708 0L10 1.707l-.646.647a.5.5 0 0 1-.708 0L8 1.707l-.646.647a.5.5 0 0 1-.708 0L6 1.707l-.646.647a.5.5 0 0 1-.708 0L4 1.707l-.646.647a.5.5 0 0 1-.708 0l-.509-.51z"></path>
+                                    //                                                                                            <path fill-rule="evenodd" d="M3 4.5a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h6a.5.5 0 1 1 0 1h-6a.5.5 0 0 1-.5-.5zm8-6a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 0 1h-1a.5.5 0 0 1-.5-.5z"></path>
+                                    //                                                                                        </svg>
+                                    //                                                                                    </div>
+                                    //                                                                                </div><!--//col-->
+                                    //                                                                                <div class="col">
+                                    //                                                                                    <div class="info">
+                                    //                                                                                        <div class="desc">You have a new invoice. Proin venenatis interdum est.</div>
+                                    //                                                                                        <div class="meta"> 1 day ago</div>
+                                    //                                                                                    </div>
+                                    //                                                                                </div><!--//col-->
+                                    //                                                                            </div><!--//row-->
+                                    //                                                                            <a class="link-mask" href="notifications.html"></a>
+                                    //                                                                        </div><!--//item-->
+                                    //                                                                        <div class="dropdown-menu-footer p-2 text-center">
+                                    //                                                                        <a href="notifications.html">View all</a>
+                                    //                                                                        </div>
+                                    //                                                                </div>`;
+                                    //                                                    Ext.getCmp("disNumberID").setValue(
+                                    //                                                            '<div class="divTable">' +
+                                    //                                                            '<div class="divRow">' +
+                                    //                                                            '<div class="divCell">' +
+                                    //                                                            '<svg xmlns="" height="1.5em" viewBox="0 0 448 512">' +
+                                    //                                                            '<path d="M224 0c-17.7 0-32 14.3-32 32V51.2C119 66 64 130.6 64 208v18.8c0 47-17.3 92.4-48.5 127.6l-7.4 8.3c-8.4 9.4-10.4 22.9-5.3 34.4S19.4 416 32 416H416c12.6 0 24-7.4 29.2-18.9s3.1-25-5.3-34.4l-7.4-8.3C401.3 319.2 384 273.9 384 226.8V208c0-77.4-55-142-128-156.8V32c0-17.7-14.3-32-32-32zm45.3 493.3c12-12 18.7-28.3 18.7-45.3H224 160c0 17 6.7 33.3 18.7 45.3s28.3 18.7 45.3 18.7s33.3-6.7 45.3-18.7z"/>' +
+                                    //                                                            "</svg>" +
+                                    //                                                            "</div>" +
+                                    //                                                            '<div class="divCell">' +
+                                    //                                                            ' <div id="cuvID" onClick="Ext.shwHistory();"' +
+                                    //                                                            ' style="' +
+                                    //                                                            ' display:flex; justify-content: center; \n\
+                                    //                                                                            align-items: center;text-align:center; \n\
+                                    //                                                                            font-weight:bold;\n\
+                                    //                                                                            color:#CCC; cursor: pointer; \n\
+                                    //                                                                            margin:auto; width: 16px; \n\
+                                    //                                                                            height: 16px; \n\
+                                    //                                                                            background-color:#0e7bf0; \n\
+                                    //                                                                            border: solid 2px #8b9db0; \n\
+                                    //                                                                            border-radius: 100%;">' +
+                                    //                                                            parseInt(obj.length) +
+                                    //                                                            "</div>" +
+                                    //                                                            "</div>" +
+                                    //                                                            "</div>"
+                                    //                                                            );
+                                    //                                                } catch (err) {
+                                    //                                                    Ext.getCmp("disNumberID").setValue(
+                                    //                                                            '<div class="divTable">' +
+                                    //                                                            '<div class="divRow">' +
+                                    //                                                            '<div class="divCell">' +
+                                    //                                                            '<svg xmlns="" height="1.5em" viewBox="0 0 448 512">' +
+                                    //                                                            '<path d="M224 0c-17.7 0-32 14.3-32 32V51.2C119 66 64 130.6 64 208v18.8c0 47-17.3 92.4-48.5 127.6l-7.4 8.3c-8.4 9.4-10.4 22.9-5.3 34.4S19.4 416 32 416H416c12.6 0 24-7.4 29.2-18.9s3.1-25-5.3-34.4l-7.4-8.3C401.3 319.2 384 273.9 384 226.8V208c0-77.4-55-142-128-156.8V32c0-17.7-14.3-32-32-32zm45.3 493.3c12-12 18.7-28.3 18.7-45.3H224 160c0 17 6.7 33.3 18.7 45.3s28.3 18.7 45.3 18.7s33.3-6.7 45.3-18.7z"/>' +
+                                    //                                                            "</svg>" +
+                                    //                                                            "</div>" +
+                                    //                                                            '<div class="divCell">' +
+                                    //                                                            ' <div id="cuvID" onClick="Ext.shwHistory();"' +
+                                    //                                                            ' style="' +
+                                    //                                                            ' display:flex; justify-content: center; \n\
+                                    //                                                                            align-items: center;text-align:center; \n\
+                                    //                                                                            font-weight:bold;\n\
+                                    //                                                                            color:#CCC; cursor: pointer; \n\
+                                    //                                                                            margin:auto; width: 16px; \n\
+                                    //                                                                            height: 16px; \n\
+                                    //                                                                            background-color:#0e7bf0; \n\
+                                    //                                                                            border: solid 2px #8b9db0; \n\
+                                    //                                                                            border-radius: 100%;">' +
+                                    //                                                            "</div>" +
+                                    //                                                            "</div>" +
+                                    //                                                            "</div>"
+                                    //                                                            );
+                                    //                                                }
+                                    //                                            },
+                                    //                                        });
+                                },
+                                afterrender: function () {
+                                    // onClick="Ext.cuvfn()"
+                                    Ext.shwHistory = function () {
+                                        textHistory(Ext.localHistoryUserID, Ext.EventObject.getXY());
+                                    };
+                                    Ext.cuvfn = function () {
+                                        var node = Ext.get("cuvID").dom;
+                                        var text = (node.textContent || node.innerText) / 1;
+                                        var result = parseInt(text) + 1;
+                                        Ext.get("cuvID").dom.innerHTML = result;
+                                        Ext.get("cuvID").dom.style["background"] = "red";
+                                        Ext.get("cuvID").dom.style["color"] = "#fff";
+                                    };
+                                },
+                            },
+                        },
+                        {
+                            xtype: "displayfield",
+                            width: 50,
+                            html: "<div style=\" font:bold 13px/10px 'Mitr', sans-serif;  color:#000;\">" + Ext.doMain + "</div>",
                         },
                         "->",
                         {

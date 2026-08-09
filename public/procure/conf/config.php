@@ -75,7 +75,7 @@ define("NMU_PERMISSION_HOST", MAIN_HOST_NAME . "/NMU_permission"); //URL ระ�
 define("NMU_EIS_HOST", MAIN_HOST_NAME . "/NMU_EIS"); //URL ระบบ NMU_EIS
 define("NMU_HOST", MAIN_HOST_NAME . "/NMU"); //URL ระบบ NMU
 define("FM_NMU_HOST", MAIN_HOST_NAME . "/FM-NMU"); //URL ระบบ FM-NMU
-define("NMU_SUPPLIES_PORT", OST_HOST == "https" ? ":8443" : ":8080");
+define("NMU_SUPPLIES_PORT", OST_HOST == "https" ? ":" : ":"); //":8443" : ":8080"
 define("NMU_SUPPLIES_HOST", MAIN_HOST_NAME . NMU_SUPPLIES_PORT . "/supplies"); //URL ระบบ NMU_ERP
 // HOST API
 define("HTTPS_HOST_API", "api-eis.nmu.ac.th"); //api-eis.nmu.ac.th
