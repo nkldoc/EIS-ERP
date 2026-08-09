@@ -214,11 +214,19 @@ switch ($mode) {
             exit();
         }
         $allowedTables = array(
+            "sp_tor_dtl" => "sp_tor_dtl_id",
+            "sp_tor_bidder_hdr" => "sp_tor_bidder_hdr_id",
+            "sp_tor_bidder_dtl" => "sp_tor_bidder_dtl_id",
+            "sp_tor_victory" => "sp_tor_bidder_dtl_id",
             "sp_check_period_hdr" => "sp_check_period_hdr_id",
             "sp_check_period_dtl" => "sp_check_period_dtl_id",
             "sp_tor_hdr_period" => "sp_tor_hdr_period_id",
             "sp_tor_dtl_period" => "sp_tor_dtl_period_id",
             "sp_tor_contract" => "sp_tor_contract_id",
+            "sp_mn_contract_hdr" => "sp_mn_contract_hdr_id",
+            "sp_mn_contract_dtl" => "sp_mn_contract_dtl_id",
+            "sp_tranf_hdr" => "sp_tranf_hdr_id",
+            "sp_tranf_item" => "sp_tranf_item_id",
             "sp_tor" => "tor_id"
         );
         $blockedFields = array(
@@ -263,22 +271,26 @@ switch ($mode) {
                 }
                 $oldValue = $oldRow['old_value'];
                 $newValue = $change['new_value'] ?? null;
-                $updateStmt = $db->QueryParam(
-                    "UPDATE dbo.[{$tableName}] SET [{$fieldName}] = ? WHERE [{$pk}] = ?",
-                    array($newValue === '' ? null : $newValue, $rowId)
+                // อัปเดตข้อมูลและ Log ใน Transaction เดียวกัน ป้องกันข้อมูลเปลี่ยนแต่ประวัติไม่ถูกบันทึก
+                $saveStmt = $db->QueryParam(
+                    "SET XACT_ABORT ON;
+                     BEGIN TRANSACTION;
+                     BEGIN TRY
+                       UPDATE dbo.[{$tableName}] SET [{$fieldName}] = ? WHERE [{$pk}] = ?;
+                       INSERT INTO NMU_ERPLOG..sys_log_change
+                         (table_name,row_id,row_field,field_name,old_value,new_value,user_id,date_create,remarks)
+                       VALUES (?,?,?,?,?,?,?,?,?);
+                       COMMIT TRANSACTION;
+                     END TRY
+                     BEGIN CATCH
+                       IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+                       THROW;
+                     END CATCH",
+                    array($newValue, $rowId, $tableName, $rowId, $pk, $fieldName, $oldValue,
+                        $newValue, $_SESSION['user_id'], date('Y-m-d H:i:s'), $remarks)
                 );
-                if (!$updateStmt) {
-                    throw new Exception("ไม่สามารถแก้ไข {$tableName}.{$fieldName} ได้");
-                }
-                $logStmt = $db->QueryParam(
-                    "INSERT INTO NMU_ERPLOG..sys_log_change
-                     (table_name,row_id,row_field,field_name,old_value,new_value,user_id,date_create,remarks)
-                     VALUES (?,?,?,?,?,?,?,?,?)",
-                    array($tableName, $rowId, $pk, $fieldName, $oldValue, $newValue,
-                        $_SESSION['user_id'], date('Y-m-d H:i:s'), $remarks)
-                );
-                if (!$logStmt) {
-                    throw new Exception("แก้ไขข้อมูลแล้ว แต่บันทึกประวัติไม่สำเร็จ");
+                if (!$saveStmt) {
+                    throw new Exception("ไม่สามารถแก้ไขหรือบันทึกประวัติ {$tableName}.{$fieldName} ได้");
                 }
                 $updatedCount++;
             }
@@ -289,6 +301,10 @@ switch ($mode) {
         exit();
 
     case "GET_CHECKING_RELATIONS":
+        if (empty($_SESSION['user_id']) || intval($_SESSION['dc_center_user'] ?? 0) !== 1) {
+            echo json_encode(array("success" => false, "msg" => "ไม่มีสิทธิ์เปิดเครื่องมือข้อมูล ADMIN"));
+            exit();
+        }
         $checkPeriodHdrId = intval($_REQUEST['sp_check_period_hdr_id'] ?? 0);
         if ($checkPeriodHdrId <= 0) {
             echo json_encode(array("success" => false, "msg" => "ไม่พบรหัสรายการตรวจรับ"));
@@ -306,16 +322,25 @@ switch ($mode) {
             return $rows;
         };
         $primaryKeys = array(
+            "sp_tor_dtl" => "sp_tor_dtl_id",
+            "sp_tor_bidder_hdr" => "sp_tor_bidder_hdr_id",
+            "sp_tor_bidder_dtl" => "sp_tor_bidder_dtl_id",
+            "sp_tor_victory" => "sp_tor_bidder_dtl_id",
             "sp_check_period_hdr" => "sp_check_period_hdr_id",
             "sp_check_period_dtl" => "sp_check_period_dtl_id",
             "sp_tor_hdr_period" => "sp_tor_hdr_period_id",
             "sp_tor_dtl_period" => "sp_tor_dtl_period_id",
             "sp_tor_contract" => "sp_tor_contract_id",
+            "sp_mn_contract_hdr" => "sp_mn_contract_hdr_id",
+            "sp_mn_contract_dtl" => "sp_mn_contract_dtl_id",
+            "sp_tranf_hdr" => "sp_tranf_hdr_id",
+            "sp_tranf_item" => "sp_tranf_item_id",
             "sp_tor" => "tor_id"
         );
         $makeDataset = function ($tableName, $title, $rows) use ($db, $primaryKeys) {
             $columns = count($rows) > 0 ? array_keys($rows[0]) : array();
             $editableColumns = array();
+            $columnTypes = array();
             $metaResult = $db->QueryParam(
                 "SELECT c.name AS field_name, ty.name AS data_type FROM sys.columns c
                  INNER JOIN sys.types ty ON ty.user_type_id=c.user_type_id
@@ -325,6 +350,7 @@ switch ($mode) {
             $blocked = array($primaryKeys[$tableName], 'dc_user_update_id', 'dc_user_update_cost_id',
                 'd_update', 'd_create', 'act_user_id', 'act_cost_id', 'act_date_dt');
             while ($metaResult && ($metaRow = $db->Fetch($metaResult))) {
+                $columnTypes[$metaRow['field_name']] = strtolower($metaRow['data_type']);
                 if (!in_array($metaRow['field_name'], $blocked, true) &&
                     !in_array(strtolower($metaRow['data_type']), array('image','binary','varbinary','timestamp','rowversion'), true)) {
                     $editableColumns[] = $metaRow['field_name'];
@@ -335,6 +361,7 @@ switch ($mode) {
                 "title" => $title,
                 "primary_key" => $primaryKeys[$tableName],
                 "columns" => $columns,
+                "column_types" => $columnTypes,
                 "editable_columns" => $editableColumns,
                 "rows" => $rows
             );
@@ -352,32 +379,140 @@ switch ($mode) {
         $hdr = $hdrRows[0];
         $torPeriodId = intval($hdr['sp_tor_hdr_period_id'] ?? ($_REQUEST['sp_tor_hdr_period_id'] ?? 0));
         $contractId = intval($hdr['sp_tor_contract_id'] ?? ($_REQUEST['sp_tor_contract_id'] ?? 0));
-        $checkDtlRows = $fetchRows(
-            "SELECT * FROM dbo.sp_check_period_dtl WHERE sp_check_period_hdr_id = ? ORDER BY sp_check_period_dtl_id",
-            array($checkPeriodHdrId)
-        );
-        $torHdrRows = $torPeriodId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor_hdr_period WHERE sp_tor_hdr_period_id = ?",
-            array($torPeriodId)
-        ) : array();
-        if ($contractId <= 0 && count($torHdrRows) > 0) {
-            $contractId = intval($torHdrRows[0]['sp_tor_contract_id'] ?? 0);
-        }
-        $torDtlRows = $torPeriodId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor_dtl_period WHERE sp_tor_hdr_period_id = ? ORDER BY sp_tor_dtl_period_id",
-            array($torPeriodId)
-        ) : array();
-        $contractRows = $contractId > 0 ? $fetchRows(
+        $selectedContractRows = $contractId > 0 ? $fetchRows(
             "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ?",
             array($contractId)
         ) : array();
-        $torId = count($contractRows) > 0
-            ? intval($contractRows[0]['sp_tor_id'] ?? ($contractRows[0]['tor_id'] ?? 0))
+        $torId = count($selectedContractRows) > 0
+            ? intval($selectedContractRows[0]['sp_tor_id'] ?? ($selectedContractRows[0]['tor_id'] ?? 0))
             : intval($_REQUEST['sp_tor_id'] ?? 0);
         $torRows = $torId > 0 ? $fetchRows(
             "SELECT * FROM dbo.sp_tor WHERE tor_id = ?",
             array($torId)
         ) : array();
+        $torDtlMasterRows = $torId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor_dtl WHERE sp_tor_id = ? ORDER BY sp_tor_dtl_id", array($torId)
+        ) : array();
+        $bidderHdrRows = $torId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor_bidder_hdr WHERE sp_tor_id = ? ORDER BY sp_tor_bidder_hdr_id", array($torId)
+        ) : array();
+        $bidderDtlRows = $torId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor_bidder_dtl WHERE sp_tor_id = ? ORDER BY sp_tor_bidder_dtl_id", array($torId)
+        ) : array();
+        $victoryRows = $torId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor_victory WHERE sp_tor_id = ?", array($torId)
+        ) : array();
+        $contractRows = $torId > 0 ? $fetchRows(
+            "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_id = ? ORDER BY sp_tor_contract_id", array($torId)
+        ) : $selectedContractRows;
+        $torHdrRows = $torId > 0 ? $fetchRows(
+            "SELECT h.* FROM dbo.sp_tor_hdr_period h
+             INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
+             WHERE c.sp_tor_id=? ORDER BY h.sp_tor_hdr_period_id", array($torId)
+        ) : array();
+        $torDtlRows = $torId > 0 ? $fetchRows(
+            "SELECT d.* FROM dbo.sp_tor_dtl_period d
+             INNER JOIN dbo.sp_tor_hdr_period h ON h.sp_tor_hdr_period_id=d.sp_tor_hdr_period_id
+             INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
+             WHERE c.sp_tor_id=? ORDER BY d.sp_tor_dtl_period_id", array($torId)
+        ) : array();
+        $mnHdrRows = $torId > 0 ? $fetchRows(
+            "SELECT m.* FROM dbo.sp_mn_contract_hdr m
+             INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=m.sp_contract_id
+             WHERE c.sp_tor_id=? ORDER BY m.sp_mn_contract_hdr_id", array($torId)
+        ) : array();
+        $mnDtlRows = $torId > 0 ? $fetchRows(
+            "SELECT d.* FROM dbo.sp_mn_contract_dtl d
+             INNER JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=d.sp_mn_contract_hdr_id
+             INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=m.sp_contract_id
+             WHERE c.sp_tor_id=? ORDER BY d.sp_mn_contract_dtl_id", array($torId)
+        ) : array();
+        $checkHdrRows = $torId > 0 ? $fetchRows(
+            "SELECT ch.* FROM dbo.sp_check_period_hdr ch
+             WHERE EXISTS (
+               SELECT 1 FROM dbo.sp_tor_contract c
+               WHERE c.sp_tor_id=? AND (
+                 c.sp_tor_contract_id=ch.sp_tor_contract_id OR
+                 EXISTS (
+                   SELECT 1 FROM dbo.sp_mn_contract_hdr m
+                   WHERE m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
+                     AND m.sp_contract_id=c.sp_tor_contract_id
+                 )
+               )
+             )
+             ORDER BY ch.sp_check_period_hdr_id",
+            array($torId)
+        ) : $hdrRows;
+        $checkDtlRows = $torId > 0 ? $fetchRows(
+            "SELECT d.* FROM dbo.sp_check_period_dtl d
+             INNER JOIN dbo.sp_check_period_hdr ch ON ch.sp_check_period_hdr_id=d.sp_check_period_hdr_id
+             LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
+             LEFT JOIN dbo.sp_tor_contract c1 ON c1.sp_tor_contract_id=m.sp_contract_id
+             LEFT JOIN dbo.sp_tor_contract c2 ON c2.sp_tor_contract_id=ch.sp_tor_contract_id
+             WHERE c1.sp_tor_id=? OR c2.sp_tor_id=? ORDER BY d.sp_check_period_dtl_id",
+            array($torId, $torId)
+        ) : array();
+        $tranfHdrRows = $torId > 0 ? $fetchRows(
+            "SELECT t.* FROM dbo.sp_tranf_hdr t
+             INNER JOIN dbo.sp_check_period_hdr ch ON ch.sp_check_period_hdr_id=t.sp_check_period_hdr_id
+             LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
+             LEFT JOIN dbo.sp_tor_contract c1 ON c1.sp_tor_contract_id=m.sp_contract_id
+             LEFT JOIN dbo.sp_tor_contract c2 ON c2.sp_tor_contract_id=ch.sp_tor_contract_id
+             WHERE c1.sp_tor_id=? OR c2.sp_tor_id=? ORDER BY t.sp_tranf_hdr_id",
+            array($torId, $torId)
+        ) : array();
+        $tranfItemRows = $torId > 0 ? $fetchRows(
+            "SELECT i.* FROM dbo.sp_tranf_item i
+             INNER JOIN dbo.sp_tranf_hdr t ON t.sp_tranf_hdr_id=i.sp_tranf_hdr_id
+             INNER JOIN dbo.sp_check_period_hdr ch ON ch.sp_check_period_hdr_id=t.sp_check_period_hdr_id
+             LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
+             LEFT JOIN dbo.sp_tor_contract c1 ON c1.sp_tor_contract_id=m.sp_contract_id
+             LEFT JOIN dbo.sp_tor_contract c2 ON c2.sp_tor_contract_id=ch.sp_tor_contract_id
+             WHERE c1.sp_tor_id=? OR c2.sp_tor_id=? ORDER BY i.sp_tranf_item_id",
+            array($torId, $torId)
+        ) : array();
+
+        $datasets = array(
+            $makeDataset("sp_tor", "1. เรื่องจัดซื้อจัดจ้าง (TOR)", $torRows),
+            $makeDataset("sp_tor_dtl", "2. รายละเอียด TOR", $torDtlMasterRows),
+            $makeDataset("sp_tor_bidder_hdr", "3. หัวผู้เสนอราคา", $bidderHdrRows),
+            $makeDataset("sp_tor_bidder_dtl", "4. รายละเอียดผู้เสนอราคา", $bidderDtlRows),
+            $makeDataset("sp_tor_victory", "5. ผู้ชนะการเสนอราคา", $victoryRows),
+            $makeDataset("sp_tor_contract", "6. สัญญา", $contractRows),
+            $makeDataset("sp_tor_hdr_period", "หัวข้องวด TOR", $torHdrRows),
+            $makeDataset("sp_tor_dtl_period", "รายละเอียดงวด TOR", $torDtlRows),
+            $makeDataset("sp_mn_contract_hdr", "หัวการส่งมอบตามสัญญา", $mnHdrRows),
+            $makeDataset("sp_mn_contract_dtl", "รายละเอียดการส่งมอบตามสัญญา", $mnDtlRows),
+            $makeDataset("sp_check_period_hdr", "หัวรายการตรวจรับ", $checkHdrRows),
+            $makeDataset("sp_check_period_dtl", "รายละเอียดตรวจรับ", $checkDtlRows),
+            $makeDataset("sp_tranf_hdr", "หัวรายการส่งบัญชี", $tranfHdrRows),
+            $makeDataset("sp_tranf_item", "รายละเอียดรายการส่งบัญชี", $tranfItemRows)
+        );
+        $logWhere = array();
+        $logParams = array();
+        foreach ($datasets as $dataset) {
+            foreach ($dataset['rows'] as $datasetRow) {
+                $primaryKey = $dataset['primary_key'];
+                if (isset($datasetRow[$primaryKey]) && $datasetRow[$primaryKey] !== '') {
+                    $logWhere[] = "(table_name = ? AND ISNULL(row_field, table_name + '_id') = ? AND CONVERT(varchar(100), row_id) = ?)";
+                    $logParams[] = $dataset['table'];
+                    $logParams[] = $primaryKey;
+                    $logParams[] = strval($datasetRow[$primaryKey]);
+                }
+            }
+        }
+        $logRows = array();
+        if (count($logWhere) > 0) {
+            $logResult = $db->QueryParam(
+                "SELECT TOP 500 log_id,table_name,row_id,row_field,field_name,old_value,new_value,user_id,
+                    CONVERT(varchar,date_create,120) AS date_create,remarks
+                 FROM NMU_ERPLOG..sys_log_change WHERE " . implode(" OR ", $logWhere) . " ORDER BY log_id DESC",
+                $logParams
+            );
+            while ($logResult && ($logRow = $db->Fetch($logResult))) {
+                $logRows[] = $logRow;
+            }
+        }
 
         echo json_encode(array(
             "success" => true,
@@ -387,14 +522,8 @@ switch ($mode) {
                 "sp_tor_contract_id" => $contractId,
                 "sp_tor_id" => $torId
             ),
-            "datasets" => array(
-                $makeDataset("sp_check_period_hdr", "หัวรายการตรวจรับ", $hdrRows),
-                $makeDataset("sp_check_period_dtl", "รายละเอียดตรวจรับ", $checkDtlRows),
-                $makeDataset("sp_tor_hdr_period", "หัวข้องวด TOR", $torHdrRows),
-                $makeDataset("sp_tor_dtl_period", "รายละเอียดงวด TOR", $torDtlRows),
-                $makeDataset("sp_tor_contract", "สัญญา", $contractRows),
-                $makeDataset("sp_tor", "TOR", $torRows)
-            )
+            "datasets" => $datasets,
+            "logs" => $logRows
         ));
         exit();
 
