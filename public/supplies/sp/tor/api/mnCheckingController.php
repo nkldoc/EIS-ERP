@@ -767,7 +767,7 @@ switch ($mode) {
         ###################
         $root = "data";
         $data = array();
-//        if ($_REQUEST && !empty($_REQUEST['mode']) && $_REQUEST['mode'] == 'getLogList') {
+ 
         // รับค่าจาก tbar ที่ส่งมากรองข้อมูล
         $search_table = !empty($_REQUEST['search_table']) ? trim($_REQUEST['search_table']) : '';
         $search_row_id = !empty($_REQUEST['search_row_id']) ? intval($_REQUEST['search_row_id']) : '';
@@ -805,13 +805,11 @@ switch ($mode) {
         $sql = "SELECT log_id, table_name, row_id, isnull(row_field,table_name+'_id') as row_field, field_name, old_value, new_value, user_id,
                    CONVERT(varchar, date_create, 120) as date_create, remarks
             FROM NMU_ERPLOG..sys_log_change " . $where . " ORDER BY log_id DESC";
-//        echo $db->debugSql($sql, $params);
-//        exit();
-        // รัน Query ผ่านฟังก์ชันของคุณ เช่น $db->QueryParam($sql, $params)
+ 
         $result = $db->QueryParam($sql, $params);
 
         $data = array();
-//            // วนลูป fetch ข้อมูลใส่ array $data ...
+ 
 // --- แบบที่ 1: กรณี $stmt_log เป็น Object ของ PDO Statement ---
         if ($result) {
             while ($row = $db->Fetch($result)) {
@@ -837,7 +835,7 @@ switch ($mode) {
         exit();
 
         break;
-//        break;
+ 
     case "batchDeleteTable":
         // 1. ตรวจสอบ Session ก่อนเริ่มทำงาน
         if (empty($_SESSION['user_id'])) {
