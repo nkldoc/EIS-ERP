@@ -1,7 +1,10 @@
 <?PHP 
-header("Access-Control-Allow-Origin: https://eis.vajira.ac.th:8443/procure");
-header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Headers: access");
+header("Access-Control-Allow-Methods: POST");
+header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+
 
 if($_SERVER["REQUEST_METHOD"] != "POST"){
  die('Page Not Found!');
@@ -10,11 +13,10 @@ if($_SERVER["REQUEST_METHOD"] != "POST"){
  
     $_POST["userf"] = $data->userf;
     $_POST["passwordf"] = $data->passwordf;
-}
-
+} 
 require_once("../conf/config.php");
 require_once("../lib/database/DatabaseServer.php");
-if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="procure"){
+if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="supplies"){
     die("plz Logout");
 } else if (isset($_POST["userf"]) && isset($_POST["passwordf"])) {
     $db = new DatabaseServer();
@@ -23,12 +25,12 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="procure"){
 
     $sql = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
                 , IIF(c.sp_emp_id is null, 0, IIF( a.dc_user_id = 1 , 2, 1)) as i_set_type_emp
-                , isnull(i_type_emp,0) as i_type_emp
+                --, isnull(i_type_emp,0) as i_type_emp
                 , isnull((select top 1 c_name from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
                 , isnull((select top 1 c_code from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
                 ,(select top 1 dc_area_id from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
                 , a.i_type_user
-                , a.super_user
+               -- , a.super_user
                 , isnull((select top 1  bb.dc_cost_acc_id from NMU_DATACENTER.dbo.dc_cost bb where bb.dc_cost_id=a.dc_cost_id),0) as dc_cost_acc_id
                 , isnull(c.c_name,'') as 'c_sp_emp'
                 , isnull(e.c_name,'') as 'c_department_type'
@@ -56,6 +58,9 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="procure"){
     
     $re = array("reval" => 1, "success" => "Error", "msg" => "Login False");
     while ($data = $db->Fetch($stmt)) {
+        // Do not carry any authenticated fields from the previous user.
+        $_SESSION = array();
+        session_regenerate_id(true);
     /**/
         $_SESSION["DOMAIN_LOGIN"] = "PROCURE"; //id ผู้ใช้งาน
         $_SESSION["DOMAIN"] = DOMAIN['en']; //id ผู้ใช้งาน 
@@ -65,7 +70,7 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="procure"){
         $_SESSION["user_name"] = $data["c_full_name"]; //ชื่อผู้ใช้งาน
         $_SESSION["dc_emp_id"] = intval($data["dc_emp_id"]); //พนักงานผู้รับผิดชอบ 
         $_SESSION["sp_emp_id"] = intval($data["sp_emp_id"]) ?? null; //
-        $_SESSION["i_type_emp"] = $data["i_type_emp"]; // i_type_emp
+//        $_SESSION["i_type_emp"] = $data["i_type_emp"]; // i_type_emp
         $_SESSION["dc_department_id"] = intval($data["dc_department_id"]) ?? null; //
         $_SESSION["dc_department_type_id"] = intval($data["dc_department_type_id"]) ?? null; //
         $_SESSION["i_seq"] = intval($data["i_seq"]) ?? null; //
@@ -82,7 +87,37 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="procure"){
         $_SESSION["super_user"] = intval($data["super_user"]) ?? null;
         $_SESSION["dc_cost_acc_id"] = intval($data["dc_cost_acc_id"]); //id ศูนย์ต้นทุนทางบัญชีของหน่วยงานที่ log in
         $_SESSION["last_login"] = date("Y-m-d H:i:s");
- 
+        $_SESSION["created"]  = time();;
+
+//Java Session
+//        require_once("../java/Java.inc");
+//        $session = java_session();
+//        $session->put("DOMAIN_LOGIN", "PROCURE");
+//        $session->put("DOMAIN", DOMAIN['en']);
+//        $session->put("DOMAIN_NAME", DOMAIN['th']);
+//        $session->put("user_id", intval($data["dc_user_id"])); 
+//        $session->put("menu", "sp/dashBard.php");  
+//        $session->put("user_name", $data["c_full_name"]);
+//        $session->put("dc_emp_id", intval($data["dc_emp_id"])); 
+//        $session->put("sp_emp_id", intval($data["sp_emp_id"]));
+//        $session->put("dc_center_user", intval($data["dc_center_user"]));
+////        $session->put("i_type_emp", $data["i_type_emp"]); // 1 ฝ่ายงานซื้อจ้าง , 2 admin , 0 หน่วยงานขอซื้อจ้าง , 3 ผู้บริหารเงิน , 4 ผู้บริหาร
+//        $session->put("dc_department_id", intval($data["dc_department_id"]));
+//        $session->put("dc_department_type_id", intval($data["dc_department_type_id"]));
+//        $session->put("i_seq", $data["i_seq"]);
+//        $session->put("i_level", $data["i_level"]); 
+//        $session->put("c_sp_emp", $data["c_sp_emp"]);
+//        $session->put("c_department_type", $data["c_department_type"]);
+//        $session->put("c_department", $data["c_department"]);
+//        $session->put("c_position", $data["c_position"]); 
+//        $session->put("dc_cost_id", $data["dc_cost_id"]);
+//        $session->put("cost_name", $data["cost_name"]);
+//        $session->put("cost_code", $data["cost_code"]); 
+//        $session->put("i_type_user", $data["i_type_user"]);
+//        $session->put("super_user", $data["super_user"]);
+//        $session->put("dc_cost_acc_id", $data["dc_cost_acc_id"]);
+//        $session->put("last_login", date("Y-m-d H:i:s"));
+//        $session->put("created", time());
  
         $re = array("reval" => 0, "success" => "Success", "msg" => "Login Success");
     }

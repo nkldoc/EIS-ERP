@@ -199,12 +199,12 @@ function shouldUseWorkInProcessAccount($request, $db) {
     }
 
     $stmt = $db->QueryParam(
-        "SELECT TOP 1 c_code FROM " . DB_CENTER . "am_mode_acc WHERE am_mode_id = ?",
-        array($amModeId)
+            "SELECT TOP 1 c_code FROM " . DB_CENTER . "am_mode_acc WHERE am_mode_id = ?",
+            array($amModeId)
     );
     $row = $stmt ? $db->Fetch($stmt) : false;
 
-    return $row && trim((string)$row['c_code']) === '9999';
+    return $row && trim((string) $row['c_code']) === '9999';
 }
 
 switch ($mode) {
@@ -268,21 +268,26 @@ switch ($mode) {
             exit();
         }
         $updatedCount = 0;
+        $pendingLogs = array();
+        $transactionActive = false;
         try {
+            // The controller opens one transaction before entering the mode switch.
+            // Reuse it here; sqlsrv does not support nested transactions.
+            $transactionActive = true;
             foreach ($changes as $change) {
                 $tableName = preg_replace('/[^a-zA-Z0-9_]/', '', $change['table_name'] ?? '');
                 $fieldName = preg_replace('/[^a-zA-Z0-9_]/', '', $change['field_name'] ?? '');
                 $rowId = $change['row_id'] ?? null;
                 if (!isset($allowedTables[$tableName]) || $rowId === null || $rowId === '' ||
-                    $fieldName === $allowedTables[$tableName] || in_array($fieldName, $blockedFields, true)) {
+                        $fieldName === $allowedTables[$tableName] || in_array($fieldName, $blockedFields, true)) {
                     throw new Exception("พบตาราง ฟิลด์ หรือรหัสแถวที่ไม่อนุญาต");
                 }
                 $metaStmt = $db->QueryParam(
-                    "SELECT ty.name AS data_type FROM sys.columns c
+                        "SELECT ty.name AS data_type FROM sys.columns c
                      INNER JOIN sys.types ty ON ty.user_type_id=c.user_type_id
                      INNER JOIN sys.tables t ON t.object_id=c.object_id
                      WHERE t.name=? AND c.name=?",
-                    array($tableName, $fieldName)
+                        array($tableName, $fieldName)
                 );
                 $meta = $metaStmt ? $db->Fetch($metaStmt) : false;
                 if (!$meta || in_array(strtolower($meta['data_type']), array('image', 'binary', 'varbinary', 'timestamp', 'rowversion'), true)) {
@@ -290,8 +295,8 @@ switch ($mode) {
                 }
                 $pk = $allowedTables[$tableName];
                 $oldStmt = $db->QueryParam(
-                    "SELECT CONVERT(nvarchar(max), [{$fieldName}]) AS old_value FROM dbo.[{$tableName}] WHERE [{$pk}] = ?",
-                    array($rowId)
+                        "SELECT CONVERT(nvarchar(max), [{$fieldName}]) AS old_value FROM dbo.[{$tableName}] WHERE [{$pk}] = ?",
+                        array($rowId)
                 );
                 $oldRow = $oldStmt ? $db->Fetch($oldStmt) : false;
                 if (!$oldRow) {
@@ -299,31 +304,68 @@ switch ($mode) {
                 }
                 $oldValue = $oldRow['old_value'];
                 $newValue = $change['new_value'] ?? null;
+                $dataType = strtolower($meta['data_type']);
+                if ($newValue === '' && in_array($dataType, array(
+                            'bigint', 'int', 'smallint', 'tinyint', 'bit', 'decimal', 'numeric',
+                            'money', 'smallmoney', 'float', 'real', 'date', 'datetime',
+                            'datetime2', 'smalldatetime', 'time', 'uniqueidentifier'
+                                ), true)) {
+                    $newValue = null;
+                }
                 // อัปเดตข้อมูลและ Log ใน Transaction เดียวกัน ป้องกันข้อมูลเปลี่ยนแต่ประวัติไม่ถูกบันทึก
                 $saveStmt = $db->QueryParam(
-                    "SET XACT_ABORT ON;
-                     BEGIN TRANSACTION;
-                     BEGIN TRY
-                       UPDATE dbo.[{$tableName}] SET [{$fieldName}] = ? WHERE [{$pk}] = ?;
-                       INSERT INTO NMU_ERPLOG..sys_log_change
-                         (table_name,row_id,row_field,field_name,old_value,new_value,user_id,date_create,remarks)
-                       VALUES (?,?,?,?,?,?,?,?,?);
-                       COMMIT TRANSACTION;
-                     END TRY
-                     BEGIN CATCH
-                       IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-                       THROW;
-                     END CATCH",
-                    array($newValue, $rowId, $tableName, $rowId, $pk, $fieldName, $oldValue,
-                        $newValue, $_SESSION['user_id'], date('Y-m-d H:i:s'), $remarks)
+                        "UPDATE dbo.[{$tableName}] SET [{$fieldName}] = ? WHERE [{$pk}] = ?",
+                        array($newValue, $rowId)
                 );
                 if (!$saveStmt) {
                     throw new Exception("ไม่สามารถแก้ไขหรือบันทึกประวัติ {$tableName}.{$fieldName} ได้");
                 }
+                $verifyStmt = $db->QueryParam(
+                        "SELECT CASE WHEN ([{$fieldName}] = ? OR ([{$fieldName}] IS NULL AND ? IS NULL))
+                         THEN 1 ELSE 0 END AS value_matches
+                     FROM dbo.[{$tableName}] WHERE [{$pk}] = ?",
+                        array($newValue, $newValue, $rowId)
+                );
+                $verifyRow = $verifyStmt ? $db->Fetch($verifyStmt) : false;
+                if (!$verifyRow || intval($verifyRow['value_matches']) !== 1) {
+                    throw new Exception("Persisted value verification failed: {$tableName}.{$fieldName} ID {$rowId}");
+                }
+                $pendingLogs[] = array($tableName, $rowId, $pk, $fieldName, $oldValue, $newValue,
+                    $_SESSION['user_id'], date('Y-m-d H:i:s'), $remarks);
                 $updatedCount++;
             }
-            echo json_encode(array("success" => true, "msg" => "แก้ไขและบันทึกประวัติ {$updatedCount} รายการแล้ว"));
+            if (!$db->CommitTran()) {
+                throw new Exception('Database commit failed');
+            }
+            $transactionActive = false;
+
+            $logFailedCount = 0;
+            foreach ($pendingLogs as $logParams) {
+                $logStmt = $db->QueryParam(
+                        "INSERT INTO NMU_ERPLOG..sys_log_change
+                           (table_name,row_id,row_field,field_name,old_value,new_value,user_id,date_create,remarks)
+                         VALUES (?,?,?,?,?,?,?,?,?)",
+                        $logParams
+                );
+                if (!$logStmt) {
+                    $logFailedCount++;
+                }
+            }
+            $message = "แก้ไขข้อมูลจริง {$updatedCount} รายการแล้ว";
+            if ($logFailedCount > 0) {
+                $message .= " แต่บันทึก Log ไม่สำเร็จ {$logFailedCount} รายการ";
+            } else {
+                $message .= " และบันทึก Log สำเร็จ";
+            }
+            echo json_encode(array(
+                "success" => true,
+                "warning" => $logFailedCount > 0,
+                "msg" => $message
+            ));
         } catch (Exception $ex) {
+            if ($transactionActive) {
+                $db->RollBackTran();
+            }
             echo json_encode(array("success" => false, "msg" => $ex->getMessage()));
         }
         exit();
@@ -368,28 +410,28 @@ switch ($mode) {
             $editableColumns = array();
             $columnTypes = array();
             $metaResult = $db->QueryParam(
-                "SELECT c.name AS field_name, ty.name AS data_type FROM sys.columns c
+                    "SELECT c.name AS field_name, ty.name AS data_type FROM sys.columns c
                  INNER JOIN sys.types ty ON ty.user_type_id=c.user_type_id
                  INNER JOIN sys.tables t ON t.object_id=c.object_id WHERE t.name=?",
-                array($tableName)
+                    array($tableName)
             );
             $blocked = array($primaryKeys[$tableName], 'dc_user_update_id', 'dc_user_update_cost_id',
                 'd_update', 'd_create', 'act_user_id', 'act_cost_id', 'act_date_dt');
             while ($metaResult && ($metaRow = $db->Fetch($metaResult))) {
                 $columnTypes[$metaRow['field_name']] = strtolower($metaRow['data_type']);
                 if (!in_array($metaRow['field_name'], $blocked, true) &&
-                    !in_array(strtolower($metaRow['data_type']), array('image','binary','varbinary','timestamp','rowversion'), true)) {
+                        !in_array(strtolower($metaRow['data_type']), array('image', 'binary', 'varbinary', 'timestamp', 'rowversion'), true)) {
                     $editableColumns[] = $metaRow['field_name'];
                 }
             }
             return array(
-                "table" => $tableName,
-                "title" => $title,
-                "primary_key" => $primaryKeys[$tableName],
-                "columns" => $columns,
-                "column_types" => $columnTypes,
-                "editable_columns" => $editableColumns,
-                "rows" => $rows
+        "table" => $tableName,
+        "title" => $title,
+        "primary_key" => $primaryKeys[$tableName],
+        "columns" => $columns,
+        "column_types" => $columnTypes,
+        "editable_columns" => $editableColumns,
+        "rows" => $rows
             );
         };
 
@@ -397,9 +439,9 @@ switch ($mode) {
         if ($searchCode !== '') {
             if ($searchType === 'contract_code') {
                 $searchRows = $fetchRows(
-                    "SELECT TOP 1 sp_tor_id,sp_tor_contract_id FROM dbo.sp_tor_contract
+                        "SELECT TOP 1 sp_tor_id,sp_tor_contract_id FROM dbo.sp_tor_contract
                      WHERE LTRIM(RTRIM(c_code))=? ORDER BY sp_tor_contract_id DESC",
-                    array($searchCode)
+                        array($searchCode)
                 );
                 if (count($searchRows) > 0) {
                     $requestedTorId = intval($searchRows[0]['sp_tor_id']);
@@ -408,8 +450,8 @@ switch ($mode) {
             } else {
                 $contractId = 0;
                 $searchRows = $fetchRows(
-                    "SELECT TOP 1 tor_id FROM dbo.sp_tor WHERE LTRIM(RTRIM(c_code))=? ORDER BY tor_id DESC",
-                    array($searchCode)
+                        "SELECT TOP 1 tor_id FROM dbo.sp_tor WHERE LTRIM(RTRIM(c_code))=? ORDER BY tor_id DESC",
+                        array($searchCode)
                 );
                 if (count($searchRows) > 0) {
                     $requestedTorId = intval($searchRows[0]['tor_id']);
@@ -421,62 +463,60 @@ switch ($mode) {
             }
         }
         $hdrRows = $checkPeriodHdrId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_check_period_hdr WHERE sp_check_period_hdr_id = ?",
-            array($checkPeriodHdrId)
-        ) : array();
+                        "SELECT * FROM dbo.sp_check_period_hdr WHERE sp_check_period_hdr_id = ?",
+                        array($checkPeriodHdrId)
+                ) : array();
         $hdr = count($hdrRows) > 0 ? $hdrRows[0] : array();
         $torPeriodId = intval($hdr['sp_tor_hdr_period_id'] ?? ($_REQUEST['sp_tor_hdr_period_id'] ?? 0));
         if ($contractId <= 0) {
             $contractId = intval($hdr['sp_tor_contract_id'] ?? 0);
         }
         $selectedContractRows = $contractId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ?",
-            array($contractId)
-        ) : array();
-        $torId = $requestedTorId > 0 ? $requestedTorId : (count($selectedContractRows) > 0
-            ? intval($selectedContractRows[0]['sp_tor_id'] ?? ($selectedContractRows[0]['tor_id'] ?? 0))
-            : 0);
+                        "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ?",
+                        array($contractId)
+                ) : array();
+        $torId = $requestedTorId > 0 ? $requestedTorId : (count($selectedContractRows) > 0 ? intval($selectedContractRows[0]['sp_tor_id'] ?? ($selectedContractRows[0]['tor_id'] ?? 0)) : 0);
         if ($torId <= 0) {
             echo json_encode(array("success" => false, "msg" => "ไม่พบข้อมูล TOR ที่เชื่อมโยง"));
             exit();
         }
         $torRows = $torId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor WHERE tor_id = ?",
-            array($torId)
-        ) : array();
+                        "SELECT * FROM dbo.sp_tor WHERE tor_id = ?",
+                        array($torId)
+                ) : array();
         $torDtlMasterRows = $torId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor_dtl WHERE sp_tor_id = ? ORDER BY sp_tor_dtl_id", array($torId)
-        ) : array();
+                        "SELECT * FROM dbo.sp_tor_dtl WHERE sp_tor_id = ? ORDER BY sp_tor_dtl_id", array($torId)
+                ) : array();
         $bidderHdrRows = $torId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor_bidder_hdr WHERE sp_tor_id = ? ORDER BY sp_tor_bidder_hdr_id", array($torId)
-        ) : array();
+                        "SELECT * FROM dbo.sp_tor_bidder_hdr WHERE sp_tor_id = ? ORDER BY sp_tor_bidder_hdr_id", array($torId)
+                ) : array();
         $bidderDtlRows = $torId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor_bidder_dtl WHERE sp_tor_id = ? ORDER BY sp_tor_bidder_dtl_id", array($torId)
-        ) : array();
+                        "SELECT * FROM dbo.sp_tor_bidder_dtl WHERE sp_tor_id = ? ORDER BY sp_tor_bidder_dtl_id", array($torId)
+                ) : array();
         $victoryRows = $torId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor_victory WHERE sp_tor_id = ?", array($torId)
-        ) : array();
+                        "SELECT * FROM dbo.sp_tor_victory WHERE sp_tor_id = ?", array($torId)
+                ) : array();
         $contractRows = $torId > 0 ? $fetchRows(
-            "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_id = ? ORDER BY sp_tor_contract_id", array($torId)
-        ) : $selectedContractRows;
+                        "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_id = ? ORDER BY sp_tor_contract_id", array($torId)
+                ) : $selectedContractRows;
         $torHdrRows = $torId > 0 ? $fetchRows(
-            "SELECT h.* FROM dbo.sp_tor_hdr_period h
+                        "SELECT h.* FROM dbo.sp_tor_hdr_period h
              INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
              WHERE c.sp_tor_id=? ORDER BY h.sp_tor_hdr_period_id", array($torId)
-        ) : array();
+                ) : array();
         $torDtlRows = $torId > 0 ? $fetchRows(
-            "SELECT d.* FROM dbo.sp_tor_dtl_period d
+                        "SELECT d.* FROM dbo.sp_tor_dtl_period d
              INNER JOIN dbo.sp_tor_hdr_period h ON h.sp_tor_hdr_period_id=d.sp_tor_hdr_period_id
              INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
              WHERE c.sp_tor_id=? ORDER BY d.sp_tor_dtl_period_id", array($torId)
-        ) : array();
+                ) : array();
         $mnHdrRows = $torId > 0 ? $fetchRows(
-            "SELECT m.* FROM dbo.sp_mn_contract_hdr m
+                        "SELECT m.* FROM dbo.sp_mn_contract_hdr m
              INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=m.sp_contract_id
              WHERE c.sp_tor_id=? ORDER BY m.sp_mn_contract_hdr_id", array($torId)
-        ) : array();
+                ) : array();
         $checkHdrRows = $torId > 0 ? $fetchRows(
-            "SELECT ch.* FROM dbo.sp_check_period_hdr ch
+                        "SELECT ch.* FROM dbo.sp_check_period_hdr ch
              WHERE EXISTS (
                SELECT 1 FROM dbo.sp_tor_contract c
                WHERE c.sp_tor_id=? AND (
@@ -489,36 +529,36 @@ switch ($mode) {
                )
              )
              ORDER BY ch.sp_check_period_hdr_id",
-            array($torId)
-        ) : $hdrRows;
+                        array($torId)
+                ) : $hdrRows;
         $checkDtlRows = $torId > 0 ? $fetchRows(
-            "SELECT d.* FROM dbo.sp_check_period_dtl d
+                        "SELECT d.* FROM dbo.sp_check_period_dtl d
              INNER JOIN dbo.sp_check_period_hdr ch ON ch.sp_check_period_hdr_id=d.sp_check_period_hdr_id
              LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
              LEFT JOIN dbo.sp_tor_contract c1 ON c1.sp_tor_contract_id=m.sp_contract_id
              LEFT JOIN dbo.sp_tor_contract c2 ON c2.sp_tor_contract_id=ch.sp_tor_contract_id
              WHERE c1.sp_tor_id=? OR c2.sp_tor_id=? ORDER BY d.sp_check_period_dtl_id",
-            array($torId, $torId)
-        ) : array();
+                        array($torId, $torId)
+                ) : array();
         $tranfHdrRows = $torId > 0 ? $fetchRows(
-            "SELECT t.* FROM dbo.sp_tranf_hdr t
+                        "SELECT t.* FROM dbo.sp_tranf_hdr t
              INNER JOIN dbo.sp_check_period_hdr ch ON ch.sp_check_period_hdr_id=t.sp_check_period_hdr_id
              LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
              LEFT JOIN dbo.sp_tor_contract c1 ON c1.sp_tor_contract_id=m.sp_contract_id
              LEFT JOIN dbo.sp_tor_contract c2 ON c2.sp_tor_contract_id=ch.sp_tor_contract_id
              WHERE c1.sp_tor_id=? OR c2.sp_tor_id=? ORDER BY t.sp_tranf_hdr_id",
-            array($torId, $torId)
-        ) : array();
+                        array($torId, $torId)
+                ) : array();
         $tranfItemRows = $torId > 0 ? $fetchRows(
-            "SELECT i.* FROM dbo.sp_tranf_item i
+                        "SELECT i.* FROM dbo.sp_tranf_item i
              INNER JOIN dbo.sp_tranf_hdr t ON t.sp_tranf_hdr_id=i.sp_tranf_hdr_id
              INNER JOIN dbo.sp_check_period_hdr ch ON ch.sp_check_period_hdr_id=t.sp_check_period_hdr_id
              LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
              LEFT JOIN dbo.sp_tor_contract c1 ON c1.sp_tor_contract_id=m.sp_contract_id
              LEFT JOIN dbo.sp_tor_contract c2 ON c2.sp_tor_contract_id=ch.sp_tor_contract_id
              WHERE c1.sp_tor_id=? OR c2.sp_tor_id=? ORDER BY i.sp_tranf_item_id",
-            array($torId, $torId)
-        ) : array();
+                        array($torId, $torId)
+                ) : array();
 
         $datasets = array(
             $makeDataset("sp_tor", "1. เรื่องจัดซื้อจัดจ้าง (TOR)", $torRows),
@@ -551,10 +591,10 @@ switch ($mode) {
         $logRows = array();
         if (count($logWhere) > 0) {
             $logResult = $db->QueryParam(
-                "SELECT TOP 500 log_id,table_name,row_id,row_field,field_name,old_value,new_value,user_id,
+                    "SELECT TOP 500 log_id,table_name,row_id,row_field,field_name,old_value,new_value,user_id,
                     CONVERT(varchar,date_create,120) AS date_create,remarks
                  FROM NMU_ERPLOG..sys_log_change WHERE " . implode(" OR ", $logWhere) . " ORDER BY log_id DESC",
-                $logParams
+                    $logParams
             );
             while ($logResult && ($logRow = $db->Fetch($logResult))) {
                 $logRows[] = $logRow;
@@ -576,12 +616,12 @@ switch ($mode) {
 
     case "getTableList":
         $result = $db->QueryParam(
-            "SELECT t.name AS table_name
+                "SELECT t.name AS table_name
              FROM sys.tables t
              INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
              WHERE s.name = 'dbo' AND t.is_ms_shipped = 0
              ORDER BY t.name",
-            array()
+                array()
         );
         $tableList = array();
         if ($result) {
@@ -595,13 +635,13 @@ switch ($mode) {
     case "getFieldList":
         $selectedTable = preg_replace('/[^a-zA-Z0-9_]/', '', $_REQUEST['table'] ?? '');
         $result = $db->QueryParam(
-            "SELECT c.name AS field_name
+                "SELECT c.name AS field_name
              FROM sys.columns c
              INNER JOIN sys.tables t ON t.object_id = c.object_id
              INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
              WHERE s.name = 'dbo' AND t.name = ?
              ORDER BY c.column_id",
-            array($selectedTable)
+                array($selectedTable)
         );
         $fieldList = array();
         if ($result) {
@@ -634,12 +674,12 @@ switch ($mode) {
         $selectedOrderDirection = !empty($matches[9]) && strtoupper($matches[9]) === 'ASC' ? 'ASC' : 'DESC';
 
         $fieldCheck = $db->QueryParam(
-            "SELECT COUNT(DISTINCT c.name) AS field_count
+                "SELECT COUNT(DISTINCT c.name) AS field_count
              FROM sys.columns c
              INNER JOIN sys.tables t ON t.object_id = c.object_id
              INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
              WHERE s.name = 'dbo' AND t.name = ? AND c.name IN (?, ?, ?, ?)",
-            array($selectedTable, $selectedIdField, $selectedValueField, $selectedOrderField, $selectedWhereField)
+                array($selectedTable, $selectedIdField, $selectedValueField, $selectedOrderField, $selectedWhereField)
         );
         $fieldCheckRow = $fieldCheck ? $db->Fetch($fieldCheck) : false;
         $requiredFields = array_unique(array_filter(array($selectedIdField, $selectedValueField, $selectedOrderField, $selectedWhereField)));
@@ -649,12 +689,12 @@ switch ($mode) {
         }
 
         $typeResult = $db->QueryParam(
-            "SELECT ty.name AS data_type FROM sys.columns c
+                "SELECT ty.name AS data_type FROM sys.columns c
              INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
              INNER JOIN sys.tables t ON t.object_id = c.object_id
              INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
              WHERE s.name = 'dbo' AND t.name = ? AND c.name = ?",
-            array($selectedTable, $selectedValueField)
+                array($selectedTable, $selectedValueField)
         );
         $typeRow = $typeResult ? $db->Fetch($typeResult) : array();
         $valueExpression = previewValueExpression($selectedValueField, $typeRow['data_type'] ?? '', 'field_value');
@@ -706,12 +746,12 @@ switch ($mode) {
 
         // ตรวจสอบ identifier กับ metadata ก่อนนำไปประกอบ SQL เสมอ
         $fieldCheck = $db->QueryParam(
-            "SELECT COUNT(DISTINCT c.name) AS field_count
+                "SELECT COUNT(DISTINCT c.name) AS field_count
              FROM sys.columns c
              INNER JOIN sys.tables t ON t.object_id = c.object_id
              INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
              WHERE s.name = 'dbo' AND t.name = ? AND c.name IN (?, ?)",
-            array($selectedTable, $selectedIdField, $selectedValueField)
+                array($selectedTable, $selectedIdField, $selectedValueField)
         );
         $fieldCheckRow = $fieldCheck ? $db->Fetch($fieldCheck) : false;
         $expectedFieldCount = ($selectedIdField === $selectedValueField) ? 1 : 2;
@@ -721,12 +761,12 @@ switch ($mode) {
         }
 
         $typeResult = $db->QueryParam(
-            "SELECT ty.name AS data_type FROM sys.columns c
+                "SELECT ty.name AS data_type FROM sys.columns c
              INNER JOIN sys.types ty ON ty.user_type_id = c.user_type_id
              INNER JOIN sys.tables t ON t.object_id = c.object_id
              INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
              WHERE s.name = 'dbo' AND t.name = ? AND c.name = ?",
-            array($selectedTable, $selectedValueField)
+                array($selectedTable, $selectedValueField)
         );
         $typeRow = $typeResult ? $db->Fetch($typeResult) : array();
         $valueExpression = previewValueExpression($selectedValueField, $typeRow['data_type'] ?? '', 'field_value');
@@ -767,7 +807,7 @@ switch ($mode) {
         ###################
         $root = "data";
         $data = array();
- 
+
         // รับค่าจาก tbar ที่ส่งมากรองข้อมูล
         $search_table = !empty($_REQUEST['search_table']) ? trim($_REQUEST['search_table']) : '';
         $search_row_id = !empty($_REQUEST['search_row_id']) ? intval($_REQUEST['search_row_id']) : '';
@@ -805,11 +845,11 @@ switch ($mode) {
         $sql = "SELECT log_id, table_name, row_id, isnull(row_field,table_name+'_id') as row_field, field_name, old_value, new_value, user_id,
                    CONVERT(varchar, date_create, 120) as date_create, remarks
             FROM NMU_ERPLOG..sys_log_change " . $where . " ORDER BY log_id DESC";
- 
+
         $result = $db->QueryParam($sql, $params);
 
         $data = array();
- 
+
 // --- แบบที่ 1: กรณี $stmt_log เป็น Object ของ PDO Statement ---
         if ($result) {
             while ($row = $db->Fetch($result)) {
@@ -835,7 +875,7 @@ switch ($mode) {
         exit();
 
         break;
- 
+
     case "batchDeleteTable":
         // 1. ตรวจสอบ Session ก่อนเริ่มทำงาน
         if (empty($_SESSION['user_id'])) {
@@ -1685,10 +1725,10 @@ switch ($mode) {
                 "i_step" => intval($row["i_step"]),
                 "check_pdf" => intval($row["check_pdf"]),
                 "i_is_upload_chk" => $row["i_is_upload_chk"],
-            "i_yyyy_overlap" => intval($row["i_yyyy_overlap"]) == 0 ? intval($BudgetYear) : intval($row["i_yyyy_overlap"]),
-            "i_yyyy_overlap2" => intval($row["i_yyyy_overlap2"]),
-            "c_overlap2" => $row["c_overlap2"],
-            "d_billing_date" => $row["d_billing_date"],
+                "i_yyyy_overlap" => intval($row["i_yyyy_overlap"]) == 0 ? intval($BudgetYear) : intval($row["i_yyyy_overlap"]),
+                "i_yyyy_overlap2" => intval($row["i_yyyy_overlap2"]),
+                "c_overlap2" => $row["c_overlap2"],
+                "d_billing_date" => $row["d_billing_date"],
                 "c_overlap" => $row["c_overlap"],
                 "c_billing_code" => $row["c_billing_code"],
                 "i_overlap" => $row["i_overlap"],
@@ -2438,9 +2478,7 @@ switch ($mode) {
                 $arrParam2["f_net_total_price"] = NULL;
             }
             // บันทึกยอดลง f_net_total_price เสมอเมื่อเพิ่มรายการตั้งหนี้ใหม่
-            $canonicalNetTotalPrice = (float)$f_net_total_price != 0
-                ? $f_net_total_price
-                : ((float)$f_wip_total_price != 0 ? $f_wip_total_price : $f_under_total_price);
+            $canonicalNetTotalPrice = (float) $f_net_total_price != 0 ? $f_net_total_price : ((float) $f_wip_total_price != 0 ? $f_wip_total_price : $f_under_total_price);
             $arrParam2["f_net_total_price"] = $canonicalNetTotalPrice;
 
             foreach ($arrParam2 as $fld => $value) {
@@ -2597,9 +2635,7 @@ switch ($mode) {
                         $arrParam2["f_net_total_price"] = NULL;
                     }
                     // บันทึกยอดลง f_net_total_price เสมอเมื่อสร้างหัวรายการและรายการตั้งหนี้ใหม่
-                    $canonicalNetTotalPrice = (float)$f_net_total_price != 0
-                        ? $f_net_total_price
-                        : ((float)$f_wip_total_price != 0 ? $f_wip_total_price : $f_under_total_price);
+                    $canonicalNetTotalPrice = (float) $f_net_total_price != 0 ? $f_net_total_price : ((float) $f_wip_total_price != 0 ? $f_wip_total_price : $f_under_total_price);
                     $arrParam2["f_net_total_price"] = $canonicalNetTotalPrice;
 
                     foreach ($arrParam2 as $fld => $value) {
@@ -3024,10 +3060,8 @@ switch ($mode) {
             $arrParam["f_under_total_price"] = !empty($fldd["f_under_total_price"]) ? str_replace(',', '', $fldd["f_under_total_price"]) : 0;
             ; // ครุภัณฑ์
             $netTotalPrice = !empty($fldd["f_net_total_price"]) ? str_replace(',', '', $fldd["f_net_total_price"]) : 0;
-            if ((float)$netTotalPrice == 0) {
-                $netTotalPrice = !empty($fldd["f_wip_total_price"])
-                    ? str_replace(',', '', $fldd["f_wip_total_price"])
-                    : (!empty($fldd["f_under_total_price"]) ? str_replace(',', '', $fldd["f_under_total_price"]) : 0);
+            if ((float) $netTotalPrice == 0) {
+                $netTotalPrice = !empty($fldd["f_wip_total_price"]) ? str_replace(',', '', $fldd["f_wip_total_price"]) : (!empty($fldd["f_under_total_price"]) ? str_replace(',', '', $fldd["f_under_total_price"]) : 0);
             }
             $arrParam["f_net_total_price"] = $netTotalPrice;
             $arrParam["f_sum_Transf"] = !empty($fldd["f_net_total"]) ? str_replace(',', '', $fldd["f_net_total"]) : 0; // วิ่งตามผังงบประมาณ / วัสดุ
@@ -3111,10 +3145,8 @@ switch ($mode) {
 //            $arrParam["f_wip_total_price"]       = !empty($fldd["f_wip_total_price"]) ? str_replace(',', '', $fldd["f_wip_total_price"]) : 0;  // งานระหว่างดำเนินการ
 //            $arrParam["f_under_total_price"]     = !empty($fldd["f_under_total_price"]) ? str_replace(',', '', $fldd["f_under_total_price"]) : 0;; // ครุภัณฑ์
             $netTotalPrice = !empty($fldd["f_net_total_price"]) ? str_replace(',', '', $fldd["f_net_total_price"]) : 0;
-            if ((float)$netTotalPrice == 0) {
-                $netTotalPrice = !empty($fldd["f_wip_total_price"])
-                    ? str_replace(',', '', $fldd["f_wip_total_price"])
-                    : (!empty($fldd["f_under_total_price"]) ? str_replace(',', '', $fldd["f_under_total_price"]) : 0);
+            if ((float) $netTotalPrice == 0) {
+                $netTotalPrice = !empty($fldd["f_wip_total_price"]) ? str_replace(',', '', $fldd["f_wip_total_price"]) : (!empty($fldd["f_under_total_price"]) ? str_replace(',', '', $fldd["f_under_total_price"]) : 0);
             }
             $arrParam["f_net_total_price"] = $netTotalPrice;
 //            $arrParam["f_sum_Transf"]            = !empty($fldd["f_net_total"]) ? str_replace(',', '', $fldd["f_net_total"]) : 0; // วิ่งตามผังงบประมาณ / วัสดุ
