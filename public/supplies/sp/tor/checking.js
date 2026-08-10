@@ -16292,7 +16292,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         {
                                                                                                 xtype: "fileuploadfield",
                                                                                                 id: "upload_pdf1",
-                                                                                                hidden: Ext.getCmp("submodeID").getValue() != "modeEditAp" ? true : false,
+                                                                                                hidden: Ext.getCmp("submodeID").getValue() != "modeEditAp" ? false : true,
                                                                                                 width: 300,
                                                                                                 emptyText: "เลือกไฟล์ (.pdf)",
                                                                                                 fieldLabel: "เอกสารใบตรวจรับ (PDF)",
