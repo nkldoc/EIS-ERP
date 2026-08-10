@@ -7109,7 +7109,9 @@ var win_edir_alldata = function (rec, searchOptions) {
                                 fields: ['value', 'text'],
                                 data: [
                                         ['tor_code', 'เลขที่ TOR (sp_tor.c_code)'],
-                                        ['contract_code', 'เลขที่สัญญา (sp_tor_contract.c_code)']
+                                        ['contract_code', 'เลขที่สัญญา (sp_tor_contract.c_code)'],
+                                        ['ap_code', 'เลขตรวจรับ AP (sp_check_period_hdr.c_code)'],
+                                        ['arrive_code', 'เลขตรวจรับ AP/IR (sp_check_period_hdr.c_arrive_code)']
                                 ]
                         }),
                         valueField: 'value',

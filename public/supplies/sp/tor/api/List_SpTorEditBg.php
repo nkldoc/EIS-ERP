@@ -108,12 +108,12 @@ if ($type == "Sp_Tor_Edit_Bg") {
     }
 
     $sqlMain = "
-		SET NOCOUNT ON; 
+		SET NOCOUNT ON;
 		SELECT ROW_NUMBER() OVER (ORDER BY a.tor_id ) AS numrow ,a.tor_id
 		INTO #TemData
 		FROM dbo.sp_tor a
         INNER JOIN dbo.sp_tor b ON a.tor_id = b.tor_id
-        LEFT JOIN sp_tor_contract c on a.tor_id = c.sp_tor_id  
+        LEFT JOIN sp_tor_contract c on a.tor_id = c.sp_tor_id
          where a.i_step_bg = 1 and a.i_enabled=1
         AND EXISTS (select top 1 1
                        from sp_tor_bg_log
@@ -121,121 +121,113 @@ if ($type == "Sp_Tor_Edit_Bg") {
                          and i_number_bg = 1
                          and i_edit = 1
                          and isnull(c_comment_edit1,'') =''
-                      order by sp_tor_bg_log_id desc) 
+                      order by sp_tor_bg_log_id desc)
 
             {$con};
-		
+
 		SELECT
-			a.numrow , 
+			a.numrow ,
 			a.tor_id  ,
             b.i_enabled ,
             b.c_code ,
             c.c_code as c_code_po ,
-			isnull(b.c_name,c.c_name)as c_name , 
+			isnull(b.c_name,c.c_name)as c_name ,
 			(select c_name from dc_expense_budget_type where dc_expense_budget_type_id = b.dc_expense_budget_type_id ) as dc_expense_budget_type_pr  ,
 			(select c_name from dc_expense_budget_type where dc_expense_budget_type_id = c.dc_expense_budget_type_id ) as dc_expense_budget_type_po  ,
-			(select c_name from NMU.DBO.bg_expense where bg_expense_id = b.po_expense_id ) as po_expense_pr  , 
+			(select c_name from NMU.DBO.bg_expense where bg_expense_id = b.po_expense_id ) as po_expense_pr  ,
 			(select c_name from sp_emp where sp_emp_id  = b.sp_emp_id ) as sp_emp_pr ,
 			(select c_name from sp_emp where sp_emp_id  = c.sp_emp_id ) as sp_emp_po ,
             b.sp_emp_id,
-            b.d_doc_ref, 
+            b.d_doc_ref,
             b.d_create ,
-            b.i_is_upload , 
-            b.i_type_bg , 
-            b.i_is_notor , 
+            b.i_is_upload ,
+            b.i_type_bg ,
+            b.i_is_notor ,
             b.dc_expense_budget_type_id  as dc_expense_budget_type_id1  ,
             b.dc_expense_budget_type2_id as dc_expense_budget_type_id2 ,
             b.dc_expense_budget_type3_id as dc_expense_budget_type_id3 ,
-            
-            b.f_type_amt  as f_type_amt1 , 
-            b.f_type2_amt as f_type_amt2 , 
+
+            b.f_type_amt  as f_type_amt1 ,
+            b.f_type2_amt as f_type_amt2 ,
             b.f_type3_amt as f_type_amt3 ,
-            b.i_pr_type1  , 
-            b.i_pr_type2  , 
-            b.i_pr_type3  ,  
+            b.i_pr_type1  ,
+            b.i_pr_type2  ,
+            b.i_pr_type3  ,
             (select top 1 dc_expense_budget_type_id from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 1 and i_edit = 1  order by sp_tor_bg_log_id desc) as dc_expense_budget_type_edit_id1 ,
             (select top 1 dc_expense_budget_type_id from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 2 and i_edit = 1  order by sp_tor_bg_log_id desc) as dc_expense_budget_type_edit_id2 ,
             (select top 1 dc_expense_budget_type_id from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 3 and i_edit = 1  order by sp_tor_bg_log_id desc) as dc_expense_budget_type_edit_id3 ,
             b.i_amount_bg ,
-            b.f_type_amt  as f_type_amt1, 
-            b.f_type2_amt as f_type_amt2, 
-            b.f_type3_amt as f_type_amt3, 
-            
-            (select top 1 c_comment 
- from sp_tor_bg_log 
- where sp_Tor_id = b.tor_id 
-   and i_number_bg = 1 
-   and i_edit = 1 
+            b.f_type_amt  as f_type_amt1,
+            b.f_type2_amt as f_type_amt2,
+            b.f_type3_amt as f_type_amt3,
+
+            (select top 1 c_comment
+ from sp_tor_bg_log
+ where sp_Tor_id = b.tor_id
+   and i_number_bg = 1
+   and i_edit = 1
  order by sp_tor_bg_log_id desc) as c_comment_edit1,
 
-(select top 1 f_total_amt 
- from sp_tor_bg_log 
- where sp_Tor_id = b.tor_id 
-   and i_number_bg = 1 
-   and i_edit = 1 
+(select top 1 f_total_amt
+ from sp_tor_bg_log
+ where sp_Tor_id = b.tor_id
+   and i_number_bg = 1
+   and i_edit = 1
  order by sp_tor_bg_log_id desc) as f_total_amt_edit1,
 
-(select top 1 f_total_amt 
- from sp_tor_bg_log 
- where sp_Tor_id = b.tor_id 
-   and i_number_bg = 2 
-   and i_edit = 1 
+(select top 1 f_total_amt
+ from sp_tor_bg_log
+ where sp_Tor_id = b.tor_id
+   and i_number_bg = 2
+   and i_edit = 1
  order by sp_tor_bg_log_id desc) as f_total_amt_edit2,
 
-(select top 1 f_total_amt 
- from sp_tor_bg_log 
- where sp_Tor_id = b.tor_id 
-   and i_number_bg = 3 
-   and i_edit = 1 
+(select top 1 f_total_amt
+ from sp_tor_bg_log
+ where sp_Tor_id = b.tor_id
+   and i_number_bg = 3
+   and i_edit = 1
  order by sp_tor_bg_log_id desc) as f_total_amt_edit3,
- 
-(select top 1 po_expense_id 
- from sp_tor_bg_log 
- where sp_Tor_id = b.tor_id 
-   and i_number_bg = 1 
-   and i_edit = 1 
+
+(select top 1 po_expense_id
+ from sp_tor_bg_log
+ where sp_Tor_id = b.tor_id
+   and i_number_bg = 1
+   and i_edit = 1
  order by sp_tor_bg_log_id desc) as po_expense_edit_id1,
 
-(select top 1 po_expense_id 
- from sp_tor_bg_log 
- where sp_Tor_id = b.tor_id 
-   and i_number_bg = 2 
-   and i_edit = 1 
+(select top 1 po_expense_id
+ from sp_tor_bg_log
+ where sp_Tor_id = b.tor_id
+   and i_number_bg = 2
+   and i_edit = 1
  order by sp_tor_bg_log_id desc) as po_expense_edit_id2,
 
-(select top 1 po_expense_id 
- from sp_tor_bg_log 
- where sp_Tor_id = b.tor_id 
-   and i_number_bg = 3 
-   and i_edit = 1 
+(select top 1 po_expense_id
+ from sp_tor_bg_log
+ where sp_Tor_id = b.tor_id
+   and i_number_bg = 3
+   and i_edit = 1
  order by sp_tor_bg_log_id desc) as po_expense_edit_id3,
-            /*
-            (select top 1 c_comment from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 1 and i_edit = 1 ORDER BY d_create desc   ) as c_comment_edit1 ,
-            (select top 1 f_total_amt from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 1 and i_edit = 1  ) as f_total_amt_edit1 ,
-            (select top 1 f_total_amt from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 2 and i_edit = 1  ) as f_total_amt_edit2 ,
-            (select top 1 f_total_amt from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 3 and i_edit = 1  ) as f_total_amt_edit3 ,
+ 
 
-            (select top 1 po_expense_id from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 1 and i_edit = 1  ) as po_expense_edit_id1 ,
-            (select top 1 po_expense_id from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 2 and i_edit = 1  ) as po_expense_edit_id2 ,
-            (select top 1 po_expense_id from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 3 and i_edit = 1  ) as po_expense_edit_id3 ,*/
-            
             b.po_expense_id  ,
             b.i_pr_year,
             b.i_yyyy ,
             b.sp_emp_id ,
             c.sp_emp_id  as sp_emp_po_id,
             b.dc_cost_id ,
-            b.dc_cost2_id , 
-            b.i_purchase , 
+            b.dc_cost2_id ,
+            b.i_purchase ,
 			b.d_doc_ref as d_doc_ref_pr ,
-            b.f_total_amt as f_total , 
+            b.f_total_amt as f_total ,
             CONVERT(VARCHAR, c.d_doc_date, 120) AS d_doc_date ,
             CONVERT(VARCHAR, c.d_due_date, 120) AS d_due_date ,
 
             (select top 1 sp_tor_dtl_id from sp_tor_dtl where sp_tor_id = b.tor_id ) as sp_tor_dtl_id ,
-            (select top 1 f_unit_price from sp_tor_dtl where  sp_tor_id  = b.tor_id  ) as f_total_dtl , 
-			(select top 1 po_expense_id from sp_tor_dtl where  sp_tor_id  = b.tor_id  ) as po_expense_dtl_id , 
-			(select top 1 dc_bg_budget_type_id from sp_tor_dtl where  sp_tor_id  = b.tor_id  ) as dc_bg_budget_type_id , 
+            (select top 1 f_unit_price from sp_tor_dtl where  sp_tor_id  = b.tor_id  ) as f_total_dtl ,
+			(select top 1 po_expense_id from sp_tor_dtl where  sp_tor_id  = b.tor_id  ) as po_expense_dtl_id ,
+			(select top 1 dc_bg_budget_type_id from sp_tor_dtl where  sp_tor_id  = b.tor_id  ) as dc_bg_budget_type_id ,
             (select top 1 dc_creditor_id from sp_tor_bidder_hdr where sp_tor_id = b.tor_id ) as dc_creditor_bidder_hdr ,
             (select top 1 dc_creditor_id from sp_tor_bidder_dtl where sp_tor_id = b.tor_id ) as dc_creditor_bidder_dtl ,
             (select top 1 dc_creditor_id from sp_tor_victory where sp_tor_id = b.tor_id ) as dc_creditor_victory ,
@@ -246,45 +238,45 @@ if ($type == "Sp_Tor_Edit_Bg") {
             (select top 1 i_edit from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 1 ORDER BY d_create  desc ) as sp_bg_edit1,
             (select top 1 i_edit from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 2 ORDER BY d_create  desc ) as sp_bg_edit2,
             (select top 1 i_edit from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 3 ORDER BY d_create  desc ) as sp_bg_edit3,
-            case when  b.i_edit  = 5  then  1 
-            when (select top 1 i_edit from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 1 ORDER BY d_create  desc ) = 3 then 2 
+            case when  b.i_edit  = 5  then  1
+            when (select top 1 i_edit from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 1 ORDER BY d_create  desc ) = 3 then 2
             else 3  end as check_edit_bg,
 
             (select top 1 sp_tor_bg_log_id from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 1 ORDER BY d_create  desc ) as sp_tor_bg_log_id1,
             (select top 1 sp_tor_bg_log_id from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 2 ORDER BY d_create  desc ) as sp_tor_bg_log_id2,
             (select top 1 sp_tor_bg_log_id from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 3 ORDER BY d_create  desc ) as sp_tor_bg_log_id3,
-            
-            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve1 , 
-            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve2 , 
-            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 3 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve3 , 
+
+            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve1 ,
+            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve2 ,
+            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 3 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve3 ,
             (select top 1 i_pr_type from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 1 and i_edit = 1  ) as i_pr_type_edit1 ,
             (select top 1 i_pr_type from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 2 and i_edit = 1  ) as i_pr_type_edit2 ,
             (select top 1 i_pr_type from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 3 and i_edit = 1  ) as i_pr_type_edit3 ,
-            (select top 1 isnull(dc_budget_type_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1  ) as dc_budget_type_bg_id , 
-            (select top 1 isnull(bg_expense_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as bg_expense_bg_id , 
-            (select top 1 isnull(dc_budget_type_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1  ) as dc_budget_type_bg_id2 , 
-            (select top 1 isnull(bg_expense_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as bg_expense_bg_id2 , 
+            (select top 1 isnull(dc_budget_type_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1  ) as dc_budget_type_bg_id ,
+            (select top 1 isnull(bg_expense_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as bg_expense_bg_id ,
+            (select top 1 isnull(dc_budget_type_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1  ) as dc_budget_type_bg_id2 ,
+            (select top 1 isnull(bg_expense_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as bg_expense_bg_id2 ,
 
-            (select top 1 isnull(f_amt,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as f_amt_reserve1 , 
-            (select top 1 isnull(f_amt,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as f_amt_reserve2 , 
-            (select top 1 i_year from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  i_year_reserve1 , 
-            (select top 1 i_year from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  i_year_reserve2 , 
-            (select top 1 i_pr_type from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  i_pr_type_reserve1 , 
-            (select top 1 i_pr_type from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  i_pr_type_reserve2 , 
-            (select top 1 FORMAT(d_create,'dd MMM yyyy','th-TH') from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  d_create_reserve1 , 
-            (select top 1 FORMAT(d_create,'dd MMM yyyy','th-TH') from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  d_create_reserve2 , 
+            (select top 1 isnull(f_amt,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as f_amt_reserve1 ,
+            (select top 1 isnull(f_amt,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as f_amt_reserve2 ,
+            (select top 1 i_year from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  i_year_reserve1 ,
+            (select top 1 i_year from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  i_year_reserve2 ,
+            (select top 1 i_pr_type from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  i_pr_type_reserve1 ,
+            (select top 1 i_pr_type from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  i_pr_type_reserve2 ,
+            (select top 1 FORMAT(d_create,'dd MMM yyyy','th-TH') from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  d_create_reserve1 ,
+            (select top 1 FORMAT(d_create,'dd MMM yyyy','th-TH') from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  d_create_reserve2 ,
             FORMAT(c.d_doc_date,'dd MMM yyyy','th-TH') as d_doc_th ,
             FORMAT(c.d_due_date,'dd MMM yyyy','th-TH') as d_due_th ,
-            (SELECT TOP 1 c_name FROM dbo.sp_type_status WHERE sp_type_status_id = b.tor_type_id)  AS c_type_name , 
-            b.tor_type_id , 
+            (SELECT TOP 1 c_name FROM dbo.sp_type_status WHERE sp_type_status_id = b.tor_type_id)  AS c_type_name ,
+            b.tor_type_id ,
             (SELECT TOP 1 c_name FROM dbo.sp_status_hdr WHERE sp_status_hdr_id = b.tor_status_id)  AS c_name_status ,
-            c.sp_tor_contract_id 
+            c.sp_tor_contract_id
 		FROM #TemData a
             INNER JOIN dbo.sp_tor b ON a.tor_id = b.tor_id
-            LEFT JOIN sp_tor_contract c on a.tor_id = c.sp_tor_id 			
-		WHERE a.numrow > ? AND a.numrow <= ? 
+            LEFT JOIN sp_tor_contract c on a.tor_id = c.sp_tor_id
+		WHERE a.numrow > ? AND a.numrow <= ?
 		ORDER BY a.numrow;
-	
+
 		SELECT COUNT(*) AS rowCounts FROM #TemData;";
     $arrParam[] = $start;
     $arrParam[] = $limit;
@@ -414,37 +406,37 @@ if ($type == "Sp_Tor_Edit_Bg") {
 		INTO #TemData
 		FROM dbo.sp_tor a
 			{$con};
-		
+
 		SELECT
-			a.numrow , 
+			a.numrow ,
 			a.tor_id  ,
             b.i_enabled ,
             b.c_code ,
             c.c_code as c_code_po ,
-			isnull(b.c_name,c.c_name)as c_name , 
+			isnull(b.c_name,c.c_name)as c_name ,
 			(select c_name from dc_expense_budget_type where dc_expense_budget_type_id = b.dc_expense_budget_type_id ) as dc_expense_budget_type_pr  ,
 			(select c_name from dc_expense_budget_type where dc_expense_budget_type_id = c.dc_expense_budget_type_id ) as dc_expense_budget_type_po  ,
-			(select c_name from NMU.DBO.bg_expense where bg_expense_id = b.po_expense_id ) as po_expense_pr  , 
+			(select c_name from NMU.DBO.bg_expense where bg_expense_id = b.po_expense_id ) as po_expense_pr  ,
 			(select c_name from sp_emp where sp_emp_id  = b.sp_emp_id ) as sp_emp_pr ,
 			(select c_name from sp_emp where sp_emp_id  = c.sp_emp_id ) as sp_emp_po ,
             b.sp_emp_id,
-            b.d_doc_ref, 
+            b.d_doc_ref,
             b.i_enabled ,
             b.d_create ,
-            b.i_is_upload , 
-            b.i_type_bg , 
-            b.i_is_notor , 
+            b.i_is_upload ,
+            b.i_type_bg ,
+            b.i_is_notor ,
             FORMAT(c.d_doc_date,'dd MMM yyyy','th-TH') as d_doc_th ,
             FORMAT(c.d_due_date,'dd MMM yyyy','th-TH') as d_due_th ,
-            (SELECT TOP 1 c_name FROM dbo.sp_type_status WHERE sp_type_status_id = b.tor_type_id)  AS c_type_name , 
+            (SELECT TOP 1 c_name FROM dbo.sp_type_status WHERE sp_type_status_id = b.tor_type_id)  AS c_type_name ,
             (SELECT TOP 1 c_name FROM dbo.sp_status_hdr WHERE sp_status_hdr_id = b.tor_status_id)  AS c_name_status ,
             c.sp_tor_contract_id
 		FROM #TemData a
 			INNER JOIN dbo.sp_tor b ON a.tor_id = b.tor_id
-            LEFT JOIN sp_tor_contract c on a.tor_id = c.sp_tor_id 			
+            LEFT JOIN sp_tor_contract c on a.tor_id = c.sp_tor_id
 		WHERE a.numrow > ? AND a.numrow <= ?
 		ORDER BY a.numrow;
-	
+
 		SELECT COUNT(*) AS rowCounts FROM #TemData;";
 
     $arrParam[] = $start;
@@ -500,34 +492,34 @@ if ($type == "Sp_Tor_Edit_Bg") {
 	SET NOCOUNT ON;
 		SELECT
 			ROW_NUMBER() OVER (ORDER BY a.sp_tor_hdr_period_id ) AS numrow
-			,a.sp_tor_hdr_period_id 
+			,a.sp_tor_hdr_period_id
 		INTO #TemData
 		FROM dbo.sp_tor_hdr_period a
         where a.sp_tor_contract_id =  ?
-		
+
 		SELECT
-			a.numrow , 
-            b.sp_tor_hdr_period_id , 
-            (select c_code from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as c_code  , 
-			(select c_arrive_code from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as c_arrive_code  , 
-			(select c_overlap from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as c_overlap  , 
-			(select c_billing_code from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as c_billing_code  , 
-			(select CONVERT(VARCHAR, d_doc_arrive_dt, 120) from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as d_doc_arrive_dt  , 
-			b.i_period , 
-			b.i_enabled , 
-			b.f_total_amt , 
-			b.sp_emp_id , 
+			a.numrow ,
+            b.sp_tor_hdr_period_id ,
+            (select c_code from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as c_code  ,
+			(select c_arrive_code from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as c_arrive_code  ,
+			(select c_overlap from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as c_overlap  ,
+			(select c_billing_code from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as c_billing_code  ,
+			(select CONVERT(VARCHAR, d_doc_arrive_dt, 120) from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as d_doc_arrive_dt  ,
+			b.i_period ,
+			b.i_enabled ,
+			b.f_total_amt ,
+			b.sp_emp_id ,
 			b.dc_expense_budget_type_id ,
 			b.dc_creditor_id,
-            (select top 1 sp_check_period_hdr_id from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as sp_check_period_hdr_id  , 
-            (select top 1 sp_check_period_dtl_id from sp_check_period_dtl where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as sp_check_period_dtl_id  , 
-            (select top 1 sp_tor_dtl_period_id from sp_tor_dtl_period where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as sp_tor_dtl_period_id  , 
-			b.sp_tor_contract_id 
+            (select top 1 sp_check_period_hdr_id from sp_check_period_hdr where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as sp_check_period_hdr_id  ,
+            (select top 1 sp_check_period_dtl_id from sp_check_period_dtl where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as sp_check_period_dtl_id  ,
+            (select top 1 sp_tor_dtl_period_id from sp_tor_dtl_period where sp_tor_hdr_period_id = b.sp_tor_hdr_period_id ) as sp_tor_dtl_period_id  ,
+			b.sp_tor_contract_id
 
 		FROM #TemData a
 			INNER JOIN dbo.sp_tor_hdr_period   b ON a.sp_tor_hdr_period_id = b.sp_tor_hdr_period_id
 		ORDER BY a.numrow;
-	
+
 		SELECT COUNT(*) AS rowCounts FROM #TemData;";
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     $i = $start + 1;

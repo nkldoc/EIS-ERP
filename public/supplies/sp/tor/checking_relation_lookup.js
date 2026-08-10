@@ -7,13 +7,15 @@
                                 return new Ext.data.JsonStore({
                                         url: 'tor/api/mnCheckingController.php',
                                         root: 'data',
-                                        fields: ['source', 'tor_id', 'sp_tor_contract_id', 'c_code', 'c_name', 'i_enabled'],
+                                        fields: ['source', 'tor_id', 'sp_tor_contract_id', 'sp_check_period_hdr_id', 'c_code', 'c_name', 'i_enabled'],
                                         baseParams: { mode: 'SEARCH_RELATION_CODES', source: source },
                                         autoLoad: true
                                 });
                         };
                         var torStore = createStore('tor');
                         var contractStore = createStore('contract');
+                        var apStore = createStore('ap');
+                        var arriveStore = createStore('arrive');
                         var selectWindow;
                         var chooseRecord = function (grid) {
                                 var sm = grid.getSelectionModel();
@@ -23,8 +25,9 @@
                                         return;
                                 }
                                 selectWindow.close();
+                                var source = selected.get('source');
                                 onSelect({
-                                        search_type: selected.get('source') === 'contract' ? 'contract_code' : 'tor_code',
+                                        search_type: source === 'arrive' ? 'arrive_code' : (source === 'ap' ? 'ap_code' : (source === 'contract' ? 'contract_code' : 'tor_code')),
                                         search_code: selected.get('c_code')
                                 });
                         };
@@ -53,13 +56,19 @@
                         };
                         var torGrid = createGrid('Grid sp_tor', torStore);
                         var contractGrid = createGrid('Grid sp_tor_contract', contractStore);
-                        var tabs = new Ext.TabPanel({ activeTab: 0, items: [torGrid, contractGrid] });
+                        var apGrid = createGrid('ค้นหาด้วยเลขตรวจรับ AP', apStore);
+                        var arriveGrid = createGrid('ค้นหาด้วยเลขตรวจรับ AP/IR (c_arrive_code)', arriveStore);
+                        var tabs = new Ext.TabPanel({ activeTab: 0, items: [torGrid, contractGrid, apGrid, arriveGrid] });
                         var runSearch = function () {
                                 var keyword = String(keywordField.getValue() || '').replace(/^\s+|\s+$/g, '');
                                 torStore.setBaseParam('keyword', keyword);
                                 contractStore.setBaseParam('keyword', keyword);
+                                apStore.setBaseParam('keyword', keyword);
+                                arriveStore.setBaseParam('keyword', keyword);
                                 torStore.reload();
                                 contractStore.reload();
+                                apStore.reload();
+                                arriveStore.reload();
                         };
                         selectWindow = new Ext.Window({
                                 title: 'เลือกข้อมูล TOR หรือสัญญา',

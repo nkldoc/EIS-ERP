@@ -5,37 +5,30 @@ include("../../../lib/database/DatabaseServer.php");
 include("../../../lib/database/apiUtil.php");
 include("../../../lib/date/i_date.class.php");
 include("../../conf/configSp.php");
-
-// config ปิด session แล้ว สามารถใช้ค่าที่อ่านมาได้
-$userId = $_SESSION['user_id'] ?? null;
-
-if (!$userId) {
-    http_response_code(401);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Session expired',
-    ]);
-
-    exit;
-} else {
-
-    $info[1] = $_SESSION['user_id'];
-    $info[2] = $_SESSION['dc_cost_id'];
-    $info[3] = date('Y-m-d H:i:s'); // วันที่และเวลา ปัจจุบัน
-}
-
 $db = new DatabaseServer();
 $date = new i_date();
 $util = new apiUtil();
 
-$mode = $_REQUEST["mode"];
+$mode = trim((string) ($_REQUEST["mode"] ?? ""));
+
+if ($mode === "") {
+    http_response_code(400);
+    header("Content-Type: application/json; charset=utf-8");
+    echo json_encode(array(
+        "reval" => 1,
+        "success" => false,
+        "msg" => "Missing required parameter: mode"
+    ));
+    exit;
+}
 $table = "dbo.sp_tor";
 $keyName = "tor_id";
 $data = $util->mnUser($_REQUEST);
 $data["i_delete"] = DELETE_FALSE;
 $c_code_gen = "TOR";
 $re_id = null;
+$ret_id = null; // return identifier from operations
+$stmt = true;  // make sure defined for rollback check
 $stmt2 = true;
 $stmt3 = true;
 $BudgetYear = (date('m') > 9) ? date('Y') + 1 : date('Y');
@@ -220,18 +213,35 @@ switch ($mode) {
             echo json_encode(array("success" => false, "data" => array(), "msg" => "ไม่มีสิทธิ์เปิดเครื่องมือข้อมูล ADMIN"));
             exit();
         }
-        $lookupSource = ($_REQUEST['source'] ?? '') === 'contract' ? 'contract' : 'tor';
+        $lookupSource = trim($_REQUEST['source'] ?? 'tor');
+        if (!in_array($lookupSource, array('tor', 'contract', 'ap'), true)) {
+            $lookupSource = 'tor';
+        }
         $lookupKeyword = trim($_REQUEST['keyword'] ?? '');
         $lookupLike = '%' . $lookupKeyword . '%';
-        if ($lookupSource === 'contract') {
+        if ($lookupSource === 'ap') {
+            $lookupSql = "SELECT TOP 200 'ap' AS source,
+                            COALESCE(c.sp_tor_id,cm.sp_tor_id) AS tor_id,
+                            COALESCE(c.sp_tor_contract_id,cm.sp_tor_contract_id) AS sp_tor_contract_id,
+                            h.sp_check_period_hdr_id,h.c_code,
+                            COALESCE(c.c_name,cm.c_name,t.c_name) AS c_name,h.i_enabled
+                          FROM dbo.sp_check_period_hdr h
+                          LEFT JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
+                          LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=h.sp_mn_contract_hdr_id
+                          LEFT JOIN dbo.sp_tor_contract cm ON cm.sp_tor_contract_id=m.sp_contract_id
+                          LEFT JOIN dbo.sp_tor t ON t.tor_id=COALESCE(c.sp_tor_id,cm.sp_tor_id)
+                          WHERE h.c_code IS NOT NULL
+                            AND (?='' OR h.c_code LIKE ? OR COALESCE(c.c_name,cm.c_name,t.c_name) LIKE ?)
+                          ORDER BY h.sp_check_period_hdr_id DESC";
+        } else if ($lookupSource === 'contract') {
             $lookupSql = "SELECT TOP 200 'contract' AS source,c.sp_tor_id AS tor_id,c.sp_tor_contract_id,
-                            c.c_code,c.c_name,c.i_enabled
+                            CAST(NULL AS bigint) AS sp_check_period_hdr_id,c.c_code,c.c_name,c.i_enabled
                           FROM dbo.sp_tor_contract c
                           WHERE (?='' OR c.c_code LIKE ? OR c.c_name LIKE ?)
                           ORDER BY c.sp_tor_contract_id DESC";
         } else {
             $lookupSql = "SELECT TOP 200 'tor' AS source,t.tor_id,CAST(NULL AS bigint) AS sp_tor_contract_id,
-                            t.c_code,t.c_name,t.i_enabled
+                            CAST(NULL AS bigint) AS sp_check_period_hdr_id,t.c_code,t.c_name,t.i_enabled
                           FROM dbo.sp_tor t
                           WHERE (?='' OR t.c_code LIKE ? OR t.c_name LIKE ?)
                           ORDER BY t.tor_id DESC";
@@ -444,7 +454,25 @@ switch ($mode) {
 
         $contractId = intval($_REQUEST['sp_tor_contract_id'] ?? 0);
         if ($searchCode !== '') {
-            if ($searchType === 'contract_code') {
+            if ($searchType === 'ap_code') {
+                $searchRows = $fetchRows(
+                        "SELECT TOP 1 h.sp_check_period_hdr_id,
+                           COALESCE(c.sp_tor_id,cm.sp_tor_id) AS sp_tor_id,
+                           COALESCE(c.sp_tor_contract_id,cm.sp_tor_contract_id) AS sp_tor_contract_id
+                         FROM dbo.sp_check_period_hdr h
+                         LEFT JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
+                         LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=h.sp_mn_contract_hdr_id
+                         LEFT JOIN dbo.sp_tor_contract cm ON cm.sp_tor_contract_id=m.sp_contract_id
+                         WHERE LTRIM(RTRIM(h.c_code))=?
+                         ORDER BY h.sp_check_period_hdr_id DESC",
+                        array($searchCode)
+                );
+                if (count($searchRows) > 0) {
+                    $checkPeriodHdrId = intval($searchRows[0]['sp_check_period_hdr_id']);
+                    $requestedTorId = intval($searchRows[0]['sp_tor_id']);
+                    $contractId = intval($searchRows[0]['sp_tor_contract_id']);
+                }
+            } else if ($searchType === 'contract_code') {
                 $searchRows = $fetchRows(
                         "SELECT TOP 1 sp_tor_id,sp_tor_contract_id FROM dbo.sp_tor_contract
                      WHERE LTRIM(RTRIM(c_code))=? ORDER BY sp_tor_contract_id DESC",
@@ -4057,13 +4085,25 @@ switch ($mode) {
         break;
 }
 
-if ($stmt && $stmt2) {
+if ((isset($stmt) && $stmt) && (isset($stmt2) && $stmt2)) {
     $db->CommitTran();
-    $re = array("reval" => 0, "success" => "Success", "msg" => "บันทึกเรียบร้อยแล้ว", "sp_tranf_hdr_id" => intVal($ret_id ?? null));
+    $re = array("reval" => 0, "success" => "Success", "msg" => "บันทึกเรียบร้อยแล้ว", "sp_tranf_hdr_id" => intval(isset($ret_id) ? $ret_id : 0), "d_update" => date("d/m/Y H:i:s"));
+    if (isset($va)) {
+        $re["i_pr_type1"] = intval($va);
+    }
 } else {
-    $db->RollBackTran();
-    $re = array("reval" => 1, "success" => "Error", "msg" => "check statement : {$sql}");
+// build message safely
+    $sqlMsgParts = array();
+    if (isset($sql) && $sql !== null)
+        $sqlMsgParts[] = $sql;
+    if (isset($sql2) && $sql2 !== null)
+        $sqlMsgParts[] = $sql2;
+    if (isset($sql3) && $sql3 !== null)
+        $sqlMsgParts[] = $sql3;
+    $sqlMsg = implode(' | ', $sqlMsgParts);
+    $re = array("reval" => 1, "success" => "Error", "msg" => "check statement : {$sqlMsg}");
 }
+
 
 echo json_encode($re);
 exit;
