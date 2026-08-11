@@ -13865,7 +13865,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         //                                                        readOnly: true,
                                                                                         //                                                        submitFormat: "Y-m-d", // ส่งเป็น 2025-07-09
                                                                                         //                                                    },
-                                                                                        //                                                ],
+                                                                                        //                                                ], 
                                                                                         //                                            },
                                                                                         {
                                                                                                 fieldLabel: "วันที่บันทึกการตรวจรับ",
@@ -13920,9 +13920,14 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 width: 348,
                                                                                                         },
                                                                                                         {
-                                                                                                                xtype: "displayfield",
-                                                                                                                value: '<span style="color:red">* ระบุงวด แสดงที่ใบส่งเบิก</span>',
-                                                                                                        },
+                                                                                                                                                                                                                                                                                                        xtype: "button",
+                                                                                                                                                                                                                                                                                                                text: 'แก้ไข', icon: "./images/icons/table_save.png",
+                                                                                                                                                                                                                                                                                                                handler: function () {
+                                                                                                                                                                                                                                                                                                                var updateTable = window.parent.Ext.updateTable('ตรวจรับ');
+//                                                                                                                                                                                                                                                                                                table, field, val, field_id, id, action
+                                                                                                                                                                                                                                                                                                                        updateTable.process('sp_check_period_dtl', 'c_name', Ext.getCmp('c_name_dtlID').getValue(), 'sp_tor_hdr_period_id', Ext.selectRow.get('sp_tor_hdr_period_id'), 'submit');
+                                                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                                        }
                                                                                                 ],
                                                                                         },
                                                                                         {
