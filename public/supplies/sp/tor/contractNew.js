@@ -1597,8 +1597,8 @@ const Uiedit_contractNew = function (rec) {
       header: "งวดที่/สัญญา",
       align: "center",
       dataIndex: "dc_expense_budget_type_txt",
-      width: 350,
-      dataIndex: "i_period",
+      width: 50,
+//      dataIndex: "i_period",
       renderer: function (value, metaData, record, row, col, store, gridView) {
         if (Ext.selectRow.get("i_type_contract") == 3) return "สัญญา " + record.get("c_contract_code");
         else return "งวด " + value;
@@ -1671,15 +1671,14 @@ const Uiedit_contractNew = function (rec) {
       header: "ลบ",
       sortable: false,
       align: "center",
-      width: 300,
+      width:60,
       dataIndex: "id",
       renderer: function (value, metaData, record, row, col, store, gridView) {
         if (record.get("no") === 9999) return "";
         else if (record.get("no") === 9998) return " ";
         else if (record.get("no") === 9997) return "";
         else
-          return `<button style=" padding: 0px 5px; font-size: 10px; height: 18px; line-height: 14px; border-radius: 2px; cursor: pointer; display: inline-block;">
-    ลบ </button>`;
+          return `<button style=" padding: 0px 5px; font-size: 10px; height: 18px; line-height: 14px; border-radius: 2px; cursor: pointer; display: inline-block;">  ลบ </button>`;
       },
     },
     { width: 30, dataIndex: "" },
