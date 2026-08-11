@@ -1551,7 +1551,7 @@ const Uiedit_contractNew = function (rec) {
     },
   });
   var colPOPNew = [
-    new Ext.grid.RowNumberer({ width: 35, header: " No ", dataIndex: "no" }),
+    new Ext.grid.RowNumberer({ width: 42, header: "ลำดับ", dataIndex: "no" }),
     { header: "ID System", hidden: true, dataIndex: "sp_tor_contract_editid" },
     // {
     //   header: "-",
@@ -1564,10 +1564,10 @@ const Uiedit_contractNew = function (rec) {
     //   },
     // },
     {
-      header: "งวดที่",
+      header: "งวด",
       align: "center",
       dataIndex: "i_period",
-      width: 50,
+      width: 30,
       renderer: function (value, metaData, record, row, col, store, gridView) {
         if (record.get("no") === 9999) return " ";
         else if (record.get("no") === 9998) return " ";
@@ -1579,7 +1579,7 @@ const Uiedit_contractNew = function (rec) {
       header: "วันที่เริ่มนับในงวดงาน",
       align: "center",
       dataIndex: "d_doc_date",
-      width: 150,
+      width: 145,
       renderer: function (val, metaData, record, rowIndex, colIndex, store) {
         return shortThaiDate(val);
       },
@@ -1588,7 +1588,7 @@ const Uiedit_contractNew = function (rec) {
       header: "วันที่สิ้นสุดในงวดงาน",
       align: "center",
       dataIndex: "d_period_date",
-      width: 150,
+      width: 145,
       renderer: function (val, metaData, record, rowIndex, colIndex, store) {
         return shortThaiDate(val);
       },
@@ -1597,24 +1597,31 @@ const Uiedit_contractNew = function (rec) {
       header: "งวดที่/สัญญา",
       align: "center",
       dataIndex: "dc_expense_budget_type_txt",
-      width: 50,
+      width: 115,
 //      dataIndex: "i_period",
       renderer: function (value, metaData, record, row, col, store, gridView) {
-        if (Ext.selectRow.get("i_type_contract") == 3) return "สัญญา " + record.get("c_contract_code");
-        else return "งวด " + value;
+        var displayValue = Ext.selectRow.get("i_type_contract") == 3 ? "สัญญา " + record.get("c_contract_code") : "งวด " + value;
+        metaData.attr = 'style="text-align:center;" ext:qtip="' + displayValue + '"';
+        return displayValue;
       },
     },
     {
+      id: "budget_source_contractNew",
       header: "แหล่งเงิน",
-      align: "center",
+      align: "left",
       dataIndex: "dc_expense_budget_type_txt",
-      width: 350,
+      width: 260,
+      renderer: function (value, metaData) {
+        value = value || "-";
+        metaData.attr = 'style="padding-left:8px;" ext:qtip="' + value + '"';
+        return value;
+      },
     },
     {
       header: "งวดสุดท้าย",
       align: "center",
       dataIndex: "d_due_date",
-      width: 120,
+      width: 90,
       renderer: function (value, metaData, record, row, col, store, gridView) {
         metaData.attr = "style='cursor:pointer; text-align:center;';";
         if (record.data.i_is_last == 1) {
@@ -1628,7 +1635,7 @@ const Uiedit_contractNew = function (rec) {
       header: "วันที่แจ้งเตือน",
       align: "center",
       dataIndex: "i_day",
-      width: 150,
+      width: 120,
       renderer: function (value, metaData, record, row, col, store, gridView) {
         if (record.get("no") === 9999) return "ยอดรวม";
         else if (record.get("no") === 9998) return "ยอดที่ใช้ได้";
@@ -1641,7 +1648,7 @@ const Uiedit_contractNew = function (rec) {
       sortable: false,
       align: "center",
       dataIndex: "f_total_amt",
-      width: 150,
+      width: 135,
       renderer: function (value, metaData, record, rowIndex, colIndex, store) {
         metaData.attr = "style='color:blue;text-align: right;'";
         return floatRenderer(value);
@@ -1651,34 +1658,37 @@ const Uiedit_contractNew = function (rec) {
       header: "แก้ไข",
       sortable: false,
       hideable: false,
-      hidden: true,
+      hidden: false,
       draggable: false,
       align: "center",
       id: "edit_bidder_hdr",
-      width: 300,
+      width: 75,
       dataIndex: "id",
       renderer: function (value, metaData, record, row, col, store, gridView) {
         if (record.get("no") === 9999) return "";
         else if (record.get("no") === 9998) return " ";
         else if (record.get("no") === 9997) return "";
         else
-          return `<button style=" padding: 0px 5px; font-size: 10px; height: 18px; line-height: 14px; border-radius: 2px; cursor: pointer; display: inline-block;">
-    แก้ไข</button>`;
+          return '[แก้ไข]';
+//          return '<button title="แก้ไขรายการ" style="padding:2px 4 px;color:#fff;background:#1677ff;border:1px solid #096dd9;border-radius:4px;cursor:pointer;">แก้ไข</button>';
       },
     },
     {
       id: "delete_contractNew",
       header: "ลบ",
       sortable: false,
+      hideable: false,
+      draggable: false,
       align: "center",
-      width:100,
+      width: 65,
       dataIndex: "id",
       renderer: function (value, metaData, record, row, col, store, gridView) {
         if (record.get("no") === 9999) return "";
         else if (record.get("no") === 9998) return " ";
         else if (record.get("no") === 9997) return "";
         else
-          return `<button style=" padding: 0px 5px; font-size: 10px; height: 18px; line-height: 14px; border-radius: 2px; cursor: pointer; display: inline-block;">  ลบ </button>`;
+          return '[ลบ]';
+//          return '<button type="button" title="ลบรายการ" style="padding:2px 4px;color:#fff;background:#d9363e;border:1px solid #cf1322;border-radius:4px;cursor:pointer;">ลบ</button>';
       },
     },
     { width: 30, dataIndex: "" },
@@ -3681,174 +3691,163 @@ const Uiedit_contractNew = function (rec) {
                   },
                 ],
                 items: [
-                  {
-                    xtype: "grid",
-                    id: "gridSub1ID",
-                    border: true,
-                    stripeRows: true,
-                    loadMask: true,
-                    height: 200,
-                    store: Ext.storeNew3,
-                    style: {
-                      overflowX: "auto",
-                    },
-                    listeners: {
-                      // contextmenu: function (e) {
-                      //   e.stopEvent();
-                      //   var id = Ext.selectRow.json.imp_assetall_supplies_hdr_id;
-                      //   var mymenu = new Ext.menu.Menu({
-                      //     items: [],
-                      //   });
-                      // },
-                      beforerender: function () {
-                        Ext.DidderHdr = function (evt, rec) {
-                          var win = new Ext.Window({
-                            labelWidth: 175,
-                            collapsible: true,
-                            maximizable: true,
-                            modal: true,
-                            title: "เพิ่มผู้เสนอราคา",
-                            id: "win-frm-contractID",
-                            layout: "fit",
-                            border: false,
-                            width: 630,
-                            height: 300,
-                            items: [{}],
-                          });
-                        };
-                        this.thisCick = function (grid, rowIndex, columnIndex, e) {
-                          var record = grid.getStore().getAt(rowIndex);
-                          Ext.SelectStore = Ext.storeNew3.getAt(rowIndex);
-                          // console.log(Ext.SelectStore.data.row_edit);
-                          // Ext.store2.setBaseParam("tor_id", Ext.HDR_ID);
-                          if ([9999, 9998, 9997].includes(Ext.SelectStore.data.no)) {
-                            Ext.getCmp("i_type_editID").setValue(1);
-                            Ext.getCmp("i_type_edit2ID").hide();
-                          } else {
-                            if (columnIndex === grid.getColumnModel().getIndexById("delete_contractNew")) {
-                              // Ext.SelectStore.data.sp_tor_contract_editid;
-                              if (record.data.sp_check_period != null) {
-                                Ext.MessageBox.alert("แจ้งเตือน", "คุณตรวจรับไปแล้วไม่สามารถลบรายไขได้");
-                              } else {
-                                delete_contractNew(Ext.SelectStore);
-                              }
-                            } else {
-                              RecSet = record.data;
-                              console.log(RecSet);
-                              Ext.getCmp("i_type_edit2ID").show();
-                              Ext.getCmp("i_type_editID").setValue(2);
-                              Ext.getCmp("sp_check_period").setValue(RecSet.sp_check_period);
-                              Ext.getCmp("i_type_editID").setValue(2);
-                              Ext.getCmp("i_periodID").setValue(RecSet.i_period);
-                              Ext.getCmp("i_pr_type2ID").setValue(RecSet.i_pr_type1);
-                              Ext.getCmp("i_is_item").setValue(RecSet.i_is_item);
-                              Ext.getCmp("i_is_lastID").setValue(RecSet.i_is_last);
-                              Ext.getCmp("d_doc_datePerID").setValue(RecSet.d_doc_date);
-                              Ext.getCmp("d_period_dateID").setValue(RecSet.d_period_date);
-                              Ext.getCmp("i_dayID").setValue(RecSet.i_day);
-                              Ext.getCmp("i_alertID").setValue(RecSet.i_alert);
-                              Ext.getCmp("sp_tor_hdr_period_idID").setValue(RecSet.id);
-                              Ext.getCmp("dc_expense_budget_type_idPerTxtID").setValue(RecSet.dc_expense_budget_type_id);
-                              Ext.getCmp("period_po_expense_id").setValue(RecSet.po_expense_per_dtl_id);
-                              Ext.getCmp("dc_cost2_idID").setValue(RecSet.dc_cost2_id);
-                              Ext.getCmp("f_total_amtPerID").setValue(RecSet.f_total_amt);
-                              Ext.getCmp("i_period_contractID").setValue(RecSet.i_period);
-                            }
-                          }
-                        };
-                        // this.
-                      },
-                      rowcontextmenu: function (grid, rowIndex, e) {
-                        e.stopEvent(); // ❗ หยุด default context menu
-                        const record = grid.getStore().getAt(rowIndex); // ✅ ดึงข้อมูลแถว
-                        Ext.selectRow5 = record; // ✅ สำคัญ เพื่อใช้ใน handler ภายหลัง
-                        var mymenu = new Ext.menu.Menu({
-                          items: [
-                            {
-                              text: "ขอแก้ไข",
-                              // hidden: Ext.selectRow.data.c_code_po == null ? true : false,
-                              icon: "../images/icons/application_view_detail.png",
-                              scope: this,
-                              handler: function (e) {
-                                win_request_disable_acc(Ext.selectRow.data);
-                              },
-                            },
-                          ],
-                          listeners: {
-                            beforerender: function () {},
-                            hide: function () {
-                              setTimeout(function () {
-                                mymenu.destroy();
-                              }, 0);
-                            },
-                          },
-                        });
-                        console.log(mymenu);
-                        mymenu.showAt(e.getXY());
-                      },
-                      cellDblClick: function (grid, rowIndex, columnIndex, e) {
-                        console.log(123);
-                        const columnModel = grid.getColumnModel();
-                        const column = columnModel.getColumnAt(columnIndex);
-                        const columnId = column.id;
-                        const dataIndex = column.dataIndex;
-                      },
-                      afterRender: function (grid) {
-                        var element = Ext.get(grid.getView().mainHd.id);
-                        element.on("contextmenu", function (e, t) {
-                          e.stopEvent();
-                          var menu = new Ext.menu.Menu();
-                          menu.add({
-                            text: "Refresh",
-                            icon: "../images/icons/arrow_refresh_small.png",
-                            scope: this,
-                            handler: function (e) {
-                              grid.store.load({ params: { sp_tor_contract_id: rec.data.sp_tor_contract_id } });
-                            },
-                          });
-                          if (Ext.session.user_id == 1) {
-                            menu.addSeparator();
-                            menu.add(
-                              new Ext.menu.Item({
-                                text: "show only admin",
-                                disabled: true,
-                                cls: "menu-separator-text",
-                              })
-                            );
-                            menu.add({
-                              text: "Inspect SQL",
-                              icon: "../images/icons/script_lightning.png",
-                              scope: this,
-                              handler: function (e) {
-                                // console.log(grid)
-                                // console.log(e)
-                                // console.log(rec.data.sp_tor_contract_id)
-                                grid.store.load({ params: { show_sql: 1, sp_tor_contract_id: rec.data.sp_tor_contract_id } });
-                              },
-                            });
-                          }
-                          menu.showAt(e.getXY());
-                        });
-                        Ext.getCmp("gridSub1ID").on("cellclick", this.thisCick, this);
-                      },
-                    },
-                    columns: colPOPNew,
-                    viewConfig: {
-                      forceFit: false,
-                      scrollOffset: 20, // เพิ่มความกว้าง scrollbar
-                      emptyText: "ไม่มีข้อมูล..",
-                      deferEmptyText: false,
-                      getRowClass: function (record) {
-                        if ([9999, 9998, 9997].includes(record.data.no)) {
-                        } else {
-                          return "td-succeed ";
-                        }
-                      },
-                    },
-                    // tbar: [
+            {
+    xtype: "grid",
+    id: "gridSub1ID",
+    border: true,
+    columnLines: true,
+    stripeRows: true,
+    loadMask: true,
+    height: 260,
+    // layout: 'fit', // หาก grid อยู่ใน panel ให้ใส่ container layout fit ด้วย
+    store: Ext.storeNew3,
+    columns: colPOPNew,
+    
+    viewConfig: {
+        forceFit: true,      // 🟢 ปรับเป็น true เพื่อให้ column ทั้งหมดขยาย/หดพอดีความกว้าง Grid
+        autoFill: true,      // 🟢 เติมพื้นที่ว่างอัตโนมัติ
+        scrollOffset: 0,     // 🟢 ลดระยะขอบ scrollbar เพื่อไม่ให้เกิดพื้นที่ว่างด้านขวา
+        emptyText: "ไม่มีข้อมูล..",
+        deferEmptyText: false,
+        getRowClass: function (record) {
+            if ([9999, 9998, 9997].includes(record.data.no)) {
+                return "";
+            } else {
+                return "td-succeed";
+            }
+        }
+    },
+    
+    listeners: {
+        beforerender: function () {
+            Ext.DidderHdr = function (evt, rec) {
+                var win = new Ext.Window({
+                    labelWidth: 175,
+                    collapsible: true,
+                    maximizable: true,
+                    modal: true,
+                    title: "เพิ่มผู้เสนอราคา",
+                    id: "win-frm-contractID",
+                    layout: "fit",
+                    border: false,
+                    width: 630,
+                    height: 300,
+                    items: [{}]
+                });
+            };
 
-                    // ]
-                  },
+            this.thisCick = function (grid, rowIndex, columnIndex, e) {
+                var record = grid.getStore().getAt(rowIndex);
+                Ext.SelectStore = Ext.storeNew3.getAt(rowIndex);
+
+                if ([9999, 9998, 9997].includes(Ext.SelectStore.data.no)) {
+                    Ext.getCmp("i_type_editID").setValue(1);
+                    Ext.getCmp("i_type_edit2ID").hide();
+                } else {
+                    if (columnIndex === grid.getColumnModel().getIndexById("delete_contractNew")) {
+                        if (record.data.sp_check_period != null) {
+                            Ext.MessageBox.alert("แจ้งเตือน", "คุณตรวจรับไปแล้วไม่สามารถลบแก้ไขได้");
+                        } else {
+                            delete_contractNew(Ext.SelectStore);
+                        }
+                    } else {
+                        RecSet = record.data;
+                        console.log(RecSet);
+                        Ext.getCmp("i_type_edit2ID").show();
+                        Ext.getCmp("i_type_editID").setValue(2);
+                        Ext.getCmp("sp_check_period").setValue(RecSet.sp_check_period);
+                        Ext.getCmp("i_periodID").setValue(RecSet.i_period);
+                        Ext.getCmp("i_pr_type2ID").setValue(RecSet.i_pr_type1);
+                        Ext.getCmp("i_is_item").setValue(RecSet.i_is_item);
+                        Ext.getCmp("i_is_lastID").setValue(RecSet.i_is_last);
+                        Ext.getCmp("d_doc_datePerID").setValue(RecSet.d_doc_date);
+                        Ext.getCmp("d_period_dateID").setValue(RecSet.d_period_date);
+                        Ext.getCmp("i_dayID").setValue(RecSet.i_day);
+                        Ext.getCmp("i_alertID").setValue(RecSet.i_alert);
+                        Ext.getCmp("sp_tor_hdr_period_idID").setValue(RecSet.id);
+                        Ext.getCmp("dc_expense_budget_type_idPerTxtID").setValue(RecSet.dc_expense_budget_type_id);
+                        Ext.getCmp("period_po_expense_id").setValue(RecSet.po_expense_per_dtl_id);
+                        Ext.getCmp("dc_cost2_idID").setValue(RecSet.dc_cost2_id);
+                        Ext.getCmp("f_total_amtPerID").setValue(RecSet.f_total_amt);
+                        Ext.getCmp("i_period_contractID").setValue(RecSet.i_period);
+                    }
+                }
+            };
+        },
+
+        rowcontextmenu: function (grid, rowIndex, e) {
+            e.stopEvent();
+            const record = grid.getStore().getAt(rowIndex);
+            Ext.selectRow5 = record;
+            
+            var mymenu = new Ext.menu.Menu({
+                items: [
+                    {
+                        text: "ขอแก้ไข",
+                        icon: "../images/icons/application_view_detail.png",
+                        scope: this,
+                        handler: function (e) {
+                            win_request_disable_acc(Ext.selectRow5.data); // แก้จาก Ext.selectRow เป็น Ext.selectRow5
+                        }
+                    }
+                ],
+                listeners: {
+                    hide: function () {
+                        setTimeout(function () {
+                            mymenu.destroy();
+                        }, 0);
+                    }
+                }
+            });
+            mymenu.showAt(e.getXY());
+        },
+
+        cellDblClick: function (grid, rowIndex, columnIndex, e) {
+            const columnModel = grid.getColumnModel();
+            const column = columnModel.getColumnAt(columnIndex);
+            const columnId = column.id;
+            const dataIndex = column.dataIndex;
+        },
+
+        afterRender: function (grid) {
+            var element = Ext.get(grid.getView().mainHd.id);
+            element.on("contextmenu", function (e, t) {
+                e.stopEvent();
+                var menu = new Ext.menu.Menu();
+                menu.add({
+                    text: "Refresh",
+                    icon: "../images/icons/arrow_refresh_small.png",
+                    scope: this,
+                    handler: function (e) {
+                        grid.store.load();
+                    }
+                });
+                
+                if (Ext.session && Ext.session.user_id == 1) {
+                    menu.addSeparator();
+                    menu.add(
+                        new Ext.menu.Item({
+                            text: "show only admin",
+                            disabled: true,
+                            cls: "menu-separator-text"
+                        })
+                    );
+                    menu.add({
+                        text: "Inspect SQL",
+                        icon: "../images/icons/script_lightning.png",
+                        scope: this,
+                        handler: function (e) {
+                            grid.store.load({ params: { show_sql: 1 } });
+                        }
+                    });
+                }
+                menu.showAt(e.getXY());
+            });
+
+            Ext.getCmp("gridSub1ID").on("cellclick", this.thisCick, this);
+        }
+    }
+}
                 ],
               },
             ],
