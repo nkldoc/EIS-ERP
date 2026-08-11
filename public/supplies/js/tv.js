@@ -827,118 +827,118 @@ Ext.onReady(function () {
 //        Ext.msgAlert('เริ่มต้นหน้าจอใหม่ ' + current, 0, 3000);
 //    }, 200000); // สลับทุก 10 วินาที   
 
-    Ext.websocket.onmessage = function (ev) {
-//        var ev = '{ "type": "users", "status": "disconnect", "socket": 0,  "id": null,  "name": null,  "message": null, "msgText": null, "datetime": "2025-01-18 15:50:45", "totalCount": null}';   
-
-        var response = JSON.parse(ev.data);
-        var status = response.status; //message text
-        var message = response.message; //message text
-        var msgText = response.msgText; //message text
-        //      
-
-        if (status === "scriptTv") {
-            Ext.get("player").dom.play();
-            if (message === 'g1-full') {
-                destroyFn();
-                var grid1 = Ext.grid1(1250, true, 'grid11ID', 500);
-                grid1.getEl().fadeIn();
-            } else if (message === 'swop') {
-                Ext.swopDisplay();
-                Ext.msgAlert('เริ่มต้นหน้าจอใหม่ ' + current, 0, 3000);
-            } else if (message === 'g2-full') {
-                destroyFn();
-                var grid1 = Ext.grid2(1250, true, 'grid11ID', 500);
-                grid1.getEl().fadeIn();
-            } else if (message === 'g3-full') {
-                destroyFn();
-                var grid1 = Ext.grid3(1250, true, 'grid11ID', 500);
-                grid1.getEl().fadeIn();
-            } else if (message === 'g4-full') {
-                destroyFn();
-                var grid1 = Ext.grid4(1250, true, 'grid11ID', 500);
-                grid1.getEl().fadeIn();
-            } else if (message === 'g-full') {
-                Ext.get("player").dom.src = "./sound/notifications-sound.mp3";
-                destroyFn();
-                newFn(false, true);
-            } else if (message === 'g12-full') {
-                Ext.get("player").dom.src = "./sound/notifications-sound.mp3";
-                destroyFn();
-                newFnDouble(true, true);
-            } else {
-                Ext.get("player").dom.src = "./sound/success-trumpets.mp3";
-                if (message === "reload-g1" || message === "reload-all") {
-                    var idCmp = 'grid1ID';
-//                            new Audio('./sound/success-trumpets.mp3').play();
-                    Ext.getCmp(idCmp).getEl().mask("ที่เรียกดู ณ ขณะนี้...", "x-mask-loading");
-                    Ext.getCmp(idCmp).store.reload({
-                        callback: function (record, operation, success) {
-                            if (success) {
-                                Ext.getCmp(idCmp).getEl().unmask();
-                            }
-                        }
-                    });
-                }
-                if (message === "reload-g2" || message === "reload-all") {
-                    var idCmp2 = 'grid2ID';
-                    Ext.getCmp(idCmp2).getEl().mask("ที่เรียกดู ณ ขณะนี้...", "x-mask-loading");
-                    Ext.getCmp(idCmp2).store.reload({
-                        callback: function (record, operation, success) {
-                            if (success) {
-                                Ext.getCmp(idCmp2).getEl().unmask();
-                            }
-                        }
-                    });
-                }
-                if (message === "reload-g3" || message === "reload-all") {
-                    var idCmp3 = 'grid3ID';
-                    Ext.getCmp(idCmp3).getEl().mask("ที่เรียกดู ณ ขณะนี้...", "x-mask-loading");
-                    Ext.getCmp(idCmp3).store.reload({
-                        callback: function (record, operation, success) {
-                            if (success) {
-                                Ext.getCmp(idCmp3).getEl().unmask();
-                            }
-                        }
-                    });
-                }
-                if (message === "reload-g4" || message === "reload-all") {
-                    var idCmp4 = 'grid4ID';
-                    Ext.getCmp(idCmp4).getEl().mask("ที่เรียกดู ณ ขณะนี้...", "x-mask-loading");
-                    Ext.getCmp(idCmp4).store.reload({
-                        callback: function (record, operation, success) {
-                            if (success) {
-                                Ext.getCmp(idCmp4).getEl().unmask();
-                            }
-                        }
-                    });
-                }
-
-
-                if (message === "msg") {
-                    Ext.get('top').dom.innerHTML = msgText;
-//                    Ext.get('top').dom.style['color'] = 'red';
-                    Ext.msgAlert(msgText, 0, 0);
-
-                } else if (message === "close") {
-                } else if (message === "reload") {
-                    reload();
-                }
-            }
-
-
-
-        }
-    };
-    Ext.websocket.onclose = function () {
-        Ext.Msg.alert("แจ้งเตือนทั้งหมดจากแอดมิน", "Socket Close ,Press Ok Connect", function (form, action) {
-            window.location.reload();
-//            if (window.location.protocol == 'http:') {
-//                Ext.websocket = new WebSocket('ws://' + window.location.host + '/supplies/websocket/chat');
+//    Ext.websocket.onmessage = function (ev) {
+////        var ev = '{ "type": "users", "status": "disconnect", "socket": 0,  "id": null,  "name": null,  "message": null, "msgText": null, "datetime": "2025-01-18 15:50:45", "totalCount": null}';   
+//
+//        var response = JSON.parse(ev.data);
+//        var status = response.status; //message text
+//        var message = response.message; //message text
+//        var msgText = response.msgText; //message text
+//        //      
+//
+//        if (status === "scriptTv") {
+//            Ext.get("player").dom.play();
+//            if (message === 'g1-full') {
+//                destroyFn();
+//                var grid1 = Ext.grid1(1250, true, 'grid11ID', 500);
+//                grid1.getEl().fadeIn();
+//            } else if (message === 'swop') {
+//                Ext.swopDisplay();
+//                Ext.msgAlert('เริ่มต้นหน้าจอใหม่ ' + current, 0, 3000);
+//            } else if (message === 'g2-full') {
+//                destroyFn();
+//                var grid1 = Ext.grid2(1250, true, 'grid11ID', 500);
+//                grid1.getEl().fadeIn();
+//            } else if (message === 'g3-full') {
+//                destroyFn();
+//                var grid1 = Ext.grid3(1250, true, 'grid11ID', 500);
+//                grid1.getEl().fadeIn();
+//            } else if (message === 'g4-full') {
+//                destroyFn();
+//                var grid1 = Ext.grid4(1250, true, 'grid11ID', 500);
+//                grid1.getEl().fadeIn();
+//            } else if (message === 'g-full') {
+//                Ext.get("player").dom.src = "./sound/notifications-sound.mp3";
+//                destroyFn();
+//                newFn(false, true);
+//            } else if (message === 'g12-full') {
+//                Ext.get("player").dom.src = "./sound/notifications-sound.mp3";
+//                destroyFn();
+//                newFnDouble(true, true);
 //            } else {
-//                Ext.websocket = new WebSocket('wss://' + window.location.host + '/supplies/websocket/chat');
+//                Ext.get("player").dom.src = "./sound/success-trumpets.mp3";
+//                if (message === "reload-g1" || message === "reload-all") {
+//                    var idCmp = 'grid1ID';
+////                            new Audio('./sound/success-trumpets.mp3').play();
+//                    Ext.getCmp(idCmp).getEl().mask("ที่เรียกดู ณ ขณะนี้...", "x-mask-loading");
+//                    Ext.getCmp(idCmp).store.reload({
+//                        callback: function (record, operation, success) {
+//                            if (success) {
+//                                Ext.getCmp(idCmp).getEl().unmask();
+//                            }
+//                        }
+//                    });
+//                }
+//                if (message === "reload-g2" || message === "reload-all") {
+//                    var idCmp2 = 'grid2ID';
+//                    Ext.getCmp(idCmp2).getEl().mask("ที่เรียกดู ณ ขณะนี้...", "x-mask-loading");
+//                    Ext.getCmp(idCmp2).store.reload({
+//                        callback: function (record, operation, success) {
+//                            if (success) {
+//                                Ext.getCmp(idCmp2).getEl().unmask();
+//                            }
+//                        }
+//                    });
+//                }
+//                if (message === "reload-g3" || message === "reload-all") {
+//                    var idCmp3 = 'grid3ID';
+//                    Ext.getCmp(idCmp3).getEl().mask("ที่เรียกดู ณ ขณะนี้...", "x-mask-loading");
+//                    Ext.getCmp(idCmp3).store.reload({
+//                        callback: function (record, operation, success) {
+//                            if (success) {
+//                                Ext.getCmp(idCmp3).getEl().unmask();
+//                            }
+//                        }
+//                    });
+//                }
+//                if (message === "reload-g4" || message === "reload-all") {
+//                    var idCmp4 = 'grid4ID';
+//                    Ext.getCmp(idCmp4).getEl().mask("ที่เรียกดู ณ ขณะนี้...", "x-mask-loading");
+//                    Ext.getCmp(idCmp4).store.reload({
+//                        callback: function (record, operation, success) {
+//                            if (success) {
+//                                Ext.getCmp(idCmp4).getEl().unmask();
+//                            }
+//                        }
+//                    });
+//                }
+//
+//
+//                if (message === "msg") {
+//                    Ext.get('top').dom.innerHTML = msgText;
+////                    Ext.get('top').dom.style['color'] = 'red';
+//                    Ext.msgAlert(msgText, 0, 0);
+//
+//                } else if (message === "close") {
+//                } else if (message === "reload") {
+//                    reload();
+//                }
 //            }
-        });
-    };
+//
+//
+//
+//        }
+//    };
+//    Ext.websocket.onclose = function () {
+//        Ext.Msg.alert("แจ้งเตือนทั้งหมดจากแอดมิน", "Socket Close ,Press Ok Connect", function (form, action) {
+//            window.location.reload();
+////            if (window.location.protocol == 'http:') {
+////                Ext.websocket = new WebSocket('ws://' + window.location.host + '/supplies/websocket/chat');
+////            } else {
+////                Ext.websocket = new WebSocket('wss://' + window.location.host + '/supplies/websocket/chat');
+////            }
+//        });
+//    };
     Ext.swopDisplay();
     Ext.msgAlert('เริ่มต้นหน้าจอใหม่ ' + current, 0, 3000);
 //    Ext.swopDisplay();
