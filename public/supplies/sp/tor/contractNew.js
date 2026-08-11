@@ -1671,7 +1671,7 @@ const Uiedit_contractNew = function (rec) {
       header: "ลบ",
       sortable: false,
       align: "center",
-      width:60,
+      width:100,
       dataIndex: "id",
       renderer: function (value, metaData, record, row, col, store, gridView) {
         if (record.get("no") === 9999) return "";
