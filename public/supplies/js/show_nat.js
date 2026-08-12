@@ -2554,7 +2554,7 @@ Ext.onReady(function () {
 
             afterrender: function () {
                 setAfterLoad();
-//                Ext.btnConnect();
+                
             }
         }
     };
@@ -2714,7 +2714,7 @@ Ext.onReady(function () {
         } else {
             Ext.get('header').show();
         }
-
+Ext.btnConnect();
         Ext.textEditor = function () {
             if (!Ext.isEmpty(Ext.getCmp('winMsgID'))) {
                 Ext.getCmp('winMsgID').show();
