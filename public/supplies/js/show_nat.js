@@ -2554,7 +2554,7 @@ Ext.onReady(function () {
 
             afterrender: function () {
                 setAfterLoad();
-                Ext.btnConnect();
+//                Ext.btnConnect();
             }
         }
     };
