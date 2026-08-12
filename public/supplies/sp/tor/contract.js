@@ -3979,6 +3979,9 @@ Ext.AppUx = function (app, menu) {
                 },
                 method: "POST", //GET
                 success: function (result, request) {
+                    let jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                    console.log(jsonData.sp_contract_po_id);
+                    if(jsonData.sp_contract_po_id>0)
                     Ext.Ajax.request({
                         url: "tor/api/mnTorController.php",
                         params: {
@@ -4003,6 +4006,10 @@ Ext.AppUx = function (app, menu) {
                             Ext.MessageBox.alert("Failed", result.responseText); // connect error
                         },
                     });
+                    else {
+                         Ext.MessageBox.alert("Failed", "กรุณาตรวจแล้วผ่านรายการอีกรอบ"); // alert massage error
+                    }
+
                 },
                 failure: function (result, request) {
                     Ext.MessageBox.alert("Failed", result.responseText); // connect error
