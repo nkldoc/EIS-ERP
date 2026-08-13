@@ -1,0 +1,134 @@
+﻿Ext.onReady(function () {
+  Ext.QuickTips.init();
+
+  /* =============================================== */
+  title_panel = "รายงานลูกหนี้คงค้าง";
+  /* =============================================== */
+
+  LookReport = function (type) {
+    var msg = "";
+    if (Ext.getCmp("d_date_start").getValue() == "" || Ext.getCmp("d_date_end").getValue() == "") {
+      msg += "- กรุณาเลือก วันที่ให้ถูกต้อง<br>";
+    }
+
+    if (msg == "") {
+      href = "report/Rep_DebtorOverdue.php";
+      var resultUrl = "";
+      resultUrl += "&type=" + type;
+      resultUrl += "&d_date_start=" + Ext.util.Format.date(Ext.getCmp("d_date_start").getValue(), "Y-m-d");
+      resultUrl += "&d_date_end=" + Ext.util.Format.date(Ext.getCmp("d_date_end").getValue(), "Y-m-d");
+
+      resultUrl = resultUrl != "" ? "?" + resultUrl.substring(1) : "";
+      window.open(href + resultUrl, href);
+      window.focus();
+    } else {
+      Ext.MessageBox.alert("แจ้งเตือน", msg);
+    }
+  };
+
+  const panelForm = new Ext.Panel({
+    region: "center",
+    title: title_panel,
+    border: false,
+    stripeRows: true,
+    loadMask: true,
+    items: [
+      {
+        xtype: "form",
+        frame: true,
+        labelAlign: "right",
+        labelWidth: 200,
+        bodyStyle: { padding: "10px 20px" },
+        defaults: {
+          anchor: "100%",
+          msgTarget: "side",
+          allowBlank: false,
+        },
+        items: [
+          {
+            xtype: "container",
+            layout: "hbox",
+            align: "stretch",
+            RemoveHeight: true,
+            defaults: {
+              xtype: "fieldset",
+              flex: 1,
+              margins: "0px 3px",
+              autoHeight: true,
+            },
+            items: [
+              {
+                title: "เมนู " + title_panel,
+                RemoveCls: "x-box-item",
+                defaults: {
+                  labelStyle: "width:200px;",
+                  allowBlank: true,
+                },
+                items: [
+                  {
+                    xtype: "compositefield",
+                    fieldLabel: "สรุปยอดค้างรับระหว่างวันที่",
+                    msgTarget: "under",
+                    items: [
+                      {
+                        xtype: "datefield",
+                        id: "d_date_start",
+                        width: 127,
+                        value: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+                      },
+                      {
+                        xtype: "displayfield",
+                        value: "ถึงวันที่",
+                        width: 36,
+                        align: "center",
+                      },
+                      {
+                        xtype: "datefield",
+                        id: "d_date_end",
+                        width: 127,
+                        value: addY(543),
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        buttonAlign: "left",
+        buttons: [
+          {
+            text: Ext.GLOBAL_BU_SHOW_TH + "สำหรับ HTML",
+            iconCls: "page_magnify",
+            handler: function () {
+              LookReport("html");
+            }, // End Handle
+          },
+          {
+            text: Ext.GLOBAL_BU_SHOW_TH + "สำหรับ Excel",
+            iconCls: "icon-excel",
+            handler: function () {
+              LookReport("excel");
+            }, // End Handle
+          },
+        ],
+      },
+    ],
+  }); // panelForm
+
+  /* ====================== CENTER ====================== */
+  const center = new Ext.TabPanel({
+    region: "center",
+    border: false,
+    activeTab: 0, // default Tab
+    id: "contenterCenter",
+    defaults: { autoScroll: true },
+    items: [panelForm],
+  });
+
+  /* ====================== RENDER ====================== */
+  new Ext.Viewport({
+    layout: "border",
+    items: [center],
+  });
+});

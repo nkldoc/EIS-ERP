@@ -1,0 +1,70 @@
+Ext.store = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: true,
+  url: "api/List_arCutAdjust.php",
+  baseParams: { type: "ar_cut_adjust" },
+  root: "data",
+  idProperty: "id",
+  totalProperty: "totalCount",
+  fields: [
+    { name: "no" },
+    { name: "id" },
+    { name: "c_code_cut" },
+    { name: "d_cut_date" },
+    { name: "ar_treat_right_name" },
+    { name: "ar_cost_name" },
+    { name: "c_hn" },
+    { name: "c_an" },
+    { name: "c_patient" },
+    { name: "d_service_date" },
+    { name: "c_service_time" },
+    { name: "d_encash_date" },
+    { name: "c_encash_time" },
+    { name: "f_cut" },
+    { name: "f_cr" },
+    { name: "f_dr" },
+    { name: "f_total" },
+    { name: "c_comment" },
+  ],
+});
+
+/* ต้ดชำระ */
+const fields = [
+  { name: "no" },
+  { name: "id" },
+  { name: "c_code_cut" },
+  { name: "d_cut_date" },
+  { name: "ar_treat_right_name" },
+  { name: "ar_cost_name" },
+  { name: "c_hn" },
+  { name: "c_an" },
+  { name: "c_patient" },
+  { name: "d_service_date" },
+  { name: "c_service_time" },
+  { name: "d_encash_date" },
+  { name: "c_encash_time" },
+  { name: "f_cut" },
+  { name: "f_cr" },
+  { name: "f_dr" },
+  { name: "c_comment" },
+];
+
+Ext.storeFrist = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: false,
+  url: "api/List_arCutAdjust.php",
+  baseParams: { type: "ar_cut" },
+  root: "data",
+  idProperty: "id",
+  totalProperty: "totalCount",
+  fields: fields,
+});
+
+Ext.storeSecond = new Ext.data.JsonStore({
+  autoDestroy: false,
+  autoLoad: false,
+  root: "data",
+  idProperty: "id",
+  totalProperty: "totalCount",
+  fields: fields,
+});

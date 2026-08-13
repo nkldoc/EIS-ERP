@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "fullName": "Somchai J.",
+      "position": "Manager",
+      "department": "HR"
+    },
+    {
+      "id": 2,
+      "fullName": "Suda T.",
+      "position": "Developer",
+      "department": "IT"
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+<?php 
+include("../api/List_RepApExpDoc.php");
+include("../../lib/export/exportUtil.php");
+
+$export		= new exportUtil();
+
+$s_title	= true;
+$title		= CUSTOMER_NAME_TH; 
+$caption	= "รายงานเอกสารที่ใช้ประกอบค่าใช้จ่าย";
+
+if($_REQUEST["type"] == "excel") { $export->headerExcel($caption); }
+$thead[]	= "ที่";
+$thead[]	= "รหัส";
+$thead[]	= "ชื่อ";
+$thead[]	= "สถานะเอกสาร";
+  
+
+$data_dtl	= json_decode(List_QueryParam(), true);
+
+if( is_array($data_dtl) && count($data_dtl["data"]) > 0 ) {
+	
+	$tbody		= "<tbody>";
+	
+	foreach($data_dtl["data"] as $index => $jObj) {
+ 
+ 
+		$tbody	.=	"<tr>";
+		$tbody	.= "<td>".$jObj["no"]."</td>";
+		$tbody	.= "<td>".$jObj["c_code"]."</td>";
+		$tbody	.= "<td>".$jObj["c_name"]."</td>";
+		$tbody	.= "<td>".$jObj["c_exp_type_name"]."</td>";		
+ 		$tbody	.=	"</tr>";
+	}
+	
+	$tbody	.= "</tbody>";
+
+} else { $tbody	= ""; }
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="../../css/report_css.css" />
+</head>
+<body>
+<?php
+	if( $s_title == true ) echo "<div align=\"center\"><strong>".$title."</strong></div>";
+	
+ 
+	if($_REQUEST["i_enable"] > 0 ) {
+		$c_enabled_caption	=  ($_REQUEST["i_enable"]=="1") ? "ใช้งาน" : "ไม่ใช้งาน";
+	} else {
+		$c_enabled_caption	= "เลือกทั้งหมด";
+	}
+ 
+ 
+ 
+	echo "<div align=\"center\"><strong>".$caption."</strong></div>";
+	echo "<div><strong>สถานะ : ".$c_enabled_caption."</strong></div>";
+	
+?>
+<table width="100%" class="table_report" border="0" cellspacing="1" cellpadding="0" style="page-break-after: always;">
+<thead valign="top">
+<?php
+	echo "<tr>";
+	foreach ($thead as $value) {
+		echo "<th style='vertical-align:middle;'>".$value."</th>";
+	}
+	echo "</tr>";
+?>
+</thead>
+<?= $tbody ?>
+</table>
+</body>
+</html>

@@ -1,0 +1,96 @@
+@import url("../css/font/TH_Sarabun.css");
+@import url("../js/ext-3.4.0/resources/css/ext-all.css");
+@import url("../js/ext-3.4.0/resources/css/xtheme-blue.css");
+@import url("../css/icon_all.css");
+@import url("../js/ComboCheckBox/css/Ext.ux.form.LovCombo.css");
+
+/* Template css รายงาน*/
+body {
+  font-family: "Sarabun";
+}
+html {
+  font-family: "Sarabun";
+}
+address, 
+caption,
+cite,
+code,
+dfn,
+em,
+strong,
+th,
+var {
+  font-style: normal;
+  font-weight: normal;
+}
+caption,
+thead th {
+  text-align: center;
+}
+.table_report {
+  font-size: 13px;
+  color: #000;
+} /* ขนาดฟ้อนต์ตาราง */
+.table_report thead td,
+.table_report thead th {
+  /* หัวตาราง */
+  background: #f4f4f5;
+  color: #000;
+}
+.table_report {
+  border-collapse: collapse;
+}
+.table_report thead td,
+.table_report thead th,
+.table_report tbody td,
+.table_report tbody th {
+  border: 1px solid #e0e0e0;
+}
+.table_report tbody td,
+.table_report tbody th {
+  padding: 1px 4px;
+}
+.table_report .active,
+.table_report tbody tr:hover {
+  background-color: #ececec !important;
+}
+.text-overflow {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 0px;
+}
+
+.outer {
+  display: flex;
+  flex-flow: column;
+  height: 100%;
+}
+
+.table-overflow {
+  position: relative;
+  overflow: auto;
+}
+
+.class-sticky {
+  position: sticky;
+  top: 0;
+}
+
+/* @media */
+@media print {
+  .outer {
+    display: unset;
+    flex-flow: unset;
+  }
+
+  .table-overflow {
+    overflow: unset;
+  }
+
+  .class-sticky {
+    position: unset;
+    top: 0;
+  }
+}

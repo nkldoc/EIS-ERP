@@ -1,0 +1,67 @@
+ let storeDtlRecord = Ext.data.Record.create([{name: "no"}, {name: "id"}, {name: "c_code_ref"}, {name: "po_expense_id"}, {name: "f_total"}, {name: "f_cancel"}, {name: "c_comment"}]);
+ let year = function () {
+     let years = [];
+     let currentTime = new Date();
+     let now = currentTime.getFullYear() + 2;
+     let id = currentTime.getFullYear() - 2;
+     while (id <= now) {
+         let c_name = id + 543;
+         years.push({id, c_name});
+         id++;
+     }
+     return years;
+ };
+
+ Ext.store = new Ext.data.JsonStore({
+     autoDestroy: false,
+     autoLoad: true,
+     url: "api/List_poBudgetHdrOverlap.php",
+     baseParams: {type: "po_budget_hdr_overlap", i_read: user_right_read}, // Permission i_read
+     root: "data",
+     idProperty: "id",
+     totalProperty: "totalCount",
+     fields: [
+         {name: "no"},
+         {name: "id"},
+         {name: "i_year"},
+         {name: "dc_expense_budget_type_id"},
+         {name: "dc_expense_budget_type_name"},
+         {name: "i_enable"},
+         {name: "c_comment"},
+         {name: "dc_user_create_id"},
+         {name: "dc_user_create_cost_id"},
+         {name: "d_create"},
+         {name: "dc_user_update_id"},
+         {name: "dc_user_update_cost_id"},
+         {name: "d_update"}
+     ]
+ });
+ Ext.storeDtl = new Ext.data.JsonStore({
+     autoDestroy: false,
+     autoLoad: false,
+     url: "api/List_poBudgetHdrOverlap.php",
+     baseParams: {type: "po_budget_dtl_overlap"},
+     root: "data",
+     idProperty: "id",
+     totalProperty: "totalCount",
+     fields: storeDtlRecord
+ });
+ Ext.dc_expense_budget_type = new Ext.data.JsonStore({
+     autoDestroy: false,
+     autoLoad: false,
+     url: "api/All_poBudgetHdr.php",
+     baseParams: {type: "dc_expense_budget_type"},
+     root: "data",
+     idProperty: "id",
+     fields: ["id", "c_name"]
+ });
+ Ext.po_expense = new Ext.data.JsonStore({
+     autoDestroy: false,
+     autoLoad: false,
+     url: "api/All_poBudgetHdr.php",
+     baseParams: {type: "po_expense"},
+     root: "data",
+     idProperty: "id",
+     fields: ["id", "c_name", "c_group_name"]
+ });
+ Ext.store_year = new Ext.data.JsonStore({fields: ["id", "c_name"], data: year()});

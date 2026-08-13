@@ -1,0 +1,14 @@
+application/ 
+	 /controller
+	   - MainController.js
+	 /model
+	   - UserModel.js
+	   - EmpModel.js
+	 /view
+	   - AppView.js
+	   /user
+		- GridUser.js
+		- FormUser.js
+	   /emp
+		- GridEmp.js
+		- FormEmp.js

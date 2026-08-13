@@ -1,0 +1,42 @@
+-- select top 100 condition_pay,due_bill from mcot..ar_bill_invoice_hdr where due_bill <> '' order by ar_bill_invoice_hdr_id desc
+-- drop table ar_bill_invoice_hdr
+CREATE TABLE [dbo].[ar_bill_invoice_hdr](
+	[ar_bill_invoice_hdr_id] [bigint] PRIMARY KEY IDENTITY(1,1) NOT NULL,
+	[c_code] [varchar](100) NULL,
+	[bl_code] [varchar](100) NULL,
+	[ar_so_hdr_id] [bigint] NULL,  
+	[dc_debtor_id] [bigint] NULL, 
+	[i_is_status] [int] NULL, 
+	[i_parent] [int] NULL, 
+	[parent_id] [bigint] NULL, 
+	[dc_cost_id] [bigint] NULL,
+	[dc_area_id] [bigint] NULL, 
+	[d_billing_date] [datetime] NULL,
+	[d_doc_date] [datetime] NULL, 
+	[i_no_order] [int] NULL, 
+	[c_contract_no] [varchar](100) NULL,	
+	[d_contract_date] [datetime] NULL,
+	[c_invoice_item] [varchar](255) NULL,
+	[f_vat_rate] [decimal](18, 2) NULL,
+	[dc_vat_id] [bigint] NULL, 	
+	[f_before_edit_vat] [decimal](18, 2) NULL,
+	[f_tax_amt] [decimal](18, 2) NULL, 	
+	[f_vat_amt] [decimal](18, 2) NULL, 	
+	[f_net_cost] [decimal](18, 2) NULL, 	
+	[c_name_inv] [varchar](255) NULL,
+	[c_address_inv] [varchar](255) NULL,
+	[due_bill] [varchar](255) NULL,
+	[condition_pay] [varchar](255) NULL,
+	[d_endpay_date] [datetime] NULL,
+	[c_comment] [varchar](255) NULL, 
+	[json_print_dtl] [text] NULL, 
+	[i_enable] [int] NOT NULL,
+	[dc_user_create_id] [bigint] NULL,
+	[dc_user_create_cost_id] [bigint] NULL,
+	[d_create] [datetime] NULL,
+	[dc_user_update_id] [bigint] NULL,
+	[dc_user_update_cost_id] [bigint] NULL,
+	[d_update] [datetime] NULL) ON [PRIMARY] 
+GO 
+SET ANSI_PADDING OFF
+GO
