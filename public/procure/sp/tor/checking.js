@@ -13865,7 +13865,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         //                                                        readOnly: true,
                                                                                         //                                                        submitFormat: "Y-m-d", // ส่งเป็น 2025-07-09
                                                                                         //                                                    },
-                                                                                        //                                                ], 
+                                                                                        //                                                ],
                                                                                         //                                            },
                                                                                         {
                                                                                                 fieldLabel: "วันที่บันทึกการตรวจรับ",
@@ -13920,15 +13920,50 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 width: 348,
                                                                                                         },
                                                                                                         {
-                                                                                                                                                                                                                                                                                                        xtype: "button",
-                                                                                                                                                                                                                                                                                                                text: 'แก้ไข', icon: "./images/icons/table_save.png",
-                                                                                                                                                                                                                                                                                                                handler: function () {
-                                                                                                                                                                                                                                                                                                                var updateTable = window.parent.Ext.updateTable('ตรวจรับ');
-//                                                                                                                                                                                                                                                                                                table, field, val, field_id, id, action
-                                                                                                                                                                                                                                                                                                                        updateTable.process('sp_check_period_dtl', 'c_name', Ext.getCmp('c_name_dtlID').getValue(), 'sp_tor_hdr_period_id', Ext.selectRow.get('sp_tor_hdr_period_id'), 'submit');
-                                                                                                                                                                                                                                                                                                                }
-                                                                                                                                                                                                                                                                                                        }
-                                                                                                ],
+                                                                                                                xtype: "displayfield",
+                                                                                                                value: '<span style="color:red">* ระบุงวด แสดงที่ใบส่งเบิก</span>',
+																										}, {
+																												xtype: "button",
+																																										 text: 'แก้ไข', icon: "./images/icons/table_save.png",
+																																										 handler: function () {
+																																										 Ext.Ajax.request({
+																																											url: "tor/api/mnCheckingController.php",
+																																											method: 'POST',
+																																											params: {
+																																													mode: 'updateCname', 
+																																													sp_tor_id: Ext.selectRow.get('sp_tor_id'),
+																																														sp_tor_contract_id: Ext.selectRow.get('sp_tor_contract_id'),
+																																														sp_check_period_hdr_id: Ext.selectRow.get('sp_check_period_hdr_id'),
+																																														sp_tor_hdr_period_id: Ext.selectRow.get('sp_tor_hdr_period_id'),
+																																													c_name:Ext.getCmp('c_name_dtlID').getValue(),
+																																											},
+																																											success: function (response) {
+																																													try {
+																																															var result = Ext.decode(response.responseText);
+																																															if (result.success === 'Success' || result.reval === 0) {
+																																																	Ext.Msg.alert('สำเร็จ', result.msg || 'อัพเดทประเภทการจองเงินเรียบร้อยแล้ว', function () {
+																												 
+																																																			if (Ext.storeDtl) {
+																																																					Ext.storeDtl.reload();
+																																																			}
+																																																	});
+																																															} else {
+																																																	Ext.Msg.alert('ข้อผิดพลาด', result.msg || 'เกิดข้อผิดพลาดในการอัพเดท');
+																																															}
+																																													} catch (e) {
+																																															console.error('Parse error:', e);
+																																															console.error('Response:', response.responseText);
+																																															Ext.Msg.alert('สำเร็จ', 'บันทึกข้อมูลเรียบร้อยแล้ว (ตอบกลับมี: ' + response.responseText + ')');
+																																													}
+																																											},
+																																											failure: function (response) {
+																																													Ext.Msg.alert('ข้อผิดพลาด', 'ไม่สามารถติดต่อ Server');
+																																													console.error('Update failed:', response);
+																																											}
+																																									}); 
+																																								 }
+																										}
+																							],
                                                                                         },
                                                                                         {
                                                                                                 xtype: "displayfield",
@@ -16177,7 +16212,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         {
                                                                                                 xtype: "fileuploadfield",
                                                                                                 id: "upload_pdf1",
-                                                                                                hidden: Ext.getCmp("submodeID").getValue() != "modeEditAp" ? true : false,
+                                                                                                // hidden: Ext.getCmp("submodeID").getValue() != "modeEditAp" ? true : false,
                                                                                                 width: 300,
                                                                                                 emptyText: "เลือกไฟล์ (.pdf)",
                                                                                                 fieldLabel: "เอกสารใบตรวจรับ (PDF)",
