@@ -59,6 +59,7 @@
     ------------------------------------------------------------------ */
     let _prRows = [];
     let _poRows = [];
+    let _paidRows = [];
     let _budgetTotal = 0;
     let _reserveTotal = 0;
     let _remaining = 0;
@@ -133,8 +134,9 @@
        [FIX2] แนบ f_budget / f_reserve / f_remaining จาก budgetMap
               เพื่อให้ click handler ส่งค่าถูกต้องไปยัง Rep_DetailByTypeV5
     ------------------------------------------------------------------ */
-    function aggregatePrByExpense(prRows, poRows, budgetMap) {
+    function aggregatePrByExpense(prRows, poRows, budgetMap, paidRows) {
         const map = new Map();
+        paidRows = paidRows || [];
 
         // PR rows — เฉพาะที่ยังไม่มี PO (has_po == 0)
         prRows
@@ -150,8 +152,10 @@
                         dc_expense_budget_type: r.dc_expense_budget_type || "-",
                         f_pr: 0,
                         f_po: 0,
+                        f_paid: 0,
                         pr_count: 0,
                         po_count: 0,
+                        paid_count: 0,
                         // [FIX2] ค่างบประมาณจริงจาก Result Set 2
                         f_budget_total:  bg.f_budget_total  || 0,
                         f_reserve_total: bg.f_reserve_total || 0,
@@ -178,8 +182,10 @@
                     dc_expense_budget_type: r.dc_expense_budget_type || "-",
                     f_pr: 0,
                     f_po: 0,
+                    f_paid: 0,
                     pr_count: 0,
                     po_count: 0,
+                    paid_count: 0,
                     // [FIX2]
                     f_budget_total:  bg.f_budget_total  || 0,
                     f_reserve_total: bg.f_reserve_total || 0,
@@ -191,9 +197,35 @@
             cur.po_count += 1;
         });
 
+        // เบิกจ่ายแล้ว (paid rows) — มาจาก Result Set 4 แยกตาม bg_expense_id แล้วจาก server
+        paidRows.forEach((r) => {
+            const key = r.bg_expense_id + "_" + (r.bg_expense || "");
+            if (!map.has(key)) {
+                const bg = budgetMap.get(String(r.bg_expense_id)) || {};
+                map.set(key, {
+                    bg_expense_id: r.bg_expense_id,
+                    bg_expense: r.bg_expense || "-",
+                    dc_expense_budget_type_id: r.dc_expense_budget_type_id,
+                    dc_expense_budget_type: r.dc_expense_budget_type || "-",
+                    f_pr: 0,
+                    f_po: 0,
+                    f_paid: 0,
+                    pr_count: 0,
+                    po_count: 0,
+                    paid_count: 0,
+                    f_budget_total:  bg.f_budget_total  || 0,
+                    f_reserve_total: bg.f_reserve_total || 0,
+                    f_remaining:     bg.f_remaining     || 0,
+                });
+            }
+            const cur = map.get(key);
+            cur.f_paid += Number(r.f_paid_total) || 0;
+            cur.paid_count += Number(r.paid_count) || 0;
+        });
+
         return Array.from(map.values()).sort((a, b) => {
-            const va = a.f_pr + a.f_po;
-            const vb = b.f_pr + b.f_po;
+            const va = a.f_pr + a.f_po + a.f_paid;
+            const vb = b.f_pr + b.f_po + b.f_paid;
             return vb - va; // เรียงจากมากไปน้อย
         });
     }
@@ -375,8 +407,9 @@
             return s.length > 28 ? s.substring(0, 28) + "…" : s;
         });
 
-        const prData = items.map((x) => +x.f_pr.toFixed(2));
-        const poData = items.map((x) => +x.f_po.toFixed(2));
+        const prData   = items.map((x) => +x.f_pr.toFixed(2));
+        const poData   = items.map((x) => +x.f_po.toFixed(2));
+        const paidData = items.map((x) => +x.f_paid.toFixed(2));
 
         const option = {
             backgroundColor: "transparent",
@@ -389,17 +422,21 @@
                 let html = `<b>${it.bg_expense}</b><br/>`;
                 params.forEach(p => {
                     if (p.value > 0) {
-                        const count = p.seriesName.includes("PR") ? it.pr_count : it.po_count;
+                        const count = p.seriesName.includes("PR")
+                            ? it.pr_count
+                            : p.seriesName.includes("PO")
+                            ? it.po_count
+                            : it.paid_count;
                         html += `<span style="color:${p.color};">● </span>${p.seriesName}: <b>${fmt(p.value)}</b> (${count} รายการ)<br/>`;
                     }
                 });
                 const total = params.reduce((s, p) => s + (p.value || 0), 0);
-                html += `รวมจอง: <b>${fmt(total)}</b>`;
+                html += `รวมทั้งหมด: <b>${fmt(total)}</b>`;
                 return html;
             },
             },
             legend: {
-                data: ["จอง PR (ยังไม่มี PO)", "สัญญา PO"],
+                data: ["จอง PR (ยังไม่มี PO)", "สัญญา PO", "เบิกจ่าย"],
                 top: "2%",
                 left: "center",
             },
@@ -441,6 +478,19 @@
                     stack: "total",
                     data: poData,
                     itemStyle: { color: "#e74c3c", borderColor: "#c0392b", borderWidth: 1 },
+                    label: {
+                        show: true,
+                        position: "inside",
+                        fontSize: 10,
+                        formatter: (p) => (p.value > 0 ? fmt(p.value) : ""),
+                    },
+                },
+                {
+                    name: "เบิกจ่าย",
+                    type: "bar",
+                    stack: "total",
+                    data: paidData,
+                    itemStyle: { color: "#27ae60", borderColor: "#1e8449", borderWidth: 1 },
                     label: {
                         show: true,
                         position: "inside",
@@ -573,6 +623,7 @@ _chartBar.on("click", function (params) {
 
             const allPrRows       = Array.isArray(data.data)     ? data.data     : [];
             const allPoRows       = Array.isArray(data.contract) ? data.contract : [];
+            const allPaidRows     = Array.isArray(data.paid)     ? data.paid     : [];
             const allBudgetDetail = Array.isArray(data.budget_detail) ? data.budget_detail : [];
 
             // [FIX3] กรองตามแหล่งเงินที่เลือกไว้ทั้งหมด (ถ้าไม่ได้เลือกเลย = แสดงทั้งหมด)
@@ -581,6 +632,7 @@ _chartBar.on("click", function (params) {
 
             _prRows = allPrRows.filter(matchSelected);
             _poRows = allPoRows.filter(matchSelected);
+            _paidRows = allPaidRows.filter(matchSelected);
             const filteredBudgetDetail = allBudgetDetail.filter(matchSelected);
 
             _budgetTotal  = data.f_budget_total   || 0;
@@ -603,7 +655,7 @@ _chartBar.on("click", function (params) {
             // [FIX2] สร้าง budgetMap จาก Result Set 2 (budget_detail) ที่กรองแล้ว
             const budgetMap = buildBudgetMap(filteredBudgetDetail);
 
-            const aggregated = aggregatePrByExpense(_prRows, _poRows, budgetMap);
+            const aggregated = aggregatePrByExpense(_prRows, _poRows, budgetMap, _paidRows);
 
             // [FIX3] ส่งข้อมูลที่กรองแล้วไปให้การ์ดสรุปด้วย (แทนข้อมูลดิบทั้งหมด)
             const filteredData = {

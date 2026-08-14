@@ -198,9 +198,9 @@
 			}
 
 			if (d && m && y) {
-				const thaiMonths = ["", "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+				const thaiMonths = ["", "มค", "กพ", "มีค", "เมย", "พค", "มิย", "กค", "สค", "กย", "ตค", "พย", "ธค"];
 				const yThai = (y + 543).toString().slice(-2);
-				return `${d} ${thaiMonths[m]} ${yThai}`;
+				return `${d}.${thaiMonths[m]}.${yThai}`;
 			}
 			return dateStr;
 		}
