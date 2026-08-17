@@ -927,6 +927,37 @@ const search = function () {
     }
     Ext.storeDtl.load();
 };
+
+// Export all records using the values currently entered in the search form.
+// Read the form directly so changed filters apply even before Search is pressed.
+const exportExcel = function () {
+    var getCmpValue = function (id, defaultValue) {
+        var cmp = Ext.getCmp(id);
+        return cmp ? cmp.getValue() : defaultValue;
+    };
+    var params = {
+        mode: "LIST",
+        type: "SEARCH",
+        export_excel: 1,
+        filter: getCmpValue("filter", "c_code"),
+        value: getCmpValue("value-box", ""),
+        dc_expense_budget_type_id: getCmpValue("s_dc_expense_budget_type_id", 0),
+        f_total_amtPr: getCmpValue("f_total_amtPrID", 0),
+        f_total_amtPo: getCmpValue("f_total_amtPoID", 0),
+        i_show: getCmpValue("i_showID", false) ? 1 : 0,
+        dc_cost_id: getCmpValue("s_dc_cost_idID", 0),
+        dc_sub_cost_id: getCmpValue("s_dc_sub_cost_idID", 0),
+        i_type_contract: getCmpValue("s_i_type_contract", 0),
+        sp_emp_id: getCmpValue("sp_emp_idID", 0),
+        i_enabled: getCmpValue("s_i_status", 0),
+        tor_type_id: getCmpValue("s_tor_type_idID", 0),
+        i_budget_year: getCmpValue("s_i_budget_year", 0),
+        i_budget_year_overlap: getCmpValue("s_i_budget_year_overlap", 0),
+        i_year_contract: getCmpValue("s_i_year_contract", 0),
+        sp_tor_status_id: getCmpValue("sp_tor_status_id", 0)
+    };
+    window.location.href = "tor/api/mnTorCheckList.php?" + Ext.urlEncode(params);
+};
 Ext.getBodyMultiBudget = function (rec, status) {
     i_amount_bg = Ext.selectRow.get("i_amount_bg") || Ext.selectRow.json.i_amount_bg;
     if (Ext.selectRow.json.sp_type_bg == 1) {
@@ -5900,6 +5931,14 @@ Ext.AppUx = function (app, menu) {
                                     iconCls: "icon-magnifier",
                                     handler: function () {
                                         search();
+                                    },
+                                },
+                                {xtype: "tbspacer", width: 4},
+                                {
+                                    text: "Export Excel",
+                                    iconCls: "icon-excel",
+                                    handler: function () {
+                                        exportExcel();
                                     },
                                 },
                             ],

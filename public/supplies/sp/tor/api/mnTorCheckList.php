@@ -58,6 +58,7 @@ $data["c_comment"] = $data["c_comment"] ?? NULL;
 switch ($mode) {
     case "LIST":
         ###########################################
+        $isExportExcel = isset($_REQUEST["export_excel"]) && intval($_REQUEST["export_excel"]) === 1;
         $mode = $_REQUEST["mode"] ?? null;
         $filter = $_REQUEST["filter"] ?? null;
         $value = $_REQUEST["value"] ?? null;
@@ -78,7 +79,10 @@ switch ($mode) {
         if (!get($start)) {
             $start = 0;
         }
-        if (!get($limit)) {
+        if ($isExportExcel) {
+            $start = 0;
+            $limit = 1000000;
+        } else if (!get($limit)) {
             $limit = 20;
         } else {
             $limit = ($limit + $start);
@@ -365,7 +369,12 @@ switch ($mode) {
             6 => '<span style="color:blue"></span>'
         );
 
+        $exportRows = array();
         while ($row = $db->Fetch($stmt)) {
+            if ($isExportExcel) {
+                $exportRows[] = $row;
+                continue;
+            }
             /* การจัดทำ PR ปกติ
               การจัดทำ PR หลักโครงการต่อเนื่อง(ไม่จองเงิน)
               การจัดทำ PR ย่อยโครงการต่อเนื่อง(จองเงิน)
@@ -527,6 +536,50 @@ switch ($mode) {
                 "po_creditor_idTxt" => $row["po_creditor_idTxt"],
             );
             ${$root}[] = $temp;
+        }
+
+        if ($isExportExcel) {
+            $excelColumns = array(
+                'c_code' => 'เลขที่ PR',
+                'd_doc_ref' => 'เลขที่อ้างอิง/เลขที่ พวช',
+                'c_name' => 'ชื่อรายการ',
+                'code' => 'เลขที่สัญญา',
+                'dc_creditor_name' => 'ผู้ขาย/ผู้รับจ้าง',
+                'c_tax_number_imp' => 'เลขประจำตัวผู้เสียภาษี',
+                'f_total_amt' => 'จำนวนเงิน PR',
+                'f_total_contract' => 'จำนวนเงินสัญญา',
+                'dc_cost_idTxt' => 'ส่วนงาน',
+                'dc_sub_cost' => 'หน่วยงานย่อย',
+                'c_type_name' => 'ประเภท TOR',
+                'c_name_status' => 'สถานะ',
+                'd_tor_date' => 'วันที่ TOR',
+                'd_doc_date' => 'วันที่เอกสาร',
+                'd_create' => 'วันที่สร้าง'
+            );
+            $fileName = 'tor_checklist_' . date('Ymd_His') . '.xls';
+            header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+            header('Content-Disposition: attachment; filename="' . $fileName . '"');
+            header('Cache-Control: max-age=0');
+            echo "\xEF\xBB\xBF";
+            echo '<html><head><meta charset="UTF-8"><style>'
+                . 'table{border-collapse:collapse}th,td{border:1px solid #999;padding:4px;vertical-align:top}'
+                . 'th{background:#d9ead3;font-weight:bold}.text{mso-number-format:"\\@"}.number{mso-number-format:"#,##0.00"}'
+                . '</style></head><body><table><thead><tr><th>ลำดับ</th>';
+            foreach ($excelColumns as $title) {
+                echo '<th>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</th>';
+            }
+            echo '</tr></thead><tbody>';
+            foreach ($exportRows as $index => $exportRow) {
+                echo '<tr><td>' . ($index + 1) . '</td>';
+                foreach ($excelColumns as $field => $title) {
+                    $cellValue = isset($exportRow[$field]) ? $exportRow[$field] : '';
+                    $cellClass = in_array($field, array('f_total_amt', 'f_total_contract')) ? 'number' : 'text';
+                    echo '<td class="' . $cellClass . '">' . htmlspecialchars((string)$cellValue, ENT_QUOTES, 'UTF-8') . '</td>';
+                }
+                echo '</tr>';
+            }
+            echo '</tbody></table></body></html>';
+            exit;
         }
 
         $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
