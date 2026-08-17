@@ -52,7 +52,7 @@
   let chartBar;
   let chartDonut;
   let DONUT_ITEMS = [];
-  let DONUT_SELECTED = -1; // -1 = ยังไม่ได้เลือก → แสดงผลรวมทุกแหล่งเงิน
+  let DONUT_SELECTED = new Set(); // เซตของ index ที่เลือก (รองรับเลือกได้หลายแหล่งเงิน); ว่าง = ยังไม่ได้เลือก → แสดงผลรวมทุกแหล่งเงิน
 
   // นิยาม "รวมทุกแหล่งเงิน" = รวมเฉพาะ 4 แหล่งเงินนี้เท่านั้น (ไม่ใช่ทุก dc_expense_budget_type_id ที่มีในข้อมูลดิบ)
   const CANONICAL_FUND_SOURCE_NAMES = ["เงินรายได้ส่วนงาน", "เงินอุดหนุนรัฐบาล", "เงินอุดหนุนกทม.", "เงินสะสมส่วนงาน"];
@@ -193,7 +193,7 @@ return Array.from(map.values())
     const year = $("#budget_year_filter").val() || "all";
 
     /* [Comment] ปิดการใช้งาน dropdown filter "แหล่งเงิน" (multiCheckCombo) ตามที่ผู้ใช้ระบุ
-       เพราะตอนนี้เลือกแหล่งเงินผ่านการ์ด/วงกลมโดนัทแทนแล้ว (ดู selectDonutSource/getEffectiveFundIds)
+       เพราะตอนนี้เลือกแหล่งเงินผ่านการ์ด/วงกลมโดนัทแทนแล้ว เลือกได้หลายแหล่ง (ดู toggleDonutSource/getEffectiveFundIds)
        คงโค้ดเดิมไว้ (comment ไว้) เผื่อจะเปิดกลับมาใช้ภายหลัง
 
     const $multi = $("#multiCheckCombo");
@@ -547,7 +547,7 @@ return Array.from(map.values())
   function syncPrPoWithDonutSelection() {
     const badge = document.getElementById("prpoDonutFilterBadge");
 
-    if (DONUT_SELECTED === -1) {
+    if (DONUT_SELECTED.size === 0) {
       if (badge) badge.style.display = "none";
       if (typeof window.loadPrPoSection === "function") {
         const yearTh = $("#budget_year_filter").val() || String(new Date().getFullYear() + 543);
@@ -557,23 +557,32 @@ return Array.from(map.values())
       return;
     }
 
-    const it = DONUT_ITEMS[DONUT_SELECTED];
-    if (!it) return;
+    const selectedItems = Array.from(DONUT_SELECTED)
+      .map((i) => DONUT_ITEMS[i])
+      .filter(Boolean);
+    if (!selectedItems.length) return;
 
     if (badge) {
-      badge.textContent = "กรองตาม: " + it.name;
+      badge.textContent = "กรองตาม: " + selectedItems.map((it) => it.name).join(", ");
       badge.style.display = "inline-block";
     }
     if (typeof window.loadPrPoSection === "function") {
       const yearTh = $("#budget_year_filter").val() || String(new Date().getFullYear() + 543);
       const yearEn = String(Number(yearTh) - 543);
-      window.loadPrPoSection({ year_th: yearTh, year_en: yearEn, override_type_ids: [it.typeId] });
+      window.loadPrPoSection({ year_th: yearTh, year_en: yearEn, override_type_ids: selectedItems.map((it) => it.typeId) });
     }
   }
 
-  // เลือก/ยกเลิกเลือกแหล่งเงินในโดนัท แล้วรีเรนเดอร์ทุกส่วนที่เกี่ยวข้อง (กราฟ + การ์ด + รายละเอียด + Data View)
-  function selectDonutSource(idx) {
-    DONUT_SELECTED = idx;
+  // เลือก/ยกเลิกเลือกแหล่งเงินในโดนัท (multi-select) แล้วรีเรนเดอร์ทุกส่วนที่เกี่ยวข้อง (กราฟ + การ์ด + รายละเอียด + Data View)
+  // idx === -1 หมายถึงการ์ด "รวมทุกแหล่งเงิน" → เคลียร์การเลือกทั้งหมด
+  function toggleDonutSource(idx) {
+    if (idx === -1) {
+      DONUT_SELECTED.clear();
+    } else if (DONUT_SELECTED.has(idx)) {
+      DONUT_SELECTED.delete(idx);
+    } else {
+      DONUT_SELECTED.add(idx);
+    }
     renderDonut();
     syncPrPoWithDonutSelection();
     refreshDataView(); // Data View เหลือเฉพาะแหล่งเงินที่เลือกจากการ์ด/วงกลมโดนัท
@@ -589,30 +598,35 @@ return Array.from(map.values())
     const items = aggregateBySource(rows, { year, ids });
 
     DONUT_ITEMS = items;
-    if (DONUT_SELECTED >= items.length) DONUT_SELECTED = -1;
+    // ตัด index ที่เลือกไว้แต่เกินขอบเขตข้อมูลปัจจุบันทิ้ง (เช่น เปลี่ยนปีแล้วจำนวนแหล่งเงินลดลง)
+    DONUT_SELECTED = new Set(Array.from(DONUT_SELECTED).filter((i) => i >= 0 && i < items.length));
 
     const grandTotal = items.reduce((s, it) => s + it.total, 0);
-    const selectedItem = DONUT_SELECTED !== -1 ? items[DONUT_SELECTED] : null;
+    const selectedIdxs = Array.from(DONUT_SELECTED);
+    const selectedItems = selectedIdxs.map((i) => items[i]).filter(Boolean);
+    // โหมด "เจาะแหล่งเดียว" (ใช้ไปแล้ว/คงเหลือ) จะใช้เฉพาะตอนเลือกแหล่งเงินเดียวเท่านั้น
+    const singleItem = selectedItems.length === 1 ? selectedItems[0] : null;
 
     // อัปเดตตัวเลขงบรวมกลางวงกลม (ใช้ HTML overlay แทน text บน canvas เพื่อให้อ่านชัดในทุกธีม)
-    // ถ้าเลือกแหล่งเงินไว้ ให้โชว์ยอดของแหล่งเงินนั้น ไม่ใช่ยอดรวมทุกแหล่ง
+    // ถ้าเลือกแหล่งเงินไว้ ให้โชว์ยอดรวมของแหล่งเงินที่เลือก ไม่ใช่ยอดรวมทุกแหล่ง
     const centerVal = document.getElementById("donutCenterValue");
     if (centerVal) {
       // แสดงตัวเลขเต็ม ไม่ปัดเป็นล้านบาท เช่น 131,750,700.00
-      const centerBase = selectedItem ? selectedItem.total : grandTotal;
+      const centerBase = selectedItems.length ? selectedItems.reduce((s, it) => s + it.total, 0) : grandTotal;
       centerVal.textContent = toBaht(centerBase);
     }
 
     if (!chartDonut) chartDonut = echarts.init(dom);
     else chartDonut.clear();
 
-    // โหมดภาพรวม: วงกลมแบ่งตามสัดส่วนของทุกแหล่งเงิน
-    // โหมดเลือกแล้ว: วงกลมของแหล่งเงินนั้นแหล่งเดียว แบ่งเป็น "ใช้ไปแล้ว" กับ "คงเหลือ"
-    const seriesData = selectedItem
+    // โหมดภาพรวม/หลายแหล่งเงิน: วงกลมแบ่งตามสัดส่วนของแต่ละแหล่งเงิน (ทั้งหมด หรือเฉพาะที่เลือก)
+    // โหมดเลือกแหล่งเดียว: วงกลมของแหล่งเงินนั้นแหล่งเดียว แบ่งเป็น "ใช้ไปแล้ว" กับ "คงเหลือ"
+    const bySourcePool = selectedItems.length ? selectedItems : items;
+    const seriesData = singleItem
       ? (() => {
-          const bg = donutColorFor(selectedItem.name);
-          const used = selectedItem.booked + selectedItem.insp + selectedItem.working;
-          const remain = Math.max(0, selectedItem.total - used);
+          const bg = donutColorFor(singleItem.name);
+          const used = singleItem.booked + singleItem.insp + singleItem.working;
+          const remain = Math.max(0, singleItem.total - used);
           return [
             {
               name: "ใช้ไปแล้ว",
@@ -628,25 +642,28 @@ return Array.from(map.values())
             },
           ];
         })()
-      : items.map((it) => {
+      : bySourcePool.map((it) => {
           const bg = donutColorFor(it.name);
           return {
             name: it.name,
             value: it.total,
             itemStyle: { color: bg },
             label: { color: "#000000" },
+            sourceIndex: items.indexOf(it), // ผูก index จริงใน DONUT_ITEMS ไว้ใช้ตอนคลิก
           };
         });
+
+    const poolTotal = bySourcePool.reduce((s, it) => s + it.total, 0);
 
     const option = {
       backgroundColor: "transparent",
       tooltip: {
         trigger: "item",
         formatter: (p) => {
-          if (selectedItem) {
-            return `<b>${selectedItem.name}</b><br/>${p.name}: ${toBaht(p.value)} บาท (${p.percent}%)`;
+          if (singleItem) {
+            return `<b>${singleItem.name}</b><br/>${p.name}: ${toBaht(p.value)} บาท (${p.percent}%)`;
           }
-          const it = items[p.dataIndex];
+          const it = bySourcePool[p.dataIndex];
           return `<b>${it.name}</b><br/>${toBaht(it.total)} บาท<br/>ใช้ไปแล้ว ${usedPct(it)}%`;
         },
       },
@@ -662,11 +679,11 @@ return Array.from(map.values())
             position: "inside",
             // แสดงชื่อแหล่งเงิน + % ทุกสไลซ์เสมอ (ไม่ซ่อนชื่อแม้สไลซ์เล็ก) ให้ตัวหนังสือขึ้นบรรทัดใหม่แทนการตัดทิ้งถ้าพื้นที่ไม่พอ
             formatter: (p) => {
-              if (selectedItem) {
+              if (singleItem) {
                 return `${p.name}\n${p.percent}%`;
               }
-              const it = items[p.dataIndex];
-              const pct = sharePct(it, grandTotal);
+              const it = bySourcePool[p.dataIndex];
+              const pct = sharePct(it, poolTotal);
               return `${it.name}\n${pct}%`;
             },
             color: "#000000",
@@ -684,11 +701,11 @@ return Array.from(map.values())
     chartDonut.setOption(option, true);
     chartDonut.off("click");
     chartDonut.on("click", (p) => {
-      if (selectedItem) {
-        // อยู่ในโหมดแหล่งเงินเดียวอยู่แล้ว คลิกซ้ำ = กลับไปดูภาพรวมทุกแหล่งเงิน
-        selectDonutSource(-1); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
-      } else if (typeof p.dataIndex === "number") {
-        selectDonutSource(p.dataIndex);
+      if (singleItem) {
+        // อยู่ในโหมดแหล่งเงินเดียวอยู่แล้ว คลิกที่วงกลม = ยกเลิกเลือกแหล่งนี้ (กลับไปดูภาพรวม/ที่เหลือ)
+        toggleDonutSource(selectedIdxs[0]); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
+      } else if (p.data && typeof p.data.sourceIndex === "number") {
+        toggleDonutSource(p.data.sourceIndex);
       }
     });
 
@@ -704,8 +721,9 @@ return Array.from(map.values())
 
     // การ์ด "รวมทุกแหล่งเงิน" — ค่าเริ่มต้นเมื่อยังไม่ได้เลือกแหล่งเงินใด
     const allDiv = document.createElement("div");
-    allDiv.className = "donut-card donut-card-all" + (DONUT_SELECTED === -1 ? " selected" : "");
-    allDiv.style.borderColor = DONUT_SELECTED === -1 ? "#495057" : "transparent";
+    const noneSelected = DONUT_SELECTED.size === 0;
+    allDiv.className = "donut-card donut-card-all" + (noneSelected ? " selected" : "");
+    allDiv.style.borderColor = noneSelected ? "#495057" : "transparent";
     const allUsedPct = grandTotal > 0
       ? (((DONUT_ITEMS.reduce((s, it) => s + it.booked + it.insp + it.working, 0)) / grandTotal) * 100).toFixed(1)
       : "0.0";
@@ -714,21 +732,22 @@ return Array.from(map.values())
       '<div class="donut-card-total" style="color:#495057">' + toBaht(grandTotal) + "</div>" +
       '<div class="donut-card-sub">100.00% ของงบรวม &middot; ใช้ไปแล้ว ' + allUsedPct + "%</div>";
     allDiv.addEventListener("click", () => {
-      selectDonutSource(-1); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
+      toggleDonutSource(-1); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
     });
     box.appendChild(allDiv);
 
     DONUT_ITEMS.forEach((it, i) => {
       const color = donutColorFor(it.name);
+      const isSelected = DONUT_SELECTED.has(i);
       const div = document.createElement("div");
-      div.className = "donut-card" + (i === DONUT_SELECTED ? " selected" : "");
-      div.style.borderColor = i === DONUT_SELECTED ? color : "transparent";
+      div.className = "donut-card" + (isSelected ? " selected" : "");
+      div.style.borderColor = isSelected ? color : "transparent";
       div.innerHTML =
         '<div class="donut-card-name"><span class="donut-dot" style="background:' + color + '"></span>' + it.name + "</div>" +
         '<div class="donut-card-total" style="color:' + color + '">' + toBaht(it.total) + "</div>" +
         '<div class="donut-card-sub">' + sharePct(it, grandTotal) + "% ของงบรวม &middot; ใช้ไปแล้ว " + usedPct(it) + "%</div>";
       div.addEventListener("click", () => {
-        selectDonutSource(i); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
+        toggleDonutSource(i); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
       });
       box.appendChild(div);
     });
@@ -740,7 +759,7 @@ return Array.from(map.values())
     if (!titleEl || !box) return;
 
     // ยังไม่ได้เลือกแหล่งเงิน → แสดงผลรวมของทุกแหล่งเงินที่กรองอยู่
-    if (DONUT_SELECTED === -1) {
+    if (DONUT_SELECTED.size === 0) {
       const sum = DONUT_ITEMS.reduce(
         (s, it) => ({
           total: s.total + it.total,
@@ -769,16 +788,34 @@ return Array.from(map.values())
       return;
     }
 
-    const it = DONUT_ITEMS[DONUT_SELECTED];
-    if (!it) return;
+    const selectedItems = Array.from(DONUT_SELECTED)
+      .map((i) => DONUT_ITEMS[i])
+      .filter(Boolean);
+    if (!selectedItems.length) return;
 
-    titleEl.textContent = "รายละเอียดของ " + it.name;
+    // เลือกแหล่งเดียว → คงชื่อแหล่งเงินนั้นไว้ตามเดิม / เลือกหลายแหล่ง → รวมชื่อ + ยอดของทุกแหล่งที่เลือก
+    titleEl.textContent =
+      selectedItems.length === 1
+        ? "รายละเอียดของ " + selectedItems[0].name
+        : "รายละเอียดของ " + selectedItems.length + " แหล่งเงินที่เลือก (" + selectedItems.map((it) => it.name).join(", ") + ")";
+
+    const sum = selectedItems.reduce(
+      (s, it) => ({
+        total: s.total + it.total,
+        booked: s.booked + it.booked,
+        insp: s.insp + it.insp,
+        working: s.working + it.working,
+        remain: s.remain + it.remain,
+      }),
+      { total: 0, booked: 0, insp: 0, working: 0, remain: 0 }
+    );
+    const headColor = selectedItems.length === 1 ? donutColorFor(selectedItems[0].name) : "#495057";
     const stats = [
-      { label: "งบรวม", val: it.total, color: donutColorFor(it.name) },
-      { label: "จองเงิน / ใช้ไปแล้ว", val: it.booked, color: "#4caf50" },
-      { label: "เงินจองตรวจรับ", val: it.insp, color: "#6f42c1" },
-      { label: "เบิกจ่ายแล้ว", val: it.working, color: "#ffc107" },
-      { label: "คงเหลือ", val: it.remain, color: it.remain < 0 ? "#e74c3c" : "#ff9800" },
+      { label: "งบรวม", val: sum.total, color: headColor },
+      { label: "จองเงิน / ใช้ไปแล้ว", val: sum.booked, color: "#4caf50" },
+      { label: "เงินจองตรวจรับ", val: sum.insp, color: "#6f42c1" },
+      { label: "เบิกจ่ายแล้ว", val: sum.working, color: "#ffc107" },
+      { label: "คงเหลือ", val: sum.remain, color: sum.remain < 0 ? "#e74c3c" : "#ff9800" },
     ];
     box.innerHTML = stats
       .map(
@@ -1261,12 +1298,16 @@ return Array.from(map.values())
   }
   window.updateDataViewColumnVisibility = updateDataViewColumnVisibility;
 
-  // คืนค่า "แหล่งเงินที่ต้องใช้กรอง Data View จริง ๆ ในตอนนี้"
+  // คืนค่า "แหล่งเงินที่ต้องใช้กรอง Data View จริง ๆ ในตอนนี้" (รองรับเลือกได้หลายแหล่งเงินพร้อมกัน)
   // ให้สิทธิ์การ์ด/วงกลมโดนัทที่เลือกไว้ (DONUT_SELECTED) มาก่อนเสมอ เพราะเป็นจุดที่ผู้ใช้ "เลือกแหล่งเงิน" จริง ๆ
-  // ถ้ายังไม่ได้เลือกจากวงกลม/การ์ด (DONUT_SELECTED === -1) ให้ fallback ไปใช้ dropdown "แหล่งเงิน" (multiCheckCombo) ตามเดิม
+  // ถ้ายังไม่ได้เลือกจากวงกลม/การ์ดเลย (DONUT_SELECTED ว่าง) ให้ fallback ไปใช้ dropdown "แหล่งเงิน" (multiCheckCombo) ตามเดิม
   function getEffectiveFundIds() {
-    if (DONUT_SELECTED !== -1 && DONUT_ITEMS[DONUT_SELECTED]) {
-      return [String(DONUT_ITEMS[DONUT_SELECTED].typeId)];
+    if (DONUT_SELECTED.size > 0) {
+      const ids = Array.from(DONUT_SELECTED)
+        .map((i) => DONUT_ITEMS[i])
+        .filter(Boolean)
+        .map((it) => String(it.typeId));
+      if (ids.length) return ids;
     }
     return $("#multiCheckCombo").val() || [];
   }

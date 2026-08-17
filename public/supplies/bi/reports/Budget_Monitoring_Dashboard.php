@@ -240,7 +240,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                                 <div class="donut-center-unit">บาท</div>
                                                         </div>
                                                 </div>
-                                                <div class="donut-center-note">คลิกส่วนวงกลม หรือคลิกการ์ดด้านล่าง เพื่อเลือกแหล่งเงิน</div>
+                                                <div class="donut-center-note">คลิกส่วนวงกลม หรือคลิกการ์ดด้านล่าง เพื่อเลือกแหล่งเงิน (เลือกได้หลายแหล่ง คลิกซ้ำเพื่อยกเลิก)</div>
                                                 <div id="donutCards" class="donut-cards-grid donut-cards-grid-lg"></div>
                                                 <div class="donut-detail-title" id="donutDetailTitle">รายละเอียดของ รวมทุกแหล่งเงิน</div>
                                                 <div id="donutDetailStats" class="donut-detail-grid"></div>
