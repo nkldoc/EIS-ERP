@@ -508,7 +508,25 @@ const transfer = function (data) {
         ],
     }).show();
 };
+  Ext.yearTh = function () {
+    let years = [];
+    let currentTime = new Date();
+    let now = currentTime.getFullYear() + 1;
+    let id = currentTime.getFullYear() - 3;
+    while (id <= now) {
+      let c_name = id + 543;
+      years.push({
+        id,
+        c_name,
+      });
+      id++;
+    }
 
+    let Date_now = new Date();
+    Date_now = Date_now.toISOString().split("T")[0].split("-");
+    Ext.bgYear = Date_now[0] - 0 + ((Date_now[1] < 10 ? 0 : 1) - 0);
+    return years;
+  };
 function popOverlap(rec) {
     Ext.storeDepartment = new Ext.data.JsonStore({
         storeId: "storeDepartment",
@@ -603,7 +621,15 @@ function popOverlap(rec) {
         },
     });
 }
-
+ Ext.i_type_bg = new Ext.data.JsonStore({
+    autoDestroy: false,
+    autoLoad: true,
+    url: "api/All_spAlert.php",
+    baseParams: { type: "sp_type_bg", i_type_bg: true },
+    root: "data",
+    idProperty: "id",
+    fields: ["id", "c_name"],
+  });
 Ext.storeSUMcontract = new Ext.data.JsonStore({
     storeId: "myStore3",
     autoLoad: false,
@@ -686,7 +712,7 @@ Ext.storeNew3 = new Ext.data.JsonStore({
 });
 Ext.store_year = new Ext.data.JsonStore({
     fields: ["id", "c_name"],
-    data: years,
+    data: Ext.yearTh(),
 });
 Ext.storeBank = new Ext.data.JsonStore({
     autoLoad: true,

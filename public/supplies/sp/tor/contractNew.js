@@ -10,6 +10,32 @@ const Uiedit_contractNew = function (rec) {
     fields: ["no", "id", "d_holiday", "c_name"],
   });
 
+    Ext.yearTh = function () {
+    let years = [];
+    let currentTime = new Date();
+    let now = currentTime.getFullYear() + 1;
+    let id = currentTime.getFullYear() - 3;
+    while (id <= now) {
+      let c_name = id + 543;
+      years.push({
+        id,
+        c_name,
+      });
+      id++;
+    }
+
+    let Date_now = new Date();
+    Date_now = Date_now.toISOString().split("T")[0].split("-");
+    Ext.bgYear = Date_now[0] - 0 + ((Date_now[1] < 10 ? 0 : 1) - 0);
+    return years;
+  };
+  Ext.store_year = new Ext.data.JsonStore({
+    fields: ["id", "c_name"],
+    autoDestroy: false,
+    autoLoad: false,
+    data: Ext.yearTh(),
+  });
+  
   function addDays(date, numDays) {
     var newDate = new Date(date);
     newDate.setDate(newDate.getDate() + numDays);
@@ -1773,7 +1799,114 @@ const Uiedit_contractNew = function (rec) {
                             xtype: "hidden",
                             name: "i_enabled",
                             value: 1,
+                          },  new Ext.form.ComboBox({
+                          mode: "local",
+                          store: Ext.i_type_bg,
+                          anchor: "55%",
+                          fieldLabel: "ประเภท PR",
+                          submitValue: true,
+                          hiddenName: "i_type_bg",
+                          name: "i_type_c_name_bg",
+                          id: "i_type_bgID",
+                          valueField: "id",
+                          displayField: "c_name",
+                          triggerAction: "all",
+                          forceSelection: true,
+                          selectOnFocus: true,
+                          typeAhead: false,
+                          emptyText: "กรุณาเลือก",
+                          validator: function (val) {
+                            if (!Ext.isEmpty(val)) {
+                              return true;
+                            } else {
+                              return "กรุณาระบุ ข้อมูลให้ถูกต้อง";
+                            }
                           },
+                          listeners: {
+                            afterrender: function () {
+                              this.fn = function () {
+                                value = this.getValue();
+                                console.log(value);
+                                if (value == 4 || value == 2 || value == 8 || value == 11) {
+                                }
+                              };
+                            },
+                            // selectRow
+                            Change: function () {
+                              this.fn();
+                            },
+                            beforequery: function (q) {
+                              if (q.query) {
+                                var length = q.query.length;
+                                q.query = new RegExp(Ext.escapeRe(q.query));
+                                q.query.length = length;
+                              }
+                            },
+                            blur: function () {
+                              this.getStore().clearFilter();
+                            },
+                          },
+                        }),new Ext.form.ComboBox({
+      mode: "local",
+      fieldLabel: " ปีงบประมาณ",
+      submitValue: true,
+      hiddenName: "i_yyyy",
+      name: "i_year",
+      id: "i_yearID",
+      width: 120,
+      store: Ext.store_year,
+      valueField: "id",
+      displayField: "c_name",
+      value: Ext.bgYear,
+      triggerAction: "all",
+      forceSelection: true,
+      selectOnFocus: true,
+      typeAhead: false,
+      emptyText: "กรุณาเลือกปีงบประมาณ...",
+      listeners: {
+        afterrender: function () {
+          this.fn = function () {};
+        },
+        Change: function () {
+          this.fn();
+        },
+        beforequery: function (q) {
+          if (q.query) {
+            var length = q.query.length;
+            q.query = new RegExp(Ext.escapeRe(q.query));
+            q.query.length = length;
+          }
+        },
+        blur: function () {
+          this.getStore().clearFilter();
+        },
+        select: function () {
+          var i_year = Ext.getCmp("i_yearID").getValue() + 543;
+          Ext.store_month = new Ext.data.JsonStore({
+            fields: ["id", "c_name"],
+            data: [
+              // { id: "00", c_name: "- ทั้งหมด -" },
+              { id: "10", c_name: "ต.ค. " + (i_year - 1) },
+              { id: "11", c_name: "พ.ย. " + (i_year - 1) },
+              { id: "12", c_name: "ธ.ค. " + (i_year - 1) },
+              { id: "01", c_name: "ม.ค. " + i_year },
+              { id: "02", c_name: "ก.พ. " + i_year },
+              { id: "03", c_name: "มี.ค. " + i_year },
+              { id: "04", c_name: "เม.ย. " + i_year },
+              { id: "05", c_name: "พ.ค. " + i_year },
+              { id: "06", c_name: "มิ.ย. " + i_year },
+              { id: "07", c_name: "ก.ค. " + i_year },
+              { id: "08", c_name: "ส.ค. " + i_year },
+              { id: "09", c_name: "ก.ย. " + i_year },
+            ],
+          });
+          Ext.getCmp("mm_startID").bindStore(Ext.store_month);
+          // Ext.getCmp("mm_end").bindStore(Ext.store_month);
+          Ext.getCmp("mm_startID").setValue(Ext.getCmp("mm_startID").getValue());
+          // Ext.getCmp("mm_end").setValue(Ext.getCmp("mm_end").getValue());
+        },
+      },
+    }),
                           {
                             xtype: "buttongroup",
                             frame: false,
