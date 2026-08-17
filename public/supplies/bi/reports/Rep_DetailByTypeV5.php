@@ -39,6 +39,15 @@ $data_json = List_QueryParam();
 $data_arr  = json_decode($data_json, true);
 $data      = $data_arr["data"] ?? [];
 
+// [FIX] ตัดแถวยอดเงิน 0 ออกทั้งชุด — has_po เช็คแค่ pr_id ว่าเคยมี PO หรือไม่ ไม่ได้เช็คว่าตรงกับ
+// budget_type ของแถวนั้นด้วย PR ที่มีเงินจองอยู่ใน 2 budget_type (เคยมี PO ทั้งคู่) แต่ budget_type
+// หนึ่งถูกเบิกจ่ายจนหมดแล้ว (เหลือ f_amt = 0.00) จะยังติด has_po=1 กลายเป็นแถว "ซาก" ไม่มีความหมาย
+// ให้แสดง (ดูคอมเมนต์เดียวกันใน Rep_PrPoListV5.php) ไม่กระทบ $f_pr_total เพราะมาจาก API แยก
+// และไม่กระทบผลรวมใดๆ (บวก 0 ไม่เปลี่ยนผลรวม)
+$data = array_values(array_filter($data, function ($r) {
+    return floatval($r['f_amt'] ?? 0) > 0.005;
+}));
+
 $total_count = count($data);
 $f_pr_total  = floatval($data_arr['f_pr_total'] ?? 0);
 
@@ -46,8 +55,22 @@ $f_plan_cut_total   = floatval($data_arr['f_plan_cut_total']   ?? 0);
 $f_period_cut_total = floatval($data_arr['f_period_cut_total'] ?? 0);
 
 // ===== เงินจองสัญญา =====
-$contract_rows    = $data_arr["contract"]                  ?? [];
-$f_contract_total = floatval($data_arr["f_contract_total"] ?? 0);
+// [FIX] เดิมใช้ $data_arr["contract"] (Result Set 3 ที่ join po_id -> sp_Tor โดยตรง) ซึ่งบาง PO
+// ไม่มีเลขที่/ชื่อ PO บันทึกไว้ในตาราง sp_Tor เลยขึ้น "-" (ยอดเงินถูกต้อง แต่เลขสัญญาหาย)
+// เปลี่ยนมาใช้แถวจาก Result Set 1 (join ผ่าน pr_id เสมอ จึงไม่มีทาง "-") ที่ has_po > 0 แทน
+// เหมือนกับที่ Rep_PrPoListV5.php แก้ไปแล้ว (ดูคอมเมนต์ [FIX-CHECKSUM] ในไฟล์นั้น) เป็นยอดเงิน
+// ก้อนเดียวกันเป๊ะ (รวม/จำนวนรายการตรงกัน) แค่ไม่มี field ขาดหาย
+//
+// [FIX] has_po เช็คแค่ pr_id ว่าเคยมี PO ในระบบหรือไม่ ไม่ได้เช็คว่า PO นั้นตรงกับ budget_type/
+// bg_expense ของแถวนี้ด้วย PR ที่มีเงินจองอยู่ใน 2 budget_type (เคยมี PO ทั้งคู่) แต่ budget_type
+// หนึ่งถูกเบิกจ่ายจนหมดแล้ว (เหลือ f_amt = 0.00) จะยังติด has_po=1 อยู่ ทำให้มีแถว "ซาก" ยอด 0.00
+// โผล่ในตาราง PO (พิสูจน์จากข้อมูลจริง PR25681000115: budget_type=4 เหลือ 0.00, budget_type=49
+// เหลือ 11,329,266.90 แต่ has_po=1 ทั้งคู่) ตัดแถวยอด 0 ออกไปเลย เพราะไม่มีความหมายให้แสดง และ
+// ไม่กระทบยอดรวม (บวก 0 ไม่เปลี่ยนผลรวม)
+$contract_rows    = array_values(array_filter($data, function ($r) {
+    return intval($r['has_po'] ?? 0) > 0 && floatval($r['f_amt'] ?? 0) > 0.005;
+}));
+$f_contract_total = array_sum(array_column($contract_rows, 'f_amt'));
 $total_contract   = count($contract_rows);
 
 // ✅ แก้ไข 3: คำนวณ "ที่ใช้ไป (จอง)" จากยอดรายการจริง (Result Set 1) แทนการเชื่อค่า
@@ -367,15 +390,14 @@ function thaiDate($dateStr)
                             elseif (strpos($status, 'อนุมัติ') !== false) $badgeClass = 'bg-status-green';
                             elseif (strpos($status, 'รอ') !== false) $badgeClass = 'bg-status-orange';
 
-                            $f_amt_contract = floatval($row['f_amt_contract'] ?? 0);
-                            $is_cross_type  = !empty($row['is_cross_type']);
+                            $f_amt_contract = floatval($row['f_amt'] ?? 0);
                         ?>
-                            <tr<?= $is_cross_type ? ' style="background:#fff8e1;"' : '' ?>>
+                            <tr>
                                 <td class="text-center text-muted"><?= $i + 1 ?></td>
-                                <td class="font-weight-bold text-danger"><?= $row['po_code'] ?? '-' ?></td>
+                                <td class="font-weight-bold text-danger"><?= $row['c_code'] ?? '-' ?></td>
                                 <td style="vertical-align: top;">
                                     <div class="text-left" style="min-width: 300px; white-space: normal; word-wrap: break-word; line-height: 1.4;">
-                                        <?= $row['po_name'] ?? '-' ?>
+                                        <?= $row['c_name'] ?? '-' ?>
                                     </div>
                                 </td>
                                 <td>
@@ -388,13 +410,10 @@ function thaiDate($dateStr)
                                 <td>
                                     <div style="font-size:0.9rem;"><?= $row['dc_expense_budget_type'] ?? '-' ?></div>
                                     <small class="text-muted"><?= $row['bg_expense'] ?? '' ?></small>
-                                    <?php if ($is_cross_type): ?>
-                                        <br><small class="text-warning" title="PR ต้นทางจองไว้ในแหล่งเงินที่กำลังดูอยู่ แต่ PO ฉบับนี้ผูกกับแหล่งเงินอื่น จึงไม่ถูกรวมในยอด 'เงินจองงบประมาณตามบัญชีจัดสรร' ของแหล่งเงินนี้">⚠ ข้ามแหล่งเงิน (ไม่รวมยอด)</small>
-                                    <?php endif; ?>
                                 </td>
                                 <td><?= $row['sp_emp'] ?? '-' ?></td>
                                 <td><?= $row['dc_department'] ?? '-' ?></td>
-                                <td class="text-right font-weight-bold <?= $is_cross_type ? 'text-muted' : 'text-danger' ?>">
+                                <td class="text-right font-weight-bold text-danger">
                                     <?= number_format($f_amt_contract, 2) ?>
                                 </td>
                             </tr>

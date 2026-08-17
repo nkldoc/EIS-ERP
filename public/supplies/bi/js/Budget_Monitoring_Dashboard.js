@@ -50,6 +50,35 @@
   window.DATA_STATUS = window.DATA_STATUS || [];
   let CURRENT_ITEMS_FOR_DV = [];
   let chartBar;
+  let chartDonut;
+  let DONUT_ITEMS = [];
+  let DONUT_SELECTED = -1; // -1 = ยังไม่ได้เลือก → แสดงผลรวมทุกแหล่งเงิน
+
+  // นิยาม "รวมทุกแหล่งเงิน" = รวมเฉพาะ 4 แหล่งเงินนี้เท่านั้น (ไม่ใช่ทุก dc_expense_budget_type_id ที่มีในข้อมูลดิบ)
+  const CANONICAL_FUND_SOURCE_NAMES = ["เงินรายได้ส่วนงาน", "เงินอุดหนุนรัฐบาล", "เงินอุดหนุนกทม.", "เงินสะสมส่วนงาน"];
+  window.CANONICAL_FUND_SOURCE_NAMES = CANONICAL_FUND_SOURCE_NAMES;
+
+  // หา dc_expense_budget_type_id ของ 4 แหล่งเงินหลักจาก DATA_BUDGET ที่โหลดมาจริง
+  function getCanonicalFundSourceIds() {
+    const ids = new Set();
+    (window.DATA_BUDGET || []).forEach((r) => {
+      if (CANONICAL_FUND_SOURCE_NAMES.includes(String(r.c_name || "").trim())) {
+        ids.add(String(r.dc_expense_budget_type_id));
+      }
+    });
+    return Array.from(ids);
+  }
+  window.getCanonicalFundSourceIds = getCanonicalFundSourceIds;
+
+  // แปลง ids ที่ผู้ใช้เลือกให้เป็น "รายการที่จะใช้กรองจริง"
+  // - ถ้าผู้ใช้เลือกแหล่งเงินไว้ (ids ไม่ว่าง) ใช้ตามที่เลือก
+  // - ถ้ายังไม่ได้เลือกเลย (ids ว่าง = "รวมทุกแหล่งเงิน") ให้ fallback เป็น 4 แหล่งเงินหลักเท่านั้น
+  //   แทนที่จะรวมทุก dc_expense_budget_type_id ที่มีอยู่ในข้อมูลดิบ
+  function resolveFundSourceIds(ids) {
+    if (ids && ids.length) return ids.map(String);
+    return getCanonicalFundSourceIds();
+  }
+  window.resolveFundSourceIds = resolveFundSourceIds;
 
   /* ---------- สร้าง/เติม <select id="budget_year_filter"> ---------- */
   function initYearSelect() {
@@ -120,9 +149,12 @@ function aggregateBySource(rows, { year = "all", ids = [] } = {}) {
     };
 
     const map = new Map();
+    const effectiveIds = resolveFundSourceIds(ids);
     rows.forEach((r) => {
         if (year !== "all" && String(r.budget_year) !== String(year)) return;
-        if (ids && ids.length && !ids.includes(String(r.dc_expense_budget_type_id))) return;
+        // [FIX] ไม่ใช้ effectiveIds.length เป็นเงื่อนไขอีกต่อไป เพราะ resolveFundSourceIds() คืนค่าที่ตัดสินใจแล้วเสมอ
+        // (ถ้าไม่พบแหล่งเงินหลักที่ตรงกันเลย effectiveIds จะว่าง ก็ควรไม่ผ่านตัวกรองเลย แทนที่จะกลายเป็น "ไม่กรองอะไรเลย")
+        if (!effectiveIds.includes(String(r.dc_expense_budget_type_id))) return;
 
         const name    = r.dc_expense_budget_type || r.c_name || "ไม่ทราบแหล่งเงิน";
         const total = Number(r.f_budget_real) || 0;
@@ -159,13 +191,18 @@ return Array.from(map.values())
 
     // เติม multi สำหรับหมวดจาก DATA_BUDGET (ปีตามที่เลือกใน select ปี)
     const year = $("#budget_year_filter").val() || "all";
+
+    /* [Comment] ปิดการใช้งาน dropdown filter "แหล่งเงิน" (multiCheckCombo) ตามที่ผู้ใช้ระบุ
+       เพราะตอนนี้เลือกแหล่งเงินผ่านการ์ด/วงกลมโดนัทแทนแล้ว (ดู selectDonutSource/getEffectiveFundIds)
+       คงโค้ดเดิมไว้ (comment ไว้) เผื่อจะเปิดกลับมาใช้ภายหลัง
+
     const $multi = $("#multiCheckCombo");
     $multi.empty();
     const seen = new Set();
     const defaultIds = [];
 
     // ค่าเริ่มต้น: เลือกเฉพาะ 4 แหล่งเงินนี้ (ผู้ใช้ยังเลือกเพิ่ม/ลดเองได้)
-    const DEFAULT_NAMES = ["เงินรายได้ส่วนงาน", "เงินอุดหนุนรัฐบาล", "เงินอุดหนุนกทม.", "เงินสะสมส่วนงาน"];
+    const DEFAULT_NAMES = CANONICAL_FUND_SOURCE_NAMES;
 
     window.DATA_BUDGET.forEach((it) => {
       if (year !== "all" && String(it.budget_year) !== String(year)) return;
@@ -181,6 +218,7 @@ return Array.from(map.values())
     $multi.selectpicker(); // init
     $multi.selectpicker("refresh");
     $multi.selectpicker("val", defaultIds);
+    */
 
     renderStatusCards(window.DATA_STATUS);
     renderCharts();
@@ -192,11 +230,14 @@ return Array.from(map.values())
     if (bindFiltersOnce.done) return;
     bindFiltersOnce.done = true;
 
+    /* [Comment] ปิดการ bind event ของ dropdown filter "แหล่งเงิน" (multiCheckCombo/multiCheckComboBg) ไปพร้อมกับ UI ด้านบน
     const $multi = $("#multiCheckCombo");
     const $multibg = $("#multiCheckComboBg");
-    $("#budget_year_filter, #filter_equipment").on("change", refreshAll);
     $multi.on("changed.bs.select", refreshAll);
     $multibg.on("changed.bs.select", refreshAll);
+    */
+
+    $("#budget_year_filter, #filter_equipment").on("change", refreshAll);
     $("#darkToggle").on("change", (e) => setDark(e.target.checked));
     $("#btnExport").on("click", exportExcel);
   }
@@ -214,9 +255,10 @@ return Array.from(map.values())
   /* ---------- สร้างข้อมูลสำหรับกราฟ ---------- */
   function pickBudget(year, ids, onlyEquipment /*, idsbg(opt) */) {
     const out = [];
+    const effectiveIds = resolveFundSourceIds(ids);
     window.DATA_BUDGET.forEach((r) => {
       if (year !== "all" && String(r.budget_year) !== String(year)) return;
-      if (ids && ids.length && !ids.includes(String(r.dc_expense_budget_type_id))) return;
+      if (!effectiveIds.includes(String(r.dc_expense_budget_type_id))) return;
       // if (onlyEquipment && String(r.i_product_type1) !== "1") return;
 
       const total = Number(r.f_budget_real) || 0;
@@ -306,7 +348,8 @@ return Array.from(map.values())
         axisPointer: { type: "shadow" },
         formatter: (params) => `<b>${params[0].axisValue}</b><br>` + params.map((p) => `${p.marker} ${p.seriesName}: <b>${fmt2(p.value)}</b>`).join("<br>"),
       },
-      legend: [{ data: ["จำนวนงบประมาณ", "จองเงิน", "เงินจองตรวจรับ", "เบิกจ่ายแล้ว", "คงเหลือหลังจองเงิน"], top: "2%", left: "40%" }],
+      // ลำดับ/สีตามที่ user ระบุ: น้ำเงิน=งบรวม, เขียว=จองเงิน/ใช้ไปแล้ว, เหลือง=เบิกจ่ายแล้ว, ม่วง=เงินจองตรวจรับ, ส้ม=คงเหลือ
+      legend: [{ data: ["จำนวนงบประมาณ", "จองเงิน / ใช้ไปแล้ว", "เบิกจ่ายแล้ว", "เงินจองตรวจรับ", "คงเหลือหลังจองเงิน"], top: "2%", left: "30%" }],
       toolbox: {
         feature: {
           saveAsImage: {},
@@ -317,48 +360,74 @@ return Array.from(map.values())
               return buildDataViewContent(CURRENT_ITEMS_FOR_DV);
             },
           },
-          magicType: { type: ["stack", "tiled"] },
           restore: {},
         },
       },
-      grid: { left: 10, right: 20, top: 40, bottom: 10, containLabel: true },
+      grid: { left: 10, right: 20, top: 50, bottom: 10, containLabel: true },
       xAxis: { type: "category", data: items.map((x) => x.name), axisLabel: { interval: 0 } },
       yAxis: { type: "value" },
       series: [
         {
-          name: "จำนวนงบประมาณ",
+          // จองเงิน / ใช้ไปแล้ว
+          name: "จองเงิน / ใช้ไปแล้ว",
           type: "bar",
-          data: items.map((x) => x.total),
-          itemStyle: { borderColor: "#111", borderWidth: 1 },
-          label: { show: true, position: "top", distance: 6, formatter: (p) => echarts.format.addCommas(fmt2(p.value)) },
-        },
-        {
-          name: "จองเงิน",
-          type: "bar",
+          stack: "flow",
+          barWidth: "45%",
           data: items.map((x) => x.booked),
-          itemStyle: { borderColor: "#111", borderWidth: 1 },
-          label: { show: true, position: "top", distance: 6, formatter: (p) => echarts.format.addCommas(fmt2(p.value)) },
+          itemStyle: { color: "#4caf50" },
+          label: { show: true, position: "inside", formatter: (p) => (p.value ? echarts.format.addCommas(fmt2(p.value)) : "") },
         },
         {
-          name: "เงินจองตรวจรับ",
-          type: "bar",
-          data: items.map((x) => x.insp),
-          itemStyle: { color: "#6f42c1", borderColor: "#111", borderWidth: 1 },
-          label: { show: true, position: "top", distance: 6, formatter: (p) => echarts.format.addCommas(fmt2(p.value)) },
-        },
-        {
+          // เบิกจ่ายแล้ว
           name: "เบิกจ่ายแล้ว",
           type: "bar",
+          stack: "flow",
+          barWidth: "45%",
           data: items.map((x) => x.working),
-          itemStyle: { borderColor: "#111", borderWidth: 1 },
-          label: { show: true, position: "top", distance: 6, formatter: (p) => echarts.format.addCommas(fmt2(p.value)) },
+          itemStyle: { color: "#ffc107" },
+          label: { show: true, position: "inside", formatter: (p) => (p.value ? echarts.format.addCommas(fmt2(p.value)) : "") },
         },
         {
+          // เงินจองตรวจรับ
+          name: "เงินจองตรวจรับ",
+          type: "bar",
+          stack: "flow",
+          barWidth: "45%",
+          data: items.map((x) => x.insp),
+          itemStyle: { color: "#6f42c1" },
+          label: { show: true, position: "inside", formatter: (p) => (p.value ? echarts.format.addCommas(fmt2(p.value)) : "") },
+        },
+        {
+          // คงเหลือ (ถ้าติดลบ = ใช้เกินงบ แท่งจะยื่นลงใต้เส้นศูนย์โดยอัตโนมัติ)
           name: "คงเหลือหลังจองเงิน",
           type: "bar",
+          stack: "flow",
+          barWidth: "45%",
           data: items.map((x) => x.remain),
-          itemStyle: { borderColor: "#111", borderWidth: 1 },
-          label: { show: true, position: "top", distance: 6, formatter: (p) => echarts.format.addCommas(fmt2(p.value)) },
+          itemStyle: { color: "#ff9800" },
+          label: {
+            show: true,
+            position: "inside",
+            formatter: (p) => (p.value ? echarts.format.addCommas(fmt2(p.value)) : ""),
+          },
+          // label "งบรวม" ตัวหนาสีน้ำเงินลอยเหนือยอดแท่ง (ไม่ใช่แท่งซ้อนทับ)
+          markPoint: {
+            symbol: "roundRect",
+            symbolSize: [0, 0],
+            itemStyle: { color: "transparent" },
+            label: {
+              show: true,
+              position: "top",
+              distance: 8,
+              fontWeight: "bold",
+              color: "#3f51b5",
+              fontSize: 13,
+              formatter: (p) => "งบรวม " + echarts.format.addCommas(fmt2(items[p.dataIndex].total)),
+            },
+            data: items.map((x, i) => ({
+              coord: [i, Math.max(x.booked + x.working + x.insp + x.remain, x.booked + x.working + x.insp, 0)],
+            })),
+          },
         },
       ],
       labelLayout: { hideOverlap: true },
@@ -451,6 +520,275 @@ return Array.from(map.values())
     chart.off("click");
     chart.on("click", (p) => window.open(`detail.php?type=bar&name=${encodeURIComponent(p.name)}`, "_blank"));
 }
+
+  /* ---------- Donut: สัดส่วนงบตามแหล่งเงิน ---------- */
+  // สีตามตัวอย่างที่กำหนด: รายได้=น้ำเงิน, สะสม=เขียว, อุดหนุนกทม.=ส้ม, อุดหนุนรัฐบาล=เหลือง/ทอง
+  function donutColorFor(name) {
+    if (name.includes("รายได้")) return "#2a78d6";
+    if (name.includes("สะสม")) return "#1baf7a";
+    if (name.includes("กทม") || name.includes("กรุงเทพ")) return "#eb6834";
+    if (name.includes("รัฐบาล")) return "#eda100";
+    return "#9e9e9e";
+  }
+
+  function usedPct(it) {
+    return it.total > 0 ? (((it.booked + it.insp + it.working) / it.total) * 100).toFixed(1) : "0.0";
+  }
+  function sharePct(it, grandTotal) {
+    return grandTotal > 0 ? ((it.total / grandTotal) * 100).toFixed(2) : "0.00";
+  }
+
+  // เลือกสีตัวหนังสือให้อ่านง่ายบนพื้นแต่ละสี (สีเหลือง/ทองใช้ตัวหนังสือเข้ม สีอื่นใช้ขาว)
+  function donutLabelColorFor(bgColor) {
+    return bgColor === "#eda100" ? "#3d2b00" : "#ffffff";
+  }
+
+  /* ---------- ซิงก์ PR/PO section (PrPoChartSection.js) กับแหล่งเงินที่เลือกในโดนัท ---------- */
+  function syncPrPoWithDonutSelection() {
+    const badge = document.getElementById("prpoDonutFilterBadge");
+
+    if (DONUT_SELECTED === -1) {
+      if (badge) badge.style.display = "none";
+      if (typeof window.loadPrPoSection === "function") {
+        const yearTh = $("#budget_year_filter").val() || String(new Date().getFullYear() + 543);
+        const yearEn = String(Number(yearTh) - 543);
+        window.loadPrPoSection({ year_th: yearTh, year_en: yearEn });
+      }
+      return;
+    }
+
+    const it = DONUT_ITEMS[DONUT_SELECTED];
+    if (!it) return;
+
+    if (badge) {
+      badge.textContent = "กรองตาม: " + it.name;
+      badge.style.display = "inline-block";
+    }
+    if (typeof window.loadPrPoSection === "function") {
+      const yearTh = $("#budget_year_filter").val() || String(new Date().getFullYear() + 543);
+      const yearEn = String(Number(yearTh) - 543);
+      window.loadPrPoSection({ year_th: yearTh, year_en: yearEn, override_type_ids: [it.typeId] });
+    }
+  }
+
+  // เลือก/ยกเลิกเลือกแหล่งเงินในโดนัท แล้วรีเรนเดอร์ทุกส่วนที่เกี่ยวข้อง (กราฟ + การ์ด + รายละเอียด + Data View)
+  function selectDonutSource(idx) {
+    DONUT_SELECTED = idx;
+    renderDonut();
+    syncPrPoWithDonutSelection();
+    refreshDataView(); // Data View เหลือเฉพาะแหล่งเงินที่เลือกจากการ์ด/วงกลมโดนัท
+  }
+
+  function renderDonut(itemsRaw) {
+    const dom = document.getElementById("donut_source");
+    if (!dom) return; // ไม่มี element ก็ข้าม (เผื่อหน้าอื่นไม่ได้ใส่ donut)
+
+    const year = $("#budget_year_filter").val() || "all";
+    const ids = $("#multiCheckCombo").val() || [];
+    const rows = window.DATA_BUDGET && window.DATA_BUDGET.length ? window.DATA_BUDGET : itemsRaw || [];
+    const items = aggregateBySource(rows, { year, ids });
+
+    DONUT_ITEMS = items;
+    if (DONUT_SELECTED >= items.length) DONUT_SELECTED = -1;
+
+    const grandTotal = items.reduce((s, it) => s + it.total, 0);
+    const selectedItem = DONUT_SELECTED !== -1 ? items[DONUT_SELECTED] : null;
+
+    // อัปเดตตัวเลขงบรวมกลางวงกลม (ใช้ HTML overlay แทน text บน canvas เพื่อให้อ่านชัดในทุกธีม)
+    // ถ้าเลือกแหล่งเงินไว้ ให้โชว์ยอดของแหล่งเงินนั้น ไม่ใช่ยอดรวมทุกแหล่ง
+    const centerVal = document.getElementById("donutCenterValue");
+    if (centerVal) {
+      // แสดงตัวเลขเต็ม ไม่ปัดเป็นล้านบาท เช่น 131,750,700.00
+      const centerBase = selectedItem ? selectedItem.total : grandTotal;
+      centerVal.textContent = toBaht(centerBase);
+    }
+
+    if (!chartDonut) chartDonut = echarts.init(dom);
+    else chartDonut.clear();
+
+    // โหมดภาพรวม: วงกลมแบ่งตามสัดส่วนของทุกแหล่งเงิน
+    // โหมดเลือกแล้ว: วงกลมของแหล่งเงินนั้นแหล่งเดียว แบ่งเป็น "ใช้ไปแล้ว" กับ "คงเหลือ"
+    const seriesData = selectedItem
+      ? (() => {
+          const bg = donutColorFor(selectedItem.name);
+          const used = selectedItem.booked + selectedItem.insp + selectedItem.working;
+          const remain = Math.max(0, selectedItem.total - used);
+          return [
+            {
+              name: "ใช้ไปแล้ว",
+              value: used,
+              itemStyle: { color: bg },
+              label: { color: "#000000" },
+            },
+            {
+              name: "คงเหลือ",
+              value: remain,
+              itemStyle: { color: "#c9c9c9" },
+              label: { color: "#000000" },
+            },
+          ];
+        })()
+      : items.map((it) => {
+          const bg = donutColorFor(it.name);
+          return {
+            name: it.name,
+            value: it.total,
+            itemStyle: { color: bg },
+            label: { color: "#000000" },
+          };
+        });
+
+    const option = {
+      backgroundColor: "transparent",
+      tooltip: {
+        trigger: "item",
+        formatter: (p) => {
+          if (selectedItem) {
+            return `<b>${selectedItem.name}</b><br/>${p.name}: ${toBaht(p.value)} บาท (${p.percent}%)`;
+          }
+          const it = items[p.dataIndex];
+          return `<b>${it.name}</b><br/>${toBaht(it.total)} บาท<br/>ใช้ไปแล้ว ${usedPct(it)}%`;
+        },
+      },
+      series: [
+        {
+          type: "pie",
+          radius: ["58%", "80%"],
+          center: ["50%", "50%"],
+          avoidLabelOverlap: true,
+          itemStyle: { borderColor: "#1e1e1e", borderWidth: 2 },
+          label: {
+            show: true,
+            position: "inside",
+            // แสดงชื่อแหล่งเงิน + % ทุกสไลซ์เสมอ (ไม่ซ่อนชื่อแม้สไลซ์เล็ก) ให้ตัวหนังสือขึ้นบรรทัดใหม่แทนการตัดทิ้งถ้าพื้นที่ไม่พอ
+            formatter: (p) => {
+              if (selectedItem) {
+                return `${p.name}\n${p.percent}%`;
+              }
+              const it = items[p.dataIndex];
+              const pct = sharePct(it, grandTotal);
+              return `${it.name}\n${pct}%`;
+            },
+            color: "#000000",
+            fontSize: 11,
+            fontWeight: 600,
+            lineHeight: 14,
+            overflow: "break",
+          },
+          labelLine: { show: false },
+          data: seriesData,
+        },
+      ],
+    };
+
+    chartDonut.setOption(option, true);
+    chartDonut.off("click");
+    chartDonut.on("click", (p) => {
+      if (selectedItem) {
+        // อยู่ในโหมดแหล่งเงินเดียวอยู่แล้ว คลิกซ้ำ = กลับไปดูภาพรวมทุกแหล่งเงิน
+        selectDonutSource(-1); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
+      } else if (typeof p.dataIndex === "number") {
+        selectDonutSource(p.dataIndex);
+      }
+    });
+
+    renderDonutCards();
+    renderDonutDetail();
+  }
+
+  function renderDonutCards() {
+    const box = document.getElementById("donutCards");
+    if (!box) return;
+    const grandTotal = DONUT_ITEMS.reduce((s, it) => s + it.total, 0);
+    box.innerHTML = "";
+
+    // การ์ด "รวมทุกแหล่งเงิน" — ค่าเริ่มต้นเมื่อยังไม่ได้เลือกแหล่งเงินใด
+    const allDiv = document.createElement("div");
+    allDiv.className = "donut-card donut-card-all" + (DONUT_SELECTED === -1 ? " selected" : "");
+    allDiv.style.borderColor = DONUT_SELECTED === -1 ? "#495057" : "transparent";
+    const allUsedPct = grandTotal > 0
+      ? (((DONUT_ITEMS.reduce((s, it) => s + it.booked + it.insp + it.working, 0)) / grandTotal) * 100).toFixed(1)
+      : "0.0";
+    allDiv.innerHTML =
+      '<div class="donut-card-name"><span class="donut-dot" style="background:#495057"></span>รวมทุกแหล่งเงิน</div>' +
+      '<div class="donut-card-total" style="color:#495057">' + toBaht(grandTotal) + "</div>" +
+      '<div class="donut-card-sub">100.00% ของงบรวม &middot; ใช้ไปแล้ว ' + allUsedPct + "%</div>";
+    allDiv.addEventListener("click", () => {
+      selectDonutSource(-1); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
+    });
+    box.appendChild(allDiv);
+
+    DONUT_ITEMS.forEach((it, i) => {
+      const color = donutColorFor(it.name);
+      const div = document.createElement("div");
+      div.className = "donut-card" + (i === DONUT_SELECTED ? " selected" : "");
+      div.style.borderColor = i === DONUT_SELECTED ? color : "transparent";
+      div.innerHTML =
+        '<div class="donut-card-name"><span class="donut-dot" style="background:' + color + '"></span>' + it.name + "</div>" +
+        '<div class="donut-card-total" style="color:' + color + '">' + toBaht(it.total) + "</div>" +
+        '<div class="donut-card-sub">' + sharePct(it, grandTotal) + "% ของงบรวม &middot; ใช้ไปแล้ว " + usedPct(it) + "%</div>";
+      div.addEventListener("click", () => {
+        selectDonutSource(i); // renderDonut() ข้างในจะรีเฟรชทั้งกราฟ การ์ด และรายละเอียดให้เอง
+      });
+      box.appendChild(div);
+    });
+  }
+
+  function renderDonutDetail() {
+    const titleEl = document.getElementById("donutDetailTitle");
+    const box = document.getElementById("donutDetailStats");
+    if (!titleEl || !box) return;
+
+    // ยังไม่ได้เลือกแหล่งเงิน → แสดงผลรวมของทุกแหล่งเงินที่กรองอยู่
+    if (DONUT_SELECTED === -1) {
+      const sum = DONUT_ITEMS.reduce(
+        (s, it) => ({
+          total: s.total + it.total,
+          booked: s.booked + it.booked,
+          insp: s.insp + it.insp,
+          working: s.working + it.working,
+          remain: s.remain + it.remain,
+        }),
+        { total: 0, booked: 0, insp: 0, working: 0, remain: 0 }
+      );
+      titleEl.textContent = "รายละเอียดของ รวมทุกแหล่งเงิน";
+      const stats = [
+        { label: "งบประมาณรวม", val: sum.total, color: "#495057" },
+        { label: "จองเงินแล้ว", val: sum.booked, color: "#4caf50" },
+        { label: "เงินจองตรวจรับ", val: sum.insp, color: "#6f42c1" },
+        { label: "เบิกจ่ายแล้ว", val: sum.working, color: "#ffc107" },
+        { label: "คงเหลือ", val: sum.remain, color: sum.remain < 0 ? "#e74c3c" : "#ff9800" },
+      ];
+      box.innerHTML = stats
+        .map(
+          (s) =>
+            '<div class="donut-stat"><div class="donut-stat-label">' + s.label + '</div>' +
+            '<div class="donut-stat-val" style="color:' + s.color + '">' + toBaht(s.val) + "</div></div>"
+        )
+        .join("");
+      return;
+    }
+
+    const it = DONUT_ITEMS[DONUT_SELECTED];
+    if (!it) return;
+
+    titleEl.textContent = "รายละเอียดของ " + it.name;
+    const stats = [
+      { label: "งบรวม", val: it.total, color: donutColorFor(it.name) },
+      { label: "จองเงิน / ใช้ไปแล้ว", val: it.booked, color: "#4caf50" },
+      { label: "เงินจองตรวจรับ", val: it.insp, color: "#6f42c1" },
+      { label: "เบิกจ่ายแล้ว", val: it.working, color: "#ffc107" },
+      { label: "คงเหลือ", val: it.remain, color: it.remain < 0 ? "#e74c3c" : "#ff9800" },
+    ];
+    box.innerHTML = stats
+      .map(
+        (s) =>
+          '<div class="donut-stat"><div class="donut-stat-label">' + s.label + '</div>' +
+          '<div class="donut-stat-val" style="color:' + s.color + '">' + toBaht(s.val) + "</div></div>"
+      )
+      .join("");
+  }
+
   /* ---------- Data View (HTML table) ---------- */
   /* ---------- Data View (HTML table) ---------- */
   function makeDetailRows(items) {
@@ -877,12 +1215,72 @@ return Array.from(map.values())
   }
 
   function filterDetailForTable(rows, { year = "all", ids = [] } = {}) {
+    const effectiveIds = resolveFundSourceIds(ids);
     return rows.filter((r) => {
       if (year !== "all" && String(r.budget_year) !== String(year)) return false;
-      if (ids && ids.length && !ids.includes(String(r.dc_expense_budget_type_id))) return false;
+      if (!effectiveIds.includes(String(r.dc_expense_budget_type_id))) return false;
       return true;
     });
   }
+
+  /* ---------- แสดง/ซ่อนกลุ่มคอลัมน์ใน Data View ตามแหล่งเงินที่เลือก ---------- */
+  // จัดหมวดชื่อแหล่งเงิน -> คีย์กลุ่มคอลัมน์ (income / bkk / gov / Savings)
+  function classifySourceName(name) {
+    const src = String(name || "").trim();
+    if (src.includes("รายได้")) return "income";
+    if (src.includes("กทม")) return "bkk";
+    if (src.includes("รัฐบาล")) return "gov";
+    return "Savings";
+  }
+
+  // หาว่า ids ที่ผู้ใช้เลือก (หรือค่า default เมื่อยังไม่ได้เลือก) ครอบคลุมกลุ่มคอลัมน์ไหนบ้าง
+  function getSelectedColumnGroups(ids) {
+    const effectiveIds = resolveFundSourceIds(ids);
+    const groups = new Set();
+    (window.DATA_BUDGET || []).forEach((r) => {
+      const id = String(r.dc_expense_budget_type_id || "").trim();
+      if (!effectiveIds.includes(id)) return;
+      groups.add(classifySourceName(r.dc_expense_budget_type || r.c_name));
+    });
+    return groups;
+  }
+
+  // ซ่อน/แสดงทั้ง header (.group-xxx) และ cell ในตาราง (.col-xxx) ของ #dvTable
+  // ให้เหลือเฉพาะกลุ่มแหล่งเงินที่ถูกเลือกอยู่ (ถ้ายังไม่เลือกเลย = แสดงครบทุกแหล่งเงินหลักตามปกติ)
+  function updateDataViewColumnVisibility(ids) {
+    const groups = getSelectedColumnGroups(ids);
+    ["income", "bkk", "gov", "Savings"].forEach((g) => {
+      const show = groups.has(g);
+      document.querySelectorAll(`#dvTable .group-${g}`).forEach((el) => {
+        el.style.display = show ? "" : "none";
+      });
+      document.querySelectorAll(`#dvTable .col-${g}`).forEach((el) => {
+        el.style.display = show ? "" : "none";
+      });
+    });
+  }
+  window.updateDataViewColumnVisibility = updateDataViewColumnVisibility;
+
+  // คืนค่า "แหล่งเงินที่ต้องใช้กรอง Data View จริง ๆ ในตอนนี้"
+  // ให้สิทธิ์การ์ด/วงกลมโดนัทที่เลือกไว้ (DONUT_SELECTED) มาก่อนเสมอ เพราะเป็นจุดที่ผู้ใช้ "เลือกแหล่งเงิน" จริง ๆ
+  // ถ้ายังไม่ได้เลือกจากวงกลม/การ์ด (DONUT_SELECTED === -1) ให้ fallback ไปใช้ dropdown "แหล่งเงิน" (multiCheckCombo) ตามเดิม
+  function getEffectiveFundIds() {
+    if (DONUT_SELECTED !== -1 && DONUT_ITEMS[DONUT_SELECTED]) {
+      return [String(DONUT_ITEMS[DONUT_SELECTED].typeId)];
+    }
+    return $("#multiCheckCombo").val() || [];
+  }
+  window.getEffectiveFundIds = getEffectiveFundIds;
+
+  // รีเฟรชเฉพาะตาราง Data View (แถว + คอลัมน์) ให้ตรงกับแหล่งเงินที่เลือกอยู่ตอนนี้
+  function refreshDataView() {
+    const year = $("#budget_year_filter").val() || "all";
+    const ids = getEffectiveFundIds();
+    const detailForTable = filterDetailForTable(window.DATA_BUDGET, { year, ids });
+    renderDataView(detailForTable);
+    updateDataViewColumnVisibility(ids);
+  }
+  window.refreshDataView = refreshDataView;
 
   /* ---------- Refresh ทั้งหน้า ---------- */
   function renderCharts() {
@@ -892,11 +1290,14 @@ return Array.from(map.values())
     const items = pickBudget(year, ids, eqOnly);
     CURRENT_ITEMS_FOR_DV = items;
 
-    buildSummary(items);
-    renderBar(items);
-    renderBarHigh(items);
-    const detailForTable = filterDetailForTable(window.DATA_BUDGET, { year, ids });
-    renderDataView(detailForTable);
+    // ตัดการ์ดสรุป (summaryBox) ออกจากหน้าจอตามที่ผู้ใช้ระบุ — ฟังก์ชันยังอยู่เผื่อเรียกใช้ภายหลัง
+    // buildSummary(items);
+    // ตัดกราฟแท่ง Stacked (bar_bg) และกราฟเปอร์เซ็นต์การใช้งบ (pie_tor_type) ออกจากหน้าจอ
+    // ตามที่ผู้ใช้ระบุ ใช้โดนัทแทนแล้ว — ฟังก์ชันยังอยู่เผื่อเรียกใช้ภายหลัง
+    // renderBar(items);
+    // renderBarHigh(items);
+    renderDonut(items);
+    refreshDataView(); // Data View จะกรองตามแหล่งเงินที่เลือกอยู่จริง (การ์ด/วงกลมโดนัท มาก่อน dropdown)
   }
 
   function refreshAll() {

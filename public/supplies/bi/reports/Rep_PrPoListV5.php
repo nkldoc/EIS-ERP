@@ -42,6 +42,15 @@ if (!empty($dc_expense_budget_type_ids)) {
     }));
 }
 
+// [FIX] ตัดแถวยอดเงิน 0 ออกจาก $pr_rows ทั้งชุดตั้งแต่ต้น — has_po เช็คแค่ pr_id ว่าเคยมี PO
+// หรือไม่ ไม่ได้เช็คว่าตรงกับ budget_type ของแถวนั้นด้วย PR ที่มีเงินจองอยู่ใน 2 budget_type
+// (เคยมี PO ทั้งคู่) แต่ budget_type หนึ่งถูกเบิกจ่ายจนหมดแล้ว (เหลือ f_amt = 0.00) จะยังติด
+// has_po=1 อยู่ กลายเป็นแถว "ซาก" ที่ไม่มีความหมายให้แสดงในตารางไหนเลย (ทั้ง pr / pr_open / po)
+// ตัดตรงนี้ทีเดียวเพื่อให้ทุกมุมมองสอดคล้องกัน ไม่กระทบยอดรวม (บวก 0 ไม่เปลี่ยนผลรวม)
+$pr_rows = array_values(array_filter($pr_rows, function ($r) {
+    return floatval($r['f_amt'] ?? 0) > 0.005;
+}));
+
 // กรองเฉพาะ PR ที่ยังไม่มี PO (สำหรับยอด "คงเหลือ")
 $pr_only = array_values(array_filter($pr_rows, function ($r) {
     return intval($r['has_po'] ?? 0) === 0;
@@ -49,8 +58,15 @@ $pr_only = array_values(array_filter($pr_rows, function ($r) {
 // [เพิ่ม] PR ที่มี PO แล้ว — f_amt ของแถวนี้คือยอดจองปัจจุบันของ PR นั้น ณ สถานะล่าสุด (PO stage)
 // ใช้ Result Set 1 ตรง ๆ (ไม่ต้องเดา/จับคู่กับ Result Set 3) เพราะ query จัดกลุ่มตาม
 // pr_id/po_id/i_reserve ให้แล้ว จึงเป็นยอด "ที่หักไปจองในสัญญาแล้ว" ของ PR นั้นโดยตรง
+//
+// [FIX] has_po เช็คแค่ pr_id ว่าเคยมี PO ในระบบหรือไม่ ไม่ได้เช็คว่า PO นั้นตรงกับ budget_type/
+// bg_expense ของแถวนี้ด้วย PR ที่มีเงินจองอยู่ใน 2 budget_type (เคยมี PO ทั้งคู่) แต่ budget_type
+// หนึ่งถูกเบิกจ่ายจนหมดแล้ว (เหลือ f_amt = 0.00) จะยังติด has_po=1 อยู่ ทำให้มีแถว "ซาก" ยอด 0.00
+// โผล่ในตาราง PO (พิสูจน์จากข้อมูลจริง PR25681000115: budget_type=4 เหลือ 0.00, budget_type=49
+// เหลือ 11,329,266.90 แต่ has_po=1 ทั้งคู่) ตัดแถวยอด 0 ออกไปเลย เพราะไม่มีความหมายให้แสดง และ
+// ไม่กระทบยอดรวม (บวก 0 ไม่เปลี่ยนผลรวม)
 $pr_with_po = array_values(array_filter($pr_rows, function ($r) {
-    return intval($r['has_po'] ?? 0) > 0;
+    return intval($r['has_po'] ?? 0) > 0 && floatval($r['f_amt'] ?? 0) > 0.005;
 }));
 
 // [FIX-BKK4] ห้ามรวม PO ที่เป็น cross budget_type (is_cross_type=true) เข้ายอดรวม

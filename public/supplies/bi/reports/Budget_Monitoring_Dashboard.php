@@ -96,6 +96,73 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                 background: #0d3320 !important;
         }
         </style>
+
+        <!-- ========== [เพิ่ม] CSS สำหรับ Donut สัดส่วนงบตามแหล่งเงิน ========== -->
+        <style>
+        #donut_source { height: 300px; margin-bottom: 6px; }
+        #donut_source.donut-source-lg { height: 420px; }
+        .donut-source-wrap { position: relative; }
+        .donut-center-text {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                text-align: center;
+                pointer-events: none;
+                width: 62%;
+        }
+        .donut-center-label { font-size: 12px; color: #6c757d; }
+        .donut-center-value { font-size: 17px; font-weight: 700; color: #1f2937; margin: 2px 0; line-height: 1.25; word-break: break-word; }
+        .donut-center-unit { font-size: 12px; color: #6c757d; }
+        body.dark-mode .donut-center-label,
+        body.dark-mode .donut-center-unit { color: #adb5bd; }
+        body.dark-mode .donut-center-value { color: #f1f3f5; }
+        .donut-center-note { text-align:center; font-size:11px; color:#888; margin-bottom:12px; }
+        .donut-cards-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 10px;
+                margin-bottom: 16px;
+        }
+        .donut-cards-grid-lg { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .donut-card {
+                background: #f8f9fa;
+                border-radius: 8px;
+                padding: 10px 12px;
+                cursor: pointer;
+                border: 1px solid transparent;
+                transition: box-shadow .15s, border-color .15s;
+        }
+        .donut-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+        .donut-card.selected { border-width: 1px; }
+        .donut-card-all { background: #eceff1; }
+        body.dark-mode .donut-card-all { background: #26292c; }
+        .donut-dot { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; }
+        .donut-card-name { display:flex; align-items:center; font-size:12px; color:#6c757d; }
+        .donut-card-total { font-size:15px; font-weight:600; margin-top:4px; }
+        .donut-card-sub { font-size:11px; color:#8a8f98; margin-top:2px; }
+        .donut-detail-title { font-size:13px; font-weight:600; margin-bottom:6px; }
+        .donut-detail-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 8px;
+        }
+        .donut-stat {
+                background: #f8f9fa;
+                border-radius: 8px;
+                padding: 8px 10px;
+        }
+        .donut-stat-label { font-size:11px; color:#6c757d; }
+        .donut-stat-val { font-size:14px; font-weight:600; margin-top:2px; }
+
+        body.dark-mode .donut-card,
+        body.dark-mode .donut-stat { background:#2d2d2d; }
+        body.dark-mode .donut-card-name,
+        body.dark-mode .donut-stat-label { color:#adb5bd; }
+        body.dark-mode .donut-card-sub { color:#8a8f98; }
+        body.dark-mode .donut-center-note { color:#9aa0a6; }
+        </style>
+        <!-- ========== [/เพิ่ม] ========== -->
         <!-- ========== [/เพิ่ม] ========== -->
 
 </head>
@@ -123,6 +190,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                         <select id="budget_year_filter" class="form-select form-select-sm" style="width:120px"></select>
                                                 </div>
 
+                                                <!-- [Comment] ปิดการใช้งาน dropdown filter "แหล่งเงิน" (multiCheckCombo) ตามที่ผู้ใช้ระบุ
+                                                     เพราะตอนนี้เลือกแหล่งเงินผ่านการ์ด/วงกลมโดนัทแทนแล้ว
+                                                     คง <select id="multiCheckCombo"> ไว้ในโค้ด (comment ไว้) เผื่อจะเปิดกลับมาใช้ภายหลัง
+                                                     หมายเหตุ: ฝั่ง JS อ้างอิง element นี้แบบ defensive ($("#multiCheckCombo")) อยู่แล้ว
+                                                     ถ้าไม่มี element นี้ในหน้า โค้ดจะ fallback ไปใช้ "รวมทุกแหล่งเงินหลัก" ตามปกติ ไม่ error
                                                 <div class="filter-group">
                                                         <label for="multiCheckCombo" style="margin:0px 10px;">แหล่งเงิน:</label>
                                                         <select id="multiCheckCombo"
@@ -136,6 +208,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                                 title="เลือกหมวดงบประมาณ">
                                                         </select>
                                                 </div>
+                                                -->
 
                                                 <div class="custom-control custom-switch mr-2">
                                                         <input type="checkbox" class="custom-control-input" id="darkToggle">
@@ -154,27 +227,26 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
 
                 <!-- ===== Charts ===== -->
                 <div class="row">
-                        <div class="col-lg-8">
+                        <div class="col-12">
+                                <!-- ========== [เพิ่ม] Donut สัดส่วนงบตามแหล่งเงิน (ย้ายมาไว้ตรงกลาง เต็มความกว้าง) ========== -->
                                 <div class="card mb-3">
                                         <div class="card-body">
-                                                <h6 class="mb-3 font-weight-bold">ภาพรวมรายหมวดงบ (Stacked)</h6>
-                                                <div id="bar_bg" class="chart-box tall" style="height:650px; min-height:420px;"></div>
+                                                <h6 class="mb-3 font-weight-bold">สัดส่วนงบตามแหล่งเงิน</h6>
+                                                <div class="donut-source-wrap">
+                                                        <div id="donut_source" class="donut-source-lg"></div>
+                                                        <div class="donut-center-text">
+                                                                <div class="donut-center-label">งบรวม</div>
+                                                                <div class="donut-center-value" id="donutCenterValue">-</div>
+                                                                <div class="donut-center-unit">บาท</div>
+                                                        </div>
+                                                </div>
+                                                <div class="donut-center-note">คลิกส่วนวงกลม หรือคลิกการ์ดด้านล่าง เพื่อเลือกแหล่งเงิน</div>
+                                                <div id="donutCards" class="donut-cards-grid donut-cards-grid-lg"></div>
+                                                <div class="donut-detail-title" id="donutDetailTitle">รายละเอียดของ รวมทุกแหล่งเงิน</div>
+                                                <div id="donutDetailStats" class="donut-detail-grid"></div>
                                         </div>
                                 </div>
-                        </div>
-                        <div class="col-lg-4">
-                                <div class="card mb-3">
-                                        <div class="card-body">
-                                                <h6 class="mb-3 font-weight-bold">จำนวนงบประมาณที่ถูกจอง</h6>
-                                                <div id="pie_tor_type" class="chart-box"></div>
-                                        </div>
-                                </div>
-                                <div class="card mb-3">
-                                        <div class="card-body">
-                                                <h6 class="mb-2 font-weight-bold">สรุป</h6>
-                                                <div id="summaryBox" class="small text-muted">กำลังคำนวณ...</div>
-                                        </div>
-                                </div>
+                                <!-- ========== [/เพิ่ม] ========== -->
                         </div>
                 </div>
 
@@ -187,6 +259,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                 <div class="d-flex align-items-center justify-content-between mb-3">
                                                         <h6 class="mb-0 font-weight-bold">
                                                                 สถานะการจองเงิน: PR และ PO แยกตามหมวดค่าใช้จ่าย
+                                                                <span id="prpoDonutFilterBadge" class="badge badge-pill" style="display:none;background:#495057;color:#fff;font-weight:500;margin-left:6px;"></span>
                                                         </h6>
                                                         <div class="small text-muted">
                                                                 <span style="display:inline-block;width:12px;height:12px;background:#f39c12;border-radius:2px;margin-right:4px;"></span>จอง PR (ยังไม่มี PO)
@@ -250,22 +323,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                         <th class="group-income">%</th>
 
                                                         <th class="group-bkk">งบประมาณ</th>
-                                                        <th class="group-income">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
-                                                        <th class="group-income">เงินจองตรวจรับ</th>
+                                                        <th class="group-bkk">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
+                                                        <th class="group-bkk">เงินจองตรวจรับ</th>
                                                         <th class="group-bkk">เบิกจ่ายแล้ว</th>
                                                         <th class="group-bkk">คงเหลือ</th>
                                                         <th class="group-bkk">%</th>
 
                                                         <th class="group-gov">งบประมาณ</th>
-                                                        <th class="group-income">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
-                                                        <th class="group-income">เงินจองตรวจรับ</th>
+                                                        <th class="group-gov">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
+                                                        <th class="group-gov">เงินจองตรวจรับ</th>
                                                         <th class="group-gov">เบิกจ่ายแล้ว</th>
                                                         <th class="group-gov">คงเหลือ</th>
                                                         <th class="group-gov">%</th>
 
                                                         <th class="group-Savings">งบประมาณ</th>
-                                                        <th class="group-income">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
-                                                        <th class="group-income">เงินจองตรวจรับ</th>
+                                                        <th class="group-Savings">เงินจองงบประมาณ<br>ตามบัญชีจัดสรร</th>
+                                                        <th class="group-Savings">เงินจองตรวจรับ</th>
                                                         <th class="group-Savings">เบิกจ่ายแล้ว</th>
                                                         <th class="group-Savings">คงเหลือ</th>
                                                         <th class="group-Savings">%</th>

@@ -242,12 +242,20 @@
             const DATA = window.DATA_BUDGET || [];
 
             // กรองตาม dc_expense_budget_type_id ที่ส่งมาใน params เดียวกับที่ fetch
-            const ids = $("#multiCheckCombo").val() || [];
+            // [FIX] ใช้ selectedIds ที่แนบมากับ data (เคารพ override_type_ids จากโดนัท)
+            // แทนการอ่าน #multiCheckCombo ตรงๆ ซึ่งจะไม่รู้จัก override
+            // [FIX] ถ้าไม่มี ids ที่ระบุไว้เลย ("รวมทุกแหล่งเงิน") ให้ fallback เป็น 4 แหล่งเงินหลักเท่านั้น
+            const rawIds = Array.isArray(data._selectedIds) ? data._selectedIds : ($("#multiCheckCombo").val() || []);
+            const ids = typeof window.resolveFundSourceIds === "function"
+                ? window.resolveFundSourceIds(rawIds)
+                : rawIds;
             const year = $("#budget_year_filter").val() || "all";
 
             const filtered = DATA.filter(r => {
                 if (year !== "all" && String(r.budget_year) !== String(year)) return false;
-                if (ids.length && !ids.includes(String(r.dc_expense_budget_type_id))) return false;
+                // [FIX] ไม่ใช้ ids.length เป็นเงื่อนไขอีกต่อไป เพราะ ids ผ่าน resolveFundSourceIds() มาแล้วเสมอ
+                // (ถ้าไม่พบแหล่งเงินหลักที่ตรงกันเลย ids จะว่าง ก็ควรไม่ผ่านตัวกรองเลย แทนที่จะกลายเป็น "ไม่กรองอะไรเลย")
+                if (!ids.includes(String(r.dc_expense_budget_type_id))) return false;
                 return true;
             });
 
@@ -269,7 +277,11 @@
             return s + remain;
         }, 0);
         // [FIX] คำนวณ PR-only จาก rows จริง (has_po == 0)
-        const prRows = Array.isArray(data.data) ? data.data : [];
+        // [FIX] ตัดแถวยอดเงิน 0 ออกทั้งชุดตั้งแต่ต้น — has_po เช็คแค่ pr_id ว่าเคยมี PO หรือไม่
+        // ไม่ได้เช็คว่าตรงกับ budget_type ของแถวนี้ด้วย PR ที่มี 2 budget_type (เคยมี PO ทั้งคู่)
+        // แต่ budget_type หนึ่งเบิกจ่ายจนหมดแล้ว (f_amt = 0.00) จะยังติด has_po=1 กลายเป็นแถว
+        // "ซาก" ที่ไม่มีความหมาย (ดูคอมเมนต์เดียวกันใน Rep_PrPoListV5.php / Rep_DetailByTypeV5.php)
+        const prRows = (Array.isArray(data.data) ? data.data : []).filter((r) => Number(r.f_amt) > 0.005);
         const prOnlyRows = prRows.filter((r) => Number(r.has_po) === 0);
         const prWithPoRows = prRows.filter((r) => Number(r.has_po) > 0);  // ← เพิ่ม
         const fPr        = prOnlyRows.reduce((s, r) => s + (Number(r.f_amt) || 0), 0);
@@ -298,8 +310,8 @@
         const pctUsed = fBudget > 0 ? ((fReserve / fBudget) * 100).toFixed(2) : "0.00";
         // ← เพิ่ม 4 บรรทัดนี้
         const dcCostId = new URLSearchParams(window.location.search).get("dc_cost_id") || "38";
-        // แก้เป็น — ดึงจาก multiCheckCombo ที่ user เลือก
-        const _selIds = $("#multiCheckCombo").val() || [];
+        // แก้เป็น — ใช้ selectedIds ที่แนบมากับ data (เคารพ override จากโดนัท) แทนอ่าน multiCheckCombo ตรงๆ
+        const _selIds = Array.isArray(data._selectedIds) ? data._selectedIds : ($("#multiCheckCombo").val() || []);
         const dcTypeId = _selIds.length === 1 ? _selIds[0] : _selIds.join(",");
         const yearTh   = document.getElementById("budget_year_filter")?.value || "";
         const yearEn   = yearTh ? Number(yearTh) - 543 : new Date().getFullYear();
@@ -598,13 +610,25 @@ _chartBar.on("click", function (params) {
             year_th = document.getElementById("budget_year_filter")?.value || "",
             year_en = year_th ? year_th - 543 : new Date().getFullYear(),
             bg_expense_id = "",
+            // [เพิ่ม] ถ้ามีค่า จะใช้แทนแหล่งเงินที่เลือกใน #multiCheckCombo
+            // ใช้ตอนคลิกเลือกแหล่งเงินจากโดนัทชาร์ต โดยไม่ไปยุ่งกับตัวกรองหลักด้านบน
+            override_type_ids = null,
         } = params;
 
         // ดึง dc_cost_id จาก URL ปัจจุบัน (default 38)
         const dcCostId = new URLSearchParams(window.location.search).get("dc_cost_id") || "38";
 
         // [FIX3] อ่านแหล่งเงินที่ผู้ใช้เลือกทั้งหมดจาก multiCheckCombo (รองรับเลือกได้หลายรายการ)
-        const selectedIds = ($("#multiCheckCombo").val() || []).map(String);
+        // [เพิ่ม] ถ้ามี override_type_ids ให้ใช้ค่านี้แทน (มาจากการคลิกโดนัท)
+        // [FIX] ถ้าไม่ได้เลือกอะไรเลย ("รวมทุกแหล่งเงิน") ให้ fallback เป็น 4 แหล่งเงินหลักเท่านั้น
+        // (เงินรายได้ส่วนงาน / เงินอุดหนุนกทม. / เงินอุดหนุนรัฐบาล / เงินสะสมส่วนงาน)
+        // แทนที่จะรวมทุก dc_expense_budget_type_id ที่มีอยู่ในข้อมูลดิบ
+        const rawIds = (override_type_ids && override_type_ids.length)
+            ? override_type_ids.map(String)
+            : ($("#multiCheckCombo").val() || []).map(String);
+        const selectedIds = typeof window.resolveFundSourceIds === "function"
+            ? window.resolveFundSourceIds(rawIds)
+            : rawIds;
 
         const reqParams = {
             year_en,
@@ -626,9 +650,9 @@ _chartBar.on("click", function (params) {
             const allPaidRows     = Array.isArray(data.paid)     ? data.paid     : [];
             const allBudgetDetail = Array.isArray(data.budget_detail) ? data.budget_detail : [];
 
-            // [FIX3] กรองตามแหล่งเงินที่เลือกไว้ทั้งหมด (ถ้าไม่ได้เลือกเลย = แสดงทั้งหมด)
-            const matchSelected = (r) =>
-                !selectedIds.length || selectedIds.includes(String(r.dc_expense_budget_type_id));
+            // [FIX] กรองตามแหล่งเงินที่เลือกไว้ (selectedIds ผ่าน resolveFundSourceIds() มาแล้วเสมอ
+            // จึงไม่ควรมีเคส "ไม่ได้เลือกเลย = แสดงทั้งหมด" อีกต่อไป — ถ้า resolve ไม่เจอเลย ก็ไม่ควรผ่านตัวกรอง)
+            const matchSelected = (r) => selectedIds.includes(String(r.dc_expense_budget_type_id));
 
             _prRows = allPrRows.filter(matchSelected);
             _poRows = allPoRows.filter(matchSelected);
@@ -658,11 +682,14 @@ _chartBar.on("click", function (params) {
             const aggregated = aggregatePrByExpense(_prRows, _poRows, budgetMap, _paidRows);
 
             // [FIX3] ส่งข้อมูลที่กรองแล้วไปให้การ์ดสรุปด้วย (แทนข้อมูลดิบทั้งหมด)
+            // [เพิ่ม] แนบ selectedIds ที่ใช้จริง (รวม override จากโดนัท) ไปด้วย
+            // เพื่อไม่ให้ renderPrPoSummaryCards ไปอ่าน #multiCheckCombo ซ้ำแล้วได้ค่าคนละชุดกัน
             const filteredData = {
                 ...data,
                 data: _prRows,
                 contract: _poRows,
                 f_contract_total: _contractTotal,
+                _selectedIds: selectedIds,
             };
 
             const dcTypeIdForLinks = selectedIds.length === 1 ? selectedIds[0] : "";
@@ -708,9 +735,19 @@ _chartBar.on("click", function (params) {
        DOM Ready
     ------------------------------------------------------------------ */
     document.addEventListener("DOMContentLoaded", function () {
+        let tries = 0;
+        const MAX_TRIES = 40; // ~20 วินาที กันเคส DATA_BUDGET ว่างจริงๆ ไม่ให้รอค้างตลอดไป
         const wait = setInterval(function () {
-            const dvBody = document.getElementById("dvBody");
-            if (dvBody || window.DATA_BUDGET) {
+            // [FIX] เดิมเช็ค document.getElementById("dvBody") ซึ่งมีอยู่ใน markup ตั้งแต่แรก (truthy เสมอ)
+            // และ window.DATA_BUDGET ซึ่งถูกตั้งเป็น [] ไว้ตั้งแต่ต้น (truthy เสมอ) รวมกันด้วย ||
+            // ทำให้ wireToMainDashboard() ทำงานทันทีตั้งแต่ก่อนโหลดข้อมูลจริง ก่อนที่ multiCheckCombo
+            // จะถูกตั้งค่าเริ่มต้น (4 แหล่งเงินหลัก) เป็นเหตุให้ตอนโหลดหน้าครั้งแรก สรุป PR/PO
+            // ไปรวมทุกแหล่งเงินแทนที่จะเป็นแค่ 4 แหล่งหลัก
+            // แก้เป็นรอจนกว่า DATA_BUDGET จะมีข้อมูลจริง และ multiCheckCombo ถูกตั้งค่า default แล้วเท่านั้น
+            const dataReady = Array.isArray(window.DATA_BUDGET) && window.DATA_BUDGET.length > 0;
+            const multiReady = ($("#multiCheckCombo").val() || []).length > 0;
+            tries++;
+            if ((dataReady && multiReady) || tries >= MAX_TRIES) {
                 clearInterval(wait);
                 wireToMainDashboard();
             }
