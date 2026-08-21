@@ -1630,6 +1630,12 @@ Ext.AppUx = function (app, menu) {
             {
                 nmae: "sp_type_bg",
             },
+            {
+                name: "plan_status",
+            },
+            {
+                name: "plan_code",
+            },
         ],
     });
 

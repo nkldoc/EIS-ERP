@@ -1067,7 +1067,17 @@ Ext.AppUx = function (app, menu) {
         idProperty: "id",
         fields: ["id", "c_code", "c_name"],
     });
-
+    Ext.dc_sub_cost = new Ext.data.JsonStore({
+        autoDestroy: false,
+        autoLoad: false,
+        url: "api/All_PoWorkingImpHdr.php",
+        baseParams: {
+            type: "dc_sub_cost",
+        },
+        root: "data",
+        idProperty: "id",
+        fields: ["id", "c_name"],
+    });
     Ext.po_creditor_transfer = new Ext.data.JsonStore({
         autoDestroy: false,
         autoLoad: true,
@@ -1438,6 +1448,12 @@ Ext.AppUx = function (app, menu) {
             {
                 name: "i_delivery_date",
             },
+            {
+                name: "plan_status",
+            },
+            {
+                name: "plan_code",
+            },
         ],
     });
     Ext.store_year = new Ext.data.JsonStore({
@@ -1615,7 +1631,7 @@ Ext.AppUx = function (app, menu) {
         });
 
 
-        var comboCost2 = new Ext.form.ComboBox({
+                var comboCost2 = new Ext.form.ComboBox({
             mode: "local",
             store: Ext.dc_cost2,
             anchor: "50%",
@@ -1645,6 +1661,12 @@ Ext.AppUx = function (app, menu) {
                 Change: function () {
                     this.fn();
                 },
+                select: function (combo, record) {
+                    Ext.getCmp("dc_sub_cost_idID").setValue(0);
+                    Ext.dc_sub_cost.load({
+                        params: { dc_cost_id: record.get("id") || 0 },
+                    });
+                },
                 beforequery: function (q) {
                     if (q.query) {
                         var length = q.query.length;
@@ -1657,6 +1679,46 @@ Ext.AppUx = function (app, menu) {
                 },
 
             }
+        });
+
+        var comboSubCost = new Ext.form.ComboBox({
+            mode: "local",
+            store: Ext.dc_sub_cost,
+            anchor: "50%",
+            readOnly: Ext.isAudit ? true : false,
+            fieldLabel: "หน่วยงานย่อย",
+            valueField: "id",
+            displayField: "c_name",
+            hiddenName: "dc_sub_cost_id",
+            id: "dc_sub_cost_idID",
+            name: "c_sub_cost_name",
+            triggerAction: "all",
+            forceSelection: true,
+            selectOnFocus: true,
+            typeAhead: false,
+            emptyText: "- ไม่ระบุ -",
+            value: Ext.selectRow.get("dc_sub_cost_id") || 0,
+            listeners: {
+                afterrender: function () {
+                    var cmp = this;
+                    Ext.dc_sub_cost.load({
+                        params: { dc_cost_id: Ext.selectRow.get("dc_cost2_id") || 0 },
+                        callback: function () {
+                            cmp.setValue(Ext.selectRow.get("dc_sub_cost_id") || 0);
+                        },
+                    });
+                },
+                beforequery: function (q) {
+                    if (q.query) {
+                        var length = q.query.length;
+                        q.query = new RegExp(Ext.escapeRe(q.query));
+                        q.query.length = length;
+                    }
+                },
+                blur: function () {
+                    this.getStore().clearFilter();
+                },
+            },
         });
 
         var comboTypeBg = new Ext.form.ComboBox({
@@ -1892,14 +1954,21 @@ Ext.AppUx = function (app, menu) {
         }
         function purchase2(id, bg_reserve_money_id, ii) {
             console.log(id + " == " + bg_reserve_money_id + " == " + ii);
+            var params = {
+                mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
+                hdr_id: id, //sp_dtl_id
+                bg_reserve_money_id: bg_reserve_money_id,
+                ii: ii,
+            };
+            var planStatusCmp = Ext.getCmp("plan_statusID");
+            var planCodeCmp = Ext.getCmp("plan_codeID");
+            if (planStatusCmp) {
+                params.plan_status = planStatusCmp.getValue().inputValue;
+                params.plan_code = planCodeCmp ? planCodeCmp.getValue() : "";
+            }
             Ext.Ajax.request({
                 url: "tor/api/mnTorController.php",
-                params: {
-                    mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
-                    hdr_id: id, //sp_dtl_id
-                    bg_reserve_money_id: bg_reserve_money_id,
-                    ii: ii,
-                },
+                params: params,
                 method: "POST", //POST
                 success: function (result, request) {
                     Ext.store2.load({
@@ -2855,24 +2924,53 @@ Ext.AppUx = function (app, menu) {
                                                  {
     xtype: 'radiogroup',
     fieldLabel: 'สถานะโครงงาน',
+    id: 'plan_statusID',
     columns: 1, // หรือใส่เป็นจำนวนคอลัมน์ที่ต้องการจัดเรียง
     items: [
-        { boxLabel: 'ยังไม่ระบุ', name: 'plan_status', inputValue: 0, checked: true }, // ค่าเริ่มต้นสำหรับ 0 หรือ null
-        { boxLabel: 'ตามแผน (1)', name: 'plan_status', inputValue: 1 },
-        { boxLabel: 'นอกแผน (2)', name: 'plan_status', inputValue: 2 }
-    ]
-}, 
+        { boxLabel: 'ยังไม่ระบุ', name: 'plan_status', inputValue: 0, checked: Ext.selectRow.get('plan_status') ? false : true },
+        { boxLabel: 'ตามแผน (1)', name: 'plan_status', inputValue: 1, checked: Ext.selectRow.get('plan_status') == 1 },
+        { boxLabel: 'นอกแผน (2)', name: 'plan_status', inputValue: 2, checked: Ext.selectRow.get('plan_status') == 2 }
+    ],
+    listeners: {
+        afterrender: function () {
+            var v = Ext.selectRow.get('plan_status');
+            Ext.getCmp('plan_codeID').setVisible(v == 1);
+        },
+        change: function (grp, radio) {
+            if (radio.inputValue == 1) {
+                Ext.getCmp('plan_codeID').show();
+            } else {
+                Ext.getCmp('plan_codeID').hide();
+                Ext.getCmp('plan_codeID').setValue('');
+                Ext.getCmp('plan_codeID').clearInvalid();
+            }
+        },
+    },
+},
+{
+    xtype: 'textfield',
+    fieldLabel: 'รหัสแผน',
+    name: 'plan_code',
+    id: 'plan_codeID',
+    anchor: '80%',
+    value: Ext.selectRow.get('plan_code') || '',
+    hidden: Ext.selectRow.get('plan_status') != 1,
+    allowBlank: false,
+                                blankText: 'กรุณากรอกรหัสแผน',
+                            },
+                            {
+                                xtype: 'textarea',
+                                fieldLabel: 'หมายเหตุ',
+                                name: 'c_remake',
+                                id: 'c_remakeID',
+                                anchor: '80%',
+                                height: 60,
+                                value: Ext.selectRow.get('c_remake') || '',
+                            },
                                                 comboExpense,
                                                 comboCost,
                                                 comboCost2,
-                                                {
-                                                    fieldLabel: "หน่วยงานย่อย",
-                                                    emptyText: "*ถ้ามี",
-                                                    xtype: "textfield",
-                                                    name: "txtsub_cost",
-                                                    id: "txtsub_costID",
-                                                    
-                                                },
+                                                comboSubCost,
                                                 {
                                                     fieldLabel: "tag search",
                                                     xtype: "textfield",
@@ -3406,6 +3504,16 @@ Ext.AppUx = function (app, menu) {
                                     },
                                     handler: function () {
                                         var msg = "";
+                                        if (Ext.getCmp("plan_statusID") && Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
+                                            msg += "- กรุณากรอกรหัสแผน" + "\n";
+                                        }
+                                        if (msg != "") {
+                                            Ext.example.msg("แจ้งเตือน", msg, 1);
+                                            setTimeout(function () {
+                                                $(this).next().remove();
+                                            }, 6000);
+                                            return;
+                                        }
                                         // if (Ext.getCmp("modesubID").getValue().inputValue == "GENCODE") {
                                         //     if (Ext.store2.data.length == 0) {
                                         //         msg += "<span style='white-space: nowrap;'>- กรุณาเพิ่มรายการจัดซื้อ</span><br>";
@@ -4884,6 +4992,7 @@ Ext.AppUx = function (app, menu) {
                                     function (e, grid, rowIndex, columnIndex) {
                                         e.stopEvent();
                                         this.contextMenu.showAt(e.getXY());
+                                        
                                     },
                                     this
                                     );

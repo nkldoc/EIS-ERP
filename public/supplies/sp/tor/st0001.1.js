@@ -1076,6 +1076,18 @@ Ext.AppUx = function (app, menu) {
     fields: ["id", "c_code", "c_name"],
   });
 
+  Ext.dc_sub_cost = new Ext.data.JsonStore({
+    autoDestroy: false,
+    autoLoad: false,
+    url: "api/All_PoWorkingImpHdr.php",
+    baseParams: {
+      type: "dc_sub_cost",
+    },
+    root: "data",
+    idProperty: "id",
+    fields: ["id", "c_name"],
+  });
+
   Ext.po_creditor_transfer = new Ext.data.JsonStore({
     autoDestroy: false,
     autoLoad: true,
@@ -1467,6 +1479,12 @@ Ext.AppUx = function (app, menu) {
       {
         name: "project_code",
       },
+      {
+        name: "plan_status",
+      },
+      {
+        name: "plan_code",
+      },
     ],
   });
   Ext.store_year = new Ext.data.JsonStore({
@@ -1663,6 +1681,52 @@ Ext.AppUx = function (app, menu) {
         },
         Change: function () {
           this.fn();
+        },
+        select: function (combo, record) {
+          Ext.getCmp("dc_sub_cost_idID").setValue(0);
+          Ext.dc_sub_cost.load({
+            params: { dc_cost_id: record.get("id") || 0 },
+          });
+        },
+        beforequery: function (q) {
+          if (q.query) {
+            var length = q.query.length;
+            q.query = new RegExp(Ext.escapeRe(q.query));
+            q.query.length = length;
+          }
+        },
+        blur: function () {
+          this.getStore().clearFilter();
+        },
+      },
+    });
+
+    var comboSubCost = new Ext.form.ComboBox({
+      mode: "local",
+      store: Ext.dc_sub_cost,
+      anchor: "50%",
+      readOnly: Ext.isAudit ? true : false,
+      fieldLabel: "หน่วยงานย่อย",
+      valueField: "id",
+      displayField: "c_name",
+      hiddenName: "dc_sub_cost_id",
+      id: "dc_sub_cost_idID",
+      name: "c_sub_cost_name",
+      triggerAction: "all",
+      forceSelection: true,
+      selectOnFocus: true,
+      typeAhead: false,
+      emptyText: "- ไม่ระบุ -",
+      value: Ext.selectRow.get("dc_sub_cost_id") || 0,
+      listeners: {
+        afterrender: function () {
+          var cmp = this;
+          Ext.dc_sub_cost.load({
+            params: { dc_cost_id: Ext.selectRow.get("dc_cost2_id") || 0 },
+            callback: function () {
+              cmp.setValue(Ext.selectRow.get("dc_sub_cost_id") || 0);
+            },
+          });
         },
         beforequery: function (q) {
           if (q.query) {
@@ -2118,7 +2182,7 @@ Ext.AppUx = function (app, menu) {
                             },
                           },
                         },
-                        {
+                        /*{
                           xtype: disp,
                           fieldLabel: "เลขที่โครงการ",
                           width: 100,
@@ -2131,7 +2195,7 @@ Ext.AppUx = function (app, menu) {
                               };
                             },
                           },
-                        },
+                        },*/
                         new Ext.form.ComboBox({
                           mode: "local",
                           store: Ext.i_type_bg,
@@ -2201,13 +2265,7 @@ Ext.AppUx = function (app, menu) {
                         comboUsedBgYear,
                         comboCost,
                         comboCost2,
-                        {
-                          fieldLabel: "หน่วยงานย่อย",
-                          emptyText: "*ถ้ามี",
-                          xtype: "textfield",
-                          name: "txtsub_cost",
-                          id: "txtsub_costID",
-                        },
+                        comboSubCost,
                         new Ext.form.ComboBox({
                           mode: "local",
                           store: Ext.torType,
@@ -2431,6 +2489,9 @@ Ext.AppUx = function (app, menu) {
                   handler: function () {
                     // return;
                     var msg = "";
+                    if (Ext.getCmp("plan_statusID") && Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
+                      msg += "- กรุณากรอกรหัสแผน" + "\n";
+                    }
                     if ([1, 2].includes(Ext.getCmp("i_is_registerID").getValue().inputValue)) {
                       if (Ext.getCmp("dc_expense_budget_type_hdr_id1").getValue() == null) {
                         msg += "- กรุณาเลือกแหล่งเงินจ่ายก่อนบันทึก" + "\n";
@@ -2444,9 +2505,9 @@ Ext.AppUx = function (app, menu) {
                       if ([null, 0, ""].includes(Ext.getCmp("f_totalID").getValue())) {
                         msg += "- กรุณากรอกจำนวนเงิน" + "\n";
                       }
-                      if ([null, 0, ""].includes(Ext.getCmp("project_codeID").getValue())) {
-                        msg += "- กรุณากรอกเลขที่โครงการ" + "\n";
-                      }
+                      // if ([null, 0, ""].includes(Ext.getCmp("project_codeID").getValue())) {
+                      //   msg += "- กรุณากรอกเลขที่โครงการ" + "\n";
+                      // }
                       // if(Ext.getCmp("i_type_bgID").getValue().inputValue != Ext.selectRow.data.i_type_bg){
                       //     Ext.Msg.alert("แจ้งเตือน", "มีการเปลี่ยนแปลงประเภท PR ให้เลือกการตรวจสอบเป็น : ยังไม่ส่งให้ฝ่ายจัดสรร แล้วบันทึกรายการ", function (bu, action) {
                       //         return false;

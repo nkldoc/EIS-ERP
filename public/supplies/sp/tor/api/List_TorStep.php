@@ -447,6 +447,8 @@ if ($type == "ownnerPr") {
                         , s.i_edit
                         , s.i_type_bg
                         , s.c_remake
+                        , s.plan_status
+                        , s.plan_code
                         , s.i_amount_bg
                         ,s.f_type_amt
                         , s.bg_reserve_money1_id
@@ -636,6 +638,8 @@ if ($type == "ownnerPr") {
             "c_comment" => $row["c_comment"],
             "c_comment_status" => $row["c_comment_status"],
             "c_remake" => $row["c_remake"],
+            "plan_status" => $row["plan_status"],
+            "plan_code" => $row["plan_code"],
             "po_creditor_id" => intval($row["po_creditor_id"]),
             "po_creditor_idTxt" => $row["po_creditor_idTxt"],
             "i_hire_type" => $row["i_hire_type"],
@@ -1502,6 +1506,8 @@ if ($type == "ownnerPr") {
         , s.i_pr_type5
         , s.i_amount_bg
         , s.project_code
+        , s.plan_status
+        , s.plan_code
         , s.dc_sub_cost_id
         , s.reason_winner
         , convert(varchar, (select top 1 act_date_dt from sp_tor_item where tor_id = s.tor_id and sp_status_hdr_id = 26 order by id desc ), 120) as d_act_date_dt26
@@ -1704,6 +1710,8 @@ if ($type == "ownnerPr") {
             "dc_cost2_idTxt" => $row["dc_cost2_idTxt"],
             "sp_emp_name" => $row["sp_emp_name"],
             "project_code" => $row["project_code"],
+            "plan_status" => $row["plan_status"],
+            "plan_code" => $row["plan_code"],
             "txtsp_emp_idID" => $row["sp_emp_name"],
             "sp_emp_id" => intval($row["sp_emp_id"]),
             "dc_department_id" => intval($row["dc_department_id"]),
@@ -2806,6 +2814,8 @@ if ($type == "ownnerPr") {
         , s.i_pr_type3
         , s.i_pr_type4
         , s.i_pr_type5
+        , s.plan_status
+        , s.plan_code
         "
             . " from ({$sqlTempTable}) a "
             . " inner join dbo.sp_tor s on s.tor_id=a.tor_id"
@@ -2962,6 +2972,8 @@ if ($type == "ownnerPr") {
             "bg_reserve_money3_id" => $row["bg_reserve_money3_id"],
             "bg_reserve_money4_id" => $row["bg_reserve_money4_id"],
             "bg_reserve_money5_id" => $row["bg_reserve_money5_id"],
+            "plan_status" => $row["plan_status"],
+            "plan_code" => $row["plan_code"],
         );
         ${$root}[] = $temp;
     }
@@ -3378,6 +3390,8 @@ if ($type == "ownnerPr") {
                         , s.i_type_bg
                         , s.c_comment
                         , s.c_remake
+                        , s.plan_status
+                        , s.plan_code
                         , s.i_yyyy as i_yyyy
                         , s.i_amount_bg
                         ,s.f_type_amt
@@ -3545,6 +3559,8 @@ if ($type == "ownnerPr") {
             "c_comment_status" => $row["c_comment_status"],
             "c_comment" => $row["c_comment"],
             "c_remake" => $row["c_remake"],
+            "plan_status" => $row["plan_status"],
+            "plan_code" => $row["plan_code"],
             "po_creditor_id" => intval($row["po_creditor_id"]),
             "po_creditor_idTxt" => $row["po_creditor_idTxt"],
             "i_hire_type" => $row["i_hire_type"],
@@ -3744,6 +3760,8 @@ if ($type == "ownnerPr") {
         , s.i_pr_type4
         , s.i_pr_type5
         , s.i_amount_bg
+        , s.plan_status
+        , s.plan_code
         , (select i_type from sp_type_bg where i_value =  i_type_bg ) as sp_type_bg
         , (select i_value from sp_type_bg where i_value =  i_type_bg ) as sp_type_value
         , (select top 1 i_enabled from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as sp_tor_delete
@@ -3842,6 +3860,8 @@ if ($type == "ownnerPr") {
             "sp_tor_delete" => $row["sp_tor_delete"],
             "c_comment_edit1" => $row["c_comment_edit1"],
             "i_amount_bg" => $row["i_amount_bg"] == null ? 1 : $row["i_amount_bg"],
+            "plan_status" => $row["plan_status"],
+            "plan_code" => $row["plan_code"],
             "tor_delete_comment" => $row["tor_delete_comment"],
             "i_receive" => intval($row["i_receive"]),
             "i_is_entrance" => intval($row["i_is_entrance"]),
