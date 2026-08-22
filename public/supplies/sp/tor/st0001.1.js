@@ -1327,6 +1327,12 @@ Ext.AppUx = function (app, menu) {
         name: "dc_cost2_idTxt",
       },
       {
+        name: "dc_sub_cost_id",
+      },
+      {
+        name: "dc_sub_cost",
+      },
+      {
         name: "i_yyyy",
       },
       {
@@ -1705,7 +1711,7 @@ Ext.AppUx = function (app, menu) {
       mode: "local",
       store: Ext.dc_sub_cost,
       anchor: "50%",
-      readOnly: Ext.isAudit ? true : false,
+      readOnly: true,
       fieldLabel: "หน่วยงานย่อย",
       valueField: "id",
       displayField: "c_name",
