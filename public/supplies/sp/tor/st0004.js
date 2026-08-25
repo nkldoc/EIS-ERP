@@ -1560,6 +1560,12 @@ Ext.AppUx = function (app, menu) {
       {
         name: "d_act_date_dt26",
       },
+      {
+        name: "plan_status",
+      },
+      {
+        name: "plan_code",
+      },
     ],
   });
   Ext.store_year = new Ext.data.JsonStore({
@@ -1881,14 +1887,21 @@ Ext.AppUx = function (app, menu) {
     }
     function purchase2(id, bg_reserve_money_id, ii) {
       console.log(id + " == " + bg_reserve_money_id + " == " + ii);
+      var params = {
+        mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
+        hdr_id: id, //sp_dtl_id
+        bg_reserve_money_id: bg_reserve_money_id,
+        ii: ii,
+      };
+      var planStatusCmp = Ext.getCmp("plan_statusID");
+      var planCodeCmp = Ext.getCmp("plan_codeID");
+      if (planStatusCmp) {
+        params.plan_status = planStatusCmp.getValue().inputValue;
+        params.plan_code = planCodeCmp ? planCodeCmp.getValue() : "";
+      }
       Ext.Ajax.request({
         url: "tor/api/mnTorController.php",
-        params: {
-          mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
-          hdr_id: id, //sp_dtl_id
-          bg_reserve_money_id: bg_reserve_money_id,
-          ii: ii,
-        },
+        params: params,
         method: "POST", //POST
         success: function (result, request) {
           Ext.store2.load({
