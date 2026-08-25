@@ -5,7 +5,7 @@ include("../../lib/database/apiUtil.php");
 include("../../lib/date/i_date.class.php");
 $db = new DatabaseServer();
 $date = new i_date();
-$mode = $_REQUEST["mode"];
+$mode = $_REQUEST["mode"] ?? null;
 $table = "dbo.sp_tor";
 /* * iceeedddee */
 switch ($mode) {
@@ -124,6 +124,29 @@ switch ($mode) {
                     }
                 } else {
                     $wh .= "";
+                }
+
+                $i_yyyy = $_REQUEST["i_yyyy"] ?? null;
+                if (!empty($i_yyyy)) {
+                    $wh .= " and a.i_yyyy = " . intval($i_yyyy) . " ";
+                }
+                // สถานะรายการ: กำลังดำเนินการ (ยังไม่ส่งเบิกทางคลัง) / ส่งเบิกทางคลัง (ตรงกับ i_start ที่แสดงในกริด)
+                $i_start_filter = $_REQUEST["i_start_filter"] ?? null;
+                $whWithdrawExists = " EXISTS (
+                        select 1 from sp_withdraw
+                        where isnull(po_working_hdr_id,0) > 0
+                        and sp_check_period_hdr_id = (
+                            select top 1 isnull(sp_check_period_hdr_id,0) from sp_check_period_hdr
+                            where sp_tor_hdr_period_id = (
+                                select top 1 sp_tor_hdr_period_id from sp_tor_hdr_period
+                                where sp_tor_contract_id = b.sp_tor_contract_id and i_is_last = 1
+                            )
+                        )
+                    ) ";
+                if ($i_start_filter == "1") {
+                    $wh .= " and not " . $whWithdrawExists;
+                } else if ($i_start_filter == "2") {
+                    $wh .= " and " . $whWithdrawExists;
                 }
     //
                 $arrParam = array();

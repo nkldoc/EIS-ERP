@@ -104,6 +104,19 @@ switch ($mode) {
                     $wh .= "";
                 }
 
+                $i_yyyy = $_REQUEST["i_yyyy"] ?? null;
+                if (!empty($i_yyyy)) {
+                    $wh .= " and a.i_yyyy = " . intval($i_yyyy) . " ";
+                }
+                $tor_status_id = $_REQUEST["tor_status_id"] ?? null;
+                if ($tor_status_id !== null && $tor_status_id !== "" && $tor_status_id != "0") {
+                    if ($tor_status_id == "-1") {
+                        $wh .= " and isnull(a.d_tor_date_alert,'') = '' ";
+                    } else {
+                        $wh .= " and isnull(a.d_tor_date_alert,'') != '' and a.tor_status_id = " . intval($tor_status_id) . " ";
+                    }
+                }
+
                 $arrParam = array();
                 $arrCountParam = array();
                 $sqlTempTable = "select a.tor_id
@@ -279,4 +292,37 @@ switch ($mode) {
                 exit();
             }
         }
+        break;
+    case "STATUS_LIST" :
+        $i_yyyy = $_REQUEST["i_yyyy"] ?? null;
+        $whYear = "";
+        if (!empty($i_yyyy)) {
+            $whYear = " and a.i_yyyy = " . intval($i_yyyy) . " ";
+        }
+        $sqlStatus = "select distinct
+                    case when isnull(a.d_tor_date_alert,'') != '' then a.tor_status_id else -1 end as tor_status_id
+                    , case when isnull(a.d_tor_date_alert,'') != '' then (select top 1 c_code from dbo.sp_status_hdr where sp_status_hdr_id = a.tor_status_id) else 'ST0000' end as c_code_status
+                    , case when isnull(a.d_tor_date_alert,'') != '' then (select top 1 c_name from dbo.sp_status_hdr where sp_status_hdr_id = a.tor_status_id) else 'ธุรการ' end as c_name_status
+                from dbo.sp_tor a
+                where isnull(a.i_enabled,0) = 1
+                and isnull(a.i_is_pause,0) <> 1
+                and isnull(a.i_is_notor,0) <> 1
+                and isnull(a.c_code,'') != ''
+                and a.i_enabled = 1
+                and isnull(a.i_is_complete,0) <> 1
+                and NOT EXISTS (SELECT 1 FROM dbo.sp_tor_contract WHERE isnull(dbo.sp_tor_contract.c_code,'') != '' and dbo.sp_tor_contract.sp_tor_id = a.tor_id)
+                {$whYear}
+                order by c_code_status";
+        $stmtStatus = $db->QueryParam($sqlStatus, array());
+        $dataStatus = array(array("id" => "0", "c_code" => "", "c_name" => "ทุกสถานะ"));
+        while ($rowStatus = $db->Fetch($stmtStatus)) {
+            $dataStatus[] = array(
+                "id" => $rowStatus["tor_status_id"],
+                "c_code" => $rowStatus["c_code_status"],
+                "c_name" => $rowStatus["c_code_status"] . " " . $rowStatus["c_name_status"],
+            );
+        }
+        echo json_encode(array("data" => $dataStatus));
+        exit();
+        break;
 }

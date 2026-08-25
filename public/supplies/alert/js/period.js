@@ -624,19 +624,37 @@ Ext.onReady(function () {
                 name: "id"
             }]
     });
+    var currentYear = new Date().getFullYear();
+    var yearsData = [{id: "0", c_name: "ทุกปี"}];
+    for (var y = currentYear - 5; y <= currentYear + 1; y++) {
+        yearsData.push({id: y, c_name: (y + 543)});
+    }
+    Ext.store_year = new Ext.data.JsonStore({
+        fields: ["id", "c_name"],
+        data: yearsData
+    });
+    Ext.store_status = new Ext.data.JsonStore({
+        fields: ["id", "c_name"],
+        data: [
+            {id: "0", c_name: "ทั้งหมด"},
+            {id: "1", c_name: "กำลังดำเนินการ"},
+            {id: "2", c_name: "ส่งเบิกทางคลัง"}
+        ]
+    });
     Ext.store = new Ext.data.JsonStore({
         autoDestroy: false,
         autoLoad: true,
         url: "api/listPeriod.php",
         baseParams: {
-            
+
             lastModify: localStorage.getItem("lastModify"),
             check: false,
             type: "po_working_dtl",
             viewData:true,
             mode: "LIST",
-            store:"storeload"
-        }, 
+            store:"storeload",
+            i_yyyy: currentYear
+        },
         root: "data",
         idProperty: "id",
         totalProperty: "totalCount",
@@ -976,7 +994,59 @@ Ext.onReady(function () {
             )
 
 });
-// Grid Main View 
+    function doFilterSearch() {
+        var store = Ext.getCmp('gridID').getStore();
+        store.setBaseParam("i_yyyy", Ext.getCmp('yearFilterID').getValue());
+        store.setBaseParam("i_start_filter", Ext.getCmp('statusFilterID').getValue());
+        store.load({
+            callback: function (record, operation, success) {
+                if (success) {
+                    Ext.getCmp("gridID").getSelectionModel().selectRow(0);
+                }
+            }
+        });
+    }
+    var yearComboFilter = new Ext.form.ComboBox({
+        id: "yearFilterID",
+        fieldLabel: "ปี",
+        mode: "local",
+        store: Ext.store_year,
+        valueField: "id",
+        displayField: "c_name",
+        triggerAction: "all",
+        forceSelection: true,
+        editable: false,
+        selectOnFocus: true,
+        typeAhead: false,
+        width: 90,
+        value: currentYear,
+        listeners: {
+            select: function () {
+                doFilterSearch();
+            }
+        }
+    });
+    var statusComboFilter = new Ext.form.ComboBox({
+        id: "statusFilterID",
+        fieldLabel: "สถานะรายการ",
+        mode: "local",
+        store: Ext.store_status,
+        valueField: "id",
+        displayField: "c_name",
+        triggerAction: "all",
+        forceSelection: true,
+        editable: false,
+        selectOnFocus: true,
+        typeAhead: false,
+        width: 220,
+        value: "0",
+        listeners: {
+            select: function () {
+                doFilterSearch();
+            }
+        }
+    });
+// Grid Main View
     items.push({
         id: 'gridID',
         xtype: 'grid',
@@ -1396,6 +1466,12 @@ Ext.onReady(function () {
             
             }
            , '->',
+           'ปี', ' ',
+           yearComboFilter,
+           ' ', '-', ' ',
+           'สถานะรายการ', ' ',
+           statusComboFilter,
+           ' ', '-', ' ',
            PermissionEmp(),
            new Ext.form.TwinTriggerField({
                xtype: 'twintriggerfield',
