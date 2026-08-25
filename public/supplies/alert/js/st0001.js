@@ -384,6 +384,26 @@ Ext.onReady(function () {
                 name: "id"
             }]
     });
+    var currentYear = new Date().getFullYear();
+    var yearsData = [{id: "0", c_name: "ทุกปี"}];
+    for (var y = currentYear - 5; y <= currentYear + 1; y++) {
+        yearsData.push({id: y, c_name: (y + 543)});
+    }
+    Ext.store_year = new Ext.data.JsonStore({
+        fields: ["id", "c_name"],
+        data: yearsData
+    });
+    Ext.store_status = new Ext.data.JsonStore({
+        autoLoad: true,
+        url: "api/mnTorController.php",
+        baseParams: {
+            mode: "STATUS_LIST",
+            type: "po_working_dtl"
+        },
+        root: "data",
+        idProperty: "id",
+        fields: ["id", "c_code", "c_name"]
+    });
     Ext.store = new Ext.data.JsonStore({
         autoDestroy: false,
         autoLoad: true,
@@ -392,7 +412,8 @@ Ext.onReady(function () {
             lastModify: localStorage.getItem("lastModify"),
             check: false,
             type: "po_working_dtl",
-            mode: "LIST"
+            mode: "LIST",
+            i_yyyy: currentYear
         },
         root: "data",
         idProperty: "id",
@@ -443,6 +464,8 @@ Ext.onReady(function () {
                 name: "c_tor_type"
             }, {
                 name: "tor_status_id"
+            }, {
+                name: "c_code_to_status"
             }, {
                 name: "tor_type_id"
             }, {
@@ -533,7 +556,62 @@ Ext.onReady(function () {
             value: Ext.session.i_level,
         });
     }
-// Grid Main View 
+    function doFilterSearch() {
+        var store = Ext.getCmp('gridID').getStore();
+        store.setBaseParam("i_yyyy", Ext.getCmp('yearFilterID').getValue());
+        store.setBaseParam("tor_status_id", Ext.getCmp('statusFilterID').getValue());
+        store.reload({
+            callback: function (record, operation, success) {
+                if (success) {
+                    Ext.getCmp("gridID").getSelectionModel().selectRow(0);
+                }
+            }
+        });
+    }
+    var yearComboFilter = new Ext.form.ComboBox({
+        id: "yearFilterID",
+        fieldLabel: "ปี",
+        mode: "local",
+        store: Ext.store_year,
+        valueField: "id",
+        displayField: "c_name",
+        triggerAction: "all",
+        forceSelection: true,
+        editable: false,
+        selectOnFocus: true,
+        typeAhead: false,
+        width: 90,
+        value: currentYear,
+        listeners: {
+            select: function () {
+                doFilterSearch();
+            }
+        }
+    });
+    var statusComboFilter = new Ext.form.ComboBox({
+        id: "statusFilterID",
+        fieldLabel: "สถานะรายการ",
+        mode: "local",
+        store: Ext.store_status,
+        valueField: "id",
+        displayField: "c_name",
+        triggerAction: "all",
+        forceSelection: true,
+        editable: false,
+        selectOnFocus: true,
+        typeAhead: false,
+        width: 220,
+        value: "0",
+        listeners: {
+            select: function () {
+                doFilterSearch();
+            }
+        }
+    });
+    Ext.store_status.on("load", function () {
+        statusComboFilter.setValue(statusComboFilter.getValue());
+    });
+// Grid Main View
     items.push({
         id: 'gridID',
         xtype: 'grid',
@@ -826,6 +904,12 @@ Ext.onReady(function () {
                 }
             }
             , '->',
+            'ปี', ' ',
+            yearComboFilter,
+            ' ', '-', ' ',
+            'สถานะรายการ', ' ',
+            statusComboFilter,
+            ' ', '-', ' ',
             PermissionEmp(),
             new Ext.form.TwinTriggerField({
                 xtype: 'twintriggerfield',
@@ -838,6 +922,16 @@ Ext.onReady(function () {
                     var TypeTxt = Ext.getCmp('viewID').getValue();
                     var txt = this.getValue();
                     var store = Ext.getCmp('gridID').getStore();
+//                    if (txt != "") {
+//                        Ext.getCmp('yearFilterID').setValue("0");
+//                        Ext.getCmp('statusFilterID').setValue("0");
+//                        store.setBaseParam("i_yyyy", "0");
+//                        store.setBaseParam("tor_status_id", "0");
+//                    }
+                    if (txt != "") {
+                        store.setBaseParam("i_yyyy", "0");
+                        store.setBaseParam("tor_status_id", "0");
+                    }
                     store.setBaseParam("TypeTxt", TypeTxt);
                     store.setBaseParam("value", txt);
                     store.setBaseParam("act", "SEARCH");
@@ -847,6 +941,18 @@ Ext.onReady(function () {
                             if (success)
                             {
                                 Ext.getCmp("gridID").getSelectionModel().selectRow(1);
+                                var rec = store.getAt(0);
+                                if (txt != "" && rec) {
+                                    var foundYear = rec.get('i_yyyy');
+                                    var foundCode = rec.get('c_code_to_status');
+                                    var statusIdx = Ext.store_status.find('c_code', foundCode);
+                                    var statusRec = statusIdx >= 0 ? Ext.store_status.getAt(statusIdx) : null;
+                                    var foundStatusId = statusRec ? statusRec.get('id') : "0";
+                                    Ext.getCmp('yearFilterID').setValue(foundYear);
+                                    Ext.getCmp('statusFilterID').setValue(foundStatusId);
+                                    store.setBaseParam("i_yyyy", foundYear);
+                                    store.setBaseParam("tor_status_id", foundStatusId);
+                                }
                             }
                         }
                     });
