@@ -696,14 +696,16 @@ switch ($mode) {
         }   // ถ้า i_is_register  = 3 เปิดใช้ตัวนี้
         // $i_register1 = @$data["i_is_register"] == 2 ? 2 : 1;  d_egp_date
         $arrParam[] = $data["c_comment"] ?? null;
+        $arrParam[] = $data["c_remake"] ?? null;
         $arrParam[] = $f_total_amt;
 
         // สำหรับธรุการ  ไม่คิด pa
         if ((!empty($data['DateAdd1'])) and (empty($data['DateAdd2']))) { //first menu
             $case = 1;
             //$count = 0;//$db->GetDataBySQL("select count(*) from dbo.sp_tor where isnull(index_receive,0) != ? and tor_id != ?", array(0, $data["id"]));
-            $arrParam2[] = $data["d_tor_date"] ?? null;
+             $arrParam2[] = $data["d_tor_date"] ?? null;
             $arrParam2[] = $data["c_comment"] ?? null;
+            $arrParam2[] = $data["c_remake"] ?? null;
             $arrParam2[] = $data['index_receive'] ?? null; //== 0 ? intVal($count + 1) : $data['index_receive'];
             //$arrParam2[] = empty($data['d_tor_status_date']) ? date('Y-m-d H:i:s') : $date->bc_to_ad($data['d_tor_status_date']) . " " . date('H:i:s');
             $arrParam2[] = $date->bc_to_ad($data['DateAdd1']) . " " . date('H:i:s');
@@ -714,6 +716,7 @@ switch ($mode) {
             $sql = "UPDATE {$table}
                   SET d_doc_date = ?
                         , c_comment = ?
+                        , c_remake = ?
                         --, i_is_inv = ?
                         , index_receive = ?
                         , i_is_register = {$i_register1}
@@ -729,8 +732,10 @@ switch ($mode) {
         } else if ((empty($data['DateAdd1'])) and (!empty($data['DateAdd2']))) { //sec menu
             $case = 2;
 
+            $arrParam[] = $data['index_receive'] ?? null;
             $arrParam[] = empty($data['d_tor_status_date']) ? date('Y-m-d H:i:s') : $date->bc_to_ad($data['d_tor_status_date']) . " " . date('H:i:s');
             $arrParam[] = $date->bc_to_ad($data['DateAdd2']) . " " . date('H:i:s');
+            $arrParam[] = $data['i_is_inv'] ?? 0;
             $arrParam[] = $data["dc_user_update_id"];
             $arrParam[] = $data["dc_user_update_cost_id"];
             $arrParam[] = $data["d_update"];
@@ -744,6 +749,8 @@ switch ($mode) {
                         , dc_expense_budget_type_id = ?
                         , po_expense_id = ?
                         , dc_cost_id = ?
+                        , dc_cost2_id = ?
+                        , dc_sub_cost_id = ?
                         , txtsub_cost = ?
                         , d_tor_date = ?
                         , tor_type_id   = ?
@@ -752,6 +759,8 @@ switch ($mode) {
                         , dc_department_id = ?
                         , i_is_register = {$i_register1}
                         , c_comment = ?
+                        , c_remake = ?
+                        , f_total_amt = ?
                         , index_receive = ?
                         , d_tor_status_date=?
                         , d_tor_date_pa=?
@@ -844,6 +853,7 @@ switch ($mode) {
                         , dc_department_id = ?
                         , i_is_register = {$i_register1}
                         , c_comment = ?
+                        , c_remake = ?
                         , f_total_amt = ?
                         {$i_po}
                         {$change}
@@ -905,6 +915,7 @@ switch ($mode) {
         $arrParam[] = $data["po_expense_id"] ?? null;
         $arrParam[] = $data["dc_cost_id"] ?? null;
         $arrParam[] = $data["dc_cost2_id"] ?? null;
+        $arrParam[] = $data["dc_sub_cost_id"] ?? null;
         $arrParam[] = $data["txtsub_cost"] ?? null;
         $arrParam[] = $data["tor_type_id"] ?? null;
         $arrParam[] = $data["d_doc_ref"] ?? null;
@@ -913,6 +924,9 @@ switch ($mode) {
         $arrParam[] = $data["i_type_bg"] ?? null;
 
         $arrParam[] = $data["c_comment"] ?? null;
+        $arrParam[] = $data["c_remake"] ?? null;
+        $arrParam[] = $data["plan_status"] ?? null;
+        $arrParam[] = $data["plan_code"] ?? null;
         $arrParam[] = !empty($data["f_total_amt"]) ? str_replace(',', '', $data["f_total_amt"]) : 0;
         // $arrParam[] = empty($data['d_tor_status_date']) ? date('Y-m-d H:i:s') : $date->bc_to_ad($data['d_tor_status_date']) . " " . date('H:i:s');
         // $arrParam[] = $date->bc_to_ad(date('Y-m-d H:i:s'));
@@ -943,6 +957,7 @@ switch ($mode) {
                         , po_expense_id = ?
                         , dc_cost_id = ?
                         , dc_cost2_id = ?
+                        , dc_sub_cost_id = ?
                         , txtsub_cost = ?
                         , tor_type_id = ?
                         ,  d_doc_ref = ?
@@ -950,6 +965,9 @@ switch ($mode) {
                         , i_is_register = ?
                         , i_type_bg = ?
                         , c_comment = ?
+                        , c_remake = ?
+                        , plan_status = ?
+                        , plan_code = ?
                         , f_total_amt = ?
 
                         , d_tor_status_date=?
@@ -1757,9 +1775,12 @@ switch ($mode) {
         $ret_id = $data["id"];
         $code_dc = (string) $c_code_gen;
         $now = str_replace('-', '/', date('Y-m-d'));
-        if ($_REQUEST['i_type_year'] == 2) {
-            $bcm = date('Y' . $_REQUEST['mm_start'], strtotime($now . "+543 years"));
+        $i_type_year = isset($_REQUEST['i_type_year']) ? (int) $_REQUEST['i_type_year'] : 1;
+        if ($i_type_year == 2) {
+            $mm_start = $_REQUEST['mm_start'];
+            $bcm = date('Y' . $mm_start, strtotime($now . "+543 years"));
         } else {
+            $mm_start = null;
             $bcm = date('Ym', strtotime($now . "+543 years"));
         }
         // $bcm = date('Ym', strtotime($now . "+543 years"));
@@ -1772,8 +1793,8 @@ switch ($mode) {
 
         if ($ret_id == $ref_id) {
 
-            $sql3 = "UPDATE {$table} SET c_code=? , i_pr_year = {$_REQUEST['i_yyyy']}  WHERE {$keyName} = ?";
-            $arrParam3 = array($c_code, $ret_id);
+            $sql3 = "UPDATE {$table} SET c_code=? , i_pr_year = {$_REQUEST['i_yyyy']}, i_type_year=?, mm_start=?  WHERE {$keyName} = ?";
+            $arrParam3 = array($c_code, $i_type_year, $mm_start, $ret_id);
             $stmt3 = $db->QueryParam($sql3, $arrParam3);
         }
 
@@ -1864,6 +1885,8 @@ switch ($mode) {
         $arrParam[] = $data["dc_user_update_cost_id"];
         $arrParam[] = $data["d_update"];
         $arrParam[] = $data["index_receive"];
+        $arrParam[] = isset($data["i_type_year"]) ? intval($data["i_type_year"]) : null;
+        $arrParam[] = ($data["i_type_year"] ?? null) == 2 ? ($data["mm_start"] ?? null) : null;
 
         $sql = "SET NOCOUNT ON
         INSERT INTO {$table} (c_name
@@ -1899,12 +1922,14 @@ switch ($mode) {
                         , dc_user_create_id, dc_user_create_cost_id, d_create
                         , dc_user_update_id, dc_user_update_cost_id, d_update
                         , index_receive
+                        , i_type_year, mm_start
                         )
                 VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,? ,? ,? ,? ,?, ?,?,?
                         , ?, ?
                         , ? , ?
                         , ?, ?, ?
-                        , ?,?,?);
+                        , ?,?,?
+                        , ?,?);
                         SELECT @@IDENTITY as sp_tor_id;";
 
         $stmt = $db->QueryParam($sql, $arrParam);
@@ -2050,6 +2075,8 @@ switch ($mode) {
         $arrParam["dc_user_update_cost_id"] = $data["dc_user_update_cost_id"];
         $arrParam["d_update"] = $data["d_update"];
         $arrParam["index_receive"] = $data["index_receive"];
+        $arrParam["i_type_year"] = isset($data["i_type_year"]) ? intval($data["i_type_year"]) : null;
+        $arrParam["mm_start"] = ($data["i_type_year"] ?? null) == 2 ? ($data["mm_start"] ?? null) : null;
 
         foreach ($arrParam as $fld => $value) {
             $arrValue[] = ($value != "") ? $value : null;
@@ -2213,6 +2240,8 @@ switch ($mode) {
                             , s.c_comment
                             , s.c_remake
                             , s.i_yyyy
+                            , s.i_type_year
+                            , s.mm_start
                             , s.i_type_bg
                             , s.sp_type_id
                             , s.dc_sub_cost_id
@@ -2356,6 +2385,8 @@ switch ($mode) {
                     "d_doc_ref" => $row["d_doc_ref"],
                     "i_yyyy" => $row["i_yyyy"],
                     "c_year" => intval($row["i_yyyy"] + 543),
+                    "i_type_year" => isset($row["i_type_year"]) ? intval($row["i_type_year"]) : null,
+                    "mm_start" => $row["mm_start"] ?? null,
                     "tor_type_id" => $row["tor_type_id"],
                     "c_tor_type" => $row["c_type_name"], // $tor_type[$row["tor_type_id"]],
                     "i_purchase" => intval($row["i_purchase"]),
@@ -2477,6 +2508,8 @@ switch ($mode) {
                             , s.c_comment
                             , s.c_remake
                             , s.i_yyyy
+                            , s.i_type_year
+                            , s.mm_start
                             , s.i_type_bg
                             , s.sp_type_id
                             , CONVERT(VARCHAR, s.d_doc_date, 120) AS d_doc_date
@@ -2609,6 +2642,8 @@ switch ($mode) {
                     "d_doc_ref" => $row["d_doc_ref"],
                     "i_yyyy" => $row["i_yyyy"],
                     "c_year" => intval($row["i_yyyy"] + 543),
+                    "i_type_year" => isset($row["i_type_year"]) ? intval($row["i_type_year"]) : null,
+                    "mm_start" => $row["mm_start"] ?? null,
                     "tor_type_id" => $row["tor_type_id"],
                     "c_tor_type" => $row["c_type_name"], // $tor_type[$row["tor_type_id"]],
                     "i_purchase" => intval($row["i_purchase"]),
@@ -3817,9 +3852,15 @@ switch ($mode) {
         break;
     case "UPDATE_TOR_BG":
         $arrValue[] = $_REQUEST["bg_reserve_money_id"] ?? null;
-        $arrValue[] = $_REQUEST["hdr_id"] ?? null;
         $ii = $_REQUEST["ii"] ?? null;
-        $sql = "UPDATE dbo.sp_tor SET bg_reserve_money" . $ii . "_id =? WHERE tor_id = ?";
+        $planSql = "";
+        if (isset($_REQUEST["plan_status"])) {
+            $planSql = ", plan_status = ?, plan_code = ?";
+            $arrValue[] = $_REQUEST["plan_status"];
+            $arrValue[] = $_REQUEST["plan_code"] ?? null;
+        }
+        $arrValue[] = $_REQUEST["hdr_id"] ?? null;
+        $sql = "UPDATE dbo.sp_tor SET bg_reserve_money" . $ii . "_id =?" . $planSql . " WHERE tor_id = ?";
         $stmt = $db->QueryParam($sql, $arrValue);
         break;
     case "UPDATE_TOR_DTL_BG":
@@ -8571,6 +8612,8 @@ switch ($mode) {
         $data["d_update"] = date("Y-m-d H:i:s");
         $data["dc_user_update_id"] = $_SESSION['user_id'];
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"];
+        $data["plan_status"] = $_REQUEST['plan_status'] ?? null;   // เพิ่มบรรทัดนี้
+        $data["plan_code"] = $_REQUEST['plan_code'] ?? null;         // เพิ่มบรรทัดนี้
         if ($_REQUEST['type'] == 1) {
             $data["i_pr_type1"] = $_REQUEST['i_pr_type'];
             $data["dc_expense_budget_type_id"] = $_REQUEST['dc_expense_budget_type'];

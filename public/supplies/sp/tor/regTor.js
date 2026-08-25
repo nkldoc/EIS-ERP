@@ -935,6 +935,12 @@ Ext.AppUx = function (app, menu) {
         name: "i_yyyy",
       },
       {
+        name: "i_type_year",
+      },
+      {
+        name: "mm_start",
+      },
+      {
         name: "c_year",
       },
       {
@@ -1118,7 +1124,7 @@ Ext.AppUx = function (app, menu) {
       var winApp = AppPoStore(statusx);
       Ext.getCmp("winChequeID").items.items[0].getForm().loadRecord(Ext.selectRow);
       winApp.show();
-      syncBgYearType(Ext.selectRow.get("i_yyyy"));
+      syncBgYearType(Ext.selectRow.get("i_yyyy"), Ext.selectRow.get("i_type_year"), Ext.selectRow.get("mm_start"));
       // ส่งรายการแล้วจะอัพเดทไม่ได้
       if (Ext.selectRow.get("tor_status_id") > 0) {
         Ext.getCmp("updateBuID").hide();
@@ -1167,32 +1173,57 @@ Ext.AppUx = function (app, menu) {
     }
   };
 
-  function syncBgYearType(selectedYear) {
+  function buildMonthStore(selectedYearAd) {
+    var i_year = (selectedYearAd - 0) + 543;
+    Ext.store_month = new Ext.data.JsonStore({
+      fields: ["id", "c_name"],
+      data: [
+        { id: "10", c_name: "ต.ค. " + (i_year - 1) },
+        { id: "11", c_name: "พ.ย. " + (i_year - 1) },
+        { id: "12", c_name: "ธ.ค. " + (i_year - 1) },
+        { id: "01", c_name: "ม.ค. " + i_year },
+        { id: "02", c_name: "ก.พ. " + i_year },
+        { id: "03", c_name: "มี.ค. " + i_year },
+        { id: "04", c_name: "เม.ย. " + i_year },
+        { id: "05", c_name: "พ.ค. " + i_year },
+        { id: "06", c_name: "มิ.ย. " + i_year },
+        { id: "07", c_name: "ก.ค. " + i_year },
+        { id: "08", c_name: "ส.ค. " + i_year },
+        { id: "09", c_name: "ก.ย. " + i_year },
+      ],
+    });
+    return Ext.store_month;
+  }
+
+  function syncBgYearType(selectedYear, savedTypeYear, savedMonth) {
     var grp = Ext.getCmp("i_type_yearID");
     var mm = Ext.getCmp("mm_ID");
     if (!grp) {
       return;
     }
     var yr = selectedYear - 0;
-    if (yr != Ext.bgYear) {
+    // ใช้ค่าที่บันทึกไว้จริงของรายการ (i_type_year/mm_start) ถ้ามี แทนการคำนวณจากปีอย่างเดียว
+    // ป้องกันไม่ให้ค่าที่ user เลือกไว้ (เช่น "ก่อนปีงบประมาณ") หายไปตอนเปิดดู/แก้ไขรายการ
+    var hasSaved = savedTypeYear != null && savedTypeYear !== "";
+    var typeYear = hasSaved ? savedTypeYear - 0 : yr < Ext.bgYear ? 2 : 1;
+    var showGroup = yr != Ext.bgYear || typeYear == 2;
+
+    if (showGroup) {
       grp.show();
-      if (yr < Ext.bgYear) {
-        grp.setValue(2);
-        if (mm) {
-          mm.show();
-        }
-      } else {
-        grp.setValue(1);
-        if (mm) {
-          mm.hide();
-        }
-      }
     } else {
       grp.hide();
-      grp.setValue(1);
-      if (mm) {
-        mm.hide();
+    }
+    grp.setValue(typeYear);
+
+    if (typeYear == 2 && mm) {
+      var mmCombo = Ext.getCmp("mm_startID");
+      mmCombo.bindStore(buildMonthStore(yr));
+      if (savedMonth) {
+        mmCombo.setValue(savedMonth);
       }
+      mm.show();
+    } else if (mm) {
+      mm.hide();
     }
   }
 
@@ -1324,29 +1355,9 @@ Ext.AppUx = function (app, menu) {
           this.getStore().clearFilter();
         },
         select: function () {
-          var i_year = Ext.getCmp("i_yearID").getValue() + 543;
-          Ext.store_month = new Ext.data.JsonStore({
-            fields: ["id", "c_name"],
-            data: [
-              // { id: "00", c_name: "- ทั้งหมด -" },
-              { id: "10", c_name: "ต.ค. " + (i_year - 1) },
-              { id: "11", c_name: "พ.ย. " + (i_year - 1) },
-              { id: "12", c_name: "ธ.ค. " + (i_year - 1) },
-              { id: "01", c_name: "ม.ค. " + i_year },
-              { id: "02", c_name: "ก.พ. " + i_year },
-              { id: "03", c_name: "มี.ค. " + i_year },
-              { id: "04", c_name: "เม.ย. " + i_year },
-              { id: "05", c_name: "พ.ค. " + i_year },
-              { id: "06", c_name: "มิ.ย. " + i_year },
-              { id: "07", c_name: "ก.ค. " + i_year },
-              { id: "08", c_name: "ส.ค. " + i_year },
-              { id: "09", c_name: "ก.ย. " + i_year },
-            ],
-          });
-          Ext.getCmp("mm_startID").bindStore(Ext.store_month);
-          // Ext.getCmp("mm_end").bindStore(Ext.store_month);
+          Ext.getCmp("mm_startID").bindStore(buildMonthStore(Ext.getCmp("i_yearID").getValue()));
           Ext.getCmp("mm_startID").setValue(Ext.getCmp("mm_startID").getValue());
-          // Ext.getCmp("mm_end").setValue(Ext.getCmp("mm_end").getValue());
+          // เปลี่ยนปีงบประมาณเอง ถือเป็นการเลือกใหม่ ไม่ใช้ค่าที่เคยบันทึกไว้
           syncBgYearType(Ext.getCmp("i_yearID").getValue());
         },
       },
