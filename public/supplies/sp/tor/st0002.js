@@ -640,12 +640,6 @@ Ext.AppUx = function (app, menu) {
       {
         name: "d_act_date_dt26",
       },
-      {
-        name: "plan_status",
-      },
-      {
-        name: "plan_code",
-      },
     ],
   });
   const sp_tor_delete = function (status, menu) {

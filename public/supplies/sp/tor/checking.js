@@ -5727,7 +5727,11 @@ function encodeLogData(data) {
                 browser: navigator.userAgent,
                 createdAtClient: new Date().toISOString()
         });
-} 
+}
+
+
+
+
 Ext.auditBoong = function (i) {
         var link = Ext.genLink(3, 0);
         Ext.Ajax.request({
@@ -14157,9 +14161,6 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                         },
                                                                                                                                 });
                                                                                                                         } else if (this.getValue() == Ext.getCmp("i_budget_year").getValue()) {
-                                                                                                                                // i_yyyy_overlapID == i_budget_year -> ไม่ต้องผูกกับใบกันเงินข้ามปี เคลียร์ c_bookingID ทิ้ง
-                                                                                                                                Ext.getCmp("c_bookingID").setValue(null);
-                                                                                                                                Ext.getCmp("c_bookingID").lastSelectionText = "";
                                                                                                                                 Ext.getCmp("c_bookingID").setReadOnly(true);
                                                                                                                                 Ext.getCmp("c_booking_radiogroup").hide(true);
                                                                                                                                 // Ext.getCmp("c_bookingID").setReadOnly(true);

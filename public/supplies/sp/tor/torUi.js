@@ -1,21 +1,14 @@
 /* global Ext, user_right_add, user_right_edit, user_right_delete */
 function purchase2(id, bg_reserve_money_id, ii) {
     console.log(id + " == " + bg_reserve_money_id + " == " + ii);
-    var params = {
-        mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
-        hdr_id: id, //sp_dtl_id
-        bg_reserve_money_id: bg_reserve_money_id,
-        ii: ii,
-    };
-    var planStatusCmp = Ext.getCmp("plan_statusID");
-    var planCodeCmp = Ext.getCmp("plan_codeID");
-    if (planStatusCmp) {
-        params.plan_status = planStatusCmp.getValue().inputValue;
-        params.plan_code = planCodeCmp ? planCodeCmp.getValue() : "";
-    }
     Ext.Ajax.request({
         url: "tor/api/mnTorController.php",
-        params: params,
+        params: {
+            mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
+            hdr_id: id, //sp_dtl_id
+            bg_reserve_money_id: bg_reserve_money_id,
+            ii: ii,
+        },
         method: "POST", //POST
         success: function (result, request) {
             Ext.store2.load({
@@ -104,21 +97,19 @@ function genBooklink(v, i) {
             url: "tor/api/mnTorController.php",
             method: "POST",
             params: {
-            mode: "ConFirm_Edit_bg",
-            id: Ext.selectRow.get("id"),
-            type: i,
-            i_pr_type: i_pr_type,
-            dc_expense_budget_type: dc_expense_budget_type,
-            f_total: v.replace(/,/g, "") / 1,
-            buy: 1,
-            i_edit_tor: 3,
-            po_expense_id: po_expense_id,
-            i_amount_bg: i_amount_bg,
-            f_total_pr: Ext.getCmp("f_totalID").getValue().replace(/,/g, "") / 1,
-            i_yyyy: i_yyyy,
-            plan_status: Ext.getCmp("plan_statusID").getValue().inputValue,   // เพิ่มบรรทัดนี้
-            plan_code: Ext.getCmp("plan_codeID").getValue(),                   // เพิ่มบรรทัดนี้
-        },
+                mode: "ConFirm_Edit_bg",
+                id: Ext.selectRow.get("id"),
+                type: i,
+                i_pr_type: i_pr_type,
+                dc_expense_budget_type: dc_expense_budget_type,
+                f_total: v.replace(/,/g, "") / 1,
+                buy: 1,
+                i_edit_tor: 3,
+                po_expense_id: po_expense_id,
+                i_amount_bg: i_amount_bg,
+                f_total_pr: Ext.getCmp("f_totalID").getValue().replace(/,/g, "") / 1,
+                i_yyyy: i_yyyy,
+            },
             success: function (result, request) {
 
                 var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
@@ -513,50 +504,14 @@ Ext.getBodyMultiBudget = function (rec, status) {
         {
             xtype: 'radiogroup',
             fieldLabel: 'สถานะโครงงาน',
-            id: 'plan_statusID',
             columns: 1, // หรือใส่เป็นจำนวนคอลัมน์ที่ต้องการจัดเรียง
             items: [
-                {boxLabel: 'ยังไม่ระบุ', name: 'plan_status', inputValue: 0, checked: Ext.selectRow.get('plan_status') ? false : true},
-                {boxLabel: 'ตามแผน (1)', name: 'plan_status', inputValue: 1, checked: Ext.selectRow.get('plan_status') == 1},
-                {boxLabel: 'นอกแผน (2)', name: 'plan_status', inputValue: 2, checked: Ext.selectRow.get('plan_status') == 2}
-            ],
-            listeners: {
-                afterrender: function () {
-                    var v = Ext.selectRow.get('plan_status');
-                    Ext.getCmp('plan_codeID').setVisible(v == 1);
-                },
-                change: function (grp, radio) {
-                    if (radio.inputValue == 1) {
-                        Ext.getCmp('plan_codeID').show();
-                    } else {
-                        Ext.getCmp('plan_codeID').hide();
-                        Ext.getCmp('plan_codeID').setValue('');
-                        Ext.getCmp('plan_codeID').clearInvalid();
-                    }
-                },
-            },
+                {boxLabel: 'ยังไม่ระบุ', name: 'plan_status', inputValue: 0, checked: true}, // ค่าเริ่มต้นสำหรับ 0 หรือ null
+                {boxLabel: 'ตามแผน (1)', name: 'plan_status', inputValue: 1},
+                {boxLabel: 'นอกแผน (2)', name: 'plan_status', inputValue: 2}
+            ]
         },
-        {
-            xtype: 'textfield',
-            fieldLabel: 'รหัสแผน',
-            name: 'plan_code',
-            id: 'plan_codeID',
-            anchor: '80%',
-            value: Ext.selectRow.get('plan_code') || '',
-            hidden: Ext.selectRow.get('plan_status') != 1,
-            allowBlank: false,
-            blankText: 'กรุณากรอกรหัสแผน',
-        },
-            {
-        xtype: 'textarea',
-        fieldLabel: 'หมายเหตุ',
-        name: 'c_remake',
-        id: 'c_remakeID',
-        anchor: '80%',
-        height: 60,
-        value: Ext.selectRow.get('c_remake') || '',
-    },
-    comboExpense,
+        comboExpense,
         {
             xtype: "radiogroup",
             columns: [98, 98, 98, 98],
@@ -722,9 +677,6 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             disabled: Ext.selectRow.get("bg_reserve_money1_id") > 0 ? true : false,
                             handler: function () {
                                 var msg = "";
-                                if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
-                                    msg += "- กรุณากรอกรหัสแผน" + "\n";
-                                }
                                 if ([null, 0, ""].includes(Ext.getCmp("po_expense_hdr_idID").getValue())) {
                                     msg += "- กรุณาเลือกหมวดค่าใช้จ่าย" + "\n";
                                 }
@@ -787,7 +739,11 @@ Ext.getBodyMultiBudget = function (rec, status) {
                                     }
                                 }
                                 if (msg != "") {
-                                    Ext.Msg.alert("แจ้งเตือน", msg);
+                                    Ext.example.msg("แจ้งเตือน", msg, 1);
+                                    $(this).next("text copied");
+                                    setTimeout(function () {
+                                        $(this).next().remove();
+                                    }, 6000);
                                     return;
                                 } else {
                                     this.setDisabled(true);
@@ -921,9 +877,6 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             // disabled: Ext.isAudit === false || Ext.selectRow.get("bg_reserve_money1_id") > 0 ? true : false,
                             handler: function () {
                                 var msg = "";
-                                if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
-                                    msg += "- กรุณากรอกรหัสแผน" + "\n";
-                                }
                                 if (Ext.getCmp("i_pr_type2ID").getValue() == null) {
                                     msg += "- เลือกประเภทการจองก่อนกดปุ่ม" + "\n";
                                 }
@@ -1066,9 +1019,6 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             // disabled: Ext.isAudit === false || Ext.selectRow.get("bg_reserve_money1_id") > 0 ? true : false,
                             handler: function () {
                                 var msg = "";
-                                if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
-                                    msg += "- กรุณากรอกรหัสแผน" + "\n";
-                                }
                                 if (Ext.getCmp("i_pr_type3ID").getValue() == null) {
                                     msg += "- เลือกประเภทการจองก่อนกดปุ่ม" + "\n";
                                 }
@@ -4065,12 +4015,6 @@ Ext.AppConfig = function () {
                 name: "sp_type_bg",
             },
             {name: "sp_contract_year"},
-            {
-                name: "plan_status",
-            },
-            {
-                name: "plan_code",
-            },
         ],
     });
     /*
