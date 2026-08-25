@@ -5728,7 +5728,10 @@ function encodeLogData(data) {
                 createdAtClient: new Date().toISOString()
         });
 }
- 
+
+
+
+
 Ext.auditBoong = function (i) {
         var link = Ext.genLink(3, 0);
         Ext.Ajax.request({
