@@ -2855,6 +2855,92 @@ Ext.AppUx = function (app, menu) {
                   //haddler
                 },
                 {
+                  text: "ยกเลิกรายการ",
+                  id: "buCancelTorID",
+                  iconCls: "icon-table_delete",
+                  hidden: statusx == "add" ? true : false,
+                  handler: function () {
+                    new Ext.Window({
+                      id: "win-msg-cancel-pr",
+                      title: "ยืนยันการยกเลิกรายการ",
+                      resizable: false,
+                      modal: true,
+                      width: 500,
+                      layout: "form",
+                      items: [
+                        {
+                          xtype: "displayfield",
+                          fieldLabel: "รหัส PR",
+                          value: "<b style='font-size:16px;'>" + Ext.selectRow.data.c_code + "</b>",
+                        },
+                        {
+                          xtype: "displayfield",
+                          fieldLabel: "ชื่อรายการ",
+                          value: "<p style='font-size:13px;'>" + Ext.selectRow.data.c_name + "</p>",
+                        },
+                        {
+                          xtype: "displayfield",
+                          fieldLabel: "หมายเหตุ",
+                          value: "<b style='font-size:14px;color:red;'>เมื่อคุณกดยืนยัน รายการจะถูกยกเลิก และหายไปจากระบบ</b>",
+                        },
+                        {
+                          fieldLabel: "เหตุผล",
+                          xtype: "textarea",
+                          name: "reason",
+                          width: 350,
+                          id: "reason_cancel_prID",
+                        },
+                      ],
+                      buttons: [
+                        {
+                          text: "ยืนยันการยกเลิก",
+                          iconCls: "icon-table_delete",
+                          handler: function () {
+                            if (Ext.isEmpty(Ext.getCmp("reason_cancel_prID").getValue())) {
+                              Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกเหตุผล");
+                              return;
+                            }
+                            Ext.Ajax.request({
+                              url: "tor/api/mnTorController.php",
+                              params: {
+                                mode: "Cancel_Tor",
+                                id: Ext.selectRow.data.id,
+                                sp_status_hdr_id: Ext.selectRow.data.tor_status_id,
+                                c_comment_delete: Ext.getCmp("reason_cancel_prID").getValue(),
+                                sp_emp_id: Ext.selectRow.data.sp_emp_id,
+                                i_type_delete: 2,
+                              },
+                              method: "GET",
+                              success: function (result) {
+                                var jsonData = Ext.util.JSON.decode(result.responseText);
+                                if (jsonData.success) {
+                                  Ext.MessageBox.alert("Success", jsonData.msg, function () {
+                                    Ext.getCmp("win-msg-cancel-pr").destroy();
+                                    Ext.getCmp("tabpanel1").getStore().reload();
+                                    Ext.getCmp("winMain").destroy();
+                                  });
+                                } else {
+                                  Ext.MessageBox.alert("Failed", jsonData.msg);
+                                }
+                              },
+                              failure: function (result) {
+                                Ext.MessageBox.alert("Failed", result.responseText);
+                              },
+                            });
+                          },
+                        },
+                        {
+                          text: Ext.GLOBAL_BU_BACK_TH,
+                          handler: function () {
+                            Ext.getCmp("win-msg-cancel-pr").hide();
+                            Ext.getCmp("win-msg-cancel-pr").destroy();
+                          },
+                        },
+                      ],
+                    }).show();
+                  },
+                },
+                {
                   text: Ext.GLOBAL_BU_BACK_TH,
                   handler: function () {
                     Ext.getCmp("winMain").hide();
