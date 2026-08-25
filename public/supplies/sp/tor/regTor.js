@@ -1118,6 +1118,7 @@ Ext.AppUx = function (app, menu) {
       var winApp = AppPoStore(statusx);
       Ext.getCmp("winChequeID").items.items[0].getForm().loadRecord(Ext.selectRow);
       winApp.show();
+      syncBgYearType(Ext.selectRow.get("i_yyyy"));
       // ส่งรายการแล้วจะอัพเดทไม่ได้
       if (Ext.selectRow.get("tor_status_id") > 0) {
         Ext.getCmp("updateBuID").hide();
@@ -1165,6 +1166,35 @@ Ext.AppUx = function (app, menu) {
       });
     }
   };
+
+  function syncBgYearType(selectedYear) {
+    var grp = Ext.getCmp("i_type_yearID");
+    var mm = Ext.getCmp("mm_ID");
+    if (!grp) {
+      return;
+    }
+    var yr = selectedYear - 0;
+    if (yr != Ext.bgYear) {
+      grp.show();
+      if (yr < Ext.bgYear) {
+        grp.setValue(2);
+        if (mm) {
+          mm.show();
+        }
+      } else {
+        grp.setValue(1);
+        if (mm) {
+          mm.hide();
+        }
+      }
+    } else {
+      grp.hide();
+      grp.setValue(1);
+      if (mm) {
+        mm.hide();
+      }
+    }
+  }
 
   var AppPoStore = function (statuss) {
     var comboCost = new Ext.form.ComboBox({
@@ -1317,6 +1347,7 @@ Ext.AppUx = function (app, menu) {
           // Ext.getCmp("mm_end").bindStore(Ext.store_month);
           Ext.getCmp("mm_startID").setValue(Ext.getCmp("mm_startID").getValue());
           // Ext.getCmp("mm_end").setValue(Ext.getCmp("mm_end").getValue());
+          syncBgYearType(Ext.getCmp("i_yearID").getValue());
         },
       },
     });
@@ -1714,7 +1745,7 @@ Ext.AppUx = function (app, menu) {
                                     // if (Ext.dc_sub_cost.totalLength > 1  ) {
                                     //   Ext.getCmp("dc_sub_costidID").setValue(0);
                                     // } else
-                                    if (Ext.selectRow.data.dc_sub_cost_id > 0) {
+                                    if (Ext.selectRow && Ext.selectRow.data.dc_sub_cost_id > 0) {
                                     } else {
                                       Ext.getCmp("dc_sub_costidID").setValue(0);
                                     }
