@@ -2979,7 +2979,7 @@ Ext.AppUx = function (app, menu) {
           border: false,
           listeners: {
             beforerender: function () {
-              // console.log(Ext.selectRow);
+              // console.log(Ext.selectRow); //พี่อ้อ
             },
           },
           items: [

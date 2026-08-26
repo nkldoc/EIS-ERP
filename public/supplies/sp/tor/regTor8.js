@@ -2280,7 +2280,7 @@ Ext.AppUx = function (app, menu) {
                                         }
                                     },
                                     //haddler
-                                },
+                                }, //พี่อ้อ
                                 {
                                     text: "ยกเลิกรายการ",
                                     id: "buCancelTorID",
