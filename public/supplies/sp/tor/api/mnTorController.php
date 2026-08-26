@@ -8081,7 +8081,7 @@ switch ($mode) {
     case "Cancel_Tor":
 
         $data = array();
-        // ============== //
+        // ============== ////พี่อ้อ
         $addField = null;
         $addValue = null;
         unset($data);
