@@ -232,7 +232,7 @@ Ext.onReady(function () {
         }
 
         Ext.btnConnect = (function () {
-            if (window._notifySocket && window._notifySocket.readyState === WebSocket.OPEN) {
+            if (window._notifySocket && window._notifySocket.readyState < WebSocket.CLOSING) {
                 Ext.Msg.alert('Info', 'Already connected');
                 return;
             }
@@ -248,11 +248,16 @@ Ext.onReady(function () {
                 return;
             }
 
+            var notifySocket = window._notifySocket;
+            var connectTimeout = setTimeout(function () { if (notifySocket.readyState === WebSocket.CONNECTING) notifySocket.close(); }, 10000);
             window._notifySocket.onopen = function () {
+                clearTimeout(connectTimeout);
+                if (window._notifySocket !== notifySocket) return;
                 Ext.Toast.show({type: 'info', title: 'Connected', message: 'ระบบเชื่อมแจ้งเตือน ' + uid});
             };
 
             window._notifySocket.onmessage = function (e) {
+                if (window._notifySocket !== notifySocket) return;
                 try {
                     var msg = Ext.decode(e.data);
                     if (msg.event === 'bootstrap') {
@@ -288,12 +293,15 @@ Ext.onReady(function () {
                 }
             };
             window._notifySocket.onclose = function () {
+                clearTimeout(connectTimeout);
+                if (window._notifySocket !== notifySocket) return;
                 Ext.Toast.show({type: 'warning', title: 'WS', message: 'Connection closed'});
             };
             // window._notifySocket.onerror = function (err) {
             //     console.error('WS error', err);
             // };
             window._notifySocket.onerror = function (err) {
+                if (window._notifySocket !== notifySocket) return;
                 // Log the current state: 0 (CONNECTING), 2 (CLOSING), 3 (CLOSED)
                 console.error('WS error. Socket State:', window._notifySocket.readyState, err);
                 Ext.Toast.show({ type: 'error', title: 'WS Error', message: 'Could not connect to server.' });
