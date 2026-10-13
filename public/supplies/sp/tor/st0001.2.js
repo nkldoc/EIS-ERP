@@ -20,9 +20,14 @@ function purchaseIA2(id, bg_reserve_money_id, ii) {
   };
   var planStatusCmp = Ext.getCmp("plan_statusID");
   var planCodeCmp = Ext.getCmp("plan_codeID");
+  var planSeqCmp = Ext.getCmp("plan_seqID");
   if (planStatusCmp) {
     params.plan_status = planStatusCmp.getValue().inputValue;
     params.plan_code = planCodeCmp ? planCodeCmp.getValue() : "";
+    params.plan_seq = planSeqCmp ? planSeqCmp.getValue() : "";
+  }
+  if (Ext.getCmp("c_remakeID")) {
+    params.c_remake = Ext.getCmp("c_remakeID").getValue();
   }
   Ext.Ajax.request({
     url: "tor/api/mnTorController.php",
@@ -498,7 +503,7 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
     id: 'plan_statusID',
     columns: 1, // หรือใส่เป็นจำนวนคอลัมน์ที่ต้องการจัดเรียง
     items: [
-        { boxLabel: 'ยังไม่ระบุ', name: 'plan_status', inputValue: 0, checked: Ext.selectRow.get('plan_status') ? false : true },
+        { boxLabel: 'ไม่ระบุ', name: 'plan_status', inputValue: 0, checked: Ext.selectRow.get('plan_status') ? false : true },
         { boxLabel: 'ตามแผน (1)', name: 'plan_status', inputValue: 1, checked: Ext.selectRow.get('plan_status') == 1 },
         { boxLabel: 'นอกแผน (2)', name: 'plan_status', inputValue: 2, checked: Ext.selectRow.get('plan_status') == 2 }
     ],
@@ -506,17 +511,32 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
         afterrender: function () {
             var v = Ext.selectRow.get('plan_status');
             Ext.getCmp('plan_codeID').setVisible(v == 1);
+            if (Ext.getCmp('plan_seqID')) Ext.getCmp('plan_seqID').setVisible(v == 1);
         },
         change: function (grp, radio) {
-            if (radio.inputValue == 1) {
-                Ext.getCmp('plan_codeID').show();
-            } else {
-                Ext.getCmp('plan_codeID').hide();
-                Ext.getCmp('plan_codeID').setValue('');
-                Ext.getCmp('plan_codeID').clearInvalid();
-            }
+            var on = radio.inputValue == 1;
+            ['plan_codeID', 'plan_seqID'].forEach(function (id) {
+                var c = Ext.getCmp(id);
+                if (!c) return;
+                if (on) {
+                    c.show();
+                } else {
+                    c.hide();
+                    c.setValue('');
+                    c.clearInvalid();
+                }
+            });
         },
     },
+},
+{
+    xtype: 'textfield',
+    fieldLabel: 'ลำดับที่',
+    name: 'plan_seq',
+    id: 'plan_seqID',
+    anchor: '80%',
+    value: Ext.selectRow.get('plan_seq') || '',
+    hidden: Ext.selectRow.get('plan_status') != 1,
 },
 {
     xtype: 'textfield',
@@ -526,8 +546,6 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
     anchor: '80%',
     value: Ext.selectRow.get('plan_code') || '',
     hidden: Ext.selectRow.get('plan_status') != 1,
-    allowBlank: false,
-    blankText: 'กรุณากรอกรหัสแผน',
 },
 {
     xtype: 'textarea',
@@ -712,6 +730,9 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
                 if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
                   msg += "- กรุณากรอกรหัสแผน" + "\n";
                 }
+                if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && Ext.getCmp("plan_seqID") && [null, 0, ""].includes(Ext.getCmp("plan_seqID").getValue())) {
+                  msg += "- กรุณากรอกลำดับที่" + "\n";
+                }
                 if ([null, 0, ""].includes(Ext.getCmp("po_expense_hdr_idIAID").getValue())) {
                   msg += "- กรุณาเลือกหมวดค่าใช้จ่าย" + "\n";
                 }
@@ -789,7 +810,14 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
                 }
               },
             },
-            // },
+            {
+              xtype: "button",
+              text: "ยกเลิกจองเงิน 1",
+              id: "buttonCancelIA1",
+              iconCls: "icon-clear",
+              hidden: !(Ext.selectRow.get("bg_reserve_money1_id") > 0 || (Ext.selectRow.json && Ext.selectRow.json.bg_reserve_money1_id > 0)),
+              handler: function () { cancelBookingPr(1); },
+            },
           ],
         },
       ],
@@ -913,6 +941,9 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
                 if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
                   msg += "- กรุณากรอกรหัสแผน" + "\n";
                 }
+                if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && Ext.getCmp("plan_seqID") && [null, 0, ""].includes(Ext.getCmp("plan_seqID").getValue())) {
+                  msg += "- กรุณากรอกลำดับที่" + "\n";
+                }
                 if (Ext.getCmp("i_pr_typeIA2ID").getValue() == null) {
                   msg += "- เลือกประเภทการจองก่อนกดปุ่ม" + "\n";
                 }
@@ -937,6 +968,14 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
                   genBooklinkIA(Ext.getCmp("f_type_amtIAID2").getValue(), 2);
                 }
               },
+            },
+            {
+              xtype: "button",
+              text: "ยกเลิกจองเงิน 2",
+              id: "buttonCancelIA2",
+              iconCls: "icon-clear",
+              hidden: !(Ext.selectRow.get("bg_reserve_money2_id") > 0 || (Ext.selectRow.json && Ext.selectRow.json.bg_reserve_money2_id > 0)),
+              handler: function () { cancelBookingPr(2); },
             },
           ],
         },
@@ -1058,6 +1097,9 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
                 if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
                   msg += "- กรุณากรอกรหัสแผน" + "\n";
                 }
+                if (Ext.getCmp("plan_statusID").getValue().inputValue == 1 && Ext.getCmp("plan_seqID") && [null, 0, ""].includes(Ext.getCmp("plan_seqID").getValue())) {
+                  msg += "- กรุณากรอกลำดับที่" + "\n";
+                }
                 if (Ext.getCmp("i_pr_typeIA3ID").getValue() == null) {
                   msg += "- เลือกประเภทการจองก่อนกดปุ่ม" + "\n";
                 }
@@ -1080,6 +1122,14 @@ Ext.getBodyMultiBudgetIA = function (rec, status) {
                   genBooklinkIA(Ext.getCmp("f_type_amtIAID3").getValue(), 3);
                 }
               },
+            },
+            {
+              xtype: "button",
+              text: "ยกเลิกจองเงิน 3",
+              id: "buttonCancelIA3",
+              iconCls: "icon-clear",
+              hidden: !(Ext.selectRow.get("bg_reserve_money3_id") > 0 || (Ext.selectRow.json && Ext.selectRow.json.bg_reserve_money3_id > 0)),
+              handler: function () { cancelBookingPr(3); },
             },
           ],
         },
@@ -2600,6 +2650,9 @@ Ext.AppUx = function (app, menu) {
       {
         name: "plan_code",
       },
+      {
+        name: "plan_seq",
+      },
     ],
   });
   Ext.store_year = new Ext.data.JsonStore({
@@ -3217,23 +3270,15 @@ Ext.AppUx = function (app, menu) {
                 afterrender: function () {
                   Ext.getCmp('winMain').getEl().mask("Please wait...", "x-mask-loading");
                   Ext.sleep(1000).then(() => {
-                    if(Ext.selectRow.json.sp_type_value  == 12    ){ 
-                    //   Ext.getCmp("buttongroup1").hide();
-                    //   Ext.getCmp("buttongroup2").hide();
-                    //   Ext.getCmp("buttongroup3").hide();
-                    //   Ext.getCmp("i_pr_typeIA1ID").hide();
-                    //   Ext.getCmp("i_pr_typeIA2ID").hide();
-                    //   Ext.getCmp("i_pr_typeIA3ID").hide();
-                    // } else {
-                      Ext.getCmp("buttongroupIA1").show();
-                      Ext.getCmp("buttongroupIA2").show();
-                      // Ext.getCmp("buttongroup3").show();
-                        // Ext.getCmp("button1").show();
-                      Ext.getCmp("i_pr_typeIA1ID").show();
-                      Ext.getCmp("i_pr_typeIA2ID").show();
-                      Ext.getCmp("i_pr_typeIA3ID").show();
-                    }
-                    Ext.getCmp('winMain').getEl().unmask(); 
+                    // แสดง "ขอดำเนินการ" (จองแบบแผน/จองแบบงวด) + ปุ่มจองเงิน สำหรับทุกประเภท PR
+                    // (รวม PR ที่จองเงินไปแล้ว - ปุ่มจะ disabled เองถ้าจองแล้ว)
+                    Ext.getCmp("buttongroupIA1").show();
+                    Ext.getCmp("buttongroupIA2").show();
+                    Ext.getCmp("buttongroupIA3").show();
+                    Ext.getCmp("i_pr_typeIA1ID").show();
+                    Ext.getCmp("i_pr_typeIA2ID").show();
+                    Ext.getCmp("i_pr_typeIA3ID").show();
+                    Ext.getCmp('winMain').getEl().unmask();
                 });
                   //
                   // Ext.getCmp('dc_expense_budget_type_hdr_id').getStore().reload({
@@ -3312,11 +3357,10 @@ Ext.AppUx = function (app, menu) {
                           submitValue: true,
                           hiddenName: "i_type_bg",
                           name: "i_type_c_name_bg",
-                          id: "i_type_bgID", 
+                          id: "i_type_bgID",
                           valueField: "id",
                           displayField: "c_name",
                           triggerAction: "all",
-                          readOnly: true, //Ext.selectRow.json.bg_reserve_money1_id > 0  ? true : false,
                           forceSelection: true,
                           selectOnFocus: true,
                           typeAhead: false,
@@ -3333,29 +3377,27 @@ Ext.AppUx = function (app, menu) {
                               this.fn = function () {
                                 value = this.getValue() ;
                                 console.log(value);
-                                if (value == 4 || value == 2 || value ==  8 || value == 11) {
-                                  // Ext.getCmp("button1").hide();
-                                  Ext.getCmp("buttongroup1").hide();
-                                  Ext.getCmp("buttongroup2").hide();
-                                  Ext.getCmp("buttongroup3").hide();
-                                  Ext.getCmp("i_pr_typeIA1ID").hide();
-                                  Ext.getCmp("i_pr_typeIA2ID").hide();
-                                  Ext.getCmp("i_pr_typeIA3ID").hide();
-                                  // setDisabled_buttonIA(1, 1);
-                                } else {
-                                  Ext.getCmp("buttongroup1").show();
-                                  Ext.getCmp("buttongroup2").show();
-                                  Ext.getCmp("buttongroup3").show();
-                                    // Ext.getCmp("button1").show();
-                                  Ext.getCmp("i_pr_typeIA1ID").show();
-                                  Ext.getCmp("i_pr_typeIA2ID").show();
-                                  Ext.getCmp("i_pr_typeIA3ID").show();
-                                    // Ext.getCmp("button1").show();
-                                }
+                                // แสดง "ขอดำเนินการ" (จองแบบแผน/จองแบบงวด) + ปุ่มจองเงิน สำหรับทุกประเภท PR
+                                Ext.getCmp("buttongroupIA1").show();
+                                Ext.getCmp("buttongroupIA2").show();
+                                Ext.getCmp("buttongroupIA3").show();
+                                Ext.getCmp("i_pr_typeIA1ID").show();
+                                Ext.getCmp("i_pr_typeIA2ID").show();
+                                Ext.getCmp("i_pr_typeIA3ID").show();
                               };
                             },
-                            // selectRow 
+                            // selectRow
                             Change: function () {
+                              // ถ้า PR นี้จองเงินไว้แล้ว ห้ามเปลี่ยนประเภท PR จนกว่าจะกด "ยกเลิกจองเงิน" ก่อน
+                              var booked =
+                                (Ext.selectRow.get("bg_reserve_money1_id") > 0 || Ext.selectRow.json.bg_reserve_money1_id > 0) ||
+                                (Ext.selectRow.get("bg_reserve_money2_id") > 0 || Ext.selectRow.json.bg_reserve_money2_id > 0) ||
+                                (Ext.selectRow.get("bg_reserve_money3_id") > 0 || Ext.selectRow.json.bg_reserve_money3_id > 0);
+                              if (booked) {
+                                Ext.Msg.alert("แจ้งเตือน", "PR นี้จองเงินไว้แล้ว กรุณากด \"ยกเลิกจองเงิน\" ก่อนเปลี่ยนประเภท PR");
+                                this.setValue(Ext.selectRow.get("i_type_bg") || Ext.selectRow.json.i_type_bg);
+                                return;
+                              }
                               this.fn();
                             },
                             beforequery: function (q) {
@@ -3594,6 +3636,9 @@ Ext.AppUx = function (app, menu) {
                     if (Ext.getCmp("plan_statusID") && Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
                       msg += "- กรุณากรอกรหัสแผน" + "\n";
                     }
+                    if (Ext.getCmp("plan_statusID") && Ext.getCmp("plan_statusID").getValue().inputValue == 1 && Ext.getCmp("plan_seqID") && [null, 0, ""].includes(Ext.getCmp("plan_seqID").getValue())) {
+                      msg += "- กรุณากรอกลำดับที่" + "\n";
+                    }
                     if ([1, 2].includes(Ext.getCmp("i_is_registerID").getValue().inputValue)) {
                       if (Ext.getCmp("dc_expense_budget_type_hdr_idIA1").getValue() == null) {
                         msg += "- กรุณาเลือกแหล่งเงินจ่ายก่อนบันทึก" + "\n";
@@ -3671,30 +3716,61 @@ Ext.AppUx = function (app, menu) {
 
                       var form = Ext.getCmp(Ext.poFormID).getForm();
                       if (form.isValid()) {
-                        // if (Ext.getCmp("modesubID2").getValue().inputValue === "VIEW") {
-                        // } else if (Ext.getCmp("modesubID2").getValue().inputValue === "DELETE") {
-                        //     Ext.MessageBox.show({
-                        //         title: "Icon Support",
-                        //         msg: "คุณต้องการที่จะลบ รายการที่เลือกนี้ใช่ใหม ?",
-                        //         buttons: Ext.MessageBox.OKCANCEL,
-                        //         icon: Ext.MessageBox.WARNING,
-                        //         fn: function (btn) {
-                        //             if (btn === "ok") {
-                        //                 formSubmit(form);
-                        //             } else {
-                        //                 return;
-                        //             }
-                        //         },
-                        //     });
-                        // } else {
-                        formSubmit(form);
-                        // }
+                        // กันลืมเลือกประเภท PR: ถ้าปีงบประมาณที่เลือกล่วงหน้ากว่าปีงบปัจจุบัน แต่ประเภท PR ไม่ใช่ "PRก่อนปีงบประมาณ" (12) ให้เตือน
+                        var __warn = false, __yy = 0;
+                        try {
+                          var __ycmp = Ext.getCmp("i_yyyyID");
+                          __yy = parseInt((__ycmp && __ycmp.getValue()) || (Ext.selectRow && Ext.selectRow.get && Ext.selectRow.get("i_yyyy")) || 0, 10);
+                          var __itbCmp = Ext.getCmp("i_type_bgID");
+                          var __itb = __itbCmp ? __itbCmp.getValue() : null;
+                          var __base = (typeof Ext.bgYear === "number" && Ext.bgYear > 0) ? Ext.bgYear : new Date().getFullYear();
+                          // console.log("[chkTypeBg] i_yyyy=", __yy, " base=", __base, " i_type_bg=", __itb);
+                          __warn = (__yy > 0 && __yy > __base && String(__itb) !== "12");
+                        } catch (e) { __warn = false; }
+                        if (__warn) {
+                          Ext.Msg.show({
+                            title: "ยืนยันประเภท PR",
+                            msg: "ปีงบประมาณที่เลือก (" + (__yy + 543) + ") ยังไม่เปิด<br>ประเภท PR ควรเป็น <b>\"PRก่อนปีงบประมาณ\"</b><br><br>ตั้งเป็น PRก่อนปีงบประมาณ ให้เลยไหม?",
+                            buttons: Ext.Msg.YESNOCANCEL,
+                            buttonText: { yes: "ใช่ ตั้งให้แล้วบันทึก", no: "ไม่ บันทึกตามที่เลือก", cancel: "ยกเลิก" },
+                            fn: function (btn) {
+                              if (btn === "yes") {
+                                var c = Ext.getCmp("i_type_bgID");
+                                if (c) { c.setValue(12); if (typeof c.fn === "function") c.fn(); }
+                                formSubmit(form);
+                              } else if (btn === "no") {
+                                formSubmit(form);
+                              }
+                            },
+                          });
+                        } else {
+                          formSubmit(form);
+                        }
+                      } else {
+                        Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกข้อมูลให้ครบก่อนบันทึก");
                       }
                     } else {
                       Ext.Msg.alert("แจ้งเตือน", msg);
                     }
                   },
                 }, //haddler
+                {
+                  text: "ถอยรายการไปหน้าจัดทำ PR",
+                  iconCls: "icon-arrow_undo",
+                  handler: function () {
+                    // ต้องยกเลิกจองเงินให้ครบก่อน ถึงจะถอยกลับไปหน้าจัดทำ PR ได้
+                    var booked =
+                      (Ext.selectRow.get("bg_reserve_money1_id") > 0 || (Ext.selectRow.json && Ext.selectRow.json.bg_reserve_money1_id > 0)) ||
+                      (Ext.selectRow.get("bg_reserve_money2_id") > 0 || (Ext.selectRow.json && Ext.selectRow.json.bg_reserve_money2_id > 0)) ||
+                      (Ext.selectRow.get("bg_reserve_money3_id") > 0 || (Ext.selectRow.json && Ext.selectRow.json.bg_reserve_money3_id > 0));
+                    if (booked) {
+                      Ext.Msg.alert("แจ้งเตือน", "กรุณากด \"ยกเลิกจองเงิน\" ให้ครบทุกแหล่งก่อน แล้วจึงถอยรายการ");
+                      return;
+                    }
+                    // เปิดหน้าต่างบังคับกรอกเหตุผล แล้วยิง REVERSE_TO_NEWTOR (helper อยู่ใน torUi.js)
+                    reverseToNewTor(Ext.selectRow);
+                  },
+                },
                 {
                   text: Ext.GLOBAL_BU_BACK_TH,
                   handler: function () {
@@ -3863,14 +3939,21 @@ Ext.AppUx = function (app, menu) {
               handler: function () {
                 //Ext.getCmp('winSearchFrm').search();
                 //   console.log(Ext.session.i_level)
+                // combo "วิธีดำเนินงาน" เก็บค่าเป็นข้อความ (c_name) ไม่ใช่ id -> ส่งเฉพาะที่เป็นตัวเลข ไม่งั้นให้ 0
+                var torTypeVal = Ext.getCmp("stor_type_idID").getValue();
+                var torTypeId = /^\d+$/.test(String(torTypeVal)) ? torTypeVal : 0;
+                // ไม่เลือกพนักงาน -> ส่ง 0 (กัน SQL พังบน PHP 8 ที่ "" != 0 เป็น true)
+                var spEmpVal = Ext.getCmp("sp_emp_idID").getValue();
+                var spEmpId = /^\d+$/.test(String(spEmpVal)) ? spEmpVal : 0;
+
                 Ext.storeDtl.setBaseParam("mode", "LIST");
                 Ext.storeDtl.setBaseParam("act", "SEARCH");
                 Ext.storeDtl.setBaseParam("d_tor_date", Ext.getCmp("sd_tor_dateID").getValue());
-                Ext.storeDtl.setBaseParam("tor_type_id", Ext.getCmp("stor_type_idID").getValue());
+                Ext.storeDtl.setBaseParam("tor_type_id", torTypeId);
 
                 Ext.storeDtl.setBaseParam("c_code", Ext.getCmp("sc_codeID").getValue());
                 Ext.storeDtl.setBaseParam("c_name", Ext.getCmp("sc_nameID").getValue());
-                Ext.storeDtl.setBaseParam("sp_emp_id", Ext.getCmp("sp_emp_idID").getValue());
+                Ext.storeDtl.setBaseParam("sp_emp_id", spEmpId);
                 Ext.storeDtl.setBaseParam("i_enabled", 1); // Ext.getCmp("searchEnabledID").getValue().inputValue);
                 Ext.storeDtl.setBaseParam("i_post", Ext.getCmp("searchPostID").getValue().inputValue);
                 // Ext.storeDtl.setBaseParam("sp_emp_id", Ext.getCmp("sp_emp_idID").getValue().inputValue);

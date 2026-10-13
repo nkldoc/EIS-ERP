@@ -13,13 +13,7 @@ $con = null;
 
 function List_QueryParam()
 {
-	if( $_REQUEST["i_year"] > 2024  ){
-		$DBNAME =  DB_NMU_EIS;
-	} else {
-		$DBNAME =  DB_NMU;
-	}
-	$DBNAME_ERP =  "NMU_ERP..";
-	$DBNAME_ERP_EIS =  "EIS_PROCURE..";
+	$DBNAME =  "NMU_EIS..";
 	global $db, $date, $root, $data, $con, $arr_status;
 
 	$con_1 = null;
@@ -72,7 +66,7 @@ function List_QueryParam()
 					$in .= ($in == "") ? $val : ", " . $val;
 				}
 				$con .= ($in != "") ? " AND cc.bg_expense_lv3_id IN (" . $in . ")" : "";
-				$con_1 = ($in != "") ? " AND cc.bg_expense_lv{$Income_Lv}_id IN (SELECT a.bg_expense_lv{$Income_Lv}_id FROM #temp_vw_bg_expense_with_parent a WHERE a.bg_expense_lv3_id IN (" . $in . "))" : "";
+				$con_1 = ($in != "") ? " AND cc.bg_expense_lv{$Income_Lv}_id IN (SELECT a.bg_expense_lv{$Income_Lv}_id FROM {$DBNAME} vw_bg_expense_with_parent a WHERE a.bg_expense_lv3_id IN (" . $in . "))" : "";
 			}
 		}
 	} else {
@@ -84,7 +78,7 @@ function List_QueryParam()
 					$in .= ($in == "") ? $val : ", " . $val;
 				}
 				$con .= ($in != "") ? " AND cc.bg_expense_lv4_id IN (" . $in . ")" : "";
-				$con_1 = ($in != "") ? " AND cc.bg_expense_lv{$Income_Lv}_id IN (SELECT a.bg_expense_lv{$Income_Lv}_id FROM #temp_vw_bg_expense_with_parent a WHERE a.bg_expense_lv4_id IN (" . $in . "))" : "";
+				$con_1 = ($in != "") ? " AND cc.bg_expense_lv{$Income_Lv}_id IN (SELECT a.bg_expense_lv{$Income_Lv}_id FROM {$DBNAME} vw_bg_expense_with_parent a WHERE a.bg_expense_lv4_id IN (" . $in . "))" : "";
 			}
 		}
 	}
@@ -92,7 +86,6 @@ function List_QueryParam()
 	$sqlMain = "
 		SET NOCOUNT ON
 		DECLARE @i_year AS numeric = {$_REQUEST["i_year"]};
-		select * into #temp_vw_bg_expense_with_parent from {$DBNAME}vw_bg_expense_with_parent
 
 		/* งบประมาณตามบัญชีจัดสรร */
 		SELECT
@@ -102,7 +95,7 @@ function List_QueryParam()
 		INTO #tempBudget
 		FROM {$DBNAME}bg_budget_hdr_plan aa
 			INNER JOIN {$DBNAME}bg_budget_dtl_plan bb ON aa.bg_budget_hdr_plan_id = bb.bg_budget_hdr_plan_id
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME}vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE aa.i_enable = 1
 			AND aa.i_year = @i_year
 			AND bb.f_total != 0
@@ -115,9 +108,9 @@ function List_QueryParam()
 		isnull(aa.po_expense_id,0) as po_expense_id
 		,SUM(ISNULL(aa.f_total_amt, 0)) AS f_total_erp
 		INTO #tempBudget_period_bg
-	from {$DBNAME_ERP}sp_tor  aa
-	RIGHT  join {$DBNAME_ERP}sp_tor_item bb on aa.tor_id = bb.tor_id
-	INNER JOIN #temp_vw_bg_expense_with_parent cc ON aa.po_expense_id = cc.bg_expense_lv4_id
+	from NMU_ERP.dbo.sp_tor  aa
+	RIGHT  join NMU_ERP.dbo.sp_tor_item bb on aa.tor_id = bb.tor_id
+	INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON aa.po_expense_id = cc.bg_expense_lv4_id
 	where aa.i_period_bg = 1 
 		and aa.bg_reserve_money1_id is null 
 		and bb.sp_status_hdr_id= 13 
@@ -133,8 +126,8 @@ function List_QueryParam()
 	from vw_sp_budget_type3 a
 	left join dbo.sp_tor aa on aa.tor_id=a.tor_id
 	left join dbo.sp_tor_dtl f on f.sp_tor_id=aa.tor_id 
-	right join {$DBNAME_ERP}sp_tor_item bb on aa.tor_id = bb.tor_id
-	INNER JOIN #temp_vw_bg_expense_with_parent cc ON aa.po_expense_id = cc.bg_expense_lv4_id
+	right join NMU_ERP.dbo.sp_tor_item bb on aa.tor_id = bb.tor_id
+	INNER JOIN NMU_EIS.dbo.vw_bg_expense_with_parent cc ON aa.po_expense_id = cc.bg_expense_lv4_id
 	where aa.i_period_bg = 1 
 		and aa.bg_reserve_money1_id is null 
 		and bb.sp_status_hdr_id= 13 
@@ -152,8 +145,8 @@ function List_QueryParam()
 	isnull(aa.bg_expense_id,0) as po_expense_id
 		,SUM(ISNULL(aa.f_amt, 0)) AS f_total_pr_type1
 		INTO #tempBudget_sum_pr_type1
-	from {$DBNAME} bg_reserve_money aa
-	INNER JOIN #temp_vw_bg_expense_with_parent cc ON aa.bg_expense_id = cc.bg_expense_lv4_id
+	from NMU_EIS..bg_reserve_money aa
+	INNER JOIN NMU_EIS.. vw_bg_expense_with_parent cc ON aa.bg_expense_id = cc.bg_expense_lv4_id
 	where aa.i_reserve =  1 and aa.i_enable = 1   and i_pr_type = 1 
 	and aa.i_year =  @i_year --  and dc_budget_type_id = 4  and 
 	{$con} {$budget3}
@@ -165,8 +158,8 @@ function List_QueryParam()
 	isnull(aa.bg_expense_id,0) as po_expense_id
 		,SUM(ISNULL(aa.f_amt, 0)) AS f_total_pr_type2
 		INTO #tempBudget_sum_pr_type2
-	from {$DBNAME}bg_reserve_money aa
-	INNER JOIN #temp_vw_bg_expense_with_parent cc ON aa.bg_expense_id = cc.bg_expense_lv4_id
+	from NMU_EIS..bg_reserve_money aa
+	INNER JOIN NMU_EIS.. vw_bg_expense_with_parent cc ON aa.bg_expense_id = cc.bg_expense_lv4_id
 	where aa.i_reserve =  1 and aa.i_enable = 1   and i_pr_type = 2 
 	and aa.i_year =  @i_year --  and dc_budget_type_id = 4  and 
 	{$con} {$budget3}
@@ -178,8 +171,8 @@ function List_QueryParam()
 		isnull(aa.bg_expense_id,0) as po_expense_id
 			,SUM(ISNULL(aa.f_amt, 0)) AS f_total_rev
 			INTO #tempBudget_sum_reserve1
-		from {$DBNAME}bg_reserve_money aa
-        INNER JOIN #temp_vw_bg_expense_with_parent cc ON aa.bg_expense_id = cc.bg_expense_lv4_id
+		from NMU_EIS..bg_reserve_money aa
+        INNER JOIN NMU_EIS.. vw_bg_expense_with_parent cc ON aa.bg_expense_id = cc.bg_expense_lv4_id
 		where aa.i_reserve =  1 and aa.i_enable = 1  
 		and aa.i_year =  @i_year --  and dc_budget_type_id = 4  and 
 		{$con} {$budget3}
@@ -193,7 +186,7 @@ function List_QueryParam()
 			INTO #tempDiscount
 		FROM {$DBNAME} bg_budget_hdr_change aa
 			INNER JOIN {$DBNAME} bg_budget_dtl_change bb ON aa.bg_budget_hdr_change_id = bb.bg_budget_hdr_change_id and ISNULL(bb.i_extenal,0) != 1
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE aa.i_enable = 1 
 			AND aa.i_year = @i_year 
 			AND i_type = 1
@@ -207,7 +200,7 @@ function List_QueryParam()
 			INTO #tempExtra
 		FROM {$DBNAME} bg_budget_hdr_change aa
 			INNER JOIN {$DBNAME} bg_budget_dtl_change bb ON aa.bg_budget_hdr_change_id = bb.bg_budget_hdr_change_id and ISNULL(bb.i_extenal,0) != 1
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE aa.i_enable = 1 
 			AND aa.i_year = @i_year  
 			AND i_type = 2	
@@ -243,7 +236,7 @@ function List_QueryParam()
 				,-SUM(ISNULL(bb.f_total, 0)) AS f_total
 			FROM {$DBNAME} bg_budget_hdr_transfer aa
 				INNER JOIN {$DBNAME} bg_budget_dtl_transfer bb ON aa.bg_budget_hdr_transfer_id = bb.bg_budget_hdr_transfer_id
-				INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_begin_id = cc.bg_expense_lv4_id
+				INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_begin_id = cc.bg_expense_lv4_id
 			WHERE aa.i_enable = 1 AND aa.i_transfer = 1
 				AND aa.i_year = @i_year
 				AND bb.f_total != 0
@@ -255,7 +248,7 @@ function List_QueryParam()
 				,SUM(ISNULL(bb.f_total, 0)) AS f_total
 			FROM {$DBNAME} bg_budget_hdr_transfer aa
 				INNER JOIN {$DBNAME} bg_budget_dtl_transfer bb ON aa.bg_budget_hdr_transfer_id = bb.bg_budget_hdr_transfer_id
-				INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_end_id = cc.bg_expense_lv4_id
+				INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_end_id = cc.bg_expense_lv4_id
 			WHERE aa.i_enable = 1 AND aa.i_transfer = 1
 				AND aa.i_year = @i_year
 				AND bb.f_total != 0
@@ -271,7 +264,7 @@ function List_QueryParam()
 		INTO #tempBudgetLong
 		FROM bg_budget_hdr_long aa
 			INNER JOIN bg_budget_dtl_long bb ON aa.bg_budget_hdr_long_id = bb.bg_budget_hdr_long_id
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN dbo.vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE aa.i_enable = 1
 			AND @i_year BETWEEN aa.i_year_start AND aa.i_year_end
 			--AND aa.i_year = @i_year
@@ -290,7 +283,7 @@ function List_QueryParam()
 				,ISNULL(bb.f_total, 0) AS f_total
 			FROM {$DBNAME} bg_budget_hdr aa
 				INNER JOIN {$DBNAME} bg_budget_dtl bb ON aa.bg_budget_hdr_id = bb.bg_budget_hdr_id
-				INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id_lv4 = cc.bg_expense_lv4_id
+				INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id_lv4 = cc.bg_expense_lv4_id
 			WHERE aa.i_enable = 1 
 				AND aa.i_year = @i_year
 				--AND bb.f_total != 0
@@ -307,7 +300,7 @@ function List_QueryParam()
 			INTO #tempDiscount_period
 		FROM {$DBNAME} bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_period") . "_change aa
 			INNER JOIN {$DBNAME} bg_budget_dtl" . ($_REQUEST["i_year"] >= 2024 ? "" : "_period") . "_change bb ON aa.bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_period") . "_change_id = bb.bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_period") . "_change_id and ISNULL(bb.i_extenal,0) != 1
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE aa.i_enable = 1 
 			AND aa.i_year = @i_year
 			AND i_type = 1	 
@@ -320,7 +313,7 @@ function List_QueryParam()
 			INTO #tempExtra_period
 			FROM {$DBNAME} bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_period") . "_change aa
 			INNER JOIN {$DBNAME} bg_budget_dtl" . ($_REQUEST["i_year"] >= 2024 ? "" : "_period") . "_change bb ON aa.bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_period") . "_change_id = bb.bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_period") . "_change_id and ISNULL(bb.i_extenal,0) != 1
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE aa.i_enable = 1 
 			AND aa.i_year = @i_year
 			AND i_type = 2
@@ -356,7 +349,7 @@ function List_QueryParam()
 				,ISNULL(bb.f_total, 0) AS f_total
 			FROM {$DBNAME} bg_budget_hdr_income aa
 				INNER JOIN {$DBNAME} bg_budget_dtl_income bb ON aa.bg_budget_hdr_income_id = bb.bg_budget_hdr_income_id
-				INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id_lv4 = cc.bg_expense_lv4_id
+				INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id_lv4 = cc.bg_expense_lv4_id
 			WHERE aa.i_enable = 1 
 				AND aa.i_year = @i_year
 				--AND bb.f_total != 0
@@ -376,7 +369,7 @@ function List_QueryParam()
 				,-SUM(ISNULL(bb.f_total, 0)) AS f_total
 			FROM {$DBNAME} bg_budget_hdr_transfer aa
 				INNER JOIN {$DBNAME} bg_budget_dtl_transfer bb ON aa.bg_budget_hdr_transfer_id = bb.bg_budget_hdr_transfer_id
-				INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_begin_id = cc.bg_expense_lv4_id
+				INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_begin_id = cc.bg_expense_lv4_id
 			WHERE aa.i_enable = 1 AND aa.i_transfer = 2
 				AND aa.i_year = @i_year
 				AND bb.f_total != 0
@@ -388,7 +381,7 @@ function List_QueryParam()
 				,SUM(ISNULL(bb.f_total, 0)) AS f_total
 			FROM {$DBNAME} bg_budget_hdr_transfer aa
 				INNER JOIN {$DBNAME} bg_budget_dtl_transfer bb ON aa.bg_budget_hdr_transfer_id = bb.bg_budget_hdr_transfer_id
-				INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_end_id = cc.bg_expense_lv4_id
+				INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_end_id = cc.bg_expense_lv4_id
 			WHERE aa.i_enable = 1 AND aa.i_transfer = 2
 				AND aa.i_year = @i_year
 				AND bb.f_total != 0
@@ -401,7 +394,7 @@ function List_QueryParam()
 			INTO #tempDiscount_income
 		FROM {$DBNAME} bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_income") . "_change aa
 			INNER JOIN {$DBNAME} bg_budget_dtl" . ($_REQUEST["i_year"] >= 2024 ? "" : "_income") . "_change bb ON aa.bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_income") . "_change_id = bb.bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_income") . "_change_id and ISNULL(bb.i_extenal,0) != 1
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE aa.i_enable = 1 
 			AND aa.i_year = @i_year
 			AND i_type = 1	 
@@ -414,7 +407,7 @@ function List_QueryParam()
 			INTO #tempExtra_income
 			FROM {$DBNAME} bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_income") . "_change aa
 			INNER JOIN {$DBNAME} bg_budget_dtl" . ($_REQUEST["i_year"] >= 2024 ? "" : "_income") . "_change bb ON aa.bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_income") . "_change_id = bb.bg_budget_hdr" . ($_REQUEST["i_year"] >= 2024 ? "" : "_income") . "_change_id and ISNULL(bb.i_extenal,0) != 1
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE aa.i_enable = 1 
 			AND aa.i_year = @i_year
 			AND i_type = 2
@@ -456,7 +449,7 @@ function List_QueryParam()
 		FROM {$DBNAME} po_working_hdr aa
 			INNER JOIN {$DBNAME} po_working_dtl bb ON aa.po_working_hdr_id = bb.po_working_hdr_id
 				AND bb.bg_expense_id IS NOT NULL
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 			LEFT JOIN (SELECT po_working_hdr_id ,SUM(isnull(f_return,0)) AS f_return FROM {$DBNAME} po_return WHERE i_enable = 1 GROUP BY po_working_hdr_id) ret ON aa.po_working_hdr_id = ret.po_working_hdr_id
 		WHERE aa.i_enable = 1
 			AND bb.i_budget_year_overlap = @i_year
@@ -481,7 +474,7 @@ function List_QueryParam()
 		FROM {$DBNAME} po_working_hdr aa
 			INNER JOIN {$DBNAME} po_working_dtl bb ON aa.po_working_hdr_id = bb.po_working_hdr_id
 				AND bb.bg_expense_id IS NOT NULL
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 			INNER JOIN {$DBNAME} po_working_item dd ON aa.po_working_hdr_id = dd.po_working_hdr_id AND dd.i_status = 5
 			LEFT JOIN (SELECT po_working_hdr_id ,SUM(isnull(f_return,0))AS f_return FROM {$DBNAME} po_return WHERE i_enable = 1 GROUP BY po_working_hdr_id) ret ON aa.po_working_hdr_id = ret.po_working_hdr_id
 		WHERE aa.i_enable = 1
@@ -508,7 +501,7 @@ function List_QueryParam()
 		FROM {$DBNAME} po_working_hdr aa
 			INNER JOIN {$DBNAME} po_working_dtl bb ON aa.po_working_hdr_id = bb.po_working_hdr_id AND bb.i_success = 1
 				AND bb.bg_expense_id IS NOT NULL
-			INNER JOIN #temp_vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
+			INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON bb.bg_expense_id = cc.bg_expense_lv4_id
 			INNER JOIN {$DBNAME} po_working_item dd ON aa.po_working_hdr_id = dd.po_working_hdr_id AND dd.i_status = 11
 			LEFT JOIN (SELECT po_working_hdr_id ,SUM(isnull(f_return,0)) AS f_return FROM {$DBNAME} po_return WHERE i_enable = 1 GROUP BY po_working_hdr_id) ret ON aa.po_working_hdr_id = ret.po_working_hdr_id
 		WHERE aa.i_enable = 1
@@ -538,7 +531,7 @@ function List_QueryParam()
 			,SUM(CASE WHEN i_reserve = 3 AND ISNULL(i_finish,0) = 1 {$cost1} THEN ISNULL(f_amt,0) ELSE 0 end) AS f_reserve_income_Finish
 		INTO #tempReserve
 		FROM {$DBNAME} vw_bg_reserve_money aa
-		INNER JOIN #temp_vw_bg_expense_with_parent cc ON aa.bg_expense_id = cc.bg_expense_lv4_id
+		INNER JOIN {$DBNAME} vw_bg_expense_with_parent cc ON aa.bg_expense_id = cc.bg_expense_lv4_id
 		WHERE i_year = @i_year
 			{$con} {$budget1} 
 			--{$cost1}
@@ -583,7 +576,6 @@ function List_QueryParam()
 				
 				WHEN f.bg_expense_lv4_id IS NOT NULL THEN f.bg_expense_lv4_id
 				WHEN g.bg_expense_id IS NOT NULL THEN g.bg_expense_id
-				WHEN g0.bg_expense_id IS NOT NULL THEN g0.bg_expense_id
 				
 				WHEN re.bg_expense_id IS NOT NULL THEN re.bg_expense_id
 
@@ -687,7 +679,7 @@ function List_QueryParam()
 			--		select 
 			--		bb.bg_expense_lv1_id,bb.bg_expense_lv2_id,aa.f_total
 			--		from #tempBudgetIncome aa 
-			--		inner join #temp_vw_bg_expense_with_parent bb on bb.bg_expense_lv2_id = aa.bg_expense_lv2_id
+			--		inner join {$DBNAME} vw_bg_expense_with_parent bb on bb.bg_expense_lv2_id = aa.bg_expense_lv2_id
 			--		where bb.bg_expense_lv1_id = b.bg_expense_lv1_id
 			--		group by bb.bg_expense_lv1_id,bb.bg_expense_lv2_id,aa.f_total
 			--	) aa
@@ -739,7 +731,7 @@ function List_QueryParam()
 			,SUM(ISNULL(a.f_total_pr_type2,0)) AS f_total_pr_type2
 
 		FROM #tempData a
-			LEFT JOIN #temp_vw_bg_expense_with_parent b ON a.bg_expense_id = b.bg_expense_lv4_id OR a.bg_expense_id = b.bg_expense_lv2_id
+			LEFT JOIN {$DBNAME} vw_bg_expense_with_parent b ON a.bg_expense_id = b.bg_expense_lv4_id OR a.bg_expense_id = b.bg_expense_lv2_id
 		GROUP BY b.bg_expense_lv1_id, b.c_code_lv1, b.c_name_lv1
 		UNION ALL
 		SELECT
@@ -809,7 +801,7 @@ function List_QueryParam()
 			,SUM(ISNULL(a.f_total_pr_type2,0)) AS f_total_pr_type2
 
 		FROM #tempData a
-			LEFT JOIN #temp_vw_bg_expense_with_parent b ON a.bg_expense_id = b.bg_expense_lv4_id OR a.bg_expense_id = b.bg_expense_lv2_id
+			LEFT JOIN {$DBNAME} vw_bg_expense_with_parent b ON a.bg_expense_id = b.bg_expense_lv4_id OR a.bg_expense_id = b.bg_expense_lv2_id
 		GROUP BY b.bg_expense_lv2_id, b.c_code_lv2, b.c_name_lv2 
 		UNION ALL
 		SELECT
@@ -879,7 +871,7 @@ function List_QueryParam()
 			,SUM(ISNULL(a.f_total_pr_type2,0)) AS f_total_pr_type2
 			
 		FROM #tempData a
-			LEFT JOIN #temp_vw_bg_expense_with_parent b ON a.bg_expense_id = b.bg_expense_lv4_id OR a.bg_expense_id = b.bg_expense_lv2_id
+			LEFT JOIN {$DBNAME} vw_bg_expense_with_parent b ON a.bg_expense_id = b.bg_expense_lv4_id OR a.bg_expense_id = b.bg_expense_lv2_id
 		GROUP BY b.bg_expense_lv3_id, b.c_code_lv3, b.c_name_lv3
 		UNION ALL
 		SELECT
@@ -968,13 +960,13 @@ function List_QueryParam()
 			--,(SUM(ISNULL(a.f_budget_income,0)) + SUM(ISNULL(a.f_income_transfer,0))) - (SUM(ISNULL(a.f_working1,0)) - SUM(ISNULL(a.f_return1,0)))as f_sum_budget_income1 /*(C1 + C2) - (D2 - E2)*/
 			--,(SUM(ISNULL(a.f_budget_income,0)) + SUM(ISNULL(a.f_income_transfer,0))) - (SUM(ISNULL(a.f_working2,0)) - SUM(ISNULL(a.f_return2,0)))as f_sum_budget_income2 /*(C1 + C2) - (D3 - E3)*/
 		FROM #tempData a
-			LEFT JOIN #temp_vw_bg_expense_with_parent b ON a.bg_expense_id = b.bg_expense_lv4_id OR a.bg_expense_id = b.bg_expense_lv2_id
+			LEFT JOIN {$DBNAME} vw_bg_expense_with_parent b ON a.bg_expense_id = b.bg_expense_lv4_id OR a.bg_expense_id = b.bg_expense_lv2_id
 		GROUP BY b.bg_expense_lv4_id, b.c_code_lv4, b.c_name_lv4
 		ORDER BY c_code;
 
 				
 		DROP TABLE #tempBudget,#tempBudgetAdjust,#tempBudgetIncome,#tempBudgetTransfer,#tempData,#tempDiscount,#tempExtra,#tempIncomeTransfer,#tempWorking0,#tempWorking1,#tempWorking2,#tempBudget_period,#tempBudgetAdjust_period,#tempDiscount_period,#tempExtra_period,#tempReserve,#tempBudgetAdjust_income,#tempDiscount_income,#tempExtra_income,#tempBudget_period_bg,#tempBudget_sum_reserve1
-		,#tempBudget_sum_pr_type1,#tempBudget_sum_pr_type2,#temp_vw_bg_expense_with_parent
+		,#tempBudget_sum_pr_type1,#tempBudget_sum_pr_type2
 		";
 				// echo($sqlMain); 
 				// exit();

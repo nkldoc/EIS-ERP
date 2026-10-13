@@ -246,7 +246,10 @@ if ($type == "APSTEPS10") {
         , (select i_type from sp_type_bg where i_value =  i_type_bg ) as sp_type_bg 
         , (select top 1 i_enabled from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as sp_tor_delete
         , (select top 1 c_comment from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as tor_delete_comment
-        , (select top 1 i_edit from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) as sp_bg_edit
+        -- ยังไม่ได้กดส่งคืนจากฝ่ายจัดสรร = อยู่ระหว่างแก้ไข (1) แม้จะบันทึกแก้ไขแล้วก็ตาม
+        , case when exists (select 1 from sp_tor_bg_log where s.tor_id = sp_tor_id and i_edit = 1 and isnull(c_comment_edit1,'') = '') then 1
+               else (select top 1 i_edit from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) end as sp_bg_edit
+        , (select top 1 c_comment_edit1 from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) as bg_comment_edit1
         , isnull((select top 1 sp_cate_id from NMU_ERP.dbo.[view_sp_tor_work_socore] where sp_tor_id=a.tor_id order by sp_cate_id desc),0) as sp_cate_id 
         "
             
@@ -316,14 +319,20 @@ if ($type == "APSTEPS10") {
             case 12: $i_type_bg = "color:#000080";
                 $i_type_bgTxt = 'PR ก่อนปีงบประมาณ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
                 break;
         }
-        if($row["sp_bg_edit"] == 1  ){
+        // sp_bg_edit = 1 และมีหมายเหตุ = ฝ่ายจัดสรรส่งคืนโดยไม่แก้ไข
+        $bgReturnedNoEdit = ($row["sp_bg_edit"] == 1 && trim($row["bg_comment_edit1"] ?? '') != '');
+        if($row["sp_bg_edit"] == 1 && !$bgReturnedNoEdit){
             $i_type_bg = "color:#F5B041";
-            $i_type_bgTxt = 'PR อยู่ระหว่างแก้ไขงบประมาณ';            
-        }else if ($row["sp_bg_edit"] ==2 ){
+            $i_type_bgTxt = 'PR อยู่ระหว่างแก้ไขงบประมาณ';
+        }else if ($row["sp_bg_edit"] ==2 || $bgReturnedNoEdit){
             $i_type_bg = "color:#006400";
             $i_type_bgTxt = 'รับเรื่องคืนจากฝ่ายจัดสรร';            
         } 

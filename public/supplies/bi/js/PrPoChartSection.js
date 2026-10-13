@@ -36,6 +36,12 @@
         </div>
         <div class="card mb-3">
             <div class="card-body">
+                <h6 class="mb-2 font-weight-bold">PR ตามแผน / นอกแผน</h6>
+                <div id="prPlanSummaryCards"></div>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-body">
                 <h6 class="mb-2 font-weight-bold">สัดส่วน PR vs PO</h6>
                 <div id="chart_prpo_pie" style="height:260px;"></div>
             </div>
@@ -401,6 +407,87 @@
     }
 
     /* ------------------------------------------------------------------
+       Render "PR ตามแผน / นอกแผน / ยังไม่ระบุ" summary cards
+       ใช้ dataset เดียวกับการ์ดสรุป PR/PO (กรองปี + แหล่งเงินแล้ว)
+       จัดกลุ่มตาม sp_tor.plan_status (1=ตามแผน, 2=นอกแผน, 0=ยังไม่ระบุ)
+       นับแบบ "รายการ" (แถวต่อแหล่งเงิน) ให้ตรงกับการ์ดอื่นและตาราง drilldown
+    ------------------------------------------------------------------ */
+    function renderPrPlanCards(data) {
+        const el = document.getElementById("prPlanSummaryCards");
+        if (!el) return;
+
+        const prRows = (Array.isArray(data.data) ? data.data : [])
+            .filter((r) => Number(r.f_amt) > 0.005);
+
+        // นับแบบ "รายการ" (แถว) ให้ตรงกับการ์ดสรุป PR/PO และตาราง drilldown
+        const grp = {
+            1: { count: 0, amt: 0 }, // ตามแผน
+            2: { count: 0, amt: 0 }, // นอกแผน
+            0: { count: 0, amt: 0 }, // ยังไม่ระบุ
+        };
+        prRows.forEach((r) => {
+            const ps = Number(r.plan_status) || 0;
+            const k = ps === 1 ? 1 : ps === 2 ? 2 : 0;
+            grp[k].count += 1;
+            grp[k].amt += Number(r.f_amt) || 0;
+        });
+
+        // จำนวน "รหัสแผน" ที่ไม่ซ้ำกัน (1 รหัสแผนอาจมีหลาย PR) — นับเฉพาะที่มีรหัสแผนจริง
+        const planCodeSet = new Set(
+            prRows.map((r) => String(r.plan_code || "").trim()).filter((c) => c !== "" && c !== "-")
+        );
+        const planCodeCount = planCodeSet.size;
+
+        const _selIds = Array.isArray(data._selectedIds)
+            ? data._selectedIds
+            : ($("#multiCheckCombo").val() || []);
+        const dcTypeId = _selIds.length === 1 ? _selIds[0] : _selIds.join(",");
+        const dcCostId = new URLSearchParams(window.location.search).get("dc_cost_id") || "38";
+        const yearTh = document.getElementById("budget_year_filter")?.value || "";
+        const yearEn = yearTh ? Number(yearTh) - 543 : new Date().getFullYear();
+
+        const cardBase = "border-radius:10px;padding:16px 10px;box-shadow:0 1px 3px rgba(0,0,0,0.08);height:100%;box-sizing:border-box;";
+        const clickable = "cursor:pointer;transition:transform .15s,box-shadow .15s;";
+        const total = grp[1].count + grp[2].count + grp[0].count;
+
+        const link = (col) =>
+            `/supplies/bi/reports/Rep_PrPoListV5.php?col=${col}&year_en=${yearEn}&year_th=${yearTh}&dc_cost_id=${dcCostId}&dc_expense_budget_type_id=${dcTypeId}`;
+
+        const cardHtml = (title, col, g, bg, bar, color) => `
+            <div class="col d-flex">
+                <div class="pr-po-card clickable" style="${cardBase} ${clickable} background:${bg};border-left:4px solid ${bar};"
+                    onclick="window.open('${link(col)}','_blank')">
+                    <div class="small text-muted pr-po-label">${title}<span>▶</span></div>
+                    <div class="font-weight-bold pr-po-value" style="font-size:20px;color:${color};">${g.count}</div>
+                    <div class="small text-muted">${fmt(g.amt)} บาท</div>
+                </div>
+            </div>`;
+
+        el.innerHTML = `
+        <style>
+            #prPlanSummaryCards .pr-po-card{display:flex;flex-direction:column;justify-content:center;align-items:center;width:100%;}
+            #prPlanSummaryCards .pr-po-card:hover.clickable{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,0.12) !important;}
+            #prPlanSummaryCards .pr-po-label{margin-bottom:8px;line-height:1.4;}
+            #prPlanSummaryCards .pr-po-value{margin-bottom:4px;line-height:1.2;}
+            #prPlanSummaryCards .pr-plan-row{min-height:130px;}
+        </style>
+        <div class="row g-2 text-center align-items-stretch pr-plan-row">
+            ${cardHtml("ตามแผน", "plan_in", grp[1], "#eef7ee", "#2fae64", "#1c7a45")}
+            ${cardHtml("นอกแผน", "plan_out", grp[2], "#fdeef0", "#e0526b", "#c22a45")}
+            ${cardHtml("ไม่ระบุ", "plan_none", grp[0], "#f2f3f5", "#8a94a6", "#5a6472")}
+        </div>
+        <div class="row g-2 text-center align-items-stretch mt-3">
+            <div class="col-12 d-flex">
+                <div class="pr-po-card clickable" style="${cardBase} ${clickable} background:#eef4ff;border-left:4px solid #4a6cf7;"
+                    onclick="window.open('${link("plan_pr")}','_blank')">
+                    <div class="small text-muted pr-po-label">รหัสแผน / PR<span>▶</span></div>
+                    <div class="font-weight-bold pr-po-value" style="font-size:20px;color:#3454d1;">${planCodeCount} รหัสแผน / ${total} PR</div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    /* ------------------------------------------------------------------
        Render Bar chart: PR vs PO by bg_expense
     ------------------------------------------------------------------ */
     function renderPrPoBar(items, yearTh, yearEn, dcTypeId, budgetMap) {
@@ -695,6 +782,7 @@ _chartBar.on("click", function (params) {
             const dcTypeIdForLinks = selectedIds.length === 1 ? selectedIds[0] : "";
 
             renderPrPoSummaryCards(filteredData);
+            renderPrPlanCards(filteredData);
             renderPrPoBar(aggregated, year_th, year_en, dcTypeIdForLinks, budgetMap);
             renderPrPoPie(_prTotal, _contractTotal);
         });

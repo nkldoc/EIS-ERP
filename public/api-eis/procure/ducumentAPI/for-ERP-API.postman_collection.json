@@ -1,0 +1,223 @@
+{
+	"info": {
+		"_postman_id": "b479f77e-8be3-44c6-9327-daa48efe39f0",
+		"name": "for-ERP-API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "28266242"
+	},
+	"item": [
+		{
+			"name": "erpRegister",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"name\":\"erpsendapi\",\r\n    \"email\":\"erpsendapi@mail.com\",\r\n    \"password\":\"erpsendapi\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/register",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "erpGetToken",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"email\":\"erpsendapi@mail.com\",\r\n    \"password\":\"erpsendapi\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/login",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "erpGetUser",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg5MDYwMTU4LCJleHAiOjE2OTY4MzYxNTgsImRhdGEiOnsidXNlcl9pZCI6IjExIn19.6jaJ2jMgm-kFzd_xkwQfS3N0KkeRISQrqIE8gia_xRo",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "    {\r\n\t  \"datatype\": \"contract\",\r\n\t  \"data\": [\r\n\t\t{\r\n\t\t  \"pr_id\": 513,\r\n\t\t  \"contract_id\": 532,\r\n\t\t  \"contract_code\": \"พวช.ซ.02060/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t},{\r\n\t\t  \"pr_id\": 514,\r\n\t\t  \"contract_id\": 534,\r\n\t\t  \"contract_code\": \"พวช.ซ.02061/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t}\r\n\t  ]\r\n\t}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.201.192/procure/getUser",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"getUser"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "erpPoPeriod",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg5MDYwMTU4LCJleHAiOjE2OTY4MzYxNTgsImRhdGEiOnsidXNlcl9pZCI6IjExIn19.6jaJ2jMgm-kFzd_xkwQfS3N0KkeRISQrqIE8gia_xRo",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n   \"datatype\":\"periodBilling\",\r\n   \"data\":[\r\n      {\r\n         \"tor_id\":700,\r\n         \"sp_tor_contract_id\":658,\r\n         \"i_period\":1,\r\n         \"d_doc_date\":\"17-07-2566\",\r\n         \"d_period_date\":\"21-07-2566\",\r\n         \"i_day\":4,\r\n         \"i_alert\":1,\r\n         \"f_total_amt\":\"100,000.00\",\r\n         \"dc_cost2_id\":38,\r\n         \"tbl_dtl\":[\r\n            {\r\n               \"sp_tor_hdr_period_id\":1218,\r\n               \"c_name\":\"ซื้อวัสดุสำนักงาน 63 รายการ\",\r\n               \"i_qty\":63,\r\n               \"dc_unit_id\":1,\r\n               \"dc_unit_name\":\"รายการ\",\r\n               \"f_net_unit_price\":\"100,000.00\",\r\n               \"dc_product_type_id\":24,\r\n               \"dc_product_type_name\":\"วัสดุสำนักงาน\"\r\n            }\r\n         ]\r\n      }\r\n   ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/poPeriod",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"poPeriod"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "erpPoPeriodPickup",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg5MDYwMTU4LCJleHAiOjE2OTY4MzYxNTgsImRhdGEiOnsidXNlcl9pZCI6IjExIn19.6jaJ2jMgm-kFzd_xkwQfS3N0KkeRISQrqIE8gia_xRo",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n   \"datatype\":\"periodPickup\",\r\n   \"data\":[\r\n      {\r\n         \"erp_hdr_period_id\":1218,\r\n         \"sp_tor_contract_id\":658,\r\n         \"c_doc_ref\":\"inv1001\",\r\n         \"f_vat_amt\":7000,\r\n         \"d_pickup_date\":\"2023-07-14\",\r\n         \"c_comment\":\"test\",\r\n         \"tbl_dtl\":[\r\n            {\r\n               \"erp_dtl_period_id\":1218,\r\n               \"c_name\":\"ซื้อวัสดุสำนักงาน 63 รายการ\",\r\n               \"i_qty\":63,\r\n               \"dc_unit_id\":1,\r\n               \"dc_unit_name\":\"รายการ\",\r\n               \"f_net_unit_price\":\"100,000.00\",\r\n               \"dc_product_type_id\":24,\r\n               \"dc_product_type_name\":\"วัสดุสำนักงาน\"\r\n            }\r\n         ]\r\n      }\r\n   ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/poPeriod",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"poPeriod"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "erpPoContractClose",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg5MDYwMTU4LCJleHAiOjE2OTY4MzYxNTgsImRhdGEiOnsidXNlcl9pZCI6IjExIn19.6jaJ2jMgm-kFzd_xkwQfS3N0KkeRISQrqIE8gia_xRo",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n   \"datatype\":\"closeContract\",\r\n   \"data\":[\r\n      {\r\n         \"contract\":658, \r\n         \"contract_code\": \"พวช.ซ.01024/2566\",\r\n         \"i_close\":1,\r\n         \"d_close_date\":\"2023-07-14\",\r\n         \"c_comment\":\"test\"\r\n      }\r\n   ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/poPeriod",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"poPeriod"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

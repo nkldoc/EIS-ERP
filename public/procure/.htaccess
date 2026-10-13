@@ -1,0 +1,4 @@
+RewriteEngine On
+RewriteRule ^incomingEndpoints(?:/(?:users|logs(?:/[1-9][0-9]*)?|[1-9][0-9]*))?/?$ incomingEndpoints.php [END,QSA]
+RewriteRule ^apiAccounts(?:/[1-9][0-9]*)?/?$ apiAccounts.php [END,QSA]
+RewriteRule ^endpoints(?:/(?:databases|preview|[1-9][0-9]*(?:/test)?))?/?$ endpoints.php [END,QSA]

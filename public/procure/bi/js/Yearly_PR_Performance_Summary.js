@@ -51,14 +51,18 @@
     }
 
     function getDetailUrl(fiscalYear, fiscalMonth) {
-        const year   = parseInt(fiscalYear, 10);
-        const yearEn = year - 543;
-        const { docYear, docMonth } = mapFiscalToDoc(year, fiscalMonth);
+        // fiscalYear is in BE (e.g. 2569). Convert to CE (AD) fiscal year.
+        const yearBE = parseInt(fiscalYear, 10);
+        const fiscalYearCE = yearBE - 543; // e.g. 2569 -> 2026
 
+        // The detail API expects `year` = fiscalYearCE - 1 (JS sends previous year).
+        const yearParam = fiscalYearCE - 1;
+
+        // month mapping is handled server-side based on `monthbg` and `year`.
         return (
             `/procure/bi/api/Rep_DetailByTypeV7.php` +
-            `?year=${docYear}&yearEn=${yearEn}` +
-            `&monthbg=${fiscalMonth}&month=${docMonth}` +
+            `?year=${yearParam}&yearEn=${fiscalYearCE}` +
+            `&monthbg=${fiscalMonth}` +
             `&dc_expense_budget_type_id=0&bg_expense_id=0&Performance_Summary=1` +
             `&fn=List_Detail`
         );
@@ -100,9 +104,30 @@
                 let o;
                 try { o = Ext.decode(resp.responseText || "{}"); } catch (e) { o = {}; }
 
-                const rows = Array.isArray(o.data) ? o.data : [];
+                // Debug: log response for troubleshooting
+                try { console.debug("Rep_Detail response:", { url: url, body: o }); } catch (e) {}
 
-                if (!rows.length) {
+                // Normalize rows: accept o.data (array), o.rows (array), or object -> values
+                let rows = [];
+                if (Array.isArray(o.data)) rows = o.data;
+                else if (Array.isArray(o.rows)) rows = o.rows;
+                else if (o.data && typeof o.data === 'object') rows = Object.values(o.data);
+
+                // Deduplicate: prefer stable primary key `tor_id` when provided,
+                // otherwise fall back to doc_no+project+date composite.
+                const seen = new Map();
+                rows.forEach((r) => {
+                    const pk = r.tor_id ? String(r.tor_id) : ((r.doc_no || r.n_doc || '') + '||' + (r.project_name || r.s_project || '') + '||' + (r.d_create_display || r.d_create || ''));
+                    if (!seen.has(pk)) seen.set(pk, r);
+                });
+                const uniqueRows = Array.from(seen.values());
+
+                // Warn if server-reported totalCount mismatches
+                if (typeof o.totalCount !== 'undefined' && o.totalCount !== uniqueRows.length) {
+                    try { console.warn('Rep_Detail: totalCount mismatch', { totalCount: o.totalCount, unique: uniqueRows.length }); } catch (e) {}
+                }
+
+                if (!uniqueRows.length) {
                     /* แสดงข้อความแตกต่างตามปี */
                     const yr = parseInt(fiscalYear, 10);
                     const emptyEl = document.getElementById("modalEmpty");
@@ -115,7 +140,7 @@
                     return;
                 }
 
-                _renderModalTable(rows, fiscalYear, fiscalMonth, monthName);
+                _renderModalTable(uniqueRows, fiscalYear, fiscalMonth, monthName);
             },
             failure: function () {
                 document.getElementById("modalErrorMsg").textContent = "เกิดข้อผิดพลาดในการดึงข้อมูล";

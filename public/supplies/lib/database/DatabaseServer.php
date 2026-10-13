@@ -21,6 +21,15 @@ class DatabaseServer {
 
         $conInfo = array("Database" => $DB_NAME, "UID" => $DB_USER, "PWD" => $DB_PASS, "CharacterSet" => $DB_CHARSET);
 
+        $requestHost = strtolower((string) parse_url('http://' . ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST));
+        if (in_array($requestHost, ['dev-eis.nmu.ac.th', 'localhost', '127.0.0.1'], true)
+            && in_array(strtolower($DB_HOST), ['.', 'localhost', '127.0.0.1'], true)) {
+            // Explicit local driver/TLS settings avoid IIS selecting the legacy driver.
+            $conInfo['Driver'] = 'ODBC Driver 18 for SQL Server';
+            $conInfo['Encrypt'] = true;
+            $conInfo['TrustServerCertificate'] = true;
+        }
+
         $this->conn = @sqlsrv_connect($DB_HOST, $conInfo);
 
         if ($this->conn) {
@@ -361,7 +370,7 @@ class DatabaseServer {
         }
     }
 
-    public function postPeriod($step = 1, $id = null, $dtl_id = null, $db, $date, $data = [], $data2 = []) {
+    public function postPeriod($step, $id, $dtl_id, $db, $date, $data = [], $data2 = []) {
 
 
         //             echo ($data['sp_tor_contract_id']);

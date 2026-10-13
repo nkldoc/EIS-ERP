@@ -3,7 +3,7 @@ Ext.onReady(function () {
   Ext.QuickTips.init();
   Ext.idRep = "frm-repTor";
   //Spring Boot cross context
-Ext.urlReport     = true ? "../../reports/repSpContract_registrationGL" : "../../reports/printr.php?get=true"; //DEBUG (PDF/Excel เดิม) — TODO: ปรับ path ให้ตรงกับ endpoint spring boot ฝั่ง EIS_PROCURE ถ้าใช้คนละ endpoint กับฝั่งคณะแพทย์
+Ext.urlReport     = true ? "https://eis.nmu.ac.th:8443/reports/repSpContract_registrationGL" : "https://eis.nmu.ac.th:8443/reports/printr.php?get=true"; //DEBUG (PDF/Excel เดิม) — TODO: ปรับ path ให้ตรงกับ endpoint spring boot ฝั่ง EIS_PROCURE ถ้าใช้คนละ endpoint กับฝั่งคณะแพทย์
 Ext.urlReportHTML = "report/RepSpContract_registrationGL_html.php"; // endpoint HTML ใหม่
   // Spring Boot
   Ext.titleReport = "รายงานทะเบียนคุมสัญญา (มหาวิทยาลัย)";

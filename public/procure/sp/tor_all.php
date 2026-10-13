@@ -11,30 +11,32 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 $db = new DatabaseServer();
-
-class clsPageStatus {
+ 
+class clsPageStatus
+{
 
     private $temp;
 
-    function __construct($db, $req) {
+    function __construct($db, $req)
+    {
         $this->db = $db;
         $this->req_name = $req;
 
         $stmt = $this->db->QueryParam("select [sp_status_hdr_id] as id "
-                . ",[sp_type_status_id] as type_id "
-                . ", js"
-                . ", c_code"
-                . ", c_name"
-                . ", i_alarm"
-                . ", i_day"
-                . ", i_config "
-                . ", i_entrance "
-                . ", i_seq "
-                . ", isnull(i_last,0) as i_last"
-                . ", isnull(code_tomenu,'') as code_tomenu"
-                //get_code_tomenu
-                . " from dbo.sp_status_hdr "
-                . "where c_code=?", array($this->req_name));
+            . ",[sp_type_status_id] as type_id "
+            . ", js"
+            . ", c_code"
+            . ", c_name"
+            . ", i_alarm"
+            . ", i_day"
+            . ", i_config "
+            . ", i_entrance "
+            . ", i_seq "
+            . ", isnull(i_last,0) as i_last"
+            . ", isnull(code_tomenu,'') as code_tomenu"
+            //get_code_tomenu
+            . " from dbo.sp_status_hdr "
+            . "where c_code=?", array($this->req_name));
         while ($row = $db->Fetch($stmt)) {
             $this->temp = array(
                 "id" => $row["id"] ?? 0,
@@ -54,162 +56,174 @@ class clsPageStatus {
     }
 
     // Methods
-    function set_name($name) {
+    function set_name($name)
+    {
         $this->name = $name;
     }
 
-    function get_name() {
+    function get_name()
+    {
         return $this->name;
     }
 
-    function get_id() {
-        return $this->temp['id'] ?? null;
+    function get_id()
+    {
+        return $this->temp['id'];
     }
 
-    function get_type_id() {
-        return $this->temp['type_id'] ?? null;
+    function get_type_id()
+    {
+        return $this->temp['type_id'];
     }
 
-    function get_i_alarm() {
-        return $this->temp['i_alarm'] ?? null;
+    function get_i_alarm()
+    {
+        return $this->temp['i_alarm'];
     }
 
-    function get_i_day() {
-        return $this->temp['i_day'] ?? null;
+    function get_i_day()
+    {
+        return $this->temp['i_day'];
     }
 
-    function get_i_config() {
-        return $this->temp['i_config'] ?? null;
+    function get_i_config()
+    {
+        return $this->temp['i_config'];
     }
 
-    function get_js() {
-        return $this->temp['js'] ?? null;
+    function get_js()
+    {
+        return $this->temp['js'];
     }
 
-    function get_i_last() {
-        return $this->temp['i_last'] ?? null;
+    function get_i_last()
+    {
+        return $this->temp['i_last'];
     }
 
-    function get_i_entrance() {
-        return $this->temp['i_entrance'] ?? null;
+    function get_i_entrance()
+    {
+        return $this->temp['i_entrance'];
     }
 
-    function get_code() {
-        return $this->temp['c_code'] ?? null;
+    function get_code()
+    {
+        return $this->temp['c_code'];
     }
 
-    function get_code_tomenu() {
-        return $this->temp['code_tomenu'] ?? null;
+    function get_code_tomenu()
+    {
+        return $this->temp['code_tomenu'];
     }
 
-    function get_menu() {
-        return $this->temp['c_name'] ?? null;
+    function get_menu()
+    {
+        return $this->temp['c_name'];
     }
 }
-
 $i_is_ap = $_REQUEST["i_is_ap"] ?? null;
 $pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"]);
 $_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"];
 $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-    <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-        <title><?php echo COMPANY_NAME; ?></title>
-        <!-- System ERP :: Src js  -->
-        <?php include("../lib/loadJs.php"); ?>
-        <?php include("../lib/loadCss.php"); ?>
-        <!-- System ERP :: -->
-        <script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?= __VPRODUCT_; ?>&f=<?php echo $_SERVER["PHP_SELF"]; ?>"></script>
-        <!-- System ERP :: -->
-        <style>
-            .warning-label-style {
-                font-weight: bold !important;
-                color: red;
-            }
+<html xmlns="http://www.w3.org/1999/xhtml"> 
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title><?php echo COMPANY_NAME; ?></title>
+    <!-- System ERP :: Src js  -->
+    <?php include("../lib/loadJs.php"); ?>
+    <?php include("../lib/loadCss.php"); ?>
+    <!-- System ERP :: -->
+    <script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?= __VPRODUCT_; ?>&f=<?php echo $_SERVER["PHP_SELF"]; ?>"></script>
+    <!-- System ERP :: -->
+    <style>
+        .warning-label-style {
+            font-weight: bold !important;
+            color: red;
+        }
 
-            label[for=is_stockID],
-            label[for=i_is_advanceID],
-            label[for=i_is_advanceID],
-            label[for=i_is_productID] {
-                font-weight: bold !important;
-            }
+        label[for=is_stockID],
+        label[for=i_is_advanceID],
+        label[for=i_is_advanceID],
+        label[for=i_is_productID] {
+            font-weight: bold !important;
+        }
 
-            .x-form-display-field {
-                padding: 2px;
-            }
+        .x-form-display-field {
+            padding: 2px;
+        }
 
-            .topAlign {
-                color: blue !important;
-                border-bottom: 1px solid #ccc;
-            }
+        .topAlign {
+            color: blue !important;
+            border-bottom: 1px solid #ccc;
+        }
 
-            input.fqty {
-                width: 80%;
-            }
+        input.fqty {
+            width: 80%;
+        }
 
-            .bnt-null {
-                padding: 2px;
-            }
-            .td-succeed {
-                background: #e4ffe4;
-            }
+        .bnt-null {
+            padding: 2px;
+        }
+        .td-succeed {
+            background: #e4ffe4;
+        }
 
-            label[for^="bbf"] {
-                font-weight: bold;
-                text-align: right;
-            }
+        label[for^="bbf"] {
+            font-weight: bold;
+            text-align: right;
+        }
 
-            /* Chrome, Safari, Edge, Opera */
-            input::-webkit-outer-spin-button,
-            input::-webkit-inner-spin-button {
-                -webkit-appearance: none;
-                margin: 0;
-            }
+        /* Chrome, Safari, Edge, Opera */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
 
-            /* Firefox */
-            input[type=number] {
-                -moz-appearance: textfield;
-            }
+        /* Firefox */
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
 
-            #content-anchor-tip ul {
-                float: left;
-                width: 200px;
-                list-style-type: disc;
-                margin-left: 15px;
-            }
+#content-anchor-tip ul {
+    float: left;
+    width: 200px;
+    list-style-type: disc;
+    margin-left: 15px;
+} 
 
-            .ext-ie #content-anchor-tip ul {
-                margin: 0;
-                padding-left: 15px;
-            }
+.ext-ie #content-anchor-tip ul {
+    margin: 0;
+    padding-left: 15px;
+} 
 
-            #content-anchor-tip .thumb {
-                float: right;
-            }
+#content-anchor-tip .thumb {
+    float: right;
+} 
 
-            #content-anchor-tip .status-icon {
-                position: absolute;
-                top: 4px;
-                right: 50px;
-                padding: 0;
-                line-height: 0;
-            }
+#content-anchor-tip .status-icon {
+    position: absolute;
+    top: 4px;
+    right: 50px;
+    padding: 0;
+    line-height: 0;
+} 
 
-            #content-anchor-tip a:link, #content-anchor-tip a:visited {
-                color: #339;
-            }
-        </style>
-        <script type="text/javascript" src="./uiData/configStoreUi.js"></script>
-        <script type="text/javascript" src="./tor/torUiAll.js?_dc=<?= __VPRODUCT_; ?>"></script>
-        <!-- controller file.js ingrid js/funcAll-->
-        <script type="text/javascript" src="./tor/tor_all.js?_dc=<?= __VPRODUCT_; ?>"></script>
-        <script type="text/javascript" id="dynamicScript" src="scripts/tor_all_menu.js?_dc=<?= __VPRODUCT_; ?>"></script>
-        <script type="text/javascript" src="./tor/pageStatusAll.js?_dc=<?= __VPRODUCT_; ?>"></script>
-    </head>
+#content-anchor-tip a:link, #content-anchor-tip a:visited {
+    color: #339;
+}
+    </style> 
+    <script type="text/javascript" src="./uiData/configStoreUi.js"></script>
+    <script type="text/javascript" src="./tor/torUiAll.js?_dc=<?= __VPRODUCT_; ?>"></script> 
+    <!-- controller file.js ingrid js/funcAll-->  
+    <script type="text/javascript" src="./tor/tor_all.js?_dc=<?= __VPRODUCT_; ?>"></script>
+    <script type="text/javascript" id="dynamicScript" src="scripts/tor_all_menu.js?_dc=<?= __VPRODUCT_; ?>"></script>
+    <script type="text/javascript" src="./tor/pageStatusAll.js?_dc=<?= __VPRODUCT_; ?>"></script>
+</head>
 
-    <body>
-    </body>
+<body> 
+</body>
 
 </html>

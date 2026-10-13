@@ -1,0 +1,9 @@
+RewriteEngine On
+RewriteRule ^incomingEndpoints(?:/(?:users|logs(?:/[1-9][0-9]*)?|[1-9][0-9]*))?/?$ incomingEndpoints.php [END,QSA]
+RewriteRule ^incoming/[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*/?$ incomingReceiver.php [END,QSA]
+RewriteRule ^apiAccounts(?:/[1-9][0-9]*)?/?$ apiAccounts.php [END,QSA]
+RewriteRule ^endpoints(?:/(?:databases|preview|[1-9][0-9]*(?:/test)?))?/?$ endpoints.php [END,QSA]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+ErrorDocument 404 /procure/error_redirect.php
+ErrorDocument 500 /procure/error_redirect.php

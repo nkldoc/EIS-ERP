@@ -1,0 +1,4 @@
+
+############# install 
+D:\EIS-ERP\storage\xampp\mysql\bin\mysqld.exe --install
+net start mysql

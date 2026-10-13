@@ -11,19 +11,16 @@ $ss_cost_id = $_SESSION["dc_cost_id"] ?? null;
 $ss_username = $_SESSION["user_name"] ?? null;
 $ss_user_id = $_SESSION["user_id"] ?? null; 
 
-require_once("../java/Java.inc");
-$session = procure_java_session();
-if (!java_values($session->get("user_id"))) {
+if (!$ss_user_id) {
     echo "<script>top.frames.location.reload(false);</script>";
     exit;
 }
 
-
-$user_name = java_values($session->get("user_name"));
-$user_id = java_values($session->get("user_id"));
-$dc_cost_id = java_values($session->get("dc_cost_id"));
-$sp_emp_id = java_values($session->get("sp_emp_id"));
-$i_type_emp = java_values($session->get("i_type_emp"));
+$user_name = $ss_username;
+$user_id = $ss_user_id;
+$dc_cost_id = $ss_cost_id;
+$sp_emp_id = $ss_emp_id;
+$i_type_emp = $_SESSION["i_type_emp"] ?? null;
 
 switch ($i_type_emp) { // 1 ฝ่ายงานซื้อจ้าง , 2 admin , 0 หน่วยงานขอซื้อจ้าง , 3 ผู้บริหารเงิน , 4 ผู้บริหาร
     case 0: $cfg = array("value" => 0, "file" => "newTor_1", "i_is_graph" => true);

@@ -1,5 +1,7 @@
 <?php
 include("../conf/config.php");  
+    require_once __DIR__ . '/../conf/presence/Presence.php';
+    ProcurePresence::revoke('PROCURE', (string)($_SESSION['user_id'] ?? ''), (string)($_SESSION['last_login'] ?? ''));
     $_SESSION = array();
     if (!headers_sent()) {
         setcookie(session_name(), "", [

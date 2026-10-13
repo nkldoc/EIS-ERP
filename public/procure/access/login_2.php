@@ -23,15 +23,15 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="supplies"){
     // เพิ่ม ระดับ แผนกและสายงาน
     //dc_department_type_id department_type_name dc_department_id department_name
 
-    $sql = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
+    $sql = "select a.dc_user_id, a.c_user_name, cost.dc_cost_id, a.c_full_name
                 , IIF(c.sp_emp_id is null, 0, IIF( a.dc_user_id = 1 , 2, 1)) as i_set_type_emp
                 --, isnull(i_type_emp,0) as i_type_emp
-                , isnull((select top 1 c_name from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
-                , isnull((select top 1 c_code from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
-                ,(select top 1 dc_area_id from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
+                , isnull(cost.c_name,'') as cost_name
+                , isnull(cost.c_code,'') as cost_code
+                ,cost.dc_area_id as dc_area_id
                 , a.i_type_user
                -- , a.super_user
-                , isnull((select top 1  bb.dc_cost_acc_id from NMU_DATACENTER.dbo.dc_cost bb where bb.dc_cost_id=a.dc_cost_id),0) as dc_cost_acc_id
+                , isnull(cost.dc_cost_acc_id,0) as dc_cost_acc_id
                 , isnull(c.c_name,'') as 'c_sp_emp'
                 , isnull(e.c_name,'') as 'c_department_type'
                 , 'สายงาน '+d.c_name as 'c_department'
@@ -39,15 +39,31 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="supplies"){
                 WHEN c.i_level = 1 THEN 'หัวหน้าหน่วยงาน'
                 WHEN c.i_level = 2 THEN 'หัวหน้าสายงาน'
                 ELSE 'ผู้ปฎิบัติงาน' END AS 'c_position'
-                , isnull(c.dc_emp_id,0) as dc_emp_id
+                , isnull(b.dc_emp_id,0) as dc_emp_id
                 , isnull(c.sp_emp_id,0) as sp_emp_id
                 , isnull(c.dc_department_id,0) as dc_department_id
                 , isnull(d.dc_department_type_id,0) as dc_department_type_id
                 , isnull(d.i_seq,0) as i_seq
                 , isnull(c.i_level,0) as i_level
-                , isnull((select top 1 dc_user_id from " . DB_CENTER . "dc_user where dc_emp_id = bb.dc_emp_id),0) as dc_center_user
+                , isnull((select top 1 dc_user_id from " . DB_CENTER . "dc_user where c_user_name = a.c_user_name),0) as dc_center_user
             from dbo.dc_user a
-                left join " . DB_CENTER . "dc_emp bb on bb.c_email = a.c_user_name
+                outer apply (
+                    select top 1 cu.dc_emp_id, cu.dc_cost_id
+                    from NMU_DATACENTER.dbo.dc_user cu
+                    where cu.c_user_name = a.c_user_name
+                    order by cu.dc_user_id
+                ) center_user
+                outer apply (
+                    select top 1 ce.dc_cost_id
+                    from NMU_DATACENTER.dbo.dc_emp ce
+                    where ce.dc_emp_id = center_user.dc_emp_id
+                       or ce.c_email = a.c_user_name
+                    order by case when ce.dc_emp_id = center_user.dc_emp_id then 0 else 1 end,
+                             ce.dc_emp_id
+                ) center_emp
+                left join NMU_DATACENTER.dbo.dc_cost cost
+                    on cost.dc_cost_id = coalesce(nullif(center_emp.dc_cost_id,0),
+                                                 nullif(center_user.dc_cost_id,0), a.dc_cost_id)
                 left join dbo.dc_emp b on b.dc_emp_id = a.dc_emp_id
                 left join dbo.sp_emp c on c.dc_emp_id = b.dc_emp_id
                 left join dbo.sp_department d on d.dc_department_id = c.dc_department_id
@@ -59,6 +75,9 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="supplies"){
     $re = array("reval" => 1, "success" => "Error", "msg" => "Login False");
     while ($data = $db->Fetch($stmt)) {
         // Do not carry any authenticated fields from the previous user.
+        require_once __DIR__ . '/../conf/presence/AdminIdentity.php';
+        $verifiedAdminOperator = ProcureAdminIdentity::forLogin($data);
+        ProcurePresence::revoke('PROCURE', (string)($_SESSION['user_id'] ?? ''), (string)($_SESSION['last_login'] ?? ''));
         $_SESSION = array();
         session_regenerate_id(true);
     /**/
@@ -66,7 +85,8 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="supplies"){
         $_SESSION["DOMAIN"] = DOMAIN['en']; //id ผู้ใช้งาน 
         $_SESSION["DOMAIN_NAME"] = DOMAIN['th']; //id ผู้ใช้งาน  
         $_SESSION["menu"] = 'sp/dashBard.php'; //id ผู้ใช้งาน   
-        $_SESSION["user_id"] = intval($data["dc_user_id"]); //id ผู้ใช้งาน   
+        $_SESSION["c_user_name"] = $data["c_user_name"];
+    $_SESSION["user_id"] = intval($data["dc_user_id"]); //id ผู้ใช้งาน   
         $_SESSION["user_name"] = $data["c_full_name"]; //ชื่อผู้ใช้งาน
         $_SESSION["dc_emp_id"] = intval($data["dc_emp_id"]); //พนักงานผู้รับผิดชอบ 
         $_SESSION["sp_emp_id"] = intval($data["sp_emp_id"]) ?? null; //
@@ -83,41 +103,13 @@ if(isset($_SESSION["DOMAIN"]) && $_SESSION["DOMAIN"]==="supplies"){
         $_SESSION["dc_cost_id"] = intval($data["dc_cost_id"]); //id หน่วยงาน
         $_SESSION["cost_name"] = $data["cost_name"]; //หน่วยงาน
         $_SESSION["cost_code"] = $data["cost_code"]; //รหัสหน่วยงาน 
-        $_SESSION["i_type_user"] = intval($data["i_type_user"]); //ประเภทผู้ใช้งาน
+        $_SESSION["i_type_user"] = intval($data["i_type_user"]);
+        $_SESSION["admin_operator"] = $verifiedAdminOperator; //ประเภทผู้ใช้งาน
         $_SESSION["super_user"] = intval($data["super_user"]) ?? null;
         $_SESSION["dc_cost_acc_id"] = intval($data["dc_cost_acc_id"]); //id ศูนย์ต้นทุนทางบัญชีของหน่วยงานที่ log in
         $_SESSION["last_login"] = date("Y-m-d H:i:s");
         $_SESSION["created"]  = time();;
 
-//Java Session
-//        require_once("../java/Java.inc");
-//        $session = java_session();
-//        $session->put("DOMAIN_LOGIN", "PROCURE");
-//        $session->put("DOMAIN", DOMAIN['en']);
-//        $session->put("DOMAIN_NAME", DOMAIN['th']);
-//        $session->put("user_id", intval($data["dc_user_id"])); 
-//        $session->put("menu", "sp/dashBard.php");  
-//        $session->put("user_name", $data["c_full_name"]);
-//        $session->put("dc_emp_id", intval($data["dc_emp_id"])); 
-//        $session->put("sp_emp_id", intval($data["sp_emp_id"]));
-//        $session->put("dc_center_user", intval($data["dc_center_user"]));
-////        $session->put("i_type_emp", $data["i_type_emp"]); // 1 ฝ่ายงานซื้อจ้าง , 2 admin , 0 หน่วยงานขอซื้อจ้าง , 3 ผู้บริหารเงิน , 4 ผู้บริหาร
-//        $session->put("dc_department_id", intval($data["dc_department_id"]));
-//        $session->put("dc_department_type_id", intval($data["dc_department_type_id"]));
-//        $session->put("i_seq", $data["i_seq"]);
-//        $session->put("i_level", $data["i_level"]); 
-//        $session->put("c_sp_emp", $data["c_sp_emp"]);
-//        $session->put("c_department_type", $data["c_department_type"]);
-//        $session->put("c_department", $data["c_department"]);
-//        $session->put("c_position", $data["c_position"]); 
-//        $session->put("dc_cost_id", $data["dc_cost_id"]);
-//        $session->put("cost_name", $data["cost_name"]);
-//        $session->put("cost_code", $data["cost_code"]); 
-//        $session->put("i_type_user", $data["i_type_user"]);
-//        $session->put("super_user", $data["super_user"]);
-//        $session->put("dc_cost_acc_id", $data["dc_cost_acc_id"]);
-//        $session->put("last_login", date("Y-m-d H:i:s"));
-//        $session->put("created", time());
  
         $re = array("reval" => 0, "success" => "Success", "msg" => "Login Success");
     }

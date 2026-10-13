@@ -1,0 +1,332 @@
+{
+	"info": {
+		"_postman_id": "0e57d1d0-ed60-406e-9929-1e04ba5680f8",
+		"name": "php-auth-api procure ERP",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "28266242"
+	},
+	"item": [
+		{
+			"name": "Register",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"name\":\"erpsendapi\",\r\n    \"email\":\"erpsendapi@mail.com\",\r\n    \"password\":\"erpsendapi\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/register",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "erpToken",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"email\":\"erpsendapi@mail.com\",\r\n    \"password\":\"erpsendapi\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/login",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "eakibanezToken",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"email\":\"eakibanez@mail.com\",\r\n    \"password\":\"eakibanez\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/login",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "getuserErp",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg4NTM4NDkyLCJleHAiOjE2ODg1NDIwOTIsImRhdGEiOnsidXNlcl9pZCI6IjExIn19.lWG6ZMSIWkyHuDa0n_N8FSQIme0ZxmFjbz-o9q7OkZ4",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "    {\r\n\t  \"datatype\": \"contract\",\r\n\t  \"data\": [\r\n\t\t{\r\n\t\t  \"pr_id\": 513,\r\n\t\t  \"contract_id\": 532,\r\n\t\t  \"contract_code\": \"พวช.ซ.02060/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t},{\r\n\t\t  \"pr_id\": 514,\r\n\t\t  \"contract_id\": 534,\r\n\t\t  \"contract_code\": \"พวช.ซ.02061/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t}\r\n\t  ]\r\n\t}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.201.192/procure/getUser",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"getUser"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "getuserEak",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg4NDYzMTgwLCJleHAiOjE2ODg0NjY3ODAsImRhdGEiOnsidXNlcl9pZCI6IjkifX0.U0R0kj3IR4wmyh5UlZU7MVQGAAhWB45k6hFS8C-kI2A",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "    {\r\n\t  \"datatype\": \"contract\",\r\n\t  \"data\": [\r\n\t\t{\r\n\t\t  \"pr_id\": 513,\r\n\t\t  \"contract_id\": 532,\r\n\t\t  \"contract_code\": \"พวช.ซ.02060/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t},{\r\n\t\t  \"pr_id\": 514,\r\n\t\t  \"contract_id\": 534,\r\n\t\t  \"contract_code\": \"พวช.ซ.02061/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t}\r\n\t  ]\r\n\t}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.201.192/procure/getUser",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"getUser"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "billingPeriod",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg4NTQyMzU0LCJleHAiOjE2ODg1NDU5NTQsImRhdGEiOnsidXNlcl9pZCI6IjExIn19.voLDMjg341yngRjRb9GpwqUCC3dG0WwWtnbNz2mrjXo",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "    {\r\n\t  \"datatype\": \"periodBilling\",\r\n\t  \"data\": [\r\n\t\t{\r\n\t\t  \"pr_id\": 513,\r\n\t\t  \"contract_id\": 532,\r\n\t\t  \"contract_code\": \"พวช.ซ.02060/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t}\r\n\t  ]\r\n\t}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/poPeriod",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"poPeriod"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "billingPeriodTest",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg4NDYzMTgwLCJleHAiOjE2ODg0NjY3ODAsImRhdGEiOnsidXNlcl9pZCI6IjkifX0.U0R0kj3IR4wmyh5UlZU7MVQGAAhWB45k6hFS8C-kI2A",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "    {\r\n\t  \"datatype\": \"periodBilling\",\r\n\t  \"data\": [\r\n\t\t{\r\n\t\t  \"pr_id\": 513,\r\n\t\t  \"contract_id\": 532,\r\n\t\t  \"contract_code\": \"พวช.ซ.02060/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t}\r\n\t  ]\r\n\t}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/poPeriod",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"poPeriod"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "closeContract",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJDOlxccHJvY3VyZSIsImF1ZCI6IkM6XFxwcm9jdXJlIiwiaWF0IjoxNjg4NTQ3MjM4LCJleHAiOjE2ODg1NTA4MzgsImRhdGEiOnsidXNlcl9pZCI6IjExIn19.UPYyGu_jSA6vcRschLQx46pkHPibsu0sHWcrLGF69o4",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "    {\r\n\t  \"datatype\": \"closeContract\",\r\n\t  \"data\": [\r\n\t\t{\r\n\t\t  \"pr_id\": 513,\r\n\t\t  \"contract_id\": 532,\r\n\t\t  \"contract_code\": \"พวช.ซ.02060/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t}\r\n\t  ]\r\n\t}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.201.192/procure/poPeriod",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"201",
+						"192"
+					],
+					"path": [
+						"procure",
+						"poPeriod"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ERP-checkingPeriod",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOlwvXC9sb2NhbGhvc3RcL3BocF9hdXRoX2FwaVwvIiwiYXVkIjoiaHR0cDpcL1wvbG9jYWxob3N0XC9waHBfYXV0aF9hcGlcLyIsImlhdCI6MTY4ODM2NTc0MiwiZXhwIjoxNjg4MzY5MzQyLCJkYXRhIjp7InVzZXJfaWQiOiIxMSJ9fQ.QjQLfLRor-vMCrK1IFaULKjeFepKeNy2PW3x5l7wD18",
+						"type": "default"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "    {\r\n\t  \"datatype\": \"contract\",\r\n\t  \"data\": [\r\n\t\t{\r\n\t\t  \"pr_id\": 513,\r\n\t\t  \"contract_id\": 532,\r\n\t\t  \"contract_code\": \"พวช.ซ.02060/2566\",\r\n\t\t  \"bg_budget_type_id\": 2,\r\n\t\t  \"bg_exp_id\": 139,\r\n\t\t  \"f_total_amt\": 1544800.0,\r\n\t\t  \"partner\": \"บริษัท ไพรม์ เมดิคอล จำกัด\",\r\n\t\t  \"contract_type_id\": 3,\r\n\t\t  \"purchase_method_id\": 3,\r\n\t\t  \"date_end\": \"2023-03-21 00:00:00.000\",\r\n\t\t  \"ordering_date\": \"2023-09-30\"\r\n\t\t}\r\n\t  ]\r\n\t}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://erpdev.vajira.ac.th/api/chula/poChecking",
+					"protocol": "https",
+					"host": [
+						"erpdev",
+						"vajira",
+						"ac",
+						"th"
+					],
+					"path": [
+						"api",
+						"chula",
+						"poChecking"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

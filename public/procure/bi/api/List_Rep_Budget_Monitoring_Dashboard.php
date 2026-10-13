@@ -669,7 +669,7 @@ GROUP BY a.dc_expense_budget_type_id, a.bg_expense_id, a.dc_cost_acc_id";
 		}
 		return false;
 	}));
-
+		// ===== ขั้นตอนหลังกรอง: ตรวจสอบและเติมแถว placeholder สำหรับเงินอุดหนุนรัฐบาล =====
 	// always include placeholders for all government grant codes if any gov rows exist
 	$hasGov = false;
 	foreach ($data as $r) {
@@ -694,7 +694,7 @@ GROUP BY a.dc_expense_budget_type_id, a.bg_expense_id, a.dc_cost_acc_id";
 				$refRow = $r;
 				break;
 			}
-		}
+		} 
 		foreach ($govAllowedBgKeywords as $g) {
 			if (!isset($present[$g['code']])) {
 				$data[] = [
@@ -712,6 +712,10 @@ GROUP BY a.dc_expense_budget_type_id, a.bg_expense_id, a.dc_cost_acc_id";
 			}
 		}
 	}
+
+	// Defensive: ensure $fixedYears and $fixedSources are arrays (may be undefined by includes)
+	$fixedYears = is_array($fixedYears ?? null) ? $fixedYears : (array)($fixedYears ?? []);
+	$fixedSources = is_array($fixedSources ?? null) ? $fixedSources : (array)($fixedSources ?? []);
 
 	if (in_array(intval($year_th), $fixedYears, true)) {
 		// Build case-insensitive list of data names for substring matching

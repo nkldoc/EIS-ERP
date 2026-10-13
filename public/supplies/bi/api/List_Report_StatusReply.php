@@ -63,6 +63,7 @@ function List_QueryParam()
             a.i_enable = 1
             AND b.dc_cost_id = '38'
             AND b.dc_cost_acc_id = 77
+            AND a.c_code_ref LIKE 'D%'
             AND CONVERT(date,a.d_create) BETWEEN '$start_date' AND '$end_date'
         ORDER BY a.c_code_ref, tor.sp_emp_id
     ";
@@ -167,6 +168,7 @@ function List_CompareProtestRounds()
              WHERE a.i_enable = 1
                 AND b.dc_cost_id = '38'
                 AND b.dc_cost_acc_id = 77
+                AND a.c_code_ref LIKE 'D%'
                 AND CONVERT(date, bb.d_doc_date) BETWEEN '$start_date' AND '$end_date'
                 $staffCond
             ) AS total_rounds
@@ -178,6 +180,7 @@ function List_CompareProtestRounds()
              WHERE a.i_enable = 1
                 AND b.dc_cost_id = '38'
                 AND b.dc_cost_acc_id = 77
+                AND a.c_code_ref LIKE 'D%'
                 AND CONVERT(date, bb.d_doc_date) BETWEEN '$start_date' AND '$end_date'
                 $staffCond
             ) AS total_docs
@@ -190,6 +193,7 @@ function List_CompareProtestRounds()
              WHERE a.i_enable = 1
                 AND b.dc_cost_id = '38'
                 AND b.dc_cost_acc_id = 77
+                AND a.c_code_ref LIKE 'D%'
                 AND CONVERT(date, a.d_create) BETWEEN '$start_date' AND '$end_date'
                 $staffCond
             ) AS total_sent
@@ -200,6 +204,7 @@ function List_CompareProtestRounds()
              WHERE a.i_enable = 1
                 AND b.dc_cost_id = '38'
                 AND b.dc_cost_acc_id = 77
+                AND a.c_code_ref LIKE 'D%'
                 AND CONVERT(date, a.d_create) BETWEEN '$start_date' AND '$end_date'
                 $staffCond
             ) AS total_sent_docs
@@ -260,6 +265,7 @@ function List_MonthlyDurationSummary()
             a.i_enable = 1
             AND b.dc_cost_id = '38'
             AND b.dc_cost_acc_id = 77
+            AND a.c_code_ref LIKE 'D%'
             AND CONVERT(date, a.d_create) BETWEEN '$rangeStart' AND '$rangeEnd'
     ";
 
@@ -375,7 +381,7 @@ function List_MonthlyDurationDetail()
             chkp.c_code AS c_code
             ,(select c_code from sp_tor_contract where sp_tor_contract_id = chkp.sp_tor_contract_id) as c_code_contract
             ,a.c_code_ref
-            ,(select c_full_name from nmu..dc_user where dc_user_id = a.dc_user_create_id) as emp_tt
+            ,ISNULL((SELECT c_name FROM NMU_ERP..sp_emp WHERE sp_emp_id = tor.sp_emp_id), 'ไม่ระบุ') AS emp_tt
             ,(Select inv_name from nmu..dc_creditor where dc_creditor_id = chkp.dc_creditor_id) as dc_creditor
             ,CONVERT(date, b.d_audit_date) AS d_audit_date
             ,CONVERT(date, a.d_create) AS d_create
@@ -389,12 +395,21 @@ function List_MonthlyDurationDetail()
             WHERE sch.po_working_hdr_id = a.po_working_hdr_id
             ORDER BY sch.sp_check_period_hdr_id DESC
         ) chkp
+        OUTER APPLY (
+            SELECT TOP 1 d.sp_emp_id
+            FROM sp_check_period_hdr sch
+            INNER JOIN sp_tor_contract stc ON sch.sp_tor_contract_id = stc.sp_tor_contract_id
+            INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
+            WHERE sch.po_working_hdr_id = a.po_working_hdr_id
+            ORDER BY sch.sp_check_period_hdr_id DESC
+        ) tor
         LEFT JOIN NMU_EIS..po_working_item recv
             ON recv.po_working_hdr_id = a.po_working_hdr_id AND recv.i_sub_status = '2.00'
         WHERE
             a.i_enable = 1
             AND b.dc_cost_id = '38'
             AND b.dc_cost_acc_id = 77
+            AND a.c_code_ref LIKE 'D%'
             AND CONVERT(date, a.d_create) BETWEEN '$rangeStart' AND '$rangeEnd'
     ";
 

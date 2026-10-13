@@ -1,0 +1,63 @@
+================JULA=================================
+1. register
+2. login authen copy token to curl add header
+3. send header with token (Authorization:Bearer xxxxxxxxxx) 
+================ERP==================================
+1. login
+2. authen copy session_id=xxxxxxxxxxxxxxxxx 90
+3. send header with (Cookie:session_id=xxxxxxxxxxxxx)
+================ERP==================================
+
+api => ERP {
+    'พวช.ซ.02068/2566'
+    request:[   
+                'mode': UP_SP_TOR_HDR_PERIOD
+                'sp_tor_hdr_period_id': 
+                'tor_id': 700
+                'sp_tor_contract_id': 658
+                'i_is_po': 0
+                'i_is_purchase': 
+                'ap_po_hdr_id': 
+                'i_period': 1
+                'd_doc_date': '17-07-2566'
+                'i_day_use_l': 1
+                'd_period_date': '21-07-2566'
+                'i_day': 4
+                'i_alert': 1
+                'f_total_amt': '100,000.00'
+                'dc_expense_budget_type_id': 2
+                'dc_bg_budget_type_id': 'เงินรายได้คณะแพทย์ฯ-โรงพยาบาล'
+                'dc_cost2_id': 38
+                'i_pr_type1': 1
+                'c_discription3': 
+                'copy_contract_dtl': save
+    ] ,
+    [   //api erp
+              
+                'tor_id': 700 //req
+                'sp_tor_contract_id': 658  //req
+                'i_period': 1//req
+                'd_doc_date': '17-07-2566' //req
+                'd_period_date': '21-07-2566' //req
+                'i_day_use_l': 1 //req
+                'i_day': 4 //req 
+                'i_alert': 1 //req
+                'f_total_amt': '100,000.00'//req  
+                'dc_cost2_id': 38 //req,descript:หน่วยงานที่ใช้ของถ้าไม่รู้ก็ต้องส่งตอนเบิกว่าหน่วยงานไหนเอาไปใช้เท่าไร
+//req};
+KTB => Convert Files & FTPs {
+
+};
+
+//ตรวจรับ CHK001
+
+// ชื่อ|ประเภทการส่งบัญชี|ประเภททรัพย์สิน/วัสดุ|จำนวนเงิน
+{
+    1:ประเภททรัพย์สิน:1|1|1200000|
+    2:ประเภททรัพย์สิน:1|2|1300000|
+    3:ประเภทวัสดุ:2|1|1300000|
+    3:ประเภททรัพย์สินต่ำกว่าเกณฑ์:3|0|12000|
+    --------------งานระหว่างทำ---------------
+    4:ของรวมค่าแรง:4|0|50000|
+    5:ของรวมค่าแรง:5|0|150000|
+}

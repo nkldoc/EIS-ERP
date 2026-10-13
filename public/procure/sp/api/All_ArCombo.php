@@ -48,7 +48,7 @@
 		,(select top 1 c_full_name from dc_user where dc_user_id={$table}.dc_user_update_id) as c_update_name
 		,(select top 1 c_name from dc_cost where dc_cost_id={$table}.dc_user_update_cost_id) as c_cost_update_name
 		, convert(varchar, d_update, 120) as d_update_dt
-		, ROW_NUMBER() OVER (ORDER BY $sort $dir) as row FROM NMU_EIS.dbo.{$table}
+		, ROW_NUMBER() OVER (ORDER BY $sort $dir) as row FROM {$table}
 		where i_enable = 1";
 
      if($mode=="SEARCH"){ 

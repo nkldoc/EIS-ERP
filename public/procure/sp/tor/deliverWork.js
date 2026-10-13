@@ -206,6 +206,7 @@ Ext.genLink = function (i, f) {
 };
 
 Ext.getMoney = function (rs) {
+    if (Number(rs.get("i_booking_bg")) === 3) return;
 
     Ext.perioidHdr = rs;
     var link = Ext.genLink(1, 0);

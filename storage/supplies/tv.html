@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Switch Group Example</title>
+    <style>
+        .group {
+            display: none;
+        }
+        .group.active {
+            display: block;
+        }
+        .container {
+            text-align: center;
+            padding: 20px;
+            font-size: 24px;
+            background-color: #eef;
+        }
+    </style>
+</head>
+<body>
+
+<div id="mainGroup" class="group container active">
+    <p>🟦 Main Group (แสดงชุดที่ 1)</p>
+</div>
+
+<div id="subGroup" class="group container">
+    <p>🟩 Sub Group (แสดงชุดที่ 2)</p>
+</div>
+
+<script>
+    let main = document.getElementById('mainGroup');
+    let sub = document.getElementById('subGroup');
+    let current = 'main';
+
+    setInterval(() => {
+        if (current === 'main') {
+            main.classList.remove('active');
+            sub.classList.add('active');
+            current = 'sub';
+        } else {
+            sub.classList.remove('active');
+            main.classList.add('active');
+            current = 'main';
+        }
+    }, 10000); // สลับทุก 10 วินาที
+</script>
+
+</body>
+</html>

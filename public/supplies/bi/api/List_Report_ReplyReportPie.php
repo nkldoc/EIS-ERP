@@ -398,6 +398,10 @@ function List_QueryParam()
                 $i_type_bg = "color:#FF1493";
                 $i_type_bgTxt = 'การจัดทำ PR ก่อนปีงบประมาณ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';

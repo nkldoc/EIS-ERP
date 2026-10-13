@@ -15,7 +15,7 @@ if ($_REQUEST["type"] == "bg_expense") {
 	$sqlMain = "
 		SELECT
 			a.*
-		FROM ".DB_NMU_EIS."bg_expense a
+		FROM {$DBNAME} bg_expense a
 		WHERE a.i_enable = 1 AND a.i_delete = 2
 			AND a.i_level = {$_REQUEST["i_level"]}
 		ORDER BY a.c_code_tree;";

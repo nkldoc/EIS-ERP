@@ -6,7 +6,7 @@ include("../../lib/export/exportUtil.php");
 $year_en = isset($_REQUEST["year_en"]) ? intval($_REQUEST["year_en"]) : intval(date('Y'));
 $year_th = $year_en + 543;
 // [เพิ่ม] รองรับ col=pr_open สำหรับหน้า "PR ที่ยังไม่ได้ทำสัญญา" (has_po=0 เท่านั้น)
-$col     = in_array($_REQUEST["col"] ?? "", ["pr", "po", "pr_open"]) ? $_REQUEST["col"] : "pr";
+$col     = in_array($_REQUEST["col"] ?? "", ["pr", "po", "pr_open", "plan_in", "plan_out", "plan_none", "plan_pr"]) ? $_REQUEST["col"] : "pr";
 $dc_cost_id = isset($_REQUEST["dc_cost_id"]) ? intval($_REQUEST["dc_cost_id"]) : 38;
 
 // [FIX] รองรับเลือกได้หลายแหล่งเงินพร้อมกัน (ค่าที่ส่งมาอาจเป็น "5,4")
@@ -31,6 +31,26 @@ $data_json = List_QueryParam();
 $data_arr  = json_decode($data_json, true);
 $pr_rows   = $data_arr["data"]     ?? [];
 $po_rows   = $data_arr["contract"] ?? [];
+
+// [FIX] ผลลัพธ์จาก List_QueryParam() (SQL ไม่มี ORDER BY ที่เสถียร) คืนลำดับแถวไม่คงที่
+// ทำให้ทุกครั้งที่รีเฟรช/ทุก user เห็นลำดับแถวสลับกันไปมา (แถวแรกเปลี่ยนเรื่อย ๆ)
+// ทั้งที่ยอดรวม/จำนวนรายการเท่ากัน — เรียงเองด้วยเลขที่ PR (c_code) แล้วตามด้วย
+// แหล่งเงิน/ประเภทงบ/ยอดเงิน เพื่อให้ลำดับคงที่เหมือนกันทุกครั้ง ทุกมุมมอง ทุก user
+$sort_rows = function ($a, $b) {
+    return [
+        (string)($a['c_code'] ?? ''),
+        (int)($a['dc_expense_budget_type_id'] ?? 0),
+        (int)($a['bg_expense_id'] ?? 0),
+        (float)($a['f_amt'] ?? 0),
+    ] <=> [
+        (string)($b['c_code'] ?? ''),
+        (int)($b['dc_expense_budget_type_id'] ?? 0),
+        (int)($b['bg_expense_id'] ?? 0),
+        (float)($b['f_amt'] ?? 0),
+    ];
+};
+usort($pr_rows, $sort_rows);
+usort($po_rows, $sort_rows);
 
 // [FIX] กรองตามแหล่งเงินที่เลือกไว้ทั้งหมด (ถ้าไม่ได้เลือกเลย = แสดงทั้งหมด)
 if (!empty($dc_expense_budget_type_ids)) {
@@ -93,7 +113,57 @@ $f_checksum_diff = $f_reserve_total_ref - $f_checksum_sum;
 $is_checksum_ok  = abs($f_checksum_diff) < 1;
 
 // [เพิ่ม] pr_open ใช้ตาราง/สไตล์แบบเดียวกับ pr (เหลือง) แต่กรองเฉพาะแถวที่ยังไม่มี PO
-$is_pr = in_array($col, ["pr", "pr_open"], true);
+// [เพิ่ม] plan_in / plan_out / plan_none = รายการ PR ตามแผน / นอกแผน / ยังไม่ระบุ (sp_tor.plan_status = 1/2/0)
+$is_plan = in_array($col, ["plan_in", "plan_out", "plan_none"], true);
+$plan_status_filter = $col === "plan_in" ? 1 : ($col === "plan_out" ? 2 : 0);
+// [เพิ่ม] plan_pr = รายการ PR ทั้งหมด (เหมือน col=pr) แต่เข้าจากการ์ด "รหัสแผน / PR" ธีมสีฟ้า
+$is_pr = in_array($col, ["pr", "pr_open", "plan_pr"], true) || $is_plan;
+// [เพิ่ม] ธีมสีของหน้ารายงาน แยกตาม col
+//   pr / pr_open           -> เหลือง
+//   po / plan_out (นอกแผน) -> แดง
+//   plan_in  (ตามแผน)      -> เขียว
+//   plan_none (ยังไม่ระบุ) -> เทา
+//   plan_pr  (รหัสแผน/PR)  -> ฟ้า
+$theme = [
+    "main"      => "#f6c23e", "head_font" => "#000",
+    "btn"       => "btn-warning", "text" => "text-warning", "icon" => "📋",
+    "xls_hdr"   => "F6C23E", "xls_hdr_font" => "000000",
+    "xls_sum_bg" => "FFF3CD", "xls_sum_font" => "856404",
+    "xls_stripe" => "FFFDE7", "xls_code_font" => "0000AA",
+];
+if (in_array($col, ["po", "plan_out"], true)) {
+    $theme = [
+        "main" => "#e74a3b", "head_font" => "#fff",
+        "btn" => "btn-danger", "text" => "text-danger", "icon" => "📑",
+        "xls_hdr" => "E74A3B", "xls_hdr_font" => "FFFFFF",
+        "xls_sum_bg" => "FADBD8", "xls_sum_font" => "922B21",
+        "xls_stripe" => "FFF5F5", "xls_code_font" => "AA0000",
+    ];
+} elseif ($col === "plan_in") {
+    $theme = [
+        "main" => "#2fae64", "head_font" => "#fff",
+        "btn" => "btn-success", "text" => "text-success", "icon" => "📗",
+        "xls_hdr" => "2FAE64", "xls_hdr_font" => "FFFFFF",
+        "xls_sum_bg" => "D9F2E4", "xls_sum_font" => "1C7A45",
+        "xls_stripe" => "F1FBF5", "xls_code_font" => "1C7A45",
+    ];
+} elseif ($col === "plan_none") {
+    $theme = [
+        "main" => "#8a94a6", "head_font" => "#fff",
+        "btn" => "btn-secondary", "text" => "text-secondary", "icon" => "📋",
+        "xls_hdr" => "8A94A6", "xls_hdr_font" => "FFFFFF",
+        "xls_sum_bg" => "E9ECF0", "xls_sum_font" => "5A6472",
+        "xls_stripe" => "F5F6F8", "xls_code_font" => "5A6472",
+    ];
+} elseif ($col === "plan_pr") {
+    $theme = [
+        "main" => "#4a6cf7", "head_font" => "#fff",
+        "btn" => "btn-primary", "text" => "text-primary", "icon" => "📘",
+        "xls_hdr" => "4A6CF7", "xls_hdr_font" => "FFFFFF",
+        "xls_sum_bg" => "E2E9FF", "xls_sum_font" => "2A3EA1",
+        "xls_stripe" => "F5F7FF", "xls_code_font" => "2A3EA1",
+    ];
+}
 // [FIX] ตาราง PR แสดงทุกแถว (ทั้งที่มี/ไม่มี PO) เพื่อให้เห็นภาพรวมการหักเงินไปจองสัญญา
 // [FIX-CHECKSUM] หน้า "รายการจองสัญญา (PO)" เปลี่ยนมาใช้ $pr_with_po (Result Set 1, has_po=1)
 // เป็นแหล่งข้อมูลโดยตรง แทนตาราง PO/สัญญาแยกต่างหาก ($po_own_match, Result Set 3) เพราะเป็น
@@ -102,18 +172,37 @@ $is_pr = in_array($col, ["pr", "pr_open"], true);
 // [เพิ่ม] pr_open แสดงเฉพาะ $pr_only (has_po=0) — คือรายการ "PR ที่ยังไม่ได้ทำสัญญา" ล้วนๆ
 if ($col === "pr_open") {
     $rows = $pr_only;
+} elseif ($is_plan) {
+    $rows = array_values(array_filter($pr_rows, function ($r) use ($plan_status_filter) {
+        return intval($r['plan_status'] ?? 0) === $plan_status_filter;
+    }));
+    // ยอดสรุป/ท้ายตาราง คิดเฉพาะรายการในกลุ่มแผนนี้
+    $f_pr_deducted_total  = array_sum(array_map(function ($r) { return intval($r['has_po'] ?? 0) > 0 ? floatval($r['f_amt'] ?? 0) : 0; }, $rows));
+    $f_pr_remaining_total = array_sum(array_map(function ($r) { return intval($r['has_po'] ?? 0) > 0 ? 0 : floatval($r['f_amt'] ?? 0); }, $rows));
 } elseif ($is_pr) {
     $rows = $pr_rows;
 } else {
     $rows = $pr_with_po;
 }
-$title_page = $col === "pr_open" ? "รายการ PR ที่ยังไม่ได้ทำสัญญา" : ($is_pr ? "รายการจอง PR" : "รายการจองสัญญา (PO)");
+$plan_title_map = ["plan_in" => "รายการ PR ตามแผน", "plan_out" => "รายการ PR นอกแผน", "plan_none" => "รายการ PR ยังไม่ระบุแผน"];
+$title_page = $col === "pr_open" ? "รายการ PR ที่ยังไม่ได้ทำสัญญา"
+    : ($col === "plan_pr" ? "รายการ รหัสแผน / PR"
+    : ($is_plan ? $plan_title_map[$col]
+    : ($is_pr ? "รายการจอง PR" : "รายการจองสัญญา (PO)")));
 $rows_count  = count($rows);
 $total_amt   = $col === "pr_open" ? $f_pr_remaining_total : ($is_pr ? ($f_pr_remaining_total + $f_pr_deducted_total) : $f_pr_deducted_total);
 $total_count = $rows_count;
 // [เพิ่ม] มุมมอง pr_open มีแต่แถว has_po=0 ทุกแถว คอลัมน์ "หัก ณ จองในสัญญา" จะเป็น 0.00 เสมอ
 // จึงไม่มีประโยชน์ ตัดออกจากตาราง/ export ของมุมมองนี้
 $show_deduct_col = ($col !== "pr_open");
+// [เพิ่ม] มุมมองแผน (ตามแผน/นอกแผน/ยังไม่ระบุ) ไม่ต้องโชว์คอลัมน์ยอดเงิน
+//   (เงินจอง PR / หัก ณ จองในสัญญา / คงเหลือ PR) — ถ้าต้องใช้ในอนาคตให้ตั้งเป็น true
+// [เพิ่ม] plan_pr ใช้เลย์เอาต์ตารางแบบหน้า "ตามแผน" (คอลัมน์ "จำนวนเงิน" เดียว) แต่ข้อมูลเป็น PR ทั้งหมด
+$show_amt_cols = !$is_plan && $col !== "plan_pr";
+// [เพิ่ม] มุมมองแผน + plan_pr โชว์คอลัมน์ "จำนวนเงิน" เดี่ยว ๆ แทน 3 คอลัมน์ยอดเงิน
+$show_plan_amt = $is_plan || $col === "plan_pr";
+// จำนวนคอลัมน์รวมของตาราง PR (สำหรับ colspan ของแถว "ไม่พบข้อมูล")
+$pr_col_count  = 11 + ($show_amt_cols ? ($show_deduct_col ? 3 : 2) : ($show_plan_amt ? 1 : 0));
 
 function thaiDate($d) {
     if (!$d || $d === '0000-00-00') return '-';
@@ -138,8 +227,8 @@ function thaiDate($d) {
     <style>
         body { background: #f8f9fc; font-family: 'Sarabun', sans-serif; }
         .page-header { background: #fff; border-bottom: 1px solid #e3e6f0; padding: 1rem 1.5rem; margin-bottom: 1.5rem; }
-        .page-header h4 { margin: 0; font-weight: 700; color: <?= $is_pr ? '#f6c23e' : '#e74a3b' ?>; }
-        .stat-card { background: #fff; border-left: 4px solid <?= $is_pr ? '#f6c23e' : '#e74a3b' ?>; border-radius: 6px; padding: 1rem 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .page-header h4 { margin: 0; font-weight: 700; color: <?= $theme['main'] ?>; }
+        .stat-card { background: #fff; border-left: 4px solid <?= $theme['main'] ?>; border-radius: 6px; padding: 1rem 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
         .stat-card .stat-title { font-size: .8rem; color: #858796; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .25rem; }
         .stat-card .stat-value { font-size: 1.5rem; font-weight: 700; }
         .card-custom { background: #fff; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.07); overflow: hidden; margin-bottom: 1.5rem; }
@@ -148,7 +237,7 @@ function thaiDate($d) {
         .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-style: normal; font-size: .9rem; }
         .search-box input { padding-left: 32px; border-radius: 20px; font-size: .85rem; border: 1px solid #d1d3e2; width: 280px; height: 34px; }
         .table-modern { width: 100%; border-collapse: collapse; font-size: .875rem; }
-        .table-modern thead th { background: <?= $is_pr ? '#f6c23e' : '#e74a3b' ?>; color: <?= $is_pr ? '#000' : '#fff' ?>; padding: .6rem .75rem; font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
+        .table-modern thead th { background: <?= $theme['main'] ?>; color: <?= $theme['head_font'] ?>; padding: .6rem .75rem; font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 1; }
         .table-modern tbody tr:nth-child(even) { background: #f8f9fc; }
         .table-modern tbody tr:hover { background: #eaecf4; }
         .table-modern td { padding: .5rem .75rem; border-bottom: 1px solid #e3e6f0; vertical-align: middle; }
@@ -168,7 +257,7 @@ function thaiDate($d) {
 <div class="page-header">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
-            <h4><?= $is_pr ? '📋' : '📑' ?> <?= $title_page ?></h4>
+            <h4><?= $theme['icon'] ?> <?= $title_page ?></h4>
             <small class="text-muted">ปีงบประมาณ <?= $year_th ?> &nbsp;|&nbsp; ข้อมูล ณ วันที่ <?= date("d/m/Y H:i") ?></small>
         </div>
         <button class="btn btn-outline-secondary btn-sm" onclick="window.close()">✕ ปิดหน้านี้</button>
@@ -182,7 +271,7 @@ function thaiDate($d) {
         <div class="col-12 mb-3">
             <div class="stat-card">
                 <div class="stat-title"><?= $title_page ?></div>
-                <div class="stat-value <?= $is_pr ? 'text-warning' : 'text-danger' ?>"><?= number_format($total_amt, 2) ?> บาท</div>
+                <div class="stat-value <?= $theme['text'] ?>"><?= number_format($total_amt, 2) ?> บาท</div>
                 <div class="small text-muted"><?= number_format($total_count) ?> รายการ</div>
             </div>
         </div>
@@ -219,7 +308,7 @@ function thaiDate($d) {
     <div class="card-custom">
         <div class="toolbar">
             <div class="d-flex align-items-center gap-2">
-                <span class="<?= $is_pr ? 'text-warning' : 'text-danger' ?> font-weight-bold">
+                <span class="<?= $theme['text'] ?> font-weight-bold">
                     ยอดรวม: <?= number_format($total_amt, 2) ?> บาท (<?= $total_count ?> รายการ)
                 </span>
             </div>
@@ -227,9 +316,9 @@ function thaiDate($d) {
                 <div class="search-box">
                     <i class="search-icon">🔍</i>
                     <input type="text" id="searchInput" class="form-control"
-                           placeholder="ค้นหา<?= $is_pr ? ' เลขที่ PR' : ' เลขที่ PO' ?>, รายการ, ผู้รับผิดชอบ...">
+                           placeholder="ค้นหา<?= $is_pr ? ' เลขที่ PR, รหัสแผน' : ' เลขที่ PO' ?>, รายการ, ผู้รับผิดชอบ...">
                 </div>
-                <button class="btn <?= $is_pr ? 'btn-warning' : 'btn-danger' ?> btn-sm rounded-pill px-3 ml-2"
+                <button class="btn <?= $theme['btn'] ?> btn-sm rounded-pill px-3 ml-2"
                         onclick="exportToExcel()">
                     📊 Export Excel
                 </button>
@@ -241,9 +330,10 @@ function thaiDate($d) {
             <table class="table-modern" id="mainTable">
                 <thead>
                     <tr>
-                        <th class="text-center" width="45">#</th>
+                        <th class="text-center" width="70">ลำดับที่</th>
                         <th>เลขที่ PR</th>
                         <th>ชื่อรายการ</th>
+                        <th style="white-space:nowrap;">รหัสแผน</th>
                         <th>ประเภทความก้าวหน้า</th>
                         <th>หน่วยงาน</th>
                         <th>สถานะ</th>
@@ -251,9 +341,13 @@ function thaiDate($d) {
                         <th>แหล่งเงิน</th>
                         <th>ผู้รับผิดชอบ</th>
                         <th>สายงาน</th>
+                        <?php if ($show_amt_cols): /* มุมมองแผนไม่โชว์ 3 คอลัมน์ยอดเงิน — ถ้าต้องใช้ตั้ง $show_amt_cols = true */ ?>
                         <th class="text-right">เงินจอง PR (บาท)</th>
                         <?php if ($show_deduct_col): ?><th class="text-right">หัก ณ จองในสัญญา (บาท)</th><?php endif; ?>
                         <th class="text-right">คงเหลือ PR (บาท)</th>
+                        <?php elseif ($show_plan_amt): ?>
+                        <th class="text-right">จำนวนเงิน (บาท)</th>
+                        <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody id="mainTableBody">
@@ -273,6 +367,7 @@ function thaiDate($d) {
                             <td class="text-center text-muted"><?= $i+1 ?></td>
                             <td class="font-weight-bold text-primary"><?= htmlspecialchars($row['c_code'] ?? '-') ?></td>
                             <td><div style="min-width:300px;white-space:normal;word-wrap:break-word;line-height:1.4;"><?= htmlspecialchars($row['c_name'] ?? '-') ?></div></td>
+                            <td style="white-space:nowrap;"><?= htmlspecialchars($row['plan_code'] ?? '') !== '' ? htmlspecialchars($row['plan_code']) : '-' ?></td>
                             <td>
                                 <small class="d-block text-muted"><?= htmlspecialchars($row['event_type'] ?? '-') ?></small>
                                 <?= htmlspecialchars($row['sp_event_detail'] ?? '') ?>
@@ -289,29 +384,42 @@ function thaiDate($d) {
                             </td>
                             <td><?= htmlspecialchars($row['sp_emp'] ?? '-') ?></td>
                             <td><?= htmlspecialchars($row['dc_department'] ?? '-') ?></td>
+                            <?php if ($show_amt_cols): ?>
                             <td class="text-right font-weight-bold"><?= number_format($f_amt, 2) ?></td>
                             <?php if ($show_deduct_col): ?><td class="text-right font-weight-bold" style="color:#6f42c1;"><?= number_format($deduct, 2) ?></td><?php endif; ?>
                             <td class="text-right font-weight-bold text-warning"><?= number_format($remain, 2) ?></td>
+                            <?php elseif ($show_plan_amt): ?>
+                            <td class="text-right font-weight-bold"><?= number_format($f_amt, 2) ?></td>
+                            <?php endif; ?>
                         </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="<?= $show_deduct_col ? 13 : 12 ?>" class="text-center py-5 text-muted">ไม่พบข้อมูล</td></tr>
+                        <tr><td colspan="<?= $pr_col_count ?>" class="text-center py-5 text-muted">ไม่พบข้อมูล</td></tr>
                     <?php endif; ?>
                 </tbody>
+                <?php if ($show_amt_cols): ?>
                 <tfoot>
                     <tr style="background:#f8f9fc;font-weight:700;">
-                        <td colspan="10" class="text-right">รวม</td>
+                        <td colspan="11" class="text-right">รวม</td>
                         <td class="text-right"><?= number_format($total_amt, 2) ?></td>
                         <?php if ($show_deduct_col): ?><td class="text-right" style="color:#6f42c1;"><?= number_format($f_pr_deducted_total, 2) ?></td><?php endif; ?>
-                        <td class="text-right text-warning"><?= number_format($f_pr_remaining_total, 2) ?></td>>
+                        <td class="text-right text-warning"><?= number_format($f_pr_remaining_total, 2) ?></td>
                     </tr>
                 </tfoot>
+                <?php elseif ($show_plan_amt): ?>
+                <tfoot>
+                    <tr style="background:#f8f9fc;font-weight:700;">
+                        <td colspan="11" class="text-right">รวม</td>
+                        <td class="text-right"><?= number_format($total_amt, 2) ?></td>
+                    </tr>
+                </tfoot>
+                <?php endif; ?>
             </table>
             <?php else: ?>
             <table class="table-modern" id="mainTable">
                 <thead>
                     <tr>
-                        <th class="text-center" width="45">#</th>
+                        <th class="text-center" width="70">ลำดับที่</th>
                         <th>เลขที่ PR</th>
                         <th>ชื่อรายการ</th>
                         <th>หน่วยงาน</th>
@@ -377,21 +485,30 @@ document.getElementById("searchInput").addEventListener("input", function() {
 function exportToExcel() {
     var X = XLSX;
     var isPr  = <?= $is_pr ? 'true' : 'false' ?>;
+    var isPlan = <?= $is_plan ? 'true' : 'false' ?>;
     var showDeductCol = <?= $show_deduct_col ? 'true' : 'false' ?>;
+    var showAmtCols   = <?= $show_amt_cols ? 'true' : 'false' ?>;
+    var showPlanAmt   = <?= $show_plan_amt ? 'true' : 'false' ?>;
     var yearTh = <?= $year_th ?>;
     var totalAmt = <?= $total_amt ?>;
     var numFmt = '#,##0.00';
 
+    var prBaseHeaders = ["ลำดับที่","เลขที่ PR","ชื่อรายการ","รหัสแผน","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","สถานะการจอง","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน"];
+    var prAmtHeaders  = showDeductCol
+        ? ["เงินจอง PR (บาท)","หัก ณ จองในสัญญา (บาท)","คงเหลือ PR (บาท)"]
+        : ["เงินจอง PR (บาท)","คงเหลือ PR (บาท)"];
     var headers = isPr
-        ? (showDeductCol
-            ? ["#","เลขที่ PR","ชื่อรายการ","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","สถานะการจอง","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจอง PR (บาท)","หัก ณ จองในสัญญา (บาท)","คงเหลือ PR (บาท)"]
-            : ["#","เลขที่ PR","ชื่อรายการ","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","สถานะการจอง","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจอง PR (บาท)","คงเหลือ PR (บาท)"])
-        : ["#","เลขที่ PR","ชื่อรายการ","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจองสัญญา (บาท)"];
+        ? (showAmtCols ? prBaseHeaders.concat(prAmtHeaders)
+           : (showPlanAmt ? prBaseHeaders.concat(["จำนวนเงิน (บาท)"]) : prBaseHeaders.slice()))
+        : ["ลำดับที่","เลขที่ PR","ชื่อรายการ","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจองสัญญา (บาท)"];
 
     var colCount = headers.length;
     // [FIX] ตาราง PR ปกติมี 3 คอลัมน์ยอดเงิน (เงินจอง PR / หัก ณ จองในสัญญา / คงเหลือ PR)
     // มุมมอง pr_open ไม่มี "หัก ณ จองในสัญญา" จึงเหลือ 2 คอลัมน์ยอดเงิน ส่วน PO มี 1 คอลัมน์
-    var amtCols = isPr ? (showDeductCol ? [colCount - 3, colCount - 2, colCount - 1] : [colCount - 2, colCount - 1]) : [colCount - 1];
+    // มุมมองแผน (ตามแผน/นอกแผน/ยังไม่ระบุ) มีคอลัมน์ยอดเงินเดียว = "จำนวนเงิน"
+    var amtCols = showAmtCols
+        ? (isPr ? (showDeductCol ? [colCount - 3, colCount - 2, colCount - 1] : [colCount - 2, colCount - 1]) : [colCount - 1])
+        : (showPlanAmt ? [colCount - 1] : []);
 
     function cs(bgHex, fontHex, bold, numFmtCode, h) {
         var s = {
@@ -414,11 +531,12 @@ function exportToExcel() {
         return { v: v, t: typeof v === 'number' ? 'n' : 's', s: cs(bgHex, fontHex, bold, numFmtCode, h) };
     }
 
-    var hdrBg  = isPr ? 'F6C23E' : 'E74A3B';
-    var hdrFc  = isPr ? '000000' : 'FFFFFF';
-    var sumBg  = isPr ? 'FFF3CD' : 'FADBD8';
-    var sumFc  = isPr ? '856404' : '922B21';
-    var stripe = isPr ? 'FFFDE7' : 'FFF5F5';
+    var hdrBg  = '<?= $theme['xls_hdr'] ?>';
+    var hdrFc  = '<?= $theme['xls_hdr_font'] ?>';
+    var sumBg  = '<?= $theme['xls_sum_bg'] ?>';
+    var sumFc  = '<?= $theme['xls_sum_font'] ?>';
+    var stripe = '<?= $theme['xls_stripe'] ?>';
+    var codeFc = '<?= $theme['xls_code_font'] ?>';
     var titleLabel = <?= json_encode($title_page, JSON_UNESCAPED_UNICODE) ?>;
 
     var aoa = [];
@@ -457,12 +575,13 @@ function exportToExcel() {
         var bg = ri % 2 === 0 ? stripe : 'FFFFFFFF';
         aoa.push(r.map(function(v, ci) {
             if (amtCols.indexOf(ci) !== -1) return cell(v, bg, sumFc, true, numFmt);
-            if (ci === 1) return cell(String(v), bg, isPr ? '0000AA' : 'AA0000', true, null, 'center');
+            if (ci === 1) return cell(String(v), bg, codeFc, true, null, 'center');
             return cell(String(v), bg, null, false);
         }));
     });
 
-    // Sum row
+    // Sum row (เฉพาะเมื่อมีคอลัมน์ยอดเงิน — มุมมองแผนไม่มี จึงข้าม)
+    if (amtCols.length) {
     var labelCol = amtCols[0] - 1;
     aoa.push(headers.map(function(h, i) {
         if (i === labelCol) return cell("ยอดรวม", sumBg, sumFc, true);
@@ -482,6 +601,7 @@ function exportToExcel() {
         }
         return cell('', sumBg, null, false);
     }));
+    }
 
     // Build sheet
     var ws = {};
@@ -496,10 +616,11 @@ function exportToExcel() {
     ws["!ref"] = X.utils.encode_range({s:{r:0,c:0}, e:{r:aoa.length-1,c:maxC-1}});
 
     // Column widths
+    var prBaseWch = [{wch:5},{wch:18},{wch:55},{wch:16},{wch:35},{wch:22},{wch:20},{wch:22},{wch:20},{wch:32},{wch:18}];
+    var prAmtWch  = showDeductCol ? [{wch:18},{wch:18},{wch:20}] : [{wch:18},{wch:20}];
     var wch = isPr
-        ? (showDeductCol
-            ? [{wch:5},{wch:18},{wch:55},{wch:35},{wch:22},{wch:20},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:18},{wch:20}]
-            : [{wch:5},{wch:18},{wch:55},{wch:35},{wch:22},{wch:20},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:20}])
+        ? (showAmtCols ? prBaseWch.concat(prAmtWch)
+           : (showPlanAmt ? prBaseWch.concat([{wch:20}]) : prBaseWch.slice()))
         : [{wch:5},{wch:18},{wch:55},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:18}];
     ws['!cols'] = wch;
     ws['!freeze'] = {xSplit:0, ySplit:4};

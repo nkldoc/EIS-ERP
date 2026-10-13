@@ -927,6 +927,7 @@ switch ($mode) {
         $arrParam[] = $data["c_remake"] ?? null;
         $arrParam[] = $data["plan_status"] ?? null;
         $arrParam[] = $data["plan_code"] ?? null;
+        $arrParam[] = $data["plan_seq"] ?? null;
         $arrParam[] = !empty($data["f_total_amt"]) ? str_replace(',', '', $data["f_total_amt"]) : 0;
         // $arrParam[] = empty($data['d_tor_status_date']) ? date('Y-m-d H:i:s') : $date->bc_to_ad($data['d_tor_status_date']) . " " . date('H:i:s');
         // $arrParam[] = $date->bc_to_ad(date('Y-m-d H:i:s'));
@@ -968,6 +969,7 @@ switch ($mode) {
                         , c_remake = ?
                         , plan_status = ?
                         , plan_code = ?
+                        , plan_seq = ?
                         , f_total_amt = ?
 
                         , d_tor_status_date=?
@@ -1345,6 +1347,8 @@ switch ($mode) {
             $tor_id = $data["id"];
             $arrValue = array();
             $add_value = array();
+            // กันสร้าง sp_tor_dtl ซ้ำ กรณีผ่านรายการจาก 10060 มากกว่า 1 ครั้ง (เช่น ถอยรายการแล้วผ่านใหม่)
+            $hasDtl = $db->GetDataBySQL("SELECT COUNT(*) FROM sp_tor_dtl WHERE sp_tor_id = ?", array($tor_id));
             $pr_id = $db->GetDataBySQL("SELECT
                 tor_id
                 ,24 as dc_unit_type_id
@@ -1377,7 +1381,7 @@ switch ($mode) {
                 FROM dbo.sp_tor a  WHERE a.tor_id=?", array($tor_id));
             $str = "";
             $add_value = "";
-            for ($x = 1; $x <= $data["i_amount_bg"]; $x++) {
+            for ($x = 1; !$hasDtl && $x <= $data["i_amount_bg"]; $x++) {
 
                 $key = $x == 1 ? null : $x;
                 $str = "   select
@@ -1807,6 +1811,30 @@ switch ($mode) {
         break;
 
     case "ADD":
+      try {
+        // "เป็น PR ลูกของ..." : ผูก PR ใหม่เข้ากับ PR แม่ที่เลือกจาก popup โดยใช้เลข PR เดียวกัน ไม่ออกเลขใหม่
+        // อ่านค่ามาก่อนตั้งแต่ต้น case เพื่อใช้เป็นค่า default ให้ field ที่ client (popup แยก PR) ไม่ได้ส่งมา
+        $parent_pr_id = !empty($data["parent_id"]) ? intval($data["parent_id"]) : null;
+        $parent_c_code = null;
+        if ($parent_pr_id) {
+            $parentRow = $db->GetDataBySQL("SELECT c_code, sp_type_id, index_receive FROM dbo.sp_tor WHERE tor_id = ?", array($parent_pr_id));
+            $parent_c_code = $parentRow['c_code'] ?? null;
+            if (!isset($data['sp_type_id']) || $data['sp_type_id'] === '' || $data['sp_type_id'] === null) {
+                $data['sp_type_id'] = $parentRow['sp_type_id'] ?? null;
+            }
+            if (!isset($data['index_receive']) || $data['index_receive'] === '' || $data['index_receive'] === null) {
+                $data['index_receive'] = $parentRow['index_receive'] ?? null;
+            }
+        }
+
+        // client (popup แยก PR) ไม่ได้ส่ง field เหล่านี้มา ใช้ค่าจาก session ปัจจุบันแทน
+        $data['dc_user_create_id'] = $data['dc_user_create_id'] ?? ($_SESSION['user_id'] ?? null);
+        $data['dc_user_create_cost_id'] = $data['dc_user_create_cost_id'] ?? ($_SESSION['dc_cost_id'] ?? null);
+        $data['d_create'] = $data['d_create'] ?? date("Y-m-d H:i:s");
+        $data['dc_user_update_id'] = $data['dc_user_update_id'] ?? ($_SESSION['user_id'] ?? null);
+        $data['dc_user_update_cost_id'] = $data['dc_user_update_cost_id'] ?? ($_SESSION['dc_cost_id'] ?? null);
+        $data['d_update'] = $data['d_update'] ?? date("Y-m-d H:i:s");
+
         $arrParam = array();
         $arrParam[] = $data["c_name"] ?? null;
 
@@ -1833,7 +1861,7 @@ switch ($mode) {
         $arrParam[] = $data["dc_cost2_id"] ?? null;
         $arrParam[] = $data["dc_sub_cost_id"] ?? null;
         $arrParam[] = $data["tag"] ?? null;
-        $arrParam[] = ($data["txtsub_cost"] == "*ถ้ามี" ? null : $data["txtsub_cost"]);
+        $arrParam[] = (($data["txtsub_cost"] ?? null) == "*ถ้ามี" ? null : ($data["txtsub_cost"] ?? null));
         $arrParam[] = (($f_total_amt >= 500000) ? 1 : 0);
         $arrParam[] = @$data["i_is_rename"] ?? null;
 
@@ -1888,6 +1916,16 @@ switch ($mode) {
         $arrParam[] = isset($data["i_type_year"]) ? intval($data["i_type_year"]) : null;
         $arrParam[] = ($data["i_type_year"] ?? null) == 2 ? ($data["mm_start"] ?? null) : null;
 
+        $arrParam[] = $parent_c_code;
+        $arrParam[] = $parent_pr_id;
+        $arrParam[] = $data["sp_emp_id"] ?? null;
+        // PR ลูก (parent_id ตั้ง) ต้องเริ่มที่ขั้นตอนเดียวกับ PR แม่ ไม่งั้นจะไม่ขึ้นในหน้าค้นหา/รายการของเมนูปัจจุบัน
+        $arrParam[] = $data["tor_status_id"] ?? null;
+        $arrParam[] = isset($data["i_step"]) ? intval($data["i_step"]) : null;
+        $arrParam[] = isset($data["i_forword"]) ? intval($data["i_forword"]) : null;
+        $arrParam[] = isset($data["i_backword"]) ? intval($data["i_backword"]) : null;
+        $arrParam[] = $data["dc_department_id"] ?? null; // สายงาน เกาะจาก PR แม่
+
         $sql = "SET NOCOUNT ON
         INSERT INTO {$table} (c_name
             , d_tor_date
@@ -1923,90 +1961,67 @@ switch ($mode) {
                         , dc_user_update_id, dc_user_update_cost_id, d_update
                         , index_receive
                         , i_type_year, mm_start
+                        , c_code, parent_id, sp_emp_id
+                        , tor_status_id, i_step, i_forword, i_backword
+                        , dc_department_id
                         )
                 VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,? ,? ,? ,? ,?, ?,?,?
                         , ?, ?
                         , ? , ?
                         , ?, ?, ?
                         , ?,?,?
-                        , ?,?);
+                        , ?,?
+                        , ?,?,?
+                        , ?,?,?,?
+                        , ?);
                         SELECT @@IDENTITY as sp_tor_id;";
 
         $stmt = $db->QueryParam($sql, $arrParam);
         $ss_id = $db->Fetch($stmt);
 
         if ($data["i_dtl_add"] == 1) {
+            // เดิมใช้ INSERT...SELECT (ผสม literal column กับ ? param) แล้วพบว่าทำให้ request 500 แบบเงียบๆ
+            // เปลี่ยนมาดึงรายการต้นทางมาก่อน แล้ว insert ทีละแถวด้วย VALUES(...) ล้วนๆ (รูปแบบเดียวกับจุดอื่นในไฟล์นี้ที่ทำงานได้ปกติ)
+            $srcDtlCols = "c_name, i_qty, i_used, i_balance, dc_unit_type_id, c_unit, dc_bg_budget_type_id, i_product_type, i_is_inv, po_expense_id, dc_creditor_id, i_hire_type, f_disc_price, f_unit_price, f_total_price, f_net_disc_price, f_net_unit_price, f_net_total_price";
+            $selStmt = $db->QueryParam("SELECT {$srcDtlCols} FROM sp_tor_dtl WHERE sp_tor_id = ?", array($data["id"]));
+            $srcRows = array();
+            while ($srcRow = $db->Fetch($selStmt)) {
+                $srcRows[] = $srcRow;
+            }
 
-            $arrParam = array();
-            $sql = "INSERT INTO sp_tor_dtl
-                    (
-                    sp_tor_id
-                    ,c_name
-                    ,i_qty
-                    ,i_used
-                    ,i_balance
-                    ,dc_unit_type_id
-                    ,c_unit
-                    ,dc_bg_budget_type_id
-                    ,i_product_type
-                    ,i_is_inv
-                    ,po_expense_id
-                    ,dc_creditor_id
-                    ,i_hire_type
-                    ,f_disc_price
-                    ,f_unit_price
-                    ,f_total_price
-                    ,f_net_disc_price
-                    ,f_net_unit_price
-                    ,f_net_total_price
-                    ,dc_user_create_id
-                    ,dc_user_create_cost_id
-                    ,d_create
-                    ,dc_user_update_id
-                    ,dc_user_update_cost_id
-                    ,d_update
-                    )(
-                SELECT
-                    ?
-                    ,c_name
-                    ,i_qty
-                    ,i_used
-                    ,i_balance
-                    ,dc_unit_type_id
-                    ,c_unit
-                    ,dc_bg_budget_type_id
-                    ,i_product_type
-                    ,i_is_inv
-                    ,po_expense_id
-                    ,dc_creditor_id
-                    ,i_hire_type
-                    ,f_disc_price
-                    ,f_unit_price
-                    ,f_total_price
-                    ,f_net_disc_price
-                    ,f_net_unit_price
-                    ,f_net_total_price
-                    ,?
-                    ,?
-                    ,?
-                    ,?
-                    ,?
-                    ,?
-                FROM
-                    sp_tor_dtl
-                WHERE sp_tor_id = ?)
-            ";
+            $dtlInsertCols = array(
+                "sp_tor_id", "c_name", "i_qty", "i_used", "i_balance", "dc_unit_type_id", "c_unit",
+                "dc_bg_budget_type_id", "i_product_type", "i_is_inv", "po_expense_id", "dc_creditor_id", "i_hire_type",
+                "f_disc_price", "f_unit_price", "f_total_price", "f_net_disc_price", "f_net_unit_price", "f_net_total_price",
+                "dc_user_create_id", "dc_user_create_cost_id", "d_create", "dc_user_update_id", "dc_user_update_cost_id", "d_update",
+            );
+            $dtlPlaceholders = implode(",", array_fill(0, count($dtlInsertCols), "?"));
+            $sqlDtl = "INSERT INTO sp_tor_dtl (" . implode(",", $dtlInsertCols) . ") VALUES (" . $dtlPlaceholders . ")";
 
-            $arrParam[] = $ss_id["sp_tor_id"];
-            $arrParam[] = $data["dc_user_create_id"];
-            $arrParam[] = $data["dc_user_create_cost_id"];
-            $arrParam[] = $data["d_create"];
-            $arrParam[] = $data["dc_user_update_id"];
-            $arrParam[] = $data["dc_user_update_cost_id"];
-            $arrParam[] = $data["d_update"];
-            $arrParam[] = $data["id"];
-            $stmt = $db->QueryParam($sql, $arrParam);
+            foreach ($srcRows as $srcRow) {
+                $arrParam = array(
+                    $ss_id["sp_tor_id"],
+                    $srcRow["c_name"], $srcRow["i_qty"], $srcRow["i_used"], $srcRow["i_balance"],
+                    $srcRow["dc_unit_type_id"], $srcRow["c_unit"], $srcRow["dc_bg_budget_type_id"],
+                    $srcRow["i_product_type"], $srcRow["i_is_inv"], $srcRow["po_expense_id"],
+                    $srcRow["dc_creditor_id"], $srcRow["i_hire_type"], $srcRow["f_disc_price"],
+                    $srcRow["f_unit_price"], $srcRow["f_total_price"], $srcRow["f_net_disc_price"],
+                    $srcRow["f_net_unit_price"], $srcRow["f_net_total_price"],
+                    $data["dc_user_create_id"], $data["dc_user_create_cost_id"], $data["d_create"],
+                    $data["dc_user_update_id"], $data["dc_user_update_cost_id"], $data["d_update"],
+                );
+                $stmt = $db->QueryParam($sqlDtl, $arrParam);
+            }
         }
+      } catch (\Throwable $e) {
+          http_response_code(200);
+          echo json_encode([
+              "success" => false,
+              "reval" => 1,
+              "msg" => "ADD exception: " . $e->getMessage() . " @ " . $e->getFile() . ":" . $e->getLine(),
+          ]);
+          exit;
+      }
 
         break;
     /* menu 1 */
@@ -2089,6 +2104,25 @@ switch ($mode) {
         $arrValue[] = $data["id"];
         $stmt = $db->QueryParam($sql, $arrValue);
         $id = $data["id"];
+
+        // PR ก่อนปีงบประมาณ: ถ้าเดือน/ปีที่เลือกไม่ตรงกับเลข PR เดิม (เช่น PR25690900015 แต่เลือก ต.ค. 2569
+        // ในปีงบ 2570) ให้ออกเลขใหม่ต่อจากเลขล่าสุดของ ปี+เดือน นั้น (SP_GEN_CODE ใช้ max+1 ของกลุ่มเดียวกัน)
+        if (($data["i_type_year"] ?? null) == 2 && !empty($data["mm_start"]) && !empty($data["i_yyyy"])) {
+            $mm_upd = str_pad(strval(intval($data["mm_start"])), 2, "0", STR_PAD_LEFT);
+            $yBe_upd = intval($data["i_yyyy"]) + 543; // i_yyyy เป็น ค.ศ. ของปีงบ
+            $calYear_upd = (intval($mm_upd) >= 10) ? $yBe_upd - 1 : $yBe_upd; // ต.ค.-ธ.ค. อยู่ปีปฏิทินก่อนปีงบ
+            $bcm_upd = $calYear_upd . $mm_upd;
+            $curCode_upd = $db->GetDataBySQL("SELECT c_code FROM sp_tor WHERE tor_id = ?", array($data["id"]));
+            // ข้าม PR ลูกที่ใช้เลขร่วมกับ PR แม่ (มีมากกว่า 1 แถวใช้ c_code เดียวกัน)
+            $shareCnt_upd = $db->GetDataBySQL("SELECT COUNT(*) FROM sp_tor WHERE c_code = ?", array($curCode_upd));
+            if ($curCode_upd && substr($curCode_upd, 2, 6) != $bcm_upd && $shareCnt_upd <= 1) {
+                $stmtGen_upd = $db->QueryParam("EXEC SP_GEN_CODE ?,?,?,?,?;", array((string) $c_code_gen, $bcm_upd, @$data['dc_user_update_id'], @$data['dc_user_update_cost_id'], $data["id"]));
+                $rowGen_upd = $db->Fetch($stmtGen_upd);
+                if (!empty($rowGen_upd["c_code_gen"]) && $rowGen_upd["reference_id"] == $data["id"]) {
+                    $db->QueryParam("UPDATE {$table} SET c_code = ?, i_pr_year = ? WHERE {$keyName} = ?", array($rowGen_upd["c_code_gen"], $data["i_yyyy"], $data["id"]));
+                }
+            }
+        }
 
         // ============== //
         $addField = null;
@@ -2250,6 +2284,10 @@ switch ($mode) {
                             , CONVERT(VARCHAR, s.d_tor_date, 120) AS d_tor_date
                             , s.po_creditor_id
                             , (select top 1 i_enabled from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as sp_tor_delete
+                            , (select top 1 c_comment from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as tor_delete_comment
+                            , (select top 1 u.c_full_name from sp_tor_delete d inner join dbo.dc_user u on u.dc_user_id = d.dc_user_delete_id where s.tor_id = d.sp_tor_id and d.i_enabled = 1 order by d.sp_tor_delete_id desc ) as tor_delete_user
+                            , (select top 1 c.c_name from sp_tor_delete d inner join dbo.dc_cost c on c.dc_cost_id = d.dc_user_cost_delete_id where s.tor_id = d.sp_tor_id and d.i_enabled = 1 order by d.sp_tor_delete_id desc ) as tor_delete_cost
+                            , (select top 1 CONVERT(VARCHAR, d.d_delete, 120) from sp_tor_delete d where s.tor_id = d.sp_tor_id and d.i_enabled = 1 order by d.sp_tor_delete_id desc ) as tor_delete_date
                             , (SELECT TOP 1 c_name FROM dbo.po_creditor WHERE po_creditor_id=s.po_creditor_id)  AS po_creditor_idTxt
                             , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost_id)  AS dc_cost_idTxt
                             , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
@@ -2328,6 +2366,10 @@ switch ($mode) {
                         $i_type_bg = "color:#52CD14";
                         $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
                         break;
+                    case 14:
+                        $i_type_bg = "color:#8B008B";
+                        $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                        break;
                     default:
                         $i_type_bg = "color:#F43217";
                         $i_type_bgTxt = '';
@@ -2339,6 +2381,11 @@ switch ($mode) {
                     "no" => $i++,
                     "id" => intval($row["tor_id"]),
                     "sp_tor_delete" => $sp,
+                    "sp_tor_delete_flag" => $row["sp_tor_delete"] == 1 ? 1 : 0, // PR ถูกถอยรายการมาให้แก้ไข
+                    "tor_delete_comment" => $row["tor_delete_comment"],
+                    "tor_delete_user" => $row["tor_delete_user"] ?? null,
+                    "tor_delete_cost" => $row["tor_delete_cost"] ?? null,
+                    "tor_delete_date" => $row["tor_delete_date"] ?? null,
                     "sp_contract_id" => $row["sp_contract_id"],
                     "i_purchase" => intval($row["i_purchase"]), //i_purchase	i_product_type	i_hire_type	i_is_inv i_delivery_date
                     "i_product_type" => intval($row["i_product_type"]),
@@ -2588,6 +2635,10 @@ switch ($mode) {
                     case 7:
                         $i_type_bg = "color:#52CD14";
                         $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
+                        break;
+                    case 14:
+                        $i_type_bg = "color:#8B008B";
+                        $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                         break;
                     default:
                         $i_type_bg = "color:#F43217";
@@ -3093,7 +3144,11 @@ switch ($mode) {
                         , (SELECT c_tax_number_imp FROM NMU.dbo.dc_creditor WHERE dc_creditor_id = a.dc_creditor_id ) AS c_tax_number_imp
                         , a.i_joint_venture
                         , a.dc_expense_budget_type_id
-                        , (select top 1 c_code from sp_check_period_hdr where a.sp_tor_hdr_period_id = sp_tor_hdr_period_id  )  as check_code
+                        , (select max(c_code) from sp_check_period_hdr where a.sp_tor_hdr_period_id = sp_tor_hdr_period_id  )  as check_code
+                        , (select max(coalesce(h2.c_arrive_code, mn2.c_arrive_code))
+                             from sp_check_period_hdr h2
+                             left join sp_mn_contract_hdr mn2 on mn2.sp_mn_contract_hdr_id = h2.sp_mn_contract_hdr_id
+                            where h2.sp_tor_hdr_period_id = a.sp_tor_hdr_period_id )  as arrive_code
                         , a.[bg_reserve_money_id]
                         , (select COUNT(*) from sp_tor_dtl_period aa where a.sp_tor_hdr_period_id = aa.sp_tor_hdr_period_id and i_enabled = 1 ) as dtl_period_count
                         , CONVERT(VARCHAR, a.d_period_date, 120) AS d_period_date
@@ -3126,6 +3181,7 @@ switch ($mode) {
                 "no" => $i++,
                 "id" => intval($row["sp_tor_hdr_period_id"]),
                 "sp_check_period" => $row["check_code"],
+                "c_arrive_code" => $row["arrive_code"],
                 "dc_creditor_id" => $row["dc_creditor_id"],
                 "i_product_typehdr" => $row["i_product_typehdr"],
                 "i_hire_type" => $row["i_hire_type"],
@@ -3224,7 +3280,11 @@ switch ($mode) {
                         , (SELECT c_tax_number_imp FROM NMU.dbo.dc_creditor WHERE dc_creditor_id = a.dc_creditor_id ) AS c_tax_number_imp
                         , a.i_joint_venture
                         , a.dc_expense_budget_type_id
-                        , (select top 1 c_code from sp_check_period_hdr where a.sp_tor_hdr_period_id = sp_tor_hdr_period_id)  as check_code
+                        , (select max(c_code) from sp_check_period_hdr where a.sp_tor_hdr_period_id = sp_tor_hdr_period_id)  as check_code
+                        , (select max(coalesce(h2.c_arrive_code, mn2.c_arrive_code))
+                             from sp_check_period_hdr h2
+                             left join sp_mn_contract_hdr mn2 on mn2.sp_mn_contract_hdr_id = h2.sp_mn_contract_hdr_id
+                            where h2.sp_tor_hdr_period_id = a.sp_tor_hdr_period_id)  as arrive_code
                         , a.[bg_reserve_money_id]
                         , (select COUNT(*) from sp_tor_dtl_period aa where a.sp_tor_hdr_period_id = aa.sp_tor_hdr_period_id and i_enabled = 1 ) as dtl_period_count
                         , CONVERT(VARCHAR, a.d_period_date, 120) AS d_period_date
@@ -3244,6 +3304,7 @@ switch ($mode) {
                 "no" => $i++,
                 "id" => intval($row["sp_tor_hdr_period_id"]),
                 "sp_check_period" => $row["check_code"],
+                "c_arrive_code" => $row["arrive_code"],
                 "dc_creditor_id" => $row["dc_creditor_id"],
                 "i_product_typehdr" => $row["i_product_typehdr"],
                 "i_hire_type" => $row["i_hire_type"],
@@ -3851,16 +3912,43 @@ switch ($mode) {
         $stmt = $db->QueryParam($sql, $arrValue);
         break;
     case "UPDATE_TOR_BG":
-        $arrValue[] = $_REQUEST["bg_reserve_money_id"] ?? null;
+        $arrValue = array();
         $ii = $_REQUEST["ii"] ?? null;
+        $arrValue[] = $_REQUEST["bg_reserve_money_id"] ?? null;
+
+        // sync จำนวนเงิน/แหล่งเงิน/ประเภทการจอง ของแหล่งนี้ลง sp_tor ด้วย (กันยอดเงิน f_typeN_amt หาย)
+        $amtCol = "f_type" . ($ii == 1 ? "" : $ii) . "_amt";
+        $btCol  = "dc_expense_budget_type" . ($ii == 1 ? "" : $ii) . "_id";
+        $prCol  = "i_pr_type" . $ii;
+        $bgSyncSql = "";
+        if (isset($_REQUEST["f_type_amt"]) && $_REQUEST["f_type_amt"] !== "") {
+            $bgSyncSql .= ", {$amtCol} = ?";
+            $arrValue[] = str_replace(",", "", $_REQUEST["f_type_amt"]);
+        }
+        if (!empty($_REQUEST["dc_expense_budget_type_id"])) {
+            $bgSyncSql .= ", {$btCol} = ?";
+            $arrValue[] = $_REQUEST["dc_expense_budget_type_id"];
+        }
+        if (isset($_REQUEST["i_pr_type"]) && $_REQUEST["i_pr_type"] !== "") {
+            $bgSyncSql .= ", {$prCol} = ?";
+            $arrValue[] = $_REQUEST["i_pr_type"];
+        }
+
         $planSql = "";
         if (isset($_REQUEST["plan_status"])) {
-            $planSql = ", plan_status = ?, plan_code = ?";
+            $planSql = ", plan_status = ?, plan_code = ?, plan_seq = ?";
             $arrValue[] = $_REQUEST["plan_status"];
             $arrValue[] = $_REQUEST["plan_code"] ?? null;
+            $arrValue[] = $_REQUEST["plan_seq"] ?? null;
+        }
+        // เซฟหมายเหตุที่พิมพ์ไว้ ตอนกดจองเงินด้วย
+        $remakeSql = "";
+        if (isset($_REQUEST["c_remake"])) {
+            $remakeSql = ", c_remake = ?";
+            $arrValue[] = $_REQUEST["c_remake"];
         }
         $arrValue[] = $_REQUEST["hdr_id"] ?? null;
-        $sql = "UPDATE dbo.sp_tor SET bg_reserve_money" . $ii . "_id =?" . $planSql . " WHERE tor_id = ?";
+        $sql = "UPDATE dbo.sp_tor SET bg_reserve_money" . $ii . "_id =?" . $bgSyncSql . $planSql . $remakeSql . " WHERE tor_id = ?";
         $stmt = $db->QueryParam($sql, $arrValue);
         break;
     case "UPDATE_TOR_DTL_BG":
@@ -4491,6 +4579,64 @@ switch ($mode) {
 
         exit();
         break;
+    case "REVERSE_TO_NEWTOR":
+        // ถอย PR กลับไปหน้า "จัดทำ PR" = ล้างสถานะ (tor_status_id = NULL) + ลบประวัติขั้นตอนทั้งหมด
+        $id = $_REQUEST['id'] ?? null;
+        if (!empty($id)) {
+            // เก็บสถานะเดิมไว้ก่อนล้าง เพื่อใช้เป็น sp_status_hdr_id ของ sp_tor_delete (กัน FK พัง)
+            $prevStatusId = $db->GetDataBySQL("SELECT tor_status_id FROM dbo.sp_tor WHERE tor_id = ?", array($id));
+            $sql = "UPDATE dbo.sp_tor
+                        SET tor_status_id = NULL
+                          , tor_status_back_id = NULL
+                          , i_step = NULL
+                          , i_edit = NULL
+                          , i_menu_edit = NULL
+                          , i_forword = NULL
+                          , i_backword = NULL
+                          , dc_user_update_id = ?
+                          , dc_user_update_cost_id = ?
+                          , d_update = ?
+                        WHERE tor_id = ?;
+                    DELETE FROM sp_tor_item WHERE tor_id = ?;
+                    DELETE FROM sp_tor_pa_item WHERE tor_id = ?;
+                    DELETE FROM sp_tor_alert_item WHERE tor_id = ?;";
+            $stmt = $db->QueryParam($sql, array(
+                $_SESSION['user_id'], $_SESSION['dc_cost_id'], date('Y-m-d H:i:s'),
+                $id, $id, $id, $id
+            ));
+
+            // บันทึกเหตุผลการถอยรายการ -> หน้า "จัดทำ PR" แสดง PR เป็นตัวแดง + (แก้ไข)
+            // และ double click เพื่อดูหมายเหตุว่าต้องแก้ไขอะไร (โครงสร้างเดียวกับ mode Cancel_Tor / RETURNMENU)
+            $db->QueryParam(
+                "UPDATE sp_tor_delete SET i_enabled = 2 WHERE sp_tor_id = ? AND i_enabled = 1",
+                array($id)
+            );
+            $spDel = array(
+                "sp_tor_id" => $id,
+                "sp_emp_id" => $_REQUEST['sp_emp_id'] ?? null,
+                "sp_status_hdr_id" => $prevStatusId, // ใช้สถานะเดิมก่อนถอย (จัดทำ PR ไม่มีสถานะปลายทาง)
+                "d_delete" => $info[3],
+                "dc_user_delete_id" => $info[1],
+                "dc_user_cost_delete_id" => $info[2],
+                "c_comment" => $_REQUEST['c_comment_delete'] ?? null,
+                "i_type_delete" => 3, // 3 = ถอยรายการ (reverse) ให้แก้ไข
+                "i_enabled" => 1,     // ต้องส่ง 1 ตรง ๆ (คอลัมน์นี้ไม่มี default)
+            );
+            $spDelField = null;
+            $spDelMark = null;
+            $spDelValue = array();
+            foreach ($spDel as $fld => $value) {
+                $spDelField .= ", {$fld}";
+                $spDelMark .= ", ?";
+                $spDelValue[] = ($value === "" || $value === null) ? ($fld === "i_enabled" ? 1 : null) : $value;
+            }
+            $stmt2 = $db->QueryParam(
+                "INSERT INTO sp_tor_delete (" . substr($spDelField, 1) . ") VALUES (" . substr($spDelMark, 1) . ");",
+                $spDelValue
+            );
+        }
+        $re_id = $id;
+        break;
     case "RETURNMENU":
         $root = "data";
         $data = array();
@@ -4503,14 +4649,55 @@ switch ($mode) {
                 . " , dc_user_update_id =? "
                 . " , dc_user_update_cost_id =? "
                 . " , d_update = ?"
-                . " WHERE tor_id = ?";
+                . " WHERE tor_id = ?;"
+                // ลบประวัติ step ที่เลยจุดที่ถอยไป เพื่อให้ re-forward เริ่มนับใหม่จากสถานะที่ถอยกลับมา
+                // (ถ้าไม่ลบ UPDATENEXTSTEP จะคำนวณ step ถัดไปเพี้ยน เช่น ข้ามมอบหมายฝ่ายงานไปประกาศแผน e-GP)
+                // เงื่อนไข id > (MAX id ของสถานะเป้าหมาย): ถ้าไม่พบสถานะเป้าหมาย subquery = NULL -> ไม่ลบอะไร (ปลอดภัย)
+                . " DELETE FROM sp_tor_item"
+                . "  WHERE tor_id = ?"
+                . "    AND id > (SELECT MAX(id) FROM sp_tor_item WHERE tor_id = ? AND sp_status_hdr_id = ?);";
 
         $val = $_REQUEST['sp_status_hdr_id'] ?? null;
         $id = $_REQUEST['id'] ?? null;
 //        echo $db->debugSql($sqlMain,  array($val,  $info[1],$info[2],$info[3],  $id));
 //        exit();
-        $stmt = $db->QueryParam($sqlMain, array($val, $info[1], $info[2], $info[3], $id));
+        $stmt = $db->QueryParam($sqlMain, array(
+            $val, $info[1], $info[2], $info[3], $id,
+            $id, $id, $val,
+        ));
         $re_id = $id;
+
+        // บันทึกเหตุผลการถอยรายการ -> ให้เมนูปลายทาง (เช่น จัดสรรเงินงบประมาณ ST0001.1)
+        // แสดง PR เป็นตัวแดง + (แก้ไข) และ double click เพื่อดูหมายเหตุว่าต้องแก้ไขอะไร
+        // ปิด flag เดิม (ถ้ามี) กันซ้ำ แล้วค่อย insert รายการใหม่ (โครงสร้างเดียวกับ mode Cancel_Tor)
+        $db->QueryParam(
+            "UPDATE sp_tor_delete SET i_enabled = 2 WHERE sp_tor_id = ? AND i_enabled = 1",
+            array($id)
+        );
+        $spDel = array(
+            "sp_tor_id" => $id,
+            "sp_emp_id" => $_REQUEST['sp_emp_id'] ?? null,
+            "sp_status_hdr_id" => $val,
+            "d_delete" => $info[3],
+            "dc_user_delete_id" => $info[1],
+            "dc_user_cost_delete_id" => $info[2],
+            "c_comment" => $_REQUEST['c_comment_delete'] ?? null,
+            "i_type_delete" => 3, // 3 = ถอยรายการ (reverse) ให้แก้ไข
+            "i_enabled" => 1,     // ต้องส่ง 1 ตรง ๆ (คอลัมน์นี้ไม่มี default) ไม่งั้น list ที่กรอง i_enabled = 1 จะไม่เจอ
+        );
+        $spDelField = null;
+        $spDelMark = null;
+        $spDelValue = array();
+        foreach ($spDel as $fld => $value) {
+            $spDelField .= ", {$fld}";
+            $spDelMark .= ", ?";
+            // i_enabled ต้องยอมให้เป็น 0/1 ได้ ห้ามแปลงเป็น null
+            $spDelValue[] = ($value === "" || $value === null) ? ($fld === "i_enabled" ? 1 : null) : $value;
+        }
+        $stmt2 = $db->QueryParam(
+            "INSERT INTO sp_tor_delete (" . substr($spDelField, 1) . ") VALUES (" . substr($spDelMark, 1) . ");",
+            $spDelValue
+        );
         break;
     case "BIDDER_SELECT":
         $root = "data";
@@ -5189,7 +5376,7 @@ switch ($mode) {
             $data["i_is_warranty_book"] = null;
         } else {
             $data["i_is_warranty"] = @$_REQUEST["i_is_bank_warranty"];
-            $data["cashiercheque_on"] = @$_REQUEST["i_is_cashiercheque_warrantyID"];
+            $data["cashiercheque_on"] = @$_REQUEST["i_is_cashiercheque_warranty"];
             $data["i_is_warranty_book"] = @$_REQUEST["i_is_bank_warranty1"];
         }
 
@@ -5215,7 +5402,7 @@ switch ($mode) {
         }
 
         if (@$_REQUEST["i_is_cashiercheque_warranty"] == 1) {
-            $data["cashiercheque_on"] = $_REQUEST["c_books_cashiercheque"] ?? null;
+            $data["cashiercheque_on"] = $_REQUEST["c_books_cashiercheque"] ?? ($_REQUEST["c_receipt_cashiercheque"] ?? 1);
             $data["cashiercheque_seq"] = $_REQUEST["c_receipt_cashiercheque"] ?? null;
             $data["d_cashiercheque_data"] = !empty($_REQUEST['d_cashiercheque_date']) ? $date->bc_to_ad($_REQUEST['d_cashiercheque_date']) : null;
             $data["f_warranty_cashiercheque"] = str_replace(',', '', $_REQUEST["f_cashiercheque_warranty_amt2"]);
@@ -5250,6 +5437,19 @@ switch ($mode) {
         $data["d_update"] = date("Y-m-d H:i:s");
 
         if ($_REQUEST['i_edit_type'] == null) {  // ****** ADD ******
+            // ---- ล็อควันที่สัญญา (ชั่วคราว) : 5-15 ต.ค. 2569 สัญญาใหม่บังคับวันที่ 1 ต.ค. 2569 ----
+            // i_contract_date_unlock ส่งมาจาก tor/signContract.js : 0 = ล็อค, 1 = ผู้ใช้ปลดล็อค
+            // ไม่บังคับ : ฟอร์มอื่นที่ไม่ส่งค่านี้ / เลือกสัญญาเดิม (sp_tor_id2) / เลยวันที่ 15 (ปลดล็อคอัตโนมัติ)
+            // ล็อคเฉพาะสัญญาตระกูล จ. (พวช.จ. / จ.) = จัดจ้าง (sp_tor.i_purchase = 2) เท่านั้น
+            $lockNow = date('Y-m-d');
+            if ($lockNow >= '2026-10-05' && $lockNow <= '2026-10-15'
+                    && isset($_REQUEST['i_contract_date_unlock'])
+                    && $_REQUEST['i_contract_date_unlock'] != '1'
+                    && empty($_REQUEST['sp_tor_id2'])
+                    && intval($db->GetDataBySQL('SELECT i_purchase FROM sp_tor WHERE tor_id = ?', array($_REQUEST["sp_tor_id"]))) == 2) {
+                $data['d_doc_date'] = '2026-10-01';
+            }
+            // ---------------------------------------------------------------------------
             $data["dc_cost_id"] = $db->GetDataBySQL('SELECT dc_cost_id FROM sp_tor WHERE tor_id = ?', array($_REQUEST["sp_tor_id"]));
             $data["sp_emp_id"] = $_SESSION["sp_emp_id"];
             $data["dc_user_create_id"] = $_SESSION["user_id"];
@@ -6517,7 +6717,7 @@ switch ($mode) {
             $data["i_is_warranty_book"] = null;
         } else {
             $data["i_is_warranty"] = @$_REQUEST["i_is_bank_warranty"];
-            $data["cashiercheque_on"] = @$_REQUEST["i_is_cashiercheque_warrantyID"];
+            $data["cashiercheque_on"] = @$_REQUEST["i_is_cashiercheque_warranty"];
             $data["i_is_warranty_book"] = @$_REQUEST["i_is_bank_warranty1"];
         }
 
@@ -6543,7 +6743,7 @@ switch ($mode) {
         }
 
         if (@$_REQUEST["i_is_cashiercheque_warranty"] == 1) {
-            $data["cashiercheque_on"] = $_REQUEST["c_books_cashiercheque"] ?? null;
+            $data["cashiercheque_on"] = $_REQUEST["c_books_cashiercheque"] ?? ($_REQUEST["c_receipt_cashiercheque"] ?? 1);
             $data["cashiercheque_seq"] = $_REQUEST["c_receipt_cashiercheque"] ?? null;
             $data["d_cashiercheque_data"] = !empty($_REQUEST['d_cashiercheque_date']) ? $date->bc_to_ad($_REQUEST['d_cashiercheque_date']) : null;
             $data["f_warranty_cashiercheque"] = str_replace(',', '', $_REQUEST["f_cashiercheque_warranty_amt2"]);
@@ -7272,14 +7472,20 @@ switch ($mode) {
         $conDtl = null;
         $act = $_REQUEST['act'] ?? null;
         $view = $_REQUEST['view'] ?? null;
+        // เจ้าของเรื่อง (ผู้รับผิดชอบ PR / สัญญา / งวด) ต้องเห็นรายการของตัวเองเสมอ
+        // แม้สายงานของ PR จะไม่ตรงกับสายงานปัจจุบันของผู้ใช้ (เช่น ย้ายสายงานหลังทำ PR)
+        $sesEmpId = intval($_SESSION['sp_emp_id'] ?? 0);
+        $sesOwn = ($sesEmpId > 0) ? "(bb.sp_emp_id = {$sesEmpId} or aa.sp_emp_id = {$sesEmpId}"
+                . " or exists (select 1 from dbo.sp_tor_hdr_period pp where pp.sp_tor_contract_id = aa.sp_contract_id and pp.sp_emp_id = {$sesEmpId} and pp.i_enabled = 1))" : "1 = 0";
+        $sesDepartment = " and (bb.dc_department_id = " . intval($_SESSION['dc_department_id'] ?? 0) . " or {$sesOwn})";
         if ($act == 'SEARCH' && $view == 1) {
-            $ses = ($_SESSION['user_id'] == 1) ? "" : " and bb.sp_emp_id = " . $_SESSION['sp_emp_id'];
+            $ses = ($_SESSION['user_id'] == 1) ? "" : " and {$sesOwn}";
             $wh = ($_REQUEST['c_code'] != "") ? " and aaa.c_code LIKE '%" . $_REQUEST['c_code'] . "%'" : "";
         } else if ($act == 'SEARCH' && $view == 0) {
-            $ses = ($_SESSION['user_id'] == 1) ? "" : " and bb.dc_department_id = " . $_SESSION['dc_department_id'];
+            $ses = ($_SESSION['user_id'] == 1) ? "" : $sesDepartment;
             $wh = ($_REQUEST['c_code'] != "") ? " and aaa.c_code LIKE '%" . $_REQUEST['c_code'] . "%'" : "";
         } else {
-            $ses = ($_SESSION['user_id'] == 1) ? "" : " and bb.dc_department_id = " . $_SESSION['dc_department_id'];
+            $ses = ($_SESSION['user_id'] == 1) ? "" : $sesDepartment;
             $wh = "";
         }
         // }
@@ -8614,6 +8820,10 @@ switch ($mode) {
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"];
         $data["plan_status"] = $_REQUEST['plan_status'] ?? null;   // เพิ่มบรรทัดนี้
         $data["plan_code"] = $_REQUEST['plan_code'] ?? null;         // เพิ่มบรรทัดนี้
+        $data["plan_seq"] = $_REQUEST['plan_seq'] ?? null;
+        if (isset($_REQUEST['c_remake'])) {
+            $data["c_remake"] = $_REQUEST['c_remake'];   // เซฟหมายเหตุตอนจองเงิน
+        }
         if ($_REQUEST['type'] == 1) {
             $data["i_pr_type1"] = $_REQUEST['i_pr_type'];
             $data["dc_expense_budget_type_id"] = $_REQUEST['dc_expense_budget_type'];

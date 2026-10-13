@@ -1919,7 +1919,7 @@ Ext.uiConfirmVat = (rec) => {
                                                                 if (Ext.not_equal == 1) {
                                                                         //  msg += "<span style='white-space: nowrap;'>- กรุณาตั้งหนี้ค่าใช้ค่าให้กับพอดีวงเงิน</span><br>";
                                                                 }
-                                                                if (Ext.sum_minus == 1) {
+                                                                if (Ext.sum_minus == 1 && !Ext.isCheckingNoBooking(Ext.perioidHdr)) {
                                                                         msg += "<span style='white-space: nowrap;'>- วงเงินแหล่งเงินไม่เพียงพอ</span><br>";
                                                                 }
                                                                 if (msg == "") {
@@ -2202,6 +2202,13 @@ Ext.uiConfirmVat = (rec) => {
                                                                                         }
                                                                                         f_per_pay_sum();
                                                                                         Ext.storeVatAcc();
+                                                                                        // ป้องกันปุ่ม "บันทึกรายการหลัก" คำนวณ f_vat ทับค่าที่เพิ่งติ๊ก/ยกเลิกภาษีมูลค่าเพิ่มไป
+                                                                                        // ด้วยยอดรวมจาก gridSub4ID (ซึ่งอาจไม่ตรงกับยอดที่คำนวณจาก f_inv_vat ตรงนี้)
+                                                                                        Ext.vatEdit = true;
+                                                                                        Ext.vatEditTxt = Ext.getCmp("f_vat").getValue();
+                                                                                        if (Ext.getCmp('i_edit_vatID')) {
+                                                                                                Ext.getCmp('i_edit_vatID').setValue(true);
+                                                                                        }
                                                                                 },
                                                                                 checkchange: function (combo, newValue) { },
                                                                                 afterreder: function () {
@@ -4395,6 +4402,7 @@ Ext.editHistoryAp = (statusx) => {
                                 let month = date.getMonth() + 1; // getMonth() คืนค่า 0-11 จึงต้อง +1
                                 let year = date.getFullYear(); // ดึงค่าปีในรูปแบบ 4 หลัก
                                 Ext.BudgetYear = month > 9 ? year + 1 : year;
+                                Ext.syncCheckingNoBookingOption();
                                 i_yyyy_overlap = Ext.selectRow.data.i_yyyy_overlap * 1;
                                 if (i_yyyy_overlap != Ext.BudgetYear && i_yyyy_overlap != 0) {
                                         Ext.getCmp("c_booking_radiogroup").show();
@@ -5713,8 +5721,7 @@ function htmlToPlainText(html) {
                 .replace(/\u00a0/g, ' ')
                 .replace(/\n{3,}/g, '\n\n')
                 .replace(/^\s+|\s+$/g, '');
-}
-
+} 
 function encodeLogData(data) {
         return Ext.encode({
                 subject: data.subject || '',
@@ -5727,12 +5734,12 @@ function encodeLogData(data) {
                 browser: navigator.userAgent,
                 createdAtClient: new Date().toISOString()
         });
-}
-
-
-
-
+} 
 Ext.auditBoong = function (i) {
+        if (Ext.isCheckingNoBooking(Ext.perioidHdr)) {
+                Ext.genCode(Ext.perioidHdr.data);
+                return;
+        }
         var link = Ext.genLink(3, 0);
         Ext.Ajax.request({
                 url: link, //record,linkGetMoney
@@ -6218,7 +6225,39 @@ Ext.c_overlap_close = function (rec, event, edit) {
                 },
         });
 };
+Ext.isProjectNoBooking = function (record) {
+        var data = record && (record.data || record);
+        return !!data && Number(data.i_booking_bg) === 3;
+};
+Ext.isFutureCheckingYear = function () {
+        var field = Ext.getCmp("i_yyyy_overlapID");
+        var year = field ? Number(field.getValue()) : 0;
+        if (year > 2400) year -= 543;
+        var today = new Date();
+        var currentYear = today.getFullYear() + (today.getMonth() >= 9 ? 1 : 0);
+        return year > currentYear;
+};
+Ext.syncCheckingNoBookingOption = function () {
+        var checkbox = Ext.getCmp("checking_no_bookingID");
+        if (!checkbox) return;
+        var future = Ext.isFutureCheckingYear();
+        checkbox.setVisible(future);
+        if (!future) checkbox.setValue(false);
+};
+Ext.isCheckingNoBooking = function (record) {
+        if (Ext.isProjectNoBooking(record)) return true;
+        var checkbox = Ext.getCmp("checking_no_bookingID");
+        var data = record && (record.data || record);
+        var active = Ext.perioidHdr && Ext.perioidHdr.data;
+        return !!(checkbox && checkbox.getValue() && Ext.isFutureCheckingYear() &&
+                data && active && String(data.id) === String(active.id));
+};
 Ext.getMoney = function (rs) {
+        if (Ext.isCheckingNoBooking(rs)) {
+                Ext.perioidHdr = rs;
+                Ext.genCode(rs.data);
+                return;
+        }
         if (Ext.perioidHdr.data.i_type_bg == 8) {
                 if (Ext.perioidHdr.data.i_period == 1 || (Ext.perioidHdr.data.pr_bg_reserve_money1_id == 0 && Ext.perioidHdr.data.request_money_income != 2 && Ext.perioidHdr.data.bg_reserve_money_id == 0)) {
                         Ext.genLink_type_bg(rs, 1);
@@ -6283,6 +6322,9 @@ Ext.upMoneyId = function (id, req, f, bgid) {
         });
 };
 Ext.genCode = function (rec) {
+        if (Ext.isCheckingNoBooking(Ext.perioidHdr) &&
+                (Ext.perioidHdr.get("c_code") || Ext.getCmp("submodeID").getValue() === "modeEditAp" ||
+                        Ext.getCmp("i_status_checkingID").getValue().inputValue != 1)) return;
         Ext.Ajax.request({
                 url: "tor/api/mnCheckCode.php",
                 method: "POST",
@@ -6300,7 +6342,7 @@ Ext.genCode = function (rec) {
                 success: function (result, request) {
                         if (result.statusText) {
                                 Ext.storeDtl.reload();
-                                Ext.Msg.alert("แจ้งเตือน", "หักเงินและออกเลขเรียบร้อยแล้ว");
+                                Ext.Msg.alert("แจ้งเตือน", Ext.isCheckingNoBooking(Ext.perioidHdr) ? "ออกเลขตรวจรับเรียบร้อยแล้ว (ไม่จองเงิน)" : "หักเงินและออกเลขเรียบร้อยแล้ว");
                                 Ext.getCmp("winPeriodHdrID").destroy();
                         }
                 },
@@ -10150,7 +10192,7 @@ var cellClick = function (grid, rowIndex, columnIndex, e) {
                 }
         } else if (columnIndex === grid.getColumnModel().getIndexById("check_pdfID")) {
                 if (Ext.selectRow.data.check_pdf > 0) {
-                        var linkDownload = window.location.protocol + "//" + window.location.hostname + "/sp_mn/api/upload_Chk/";
+                        var linkDownload = window.location.protocol + "//" + window.location.hostname + "/sp_mn/api/upload_eis_Chk/";
                         if (Ext.isEmpty(Ext.selectRow))
                                 Ext.MessageBox.alert("แจ้งเตือน", "กรุณากดเลือกข้อมูลที่จะแสดง/ออกเลข PR ก่อน");
                         window.open(linkDownload + Ext.selectRow.get("c_arrive_code") + ".pdf?T=Tap_" + Math.floor(Math.random() * 100000), "_blank", 'fullscreen="yes"');
@@ -10206,9 +10248,9 @@ Ext.AppUx = function (app, menu) {
                 id++;
         }
         Ext.storeDtl = new Ext.data.JsonStore({
-                storeId: "storeDtl",
+                storeId: "storeDtlChecking",
                 autoDestroy: false,
-                autoLoad: true,
+                autoLoad: false, // ปิดไว้เพื่อไม่ให้ยิงซ้ำกับ loadAllStoresWithChain() ใน Ext.onReady
                 url: "tor/api/mnCheckingController.php",
                 baseParams: { mode: "LIST_SUB_PERIOD_HDR" },
                 root: "data",
@@ -10636,7 +10678,7 @@ Ext.AppUx = function (app, menu) {
         Ext.bg_budget_year = new Ext.data.JsonStore({
                 autoDestroy: false,
                 storeId: 'bg_budget_year',
-                autoLoad: true,
+                autoLoad: false, // ปิดไว้เพื่อไม่ให้ยิงซ้ำกับ loadAllStoresWithChain() ใน Ext.onReady
                 url: "api/All_PoWorkingImpHdr.php",
                 baseParams: {
                         type: "bg_budget_year",
@@ -10661,6 +10703,7 @@ Ext.AppUx = function (app, menu) {
                         { name: "id" },
                         { name: "i_yyyy" },
                         { name: "now_yyyy" },
+                        { name: "i_booking_bg", type: "int" },
                         { name: "i_type_bg" },
                         { name: "bg_budget_dtl_overlap_id" },
                         { name: "dc_expense_budget_type_id" },
@@ -12373,7 +12416,7 @@ Ext.AppUx = function (app, menu) {
         );
         Ext.AppPoStore = function () {
                 var urlUpload = window.location.protocol + "//" + window.location.hostname + "/sp_mn/api/mnUploadDocChk.php"; // ไฟล์ที่อัพโหลด
-                var linkDownload = window.location.protocol + "//" + window.location.hostname + "/sp_mn/api/upload_chk"; // ที่วางไฟล์
+                var linkDownload = window.location.protocol + "//" + window.location.hostname + "/sp_mn/api/upload_eis_Chk"; // ที่วางไฟล์
                 function getPDF(a) {
                         if (Ext.check_pdf == 1) {
                                 return (
@@ -13609,7 +13652,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         if (Ext.not_equal == 1) {
                                                                                                 //  msg += "<span style='white-space: nowrap;'>- กรุณาตั้งหนี้ค่าใช้ค่าให้กับพอดีวงเงิน</span><br>";
                                                                                         }
-                                                                                        if (Ext.sum_minus == 1) {
+                                                                                        if (Ext.sum_minus == 1 && !Ext.isCheckingNoBooking(Ext.perioidHdr)) {
                                                                                                 msg += "<span style='white-space: nowrap;'>- วงเงินแหล่งเงินไม่เพียงพอ</span><br>";
                                                                                         }
                                                                                         if (msg == "") {
@@ -13921,7 +13964,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                         },
                                                                                                         {
                                                                                                                 xtype: "displayfield",
-                                                                                                                value: '<span style="color:red">* ระบุงวด แสดงที่ใบส่งเบิก</span>',
+                                                                                                                value: '<span style="color:red">* ระบุงวด </span>',
 																										}, {
 																												xtype: "button",
 																																										 text: 'แก้ไข', icon: "./images/icons/table_save.png",
@@ -14063,6 +14106,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 };
                                                                                                                 this.fn = function () { };
                                                                                                                 this.select_value = function () {
+                                                                                                                        Ext.syncCheckingNoBookingOption();
                                                                                                                         if (Ext.getCmp("i_budget_year").getValue() > this.getValue()) {
                                                                                                                                 // Ext.bg_expense_have.load();
                                                                                                                                 // Ext.getCmp("BuPopSelectID").disable();
@@ -14070,7 +14114,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                 Ext.getCmp("c_bookingID").setReadOnly(false);
                                                                                                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                                                                                                 Ext.booking_store.load({
-                                                                                                                                        params: { dc_cost_id: Ext.getCmp("dc_cost_idID").getValue(), i_yyyy_overlap: Ext.getCmp("i_yyyy_overlapID").getValue() },
+                                                                                                                                        params: { dc_cost_id: Ext.getCmp("dc_cost2_idID").getValue(), i_yyyy_overlap: Ext.getCmp("i_yyyy_overlapID").getValue() },
                                                                                                                                         callback: function (record, success) {
                                                                                                                                                 if (success) {
                                                                                                                                                         Ext.getCmp("winPeriodHdrID").getEl().unmask();
@@ -14147,6 +14191,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                 Ext.selectRow.set("c_overlap", original.rowOverlap);
                                                                                                                                 Ext.selectRow.set("c_booking", original.rowBooking);
                                                                                                                         }
+                                                                                                                        Ext.syncCheckingNoBookingOption();
                                                                                                                         return;
                                                                                                                 }
 
@@ -14170,7 +14215,9 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 }
 
                                                                                                                 Ext.useContractOverlap2 = true;
+                                                                                                                Ext.getCmp("checking_no_bookingID").setValue(false);
                                                                                                                 Ext.getCmp("i_yyyy_overlapID").setValue(overlapYear);
+                                                                                                                Ext.syncCheckingNoBookingOption();
                                                                                                                 Ext.getCmp("c_booking_radiogroup").show();
                                                                                                                 Ext.getCmp("c_bookingID").setReadOnly(false);
                                                                                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
@@ -14204,6 +14251,31 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                 Ext.selectRow.set("c_booking", overlapCode);
                                                                                                                         }
                                                                                                                 });
+                                                                                                        }
+                                                                                                }
+                                                                                        },
+                                                                                        {
+                                                                                                xtype: "checkbox",
+                                                                                                id: "checking_no_bookingID",
+                                                                                                fieldLabel: "ตัวเลือกใบกัน",
+                                                                                                boxLabel: "ออกตรวจรับไม่จองเงิน",
+                                                                                                checked: false,
+                                                                                                submitValue: false,
+                                                                                                hidden: true,
+                                                                                                listeners: {
+                                                                                                        afterrender: function () {
+                                                                                                                Ext.syncCheckingNoBookingOption();
+                                                                                                        },
+                                                                                                        check: function (checkbox, checked) {
+                                                                                                                if (checked && !Ext.isFutureCheckingYear()) {
+                                                                                                                        checkbox.setValue(false);
+                                                                                                                        return;
+                                                                                                                }
+                                                                                                                if (checked) {
+                                                                                                                        var overlap2 = Ext.getCmp("use_contract_overlap2ID");
+                                                                                                                        if (overlap2 && overlap2.getValue()) overlap2.setValue(false);
+                                                                                                                        Ext.syncCheckingNoBookingOption();
+                                                                                                                }
                                                                                                         }
                                                                                                 }
                                                                                         },
@@ -15449,6 +15521,12 @@ Ext.AppUx = function (app, menu) {
 
                                                                                                                                                                 f_per_pay_sum();
                                                                                                                                                                 Ext.storeVatAcc();
+                                                                                                                                                                // ป้องกันปุ่ม "บันทึกรายการหลัก" คำนวณ f_vat ทับค่าที่เพิ่งติ๊ก/ยกเลิกภาษีมูลค่าเพิ่มไป ด้วยยอดรวมจาก gridSub4ID
+                                                                                                                                                                Ext.vatEdit = true;
+                                                                                                                                                                if (fVat) Ext.vatEditTxt = fVat.getValue();
+                                                                                                                                                                if (Ext.getCmp('i_edit_vatID')) {
+                                                                                                                                                                        Ext.getCmp('i_edit_vatID').setValue(true);
+                                                                                                                                                                }
                                                                                                                                                         },
                                                                                                                                                         checkchange: function (combo, newValue) { },
                                                                                                                                                         afterreder: function () {
@@ -16323,6 +16401,46 @@ Ext.AppUx = function (app, menu) {
                                                                 return false;
                                                         }
                                                         validationSaveButton.receiveValidationPassed = false;
+                                                        // ---- เช็คงวดปิด (gl_dc_period.i_status = 2) ----
+                                                        if (!validationSaveButton.periodCheckPassed) {
+                                                            var chkDateVal = Ext.getCmp("d_checking_dateID").getValue();
+                                                            if (chkDateVal) {
+                                                                var winMask = Ext.getCmp("winPeriodHdrID").getEl();
+                                                                winMask.mask("ตรวจสอบงวดบัญชี...", "x-mask-loading");
+                                                                Ext.Ajax.request({
+                                                                    url: "tor/api/mnCheckingController.php",
+                                                                    method: "POST",
+                                                                    params: {
+                                                                        mode: "CHECK_PERIOD_CLOSE",
+                                                                        d_checking_date: Ext.util.Format.date(chkDateVal, "Y-m-d"),
+                                                                    },
+                                                                    success: function (result) {
+                                                                        winMask.unmask();
+                                                                        var json;
+                                                                        try { json = Ext.decode(result.responseText); }
+                                                                        catch (e) { Ext.Msg.alert("ผิดพลาด", "ตรวจสอบงวดไม่สำเร็จ (ข้อมูลตอบกลับไม่ถูกต้อง)"); return; }
+                                                        
+                                                                        if (json.i_status == 2) {
+                                                                            Ext.Msg.alert("แจ้งเตือน",
+                                                                                "วันที่ตรวจรับถูกปิดงวดแล้ว กรุณาเปิดงวด เดือน " + json.c_mm + " ปี " + json.c_yyyy_be,
+                                                                                function () { Ext.getCmp("d_checking_dateID").focus(); });
+                                                                            return;
+                                                                        }
+                                                                        // ผ่าน -> เรียก handler ซ้ำ (ต้องตั้งทั้งสองแฟล็ก เพราะบรรทัดบนรีเซ็ต receiveValidationPassed ทุกรอบ)
+                                                                        validationSaveButton.receiveValidationPassed = true;
+                                                                        validationSaveButton.periodCheckPassed = true;
+                                                                        validationSaveButton.handler.call(validationSaveButton.scope || validationSaveButton, validationSaveButton);
+                                                                    },
+                                                                    failure: function () {
+                                                                        winMask.unmask();
+                                                                        Ext.Msg.alert("ผิดพลาด", "ไม่สามารถตรวจสอบงวดบัญชีได้");
+                                                                    },
+                                                                });
+                                                                return false;
+                                                            }
+                                                        }
+                                                        validationSaveButton.periodCheckPassed = false;
+                                                        // ---- จบเช็คงวดปิด ----
                                                         Ext.getCmp('gridSub4ID').stopEditing(); // ✅ เพิ่มบรรทัดนี้
                                                         const text = Ext.getCmp('c_name_dtlID').getValue();
                                                         // ใช้ Regex ค้นหาคำว่า "งวดที่ : ตามด้วยตัวเลข" ทั้งหมดในข้อความ
@@ -16332,11 +16450,7 @@ Ext.AppUx = function (app, menu) {
                                                         var val_totalID = Ext.getCmp('f_totalID').getValue().toString().replace(/,/g, "");
                                                         var f_sum_Transf = parseFloat(val_sum_Transf) || 0;
                                                         var f_totalID = parseFloat(val_totalID) || 0;
-                                                        if (Ext.vatEdit) {
-                                                                Ext.MessageBox.alert("Notification", "มีการแก้ไขเงินภาษี " + Ext.vatEditTxt, function () {
-                                                                        return true;
-                                                                });
-                                                        }
+                                                        // ไม่แจ้งเตือน "มีการแก้ไขเงินภาษี" แล้ว (ยังคงใช้ Ext.vatEdit เก็บค่าภาษีที่แก้เองไว้ตามเดิม)
                                                         if (f_totalID !== f_sum_Transf) {
                                                                 // 1. แสดงกล่องแจ้งเตือน (Callback เอาไว้ทำอย่างอื่นหลังจากกด OK เช่น focus ที่ช่องข้อมูล)
                                                                 Ext.MessageBox.alert("Notification", "จำนวนเงินในการตั้งหนี้ " + f_sum_Transf + " ไม่เท่ากับจำนวนเงินที่ส่งเบิก " + f_totalID, function () {
@@ -16362,7 +16476,7 @@ Ext.AppUx = function (app, menu) {
                                                         } //End IF
 
                                                         console.log("Edit_bg", Ext.arrEdit);
-                                                        if (Ext.arrEdit.includes("Edit_bg")) {
+                                                        if (Ext.arrEdit.includes("Edit_bg") && !Ext.isCheckingNoBooking(Ext.perioidHdr)) {
                                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                                 console.log("c_overlap_close 1");
                                                                 Ext.c_overlap_close(Ext.selectRow.data, "c_overlap_book", "edit_bg");
@@ -16461,7 +16575,7 @@ Ext.AppUx = function (app, menu) {
                                                                                 msg += "ออกเลขตรวจรับแล้ว ไม่สามารถทำรายการซ้ำได้";
                                                                         }
                                                                         var i_year = Ext.bg_budget_year.data.items[0].data.i_year_be;
-                                                                        if (Ext.selectRow.get("c_yyyy") != i_year && Ext.selectRow.data.i_chk_bg == 1) {
+                                                                        if (Ext.selectRow.get("c_yyyy") != i_year && Ext.selectRow.data.i_chk_bg == 1 && !Ext.isCheckingNoBooking(Ext.perioidHdr)) {
                                                                                 msg += "ใช้เงินปีงบประมาณ ไม่ตรงกับปีงบที่เปิด ";
                                                                         }
                                                                         if (Ext.getCmp("i_is_warrantyID").getValue().inputValue == 1) {
@@ -16479,6 +16593,19 @@ Ext.AppUx = function (app, menu) {
                                                                                 }
                                                                         }
                                                                 });
+                                                                // ปรับยอด VAT ของบรรทัดสุดท้ายใน jsonArr ให้ผลรวมตรงกับยอด VAT รวมของฟอร์ม (f_vat)
+                                                                // ป้องกันปัญหาปัดเศษ VAT แยกทีละบรรทัดตามรหัสงบประมาณแล้วรวมได้ไม่เท่ากับยอดรวมที่คำนวณจากยอดเงินขอเบิกทั้งก้อน
+                                                                if (jsonArr.length > 0) {
+                                                                        var targetVat = parseFloat((Ext.getCmp("f_vat").getValue() || "0").toString().replace(/,/g, "")) || 0;
+                                                                        var sumVatLines = 0;
+                                                                        jsonArr.forEach(function (it) { sumVatLines += it.f_vat_amt; });
+                                                                        sumVatLines = Math.round(sumVatLines * 100) / 100;
+                                                                        var diffVat = Math.round((targetVat - sumVatLines) * 100) / 100;
+                                                                        if (diffVat !== 0) {
+                                                                                var lastIdx = jsonArr.length - 1;
+                                                                                jsonArr[lastIdx].f_vat_amt = Math.round((jsonArr[lastIdx].f_vat_amt + diffVat) * 100) / 100;
+                                                                        }
+                                                                }
                                                                 if (isNaN(Ext.getCmp("editor_dc_acc_id").getValue())) {
                                                                         msg += "<span style='white-space: nowrap;'>- กรุณาจำนวนเดือนเป็นตัวเลข</span><br>";
                                                                 }
@@ -16486,7 +16613,7 @@ Ext.AppUx = function (app, menu) {
                                                                 if (Ext.not_equal == 1) {
                                                                         //  msg += "<span style='white-space: nowrap;'>- กรุณาตั้งหนี้ค่าใช้ค่าให้กับพอดีวงเงิน</span><br>";
                                                                 }
-                                                                if (Ext.sum_minus == 1) {
+                                                                if (Ext.sum_minus == 1 && !Ext.isCheckingNoBooking(Ext.perioidHdr)) {
                                                                         msg += "<span style='white-space: nowrap;'>- วงเงินแหล่งเงินไม่เพียงพอ</span><br>";
                                                                 }
                                                                 if (Ext.util.Format.date(Ext.getCmp("d_checking_dateID").getValue(), "Y-m-d") < Ext.util.Format.date(Ext.getCmp("d_arrive_dateID").getValue(), "Y-m-d")) {
@@ -16542,8 +16669,17 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                         // Ext.c_overlap_close(record, "c_overlap_close");
                                                                                                                                                         // return;
                                                                                                                                                         Ext.bookingOverall = function (record, txt, rs) {
-                                                                                                                                                                Ext.selectRow.set("i_yyyy", parseInt(Ext.selectRow.get("i_yyyy")) - 1);
                                                                                                                                                                 rec = record[0].data;
+                                                                                                                                                                if (Ext.isCheckingNoBooking(rec)) {
+                                                                                                                                                                        Ext.perioidHdr = record[0];
+                                                                                                                                                                        if (Ext.getCmp("submodeID").getValue() !== "modeEditAp" &&
+                                                                                                                                                                                Ext.getCmp("i_status_checkingID").getValue().inputValue == 1 &&
+                                                                                                                                                                                !rec.c_code) {
+                                                                                                                                                                                Ext.genCode(rec);
+                                                                                                                                                                        }
+                                                                                                                                                                        return true;
+                                                                                                                                                                }
+                                                                                                                                                                Ext.selectRow.set("i_yyyy", parseInt(Ext.selectRow.get("i_yyyy")) - 1);
                                                                                                                                                                 if ([1, 5, 6, 7].includes(rec.i_type_bg) && rec.i_overlap == 0) {
                                                                                                                                                                         // ปีงบปัจจุบัน
                                                                                                                                                                         if (rec.i_type_bg == 8 && rec.i_overlap == 0) {
@@ -17071,6 +17207,7 @@ Ext.AppUx = function (app, menu) {
                                                                                 width: 95,
                                                                                 id: "checkingBookID",
                                                                                 renderer: function (value, metaData, record, row, col, store, gridView) {
+                                                                                        if (Ext.isProjectNoBooking(record)) return "ไม่จองเงิน";
                                                                                         //set Test after then COmment
                                                                                         Ext.selectRow.set("i_yyyy", parseInt(Ext.selectRow.get("i_yyyy")) - 1);
                                                                                         if (record.get("contract_overlap") > 0) {
@@ -17101,6 +17238,7 @@ Ext.AppUx = function (app, menu) {
                                                                                 width: 150,
                                                                                 id: "checkingOverlapBookID",
                                                                                 renderer: function (value, metaData, record, row, col, store, gridView) {
+                                                                                        if (Ext.isProjectNoBooking(record)) return "ไม่จองเงิน";
                                                                                         //set Test after then COmment
                                                                                         Ext.selectRow.set("i_yyyy", parseInt(Ext.selectRow.get("i_yyyy")) - 1);
                                                                                         if (record.get("i_overlap") == 3 && record.get("i_overlapcheck") == 0) {
@@ -17552,11 +17690,13 @@ Ext.onReady(function () {
                                                         }
                                                         // สั่งโหลด Store พร้อมใส่ callback
                                                         store.load({
-                                                                callback: function (records, operation, success) {
+                                                                callback: function (records, options, success) {
                                                                         if (success) {
                                                                                 resolve(store); // โหลดสำเร็จ ส่งสัญญานไปต่อ
                                                                         } else {
-                                                                                reject('ไม่สามารถโหลดข้อมูล Store ได้'); // โหลดพัง ส่งสัญญาณหยุด
+                                                                                var storeName = store.storeId || '(unknown store)';
+                                                                                console.error('loadStorePromise failed for store:', storeName, options);
+                                                                                reject('ไม่สามารถโหลดข้อมูล Store ' + storeName + ' ได้ (ดูรายละเอียดใน console)'); // โหลดพัง ส่งสัญญาณหยุด
                                                                         }
                                                                 }
                                                         });

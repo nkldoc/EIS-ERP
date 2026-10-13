@@ -10,26 +10,11 @@ $util = new apiUtil();
 $root = "data";
 $data = array();
 $con = null;
+$limit = @$_REQUEST["limit"] ?? null;
+$dir = @$_REQUEST["dir"] ?? null;
+$sort = @$_REQUEST["sort"] ?? null;
+$start = @$_REQUEST["start"] ?? null;
 
-$limit = $_REQUEST["limit"] ?? null;
-$dir = $_REQUEST["dir"] ?? null;
-$sort = $_REQUEST["sort"] ?? null;
-$start = $_REQUEST["start"] ?? null;
-
-function get($a)
-{
-    return $a ?? 0;
-}
-
-if (!get($start)) {
-    $start = 0;
-}
-if (!get($limit)) {
-    $limit = 20;
-} else {
-    $limit = ($limit + $start);
-}
-$totalCount = null;
 if ($_REQUEST['type'] == 'storeSpEmp') {
 
     $TEAM_TOR = " 2,3 "; // จัดหาหนึ่ง จัดหาสอง
@@ -37,7 +22,16 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
     $department_id = $_REQUEST['dc_department_id'] ?? $department_id;
     ###################
     $table = "dbo.sp_emp";
-
+    switch ($department_id) {
+        case 1: $sw = ' b.dc_department_id in (1)';
+            break;
+        case 2: $sw = ' b.dc_department_id in (2,3)';
+            break;
+        case 3: $sw = ' b.dc_department_id in (2,3)';
+            break; 
+        default :  $sw = ' 1=1 ';
+            break;
+    }
     $sqlTempTable = "select b.c_name as c_department
                     , a.c_name
                     , a.sp_emp_id
@@ -49,7 +43,7 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
 		 , ROW_NUMBER() OVER (ORDER BY a.dc_department_id asc) as row
                 from dbo.sp_emp a
                   inner join sp_department b on b.dc_department_id = a.dc_department_id
-                where b.dc_department_id in (8,?) and  i_enable = 1"; //  and a.i_level=3 and b.dc_department_id = " . $_SESSION['dc_department_id'];
+                where $sw and  i_enable = 1"; //  and a.i_level=3 and b.dc_department_id = " . $_SESSION['dc_department_id'];
 
 
     if (@$mode == "SEARCH") {
@@ -57,24 +51,23 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
             $sqlTempTable .= " and " . $filter . " like ?";
         }
         $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
-        $arrParam = array($department_id, "%{$value}%", $start, $limit);
-        $arrCountParam = array($department_id, "%{$value}%");
+        $arrParam = array("%{$value}%", $start, $limit);
+        $arrCountParam = array("%{$value}%");
     } else {
         $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
-        $arrParam = array($department_id, $start, $limit);
-        $arrCountParam = array($department_id);
+        $arrParam = array($start, $limit);
+        $arrCountParam = array();
     }
 
-    //     echo $sqlMain;
-    //     print_r($arrParam);
-    //     exit();
+//     echo $sqlMain;
+//     print_r($arrParam);
+//     exit();
 
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     $i = $start + 1;
 
     while ($row = $db->Fetch($stmt)) {
-        $temp = array(
-            "no" => ($i++),
+        $temp = array("no" => ($i++),
             "no" => intval($row["row"]),
             "id" => intval($row["sp_emp_id"]),
             "c_code" => $row["c_department"],
@@ -91,59 +84,6 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
     $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
     $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
     $debug = 'storeDepartment >>>';
-} else if ($_REQUEST['type'] == 'PRLISTSTEP02') {
-    $TEAM_TOR = " 2,3 "; //dc_department_type_id 23
-    $docType = $_REQUEST['docType'] ?? null;
-    $ss = $_SESSION['user_id'] == 1 ? '' : ' and t.sp_emp_id=' . $_SESSION['sp_emp_id'];
-
-    $type_menu = "";
-    ###################
-    $table = "dbo.sp_tor";
-    //    $dc_department_type_id = $_REQUEST['dc_department_type_id'] ?? null;
-    //SELECT sp_type_status_id as id ,c_name FROM dbo.sp_type_status WHERE i_enabled = ?
-    $sqlTempTable = "select t.f_total_amt, t.tor_type_id,(select top 1 c_name from dbo. sp_type_status where sp_type_status_id= t.tor_type_id and i_enabled = 1) as tor_typeTxt 
-        ,t.d_doc_ref, t.tor_id, t.c_code , t.c_name , ROW_NUMBER() OVER (ORDER BY t.tor_id asc) as row
-                    from dbo.sp_tor t 
-                    where 1=1 {$type_menu} and isnull(t.tor_type_id,0) <> 0 and t.i_enabled=? $ss";
-
-
-
-    if (@$mode == "SEARCH") {
-        if (isset($value) && $value != "") {
-            $sqlTempTable .= " and " . $filter . " like ?";
-        }
-        $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
-        $arrParam = array(1, "%{$value}%", $start, $limit);
-        $arrCountParam = array(1, "%{$value}%");
-    } else {
-        $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
-        $arrParam = array(1, $start, $limit);
-        $arrCountParam = array(1);
-    }
-
-
-    //echo $db->debugSql($sqlTempTable, $arrParam); exit;
-
-
-
-
-    $stmt = $db->QueryParam($sqlMain, $arrParam);
-    $i = $start + 1;
-
-    while ($row = $db->Fetch($stmt)) {
-        $temp = array(
-            "no" => ($i++),
-            "id" => intval($row["tor_id"]),
-            "c_code" => $row["c_code"],
-            "d_doc_ref" => $row["d_doc_ref"],
-            "tor_typeTxt" => $row["tor_typeTxt"],
-            "f_total_amt" => number_format($row["f_total_amt"], 2),
-            "c_name" => $row["c_name"]
-        );
-        ${$root}[] = $temp;
-    }
-    $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
-    $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
 } else if ($_REQUEST['type'] == 'storeDepartment') {
     $TEAM_TOR = " 2,3 "; //dc_department_type_id 23
     ###################
@@ -156,13 +96,13 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
                     , a.dc_department_id
                     , b.dc_department_type_id
                     , b.i_seq
-                        , a.i_level
+                    , a.i_level
             , ROW_NUMBER() OVER (ORDER BY a.dc_department_id asc) as row
                     from dbo.sp_emp a
                     inner join sp_department b on b.dc_department_id = a.dc_department_id
                     where a.i_level in (1,2)  
-                    and b.i_show = 1 
-                and a.i_enable=?  ";
+                    and a.dc_department_id  in  (1,2,4,3,6)  
+                and a.i_enable=?";
 
 
     if (@$mode == "SEARCH") {
@@ -178,16 +118,15 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
         $arrCountParam = array(1);
     }
 
-    //     echo $sqlMain;
-    //     print_r($arrParam);
-    //     exit();
+//     echo $sqlMain;
+//     print_r($arrParam);
+//     exit();
 
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     $i = $start + 1;
 
     while ($row = $db->Fetch($stmt)) {
-        $temp = array(
-            "no" => ($i++),
+        $temp = array("no" => ($i++),
             "id" => intval($row["dc_department_id"]),
             "c_department" => $row["c_department"],
             "c_name" => $row["c_name"]
@@ -197,43 +136,49 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
     $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
     $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
     $debug = 'storeDepartment >>>';
-} else if ($_REQUEST['type'] == 'storeOverlap') {
-    ############################################################################################################
-    $mode   = $_REQUEST["mode"] ?? null;
-    $filter = $_REQUEST["filter"] ?? null;
-    $value  = $_REQUEST["value"] ?? null;
-    ###################
-    $root   = "data";
-    $data   = array();
-    ###################
-    $limit  = $_REQUEST["limit"] ?? null;
-    $dir    = $_REQUEST["dir"] ?? null;
-    $sort   = $_REQUEST["sort"] ?? null;
-    $start  = $_REQUEST["start"] ?? null;
-    // function get($a)
-    // {
-    //     return $a ?? 0;
-    // }
+    
+    
+    
+    
+    
+} else if ($_REQUEST['type'] == 'storeOverlap') { 
+############################################################################################################
+$mode   = $_REQUEST["mode"]??null;
+$filter = $_REQUEST["filter"]??null;
+$value  = $_REQUEST["value"]??null; 
+###################
+$root   = "data";
+$data   = array();
+###################
+$limit  = $_REQUEST["limit"]??null;
+$dir    = $_REQUEST["dir"]??null;
+$sort   = $_REQUEST["sort"]??null;
+$start  = $_REQUEST["start"]??null; 
+function get($a)
+{
+    return $a ?? 0;
+}
 
-    if (!get($start)) {
-        $start = 0;
-    }
-    if (!get($limit)) {
-        $limit = 20;
-    } else {
-        $limit = ($limit + $start);
-    }
-    if (!get($dir)) {
-        $dir = "DESC";
-    }
-    if (!get($sort)) {
-        $sort = " bg_budget_dtl_overlap_id";
-    }
-    //    print_r($_SESSION);
-    if ($_SESSION['user_id'] === 1) {
-        $dc_cost_id = '38';
-    } else {
-        $dc_cost_id = $_SESSION['dc_cost_id'] ?? null;
+if (!get($start)) {
+    $start = 0;
+}
+if (!get($limit)) {
+    $limit = 20;
+} else {
+    $limit = ($limit + $start);
+}
+if (!get($dir)) {
+    $dir = "DESC";
+}
+if (!get($sort)) {
+    $sort = " bg_budget_dtl_overlap_id";
+}
+//    print_r($_SESSION);
+if($_SESSION['user_id']===1){
+        // $dc_cost_id = 38;
+        $dc_cost_id = $_REQUEST['dc_cost_id']??null;
+    }else{
+        $dc_cost_id = $_REQUEST['dc_cost_id']??null;
     }
 
     // $sqlTempTable = "select "
@@ -248,8 +193,9 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
     //         . ", ROW_NUMBER() OVER (ORDER BY bg_budget_dtl_overlap_id desc) as row"
     //         . " from NMU.dbo.vw_bg_budget_overlap "
     //         . " where dc_cost_id=?  and d_end_date  >= '" . date('Y-m-d') ."'"  ;
+    $con_cost = " dc_cost_id = ? AND a.i_year = ?   ";
 
-    $sqlTempTable = "select 
+        $sqlTempTable = "select 
         ROW_NUMBER() OVER (ORDER BY i_year DESC, bg_budget_dtl_overlap_id DESC) AS row 
         ,* from (
         SELECT 
@@ -258,19 +204,19 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
          ,a.bg_expense_id
          ,a.dc_expense_budget_type_id
          ,a.dc_cost_id
-         ,(SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost aa WHERE aa.dc_cost_id = a.dc_cost_id) AS dc_costTxt
+         ,(SELECT TOP 1 c_name FROM ".DB_CENTER."dc_cost aa WHERE aa.dc_cost_id = a.dc_cost_id) AS dc_costTxt
          ,b.c_code
          ,b.c_name
          ,a.f_total AS f_overlap
          ,i_year
-         ,(SELECT TOP 1  ISNULL(SUM(ISNULL(f_amt,0.00)),0.00)FROM " . DB_NMU_EIS . "vw_bg_reserve_overlap aa WHERE aa.i_reserve = 2 AND a.c_code_ref = aa.c_code_overlap) AS f_overlap_reserve
-         ,(SELECT TOP 1  ISNULL(SUM(ISNULL(f_amt,0.00)),0.00)FROM " . DB_NMU_EIS . "vw_bg_reserve_overlap aa WHERE aa.i_reserve = 3 AND ISNULL(aa.i_finish,0) = 0 AND a.c_code_ref = aa.c_code_overlap) AS f_overlap_reserve_income
-         ,(SELECT TOP 1  ISNULL(SUM(ISNULL(f_amt,0.00)),0.00)FROM " . DB_NMU_EIS . "vw_bg_reserve_overlap aa WHERE aa.i_reserve = 3 AND ISNULL(aa.i_finish,0) = 1 AND a.c_code_ref = aa.c_code_overlap) AS f_overlap_reserve_finish
+         ,(SELECT TOP 1  ISNULL(SUM(ISNULL(f_amt,0.00)),0.00)FROM ".DB_NMU_EIS."vw_bg_reserve_overlap aa WHERE aa.i_reserve = 2 AND a.c_code_ref = aa.c_code_overlap) AS f_overlap_reserve
+         ,(SELECT TOP 1  ISNULL(SUM(ISNULL(f_amt,0.00)),0.00)FROM ".DB_NMU_EIS."vw_bg_reserve_overlap aa WHERE aa.i_reserve = 3 AND ISNULL(aa.i_finish,0) = 0 AND a.c_code_ref = aa.c_code_overlap) AS f_overlap_reserve_income
+         ,(SELECT TOP 1  ISNULL(SUM(ISNULL(f_amt,0.00)),0.00)FROM ".DB_NMU_EIS."vw_bg_reserve_overlap aa WHERE aa.i_reserve = 3 AND ISNULL(aa.i_finish,0) = 1 AND a.c_code_ref = aa.c_code_overlap) AS f_overlap_reserve_finish
          ,ISNULL((SELECT TOP 1 aa.f_total FROM #tmp_working aa WHERE aa.c_booking = a.c_code_ref),0) AS f_working
          ,a.d_end_date
-        FROM " . DB_NMU_EIS . "vw_bg_budget_overlap a
-        LEFT JOIN " . DB_NMU_EIS . "bg_expense b ON a.bg_expense_id = b.bg_expense_id
-        where dc_cost_id=? and d_end_date  >= '" . date('Y-m-d') . "' ) a
+        FROM ".DB_NMU_EIS."vw_bg_budget_overlap a
+        LEFT JOIN ".DB_NMU_EIS."bg_expense b ON a.bg_expense_id = b.bg_expense_id
+        where {$con_cost} and d_end_date  >= '" . date('Y-m-d') ."' ) a
             
         where  f_overlap - f_overlap_reserve_income - f_overlap_reserve - f_working > 0 ";
     if ($mode == "SEARCH") {
@@ -282,9 +228,9 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
             b.c_booking 
             ,SUM((ISNULL(b.f_total,0) - ISNULL(ret.f_return, 0))) AS f_total
         INTO #tmp_working
-        FROM " . DB_NMU_EIS . "po_working_hdr a
-        INNER JOIN " . DB_NMU_EIS . "po_working_dtl b ON a.po_working_hdr_id = b.po_working_hdr_id 
-        LEFT JOIN (SELECT po_working_hdr_id ,SUM(f_return) AS f_return FROM " . DB_NMU_EIS . "po_return WHERE i_enable = 1 
+        FROM ".DB_NMU_EIS."po_working_hdr a
+        INNER JOIN ".DB_NMU_EIS."po_working_dtl b ON a.po_working_hdr_id = b.po_working_hdr_id 
+        LEFT JOIN (SELECT po_working_hdr_id ,SUM(f_return) AS f_return FROM ".DB_NMU_EIS."po_return WHERE i_enable = 1 
         GROUP BY po_working_hdr_id) ret ON a.po_working_hdr_id = ret.po_working_hdr_id
         WHERE a.i_enable = 1 AND b.c_booking IS NOT NULL
         GROUP BY b.c_booking;
@@ -300,7 +246,7 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
         ) a WHERE a.row > ? and a.row <= ?
         drop table #tmp_working
         ";
-        $arrParam = array($dc_cost_id, "%{$value}%", $start, $limit);
+        $arrParam = array($dc_cost_id, $_REQUEST['i_yyyy_overlap'], "%{$value}%", $start, $limit);
         $arrCountParam = array($dc_cost_id, "%{$value}%");
     } else {
         $sqlMain = "SET NOCOUNT ON 
@@ -308,12 +254,13 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
             b.c_booking 
             ,SUM((ISNULL(b.f_total,0) - ISNULL(ret.f_return, 0))) AS f_total
         INTO #tmp_working
-        FROM " . DB_NMU_EIS . "po_working_hdr a
-        INNER JOIN " . DB_NMU_EIS . "po_working_dtl b ON a.po_working_hdr_id = b.po_working_hdr_id 
-        LEFT JOIN (SELECT po_working_hdr_id ,SUM(f_return) AS f_return FROM " . DB_NMU_EIS . "po_return WHERE i_enable = 1 
+        FROM ".DB_NMU_EIS."po_working_hdr a
+        INNER JOIN ".DB_NMU_EIS."po_working_dtl b ON a.po_working_hdr_id = b.po_working_hdr_id 
+        LEFT JOIN (SELECT po_working_hdr_id ,SUM(f_return) AS f_return FROM ".DB_NMU_EIS."po_return WHERE i_enable = 1 
         GROUP BY po_working_hdr_id) ret ON a.po_working_hdr_id = ret.po_working_hdr_id
         WHERE a.i_enable = 1 AND b.c_booking IS NOT NULL
         GROUP BY b.c_booking;
+
         select  bg_budget_dtl_overlap_id
         ,i_year
         ,c_code_ref
@@ -322,34 +269,33 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
         ,f_overlap - f_overlap_reserve - f_overlap_reserve_income - f_working AS f_total
         ,dc_costTxt
         ,bg_expense_id
+        ,(select c_name from ".DB_NMU_EIS."bg_expense where bg_expense_id = a.bg_expense_id  ) as bg_expense_name
         ,d_end_date from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?
         drop table #tmp_working
         ";
-        $arrParam = array($dc_cost_id, $start, $limit);
-        $arrCountParam = array($dc_cost_id);
+        $arrParam = array($dc_cost_id, $_REQUEST['i_yyyy_overlap'], $start, $limit);
+        $arrCountParam = array($dc_cost_id, $_REQUEST['i_yyyy_overlap']);
     }
     // /******echo sql******/
     // $sql = (@$sqlMain) ? $sqlMain : $sql;
     // $arr = (@$arrParam) ? $arrParam : ((@$arrValue) ? $arrValue : array());
-
+    
     // $sql = str_replace('?', '#-#', $sql);
     // foreach ($arr as $fld => $value) {
     //  $sql = preg_replace('/#-#/', "'" . $value . "'", $sql, 1);
     // }
     // echo $sql; exit;
     // /********************/
-  //  $db->debugSql($sqlMain,$sqlMain);  
-    $stmt = $db->QueryParam($sqlMain, $sqlMain);
-    
+    $stmt = $db->QueryParam($sqlMain, $arrParam);
     $i = $start + 1;
 
     while ($row = $db->Fetch($stmt)) {
-        $temp = array(
-            "no" => ($i++),
+        $temp = array("no" => ($i++),
             "id" => intval($row["bg_budget_dtl_overlap_id"]),
-            "i_year" => $row["i_year"] + 543,
+            "i_year" => $row["i_year"]+543,
             "dc_costTxt" => $row["dc_costTxt"],
             "c_name" => $row["c_code_ref"],
+            "bg_expense_name" => $row["bg_expense_name"],
             "c_code_ref" => $row["c_code_ref"],
             "dc_expense_budget_type_id" => $row["dc_expense_budget_type_id"],
             "dc_cost_id" => $row["dc_cost_id"],
@@ -364,19 +310,20 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
             b.c_booking 
             ,SUM((ISNULL(b.f_total,0) - ISNULL(ret.f_return, 0))) AS f_total
         INTO #tmp_working
-        FROM " . DB_NMU_EIS . "po_working_hdr a
-        INNER JOIN " . DB_NMU_EIS . "po_working_dtl b ON a.po_working_hdr_id = b.po_working_hdr_id 
-        LEFT JOIN (SELECT po_working_hdr_id ,SUM(f_return) AS f_return FROM " . DB_NMU_EIS . "po_return WHERE i_enable = 1 
+        FROM ".DB_NMU_EIS."po_working_hdr a
+        INNER JOIN ".DB_NMU_EIS."po_working_dtl b ON a.po_working_hdr_id = b.po_working_hdr_id 
+        LEFT JOIN (SELECT po_working_hdr_id ,SUM(f_return) AS f_return FROM ".DB_NMU_EIS."po_return WHERE i_enable = 1 
         GROUP BY po_working_hdr_id) ret ON a.po_working_hdr_id = ret.po_working_hdr_id
         WHERE a.i_enable = 1 AND b.c_booking IS NOT NULL
         GROUP BY b.c_booking;
     select count(*) as totalCount from ({$sqlTempTable}) a";
-
     $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
     $debug = 'storeOverlap >>>';
-
+    
     echo json_encode(array("debug" => true, "totalCount" => $totalCount, $root => ${$root}));
     exit();
+    
+    
 } else if ($_REQUEST["type"] == "storeSpNoTor") {
 
     $sqlMain = "SELECT tor_id
@@ -387,24 +334,25 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
                 FROM dbo.sp_tor
 		WHERE i_type_bg = 3 AND i_enabled = 1  and sp_emp_id = {$_SESSION['sp_emp_id']}
 		ORDER BY c_code desc";
-    //                echo $sqlMain; exit();
+//                echo $sqlMain; exit();
     $arrParam = array(STATUS_ENABLE, 1);
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     if ($stmt) {
 
-
+  
         while ($row = $db->Fetch($stmt)) {
             $temp = array(
                 "id" => "{$row["tor_id"]}",
-                "c_code" => $row["c_code"],
+                "c_code" => $row["c_code"],    
                 "c_name" => $row["c_name"],
                 "dc_expense_budget_type_id" => $row["dc_expense_budget_type_id"],
-                // "dc_expense_budget_type_idTxt" => $row["dc_expense_budget_type_idTxt"],
-
+               // "dc_expense_budget_type_idTxt" => $row["dc_expense_budget_type_idTxt"],
+                
             );
             ${$root}[] = $temp;
         }
     }
+    
 } else if ($_REQUEST["type"] == "storeSpMainPR") {
 
     $sqlMain = "SELECT tor_id
@@ -423,16 +371,16 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
                 FROM dbo.sp_tor
 		WHERE i_type_bg = 2 AND i_enabled = 1
 		ORDER BY c_code";
-    //                echo $sqlMain; exit();
+//                echo $sqlMain; exit();
     $arrParam = array(STATUS_ENABLE, 1);
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     if ($stmt) {
 
-
+  
         while ($row = $db->Fetch($stmt)) {
             $temp = array(
                 "id" => "{$row["tor_id"]}",
-                "c_code" => $row["c_code"],
+                "c_code" => $row["c_code"],    
                 "c_name" => $row["c_name"],
                 "dc_expense_budget_type_id" => $row["dc_expense_budget_type_id"],
                 "po_expense_id" => $row["po_expense_id"],
@@ -443,12 +391,13 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
                 "i_hire_type" => $row["i_hire_type"],
                 "i_product_type" => $row["i_product_type"],
                 "d_doc_ref" => $row["d_doc_ref"],
-                // "dc_expense_budget_type_idTxt" => $row["dc_expense_budget_type_idTxt"],
-
+               // "dc_expense_budget_type_idTxt" => $row["dc_expense_budget_type_idTxt"],
+                
             );
             ${$root}[] = $temp;
         }
     }
+    
 } else if ($_REQUEST["type"] == "dc_cost") {
 
     $sqlMain = "
@@ -477,6 +426,7 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
         }
     }
 } else if ($_REQUEST['type'] == 'storeDepartment') {
+
     $TEAM_TOR = " 2,3 "; //dc_department_type_id 23
     ###################
     $table = "dbo.sp_emp";
@@ -508,16 +458,15 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
         $arrCountParam = array(1);
     }
 
-    //     echo $sqlMain;
-    //     print_r($arrParam);
-    //     exit();
+//     echo $sqlMain;
+//     print_r($arrParam);
+//     exit();
 
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     $i = $start + 1;
 
     while ($row = $db->Fetch($stmt)) {
-        $temp = array(
-            "no" => ($i++),
+        $temp = array("no" => ($i++),
             "id" => intval($row["dc_department_id"]),
             "c_department" => $row["c_department"],
             "c_name" => $row["c_name"]
@@ -829,35 +778,7 @@ order by b.dc_department_type_id";
             ${$root}[] = $temp;
         }
     }
-} else if ($_REQUEST["type"] == "List_spHoliday") {
-
-    $sqlMain = " select c_name
-                        , sp_holiday_dtl_id
-                        , CONVERT(VARCHAR,d_holiday, 120) as d_holiday  
-                        , CONVERT(date,d_holiday) as d_holiday2  
-                from sp_holiday_dtl a";
-    $arrParam = array(STATUS_ENABLE);
-    $stmt = $db->QueryParam($sqlMain, $arrParam);
-    if ($stmt) {
-
-        if (@$_REQUEST["all"] == "all") {
-            ${$root}[] = array(
-                "id" => "0",
-                "c_name" => "- เลือกทั้งหมด -"
-            );
-        }
-
-        while ($row = $db->Fetch($stmt)) {
-            $temp = array(
-                "id"                => "{$row["sp_holiday_dtl_id"]}",
-                "c_name"            => $row["c_name"],
-                "d_holiday"         => $row["d_holiday"],
-                "d_holiday2"        => $row["d_holiday2"],
-            );
-            ${$root}[] = $temp;
-        }
-    }
 }
-//echo json_encode(array("debug" => true, $root => ${$root}));
-echo json_encode(array("debug" => true, "totalCount" => $totalCount, $root => ${$root}));
+
+echo json_encode(array("debug" => true, $root => ${$root}));
 exit;

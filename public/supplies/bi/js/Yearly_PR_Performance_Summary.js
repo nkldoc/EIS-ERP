@@ -9,11 +9,12 @@
 
   window.DATA_BUDGET = window.DATA_BUDGET || [];
   let chartBar;
+  let zrClickHandler = null; // เก็บ handler ระดับ zrender ไว้ถอดออกก่อน bind ใหม่
 
   function loadAll(params = {}) {
     $.ajax({
           url: "../api/List_Rep_Yearly_PR_Performance_Summary.php",
-          method: "GET",
+          method: "GET", 
           data: { fn: "List_QueryParam", ...params },
           dataType: "text",
           success: function (responseText) {
@@ -34,13 +35,54 @@
   }
 
   /* ---------- กราฟหลัก ---------- */
-  /* ---------- กราฟหลัก ---------- */
+  // ปีงบที่ให้คลิกดูรายละเอียดได้ (Rep_DetailByTypeV7)
+  const DRILLDOWN_YEAR = 2569;
+  // ปีเริ่มต้นที่แสดงในกราฟแนวโน้ม (ตัดปีก่อนหน้านี้ทิ้ง เช่น 2566)
+  const TREND_START_YEAR = 2567;
+
+  // สไตล์เส้นแต่ละปี — เน้นปีงบปัจจุบัน (2569) ให้เด่น ปีอื่นจางลงเพื่อให้อ่านง่าย
+  const YEAR_STYLES = {
+    2567: { color: "#9aa5b1", width: 1.5, opacity: 0.55, type: "dashed", symbol: 4 },
+    2568: { color: "#f0a020", width: 2, opacity: 0.85, type: "solid", symbol: 5 },
+    2569: { color: "#1f6feb", width: 4, opacity: 1, type: "solid", symbol: 9 },
+    2570: { color: "#2fb344", width: 2, opacity: 0.85, type: "solid", symbol: 5 },
+  };
+  const DEFAULT_YEAR_STYLE = { color: "#748ffc", width: 2, opacity: 0.8, type: "solid", symbol: 5 };
+
+  function mapFiscalToDoc(fiscalYear, fiscalMonth) {
+    let docYear, docMonth;
+    if (fiscalMonth >= 1 && fiscalMonth <= 3) {
+      docYear = fiscalYear - 1; // ต.ค.–ธ.ค. อยู่ปีที่แล้ว
+      docMonth = fiscalMonth + 9; // 1→10, 2→11, 3→12
+    } else {
+      docYear = fiscalYear; // ม.ค.–ก.ย. อยู่ปีเดียวกับปีงบ
+      docMonth = fiscalMonth - 3; // 4→1, 5→2, ..., 12→9
+    }
+    return { docYear, docMonth };
+  }
+
+  // เปิดหน้ารายละเอียด PR ตามปีงบ + เดือนงบ (1 = ตุลาคม … 12 = กันยายน)
+  function openDetail(fiscalYear, fiscalMonth) {
+    fiscalYear = Number(fiscalYear);
+    if (!fiscalYear || !(fiscalMonth >= 1 && fiscalMonth <= 12)) return;
+    const yearEn = fiscalYear - 543;
+    const { docYear, docMonth } = mapFiscalToDoc(fiscalYear, fiscalMonth);
+    const url =
+      `/supplies/bi/reports/Rep_DetailByTypeV7.php?year=${docYear}&yearEn=${yearEn}` +
+      `&monthbg=${fiscalMonth}&month=${docMonth}` +
+      `&dc_expense_budget_type_id=0&bg_expense_id=0&Performance_Summary=1`;
+    window.open(url, "_blank");
+  }
+
   function renderBar(itemsRaw) {
     if (!chartBar) {
       chartBar = echarts.init(document.getElementById("bar_bg"));
     } else {
       chartBar.clear();
     }
+
+    const barEl = document.getElementById("bar_bg");
+    if (barEl) barEl.style.cursor = "pointer";
 
     // 1) ดึงข้อมูลจาก global / parameter
     const rows = itemsRaw || window.DATA_BUDGET || [];
@@ -53,60 +95,76 @@
     // 2) header เดือนตรงกับ month_no 1–12
     const monthHeader = ["product", "ตุลาคม", "พฤศจิกายน", "ธันวาคม", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน"];
 
-    // 3) จัดกลุ่มตามปี + map เดือน → ค่ายอดสะสม
-    const byYear = {}; // { "2565": [12 ค่า], ... }
-
+    // 3) จัดกลุ่มตามปี → จำนวน PR รายเดือน
+    //    total_pr มาจาก API เป็น "ยอดรายเดือน" ที่นับด้วยเงื่อนไขเดียวกับหน้า detail แล้ว จึงใช้ตรง ๆ
+    const byYear = {};
     rows.forEach((r) => {
       const year = String(r.year_th);
       const m = parseInt(r.month_no, 10); // 1-12
       if (!year || isNaN(m) || m < 1 || m > 12) return;
 
-      if (!byYear[year]) {
-        byYear[year] = new Array(12).fill(0);
-      }
-
-      // ใช้ cumulative_total เป็นค่าที่ plot
-      const val = Number(r.cumulative_total ?? r.total_pr ?? 0) || 0;
-      byYear[year][m - 1] = val;
+      if (!byYear[year]) byYear[year] = new Array(12).fill(0);
+      byYear[year][m - 1] = Number(r.total_pr ?? 0) || 0;
     });
 
-    // 4) เรียงปี + เอาแค่ 5 ปีล่าสุด
-    const years = Object.keys(byYear).sort(); // 2565,2566,...
-    const last5Years = years.slice(-5);
+    // 4) เรียงปี + ตัดปีก่อน TREND_START_YEAR ทิ้ง (เช่น 2566) เหลือ 2567–2570
+    const years = Object.keys(byYear)
+      .filter((y) => Number(y) >= TREND_START_YEAR)
+      .sort();
 
-    // 5) เตรียม dataset.source
-    const source = [monthHeader];
-    last5Years.forEach((y) => {
-      source.push([y, ...byYear[y]]);
-    });
+    // 5) ชื่อเดือนสำหรับแกน X (ตัด "product" ออก)
+    const monthNames = monthHeader.slice(1);
 
-    // 6) series config ตามจำนวนปี
-    const series = last5Years.map(() => ({
-      type: "line",
-      smooth: true,
-      symbolSize: 10,
-      lineStyle: {
-        width: 4,
-        shadowColor: "rgba(0,0,0,0.3)",
-        shadowBlur: 10,
-        shadowOffsetY: 5,
-      },
-      emphasis: {
-        focus: "series",
-        scale: true,
-      },
-      seriesLayoutBy: "row",
-    }));
-
-    // 6.2) Dynamic Colors based on Dark Mode
+    // 6) Dynamic Colors based on Dark Mode
     const isDark = getDark();
-    const textColor = isDark ? "#e9ecef" : "#000";
-    const tooltipBg = isDark ? "rgba(50, 50, 50, 0.9)" : "rgba(255, 255, 255, 0.9)";
-    const tooltipBorder = isDark ? "#dee2e6" : "#333";
+    const textColor = isDark ? "#e9ecef" : "#212529";
+    const subTextColor = isDark ? "#adb5bd" : "#6c757d";
+    const splitLineColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)";
+    const tooltipBg = isDark ? "rgba(40, 44, 52, 0.95)" : "rgba(255, 255, 255, 0.96)";
+    const tooltipBorder = isDark ? "#495057" : "#dee2e6";
+
+    // 7) series config — กราฟแท่งแนวตั้ง จำนวน PR รายเดือน จัดกลุ่มตามเดือน เน้นปีงบปัจจุบัน (2569)
+    const series = years.map((y) => {
+      const st = YEAR_STYLES[Number(y)] || DEFAULT_YEAR_STYLE;
+      const isCurrent = Number(y) === DRILLDOWN_YEAR;
+      return {
+        name: String(y),
+        type: "bar",
+        data: byYear[y], // จำนวน PR รายเดือน 12 เดือน (ต.ค.–ก.ย.)
+        barMaxWidth: 26,
+        barGap: "10%",
+        barCategoryGap: "35%",
+        itemStyle: {
+          color: st.color,
+          opacity: isCurrent ? 1 : 0.55,
+          borderRadius: [3, 3, 0, 0],
+        },
+        emphasis: { focus: "series", itemStyle: { opacity: 1 } },
+        label: {
+          show: true,
+          position: "top",
+          fontSize: 9,
+          fontWeight: isCurrent ? "bold" : "normal",
+          color: textColor,
+          formatter: (p) => (p.value ? Number(p.value).toLocaleString("th-TH") : ""),
+        },
+        z: isCurrent ? 10 : 2,
+      };
+    });
 
     const option = {
       backgroundColor: "transparent",
+      color: years.map((y) => (YEAR_STYLES[Number(y)] || DEFAULT_YEAR_STYLE).color),
+      title: {
+        text: `จำนวนใบขอซื้อ/จ้าง (PR) รายเดือน`,
+        subtext: `คลิกที่แท่งกราฟ = ดูรายละเอียด PR ของปีนั้น | คลิกชื่อเดือน = ปีงบ ${DRILLDOWN_YEAR}`,
+        left: "center",
+        top: 0,
+        textStyle: { fontSize: 14, fontWeight: "bold", color: textColor },
+        subtextStyle: { fontSize: 12, color: subTextColor },
+      },
       legend: {
+        top: 46,
         textStyle: { color: textColor },
       },
       tooltip: {
@@ -115,65 +173,54 @@
         borderColor: tooltipBorder,
         borderWidth: 1,
         textStyle: { color: textColor },
-        axisPointer: {
-          type: "cross",
-          label: { backgroundColor: "#6a7985" },
-        },
+        valueFormatter: (v) => (v == null || v === "" ? "-" : Number(v).toLocaleString("th-TH") + " รายการ"),
+        axisPointer: { type: "shadow" },
       },
-      dataset: { source },
-      grid: [{ top: "25%", bottom: "15%" }],
+      grid: [{ top: 95, bottom: 40, left: 16, right: 24, containLabel: true }],
       xAxis: {
         type: "category",
-        gridIndex: 0,
-        axisLabel: { color: textColor },
+        data: monthNames,
+        triggerEvent: true,
+        axisLabel: { color: textColor, interval: 0 },
+        axisTick: { alignWithLabel: true },
       },
       yAxis: {
         gridIndex: 0,
-        axisLabel: { color: textColor },
+        name: "จำนวน PR (รายการ/เดือน)",
+        nameTextStyle: { color: subTextColor, align: "left" },
+        axisLabel: { color: textColor, formatter: (v) => Number(v).toLocaleString("th-TH") },
+        splitLine: { lineStyle: { color: splitLineColor } },
       },
-      label: {
-        show: true,
-        position: "top",
-        fontSize: 12,
-        color: textColor,
-      },
-      series,
       labelLayout: { hideOverlap: true },
+      series,
     };
 
     chartBar.setOption(option);
-    function mapFiscalToDoc(fiscalYear, fiscalMonth) {
-      let docYear, docMonth;
 
-      if (fiscalMonth >= 1 && fiscalMonth <= 3) {
-        docYear = fiscalYear - 1; // ต.ค.–ธ.ค. อยู่ปีที่แล้ว
-        docMonth = fiscalMonth + 9; // 1→10, 2→11, 3→12
-      } else {
-        docYear = fiscalYear; // ม.ค.–ก.ย. อยู่ปีเดียวกับปีงบ
-        docMonth = fiscalMonth - 3; // 4→1, 5→2, ..., 12→9
-      }
-      return { docYear, docMonth };
-    }
-
-    chartBar.off("click"); // เคลียร์ event เดิมเผื่อมีค้าง
+    // --- คลิกที่แท่งกราฟ → ดูรายละเอียดของ "ปีนั้น" เดือนนั้น ; คลิกชื่อเดือน → ปีงบ DRILLDOWN_YEAR ---
+    chartBar.off("click");
     chartBar.on("click", function (params) {
-      if (String(params.seriesName) !== "2569") {
-        return;
+      if (params.componentType === "series") {
+        openDetail(params.seriesName, params.dataIndex + 1); // dataIndex 0–11 → เดือนงบ 1–12
+      } else if (params.componentType === "xAxis") {
+        const idx = monthNames.indexOf(String(params.value));
+        if (idx >= 0) openDetail(DRILLDOWN_YEAR, idx + 1);
       }
-      const year = params.seriesName;
-      const yearEn = params.seriesName - 543;
-      const monthIndex = params.dataIndex + 1; // 1–12
-      const monthName = params.name;
-      const { docYear, docMonth } = mapFiscalToDoc(year, monthIndex);
-
-      console.log(yearEn);
-      // URL ที่คุณต้องการเปิดหน้าใหม่
-      const url =
-        `/supplies/bi/reports/Rep_DetailByTypeV7.php?year=${docYear}&yearEn=${yearEn}&monthbg=${monthIndex}&month=${docMonth}` + `&dc_expense_budget_type_id=0&bg_expense_id=0&Performance_Summary=1  `;
-      +`&month_name=${encodeURIComponent(monthName)}`;
-
-      window.open(url, "_blank");
     });
+
+    // --- คลิกที่ไหนก็ได้ในพื้นที่กราฟ → หาเดือนจากตำแหน่ง x แล้วเปิดรายละเอียด ---
+    const zr = chartBar.getZr();
+    if (zrClickHandler) zr.off("click", zrClickHandler); // ถอด handler เดิม กันซ้ำเมื่อ render ใหม่
+    zrClickHandler = function (ev) {
+      // ปล่อยให้ handler ของ series/axis label จัดการเอง
+      if (ev.target) return;
+      const pt = [ev.offsetX, ev.offsetY];
+      if (!chartBar.containPixel({ gridIndex: 0 }, pt)) return;
+      const catIdx = chartBar.convertFromPixel({ xAxisIndex: 0 }, ev.offsetX);
+      openDetail(DRILLDOWN_YEAR, Math.round(catIdx) + 1);
+    };
+    zr.on("click", zrClickHandler);
+
     renderTable(window.DATA_BUDGET);
   }
 

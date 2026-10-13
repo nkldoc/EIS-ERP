@@ -100,7 +100,7 @@ class clsPageStatus {
     }
 
     function get_code() {
-        return "EmpSignEIS";
+        return $this->temp['c_code'];
     }
 
     function get_code_tomenu() {
@@ -108,14 +108,14 @@ class clsPageStatus {
     }
 
     function get_menu() {
-        return "EmpSignEIS";
+        return $this->temp['c_name'];
     }
+
 }
 
 $pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"]);
 $_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"];
 $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
-?>
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -199,59 +199,56 @@ $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
                     }*/
         </style>
         <script type="text/javascript">
-            Ext.menu_name = '<?PHP
-        echo "{$pg->get_menu()}";
-        $_SESSION['menu'] = "{$pg->get_menu()}";
-        ?>';
-            Ext.menu_code = '<?PHP echo "{$pg->get_code()}"; ?>';
-            Ext.menu_id = <?PHP echo "{$pg->get_id()}"; ?>;
-            Ext.menu_type_id = <?PHP echo "{$pg->get_type_id()}"; ?>;
-            Ext.menu_i_alarm = <?PHP echo "{$pg->get_i_alarm()}"; ?>;
-            Ext.menu_i_day = <?PHP echo "{$pg->get_i_day()}"; ?>;
-            Ext.menu_i_config = <?PHP echo "{$pg->get_i_config()}"; ?>;
-            Ext.menu_js = '<?PHP echo "{$pg->get_js()}"; ?>';
+            Ext.menu_name = '<?PHP echo "{$pg->get_menu()}"; $_SESSION['menu'] = "{$pg->get_menu()}"; ?>';
+                Ext.menu_code = '<?PHP echo "{$pg->get_code()}"; ?>';
+                Ext.menu_id = <?PHP echo "{$pg->get_id()}"; ?>;
+                Ext.menu_type_id = <?PHP echo "{$pg->get_type_id()}"; ?>;
+                Ext.menu_i_alarm = <?PHP echo "{$pg->get_i_alarm()}"; ?>;
+                Ext.menu_i_day = <?PHP echo "{$pg->get_i_day()}"; ?>;
+                Ext.menu_i_config = <?PHP echo "{$pg->get_i_config()}"; ?>;
+                Ext.menu_js = '<?PHP echo "{$pg->get_js()}"; ?>';
 
-            console.log(
-                    ''
-                    + '\n\r menu_code =>' + Ext.menu_code
-                    + '\n\r menu_name =>' + Ext.menu_name
-                    );
-            // Ext.onReady(function () {
-            //     var window = new Ext.Window({
-            //     hidden: true,
-            //     id : "login-eis",
-            //     items: new Ext.form.FormPanel({
-            //         id: "login-form",
-            //         baseCls: "x-plain",
-            //         hidden: true,
-            //         items: [],
-            //     }),
-            // }).show();
-            // var iframe = document.createElement("iframe");
-            // iframe.style.visibility = "hidden";
-            // iframe.src = Ext.session.NMU_PERMISSION_HOST + "/access/login_1.php?ss_user_id=" + Ext.session.dc_center_user;
-            // Ext.getCmp("login-form").getEl().dom.appendChild(iframe);
-            // // console.log(Ext.session.NMU_EIS_HOST + "/access/login_1.php?ss_user_id=" + dc_user_id);
-            // /*** FM-NMU ***/
-            // var iframe = document.createElement("iframe");
-            // iframe.style.visibility = "hidden";
-            // iframe.src = Ext.session.FM_NMU_HOST + "/access/login_1.php?ss_user_id=" + Ext.session.dc_center_user;
-            // Ext.getCmp("login-form").getEl().dom.appendChild(iframe);
+                console.log(
+                    ''  
+                    +'\n\r menu_code =>' + Ext.menu_code
+                    +'\n\r menu_name =>' + Ext.menu_name
+                );
+                // Ext.onReady(function () {
+                //     var window = new Ext.Window({
+                //     hidden: true,
+                //     id : "login-eis",
+                //     items: new Ext.form.FormPanel({
+                //         id: "login-form",
+                //         baseCls: "x-plain",
+                //         hidden: true,    
+                //         items: [],
+                //     }),
+                // }).show();
+                // var iframe = document.createElement("iframe");
+                // iframe.style.visibility = "hidden";
+                // iframe.src = Ext.session.NMU_PERMISSION_HOST + "/access/login_1.php?ss_user_id=" + Ext.session.dc_center_user;
+                // Ext.getCmp("login-form").getEl().dom.appendChild(iframe);
+                // // console.log(Ext.session.NMU_EIS_HOST + "/access/login_1.php?ss_user_id=" + dc_user_id);
+                // /*** FM-NMU ***/
+                // var iframe = document.createElement("iframe");
+                // iframe.style.visibility = "hidden";
+                // iframe.src = Ext.session.FM_NMU_HOST + "/access/login_1.php?ss_user_id=" + Ext.session.dc_center_user;
+                // Ext.getCmp("login-form").getEl().dom.appendChild(iframe);
 
-            // /*** NMU ***/
-            // var iframe = document.createElement("iframe");
-            // iframe.style.visibility = "hidden";
-            // iframe.src = Ext.session.HOST_NMU + "/access/login_1.php?ss_user_id=" + Ext.session.dc_center_user;
-            // Ext.getCmp("login-form").getEl().dom.appendChild(iframe);
+                // /*** NMU ***/
+                // var iframe = document.createElement("iframe");
+                // iframe.style.visibility = "hidden";
+                // iframe.src = Ext.session.HOST_NMU + "/access/login_1.php?ss_user_id=" + Ext.session.dc_center_user;
+                // Ext.getCmp("login-form").getEl().dom.appendChild(iframe);
 
-            // /*** NMU_EIS ***/
-            // var iframe = document.createElement("iframe");
-            // iframe.style.visibility = "hidden";
-            // iframe.src = Ext.session.NMU_EIS_HOST +  "/access/login_1.php?ss_user_id=" + Ext.session.dc_center_user;
-            // Ext.getCmp("login-form").getEl().dom.appendChild(iframe);
-            // // let jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-            // Ext.getCmp("login-eis").destroy();
-            // });
+                // /*** NMU_EIS ***/
+                // var iframe = document.createElement("iframe");
+                // iframe.style.visibility = "hidden";
+                // iframe.src = Ext.session.NMU_EIS_HOST +  "/access/login_1.php?ss_user_id=" + Ext.session.dc_center_user;
+                // Ext.getCmp("login-form").getEl().dom.appendChild(iframe);
+                // // let jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                // Ext.getCmp("login-eis").destroy();
+                // });
         </script>
         <script type="text/javascript">
             Ext.SS_I_TYPE_USER = 3;
@@ -260,7 +257,7 @@ $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
 
         <!-- System ERP :: -->
         <script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?= __VPRODUCT_; ?>&f=<?php echo $_SERVER["PHP_SELF"]; ?>"></script>
-
+        
         <script type="text/javascript" src="./uiData/configStoreUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
         <!-- System ERP :: -->
         <iframe src="<?= OST_HOST ?>://<?= NMU_EIS_HOST ?>/access/login_1.php?ss_user_id=<?= $_SESSION['dc_center_user'] ?>" style="position: absolute; width:0; height:0; border:0;" height="1" width="1"></iframe>

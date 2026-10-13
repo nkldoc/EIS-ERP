@@ -1,10 +1,14 @@
 <?php
 // ===== Budget Dashboard Demo (PHP, with Data View colored by fund) =====
 
-if (isset($_GET['action']) && $_GET['action'] === 'data') {
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['budget' => $rowsBudget, 'status' => $rowsStatus, 'year_th_default' => 2568], JSON_UNESCAPED_UNICODE);
-        exit;
+// โหลด config ก่อนทุกอย่าง เพื่อให้ได้ COMPANY_NAME และ __VPRODUCT_
+@include("../../conf/config.php");
+
+// Temporary debug helper: enable detailed errors when ?debug=1 is present
+if (isset($_GET['debug']) && $_GET['debug'] == '1') {
+    ini_set('display_errors', '1');
+    ini_set('display_startup_errors', '1');
+    error_reporting(E_ALL);
 }
 ?>
 <!DOCTYPE html>
@@ -28,7 +32,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
         <script src="../bootstrap/bootstrap-select-1.13.14/dist/js/bootstrap-select.min.js"></script>
         <script src="../../js/echarts/macarons.js"></script>
         <script src="../lib/xlsx.full.min.js"></script>
-        <script src="../../lib/xlsx-js-style.min.js"></script>
+        <script src="../../lib/xlsx.min.js"></script>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
         <title><?php echo COMPANY_NAME; ?></title>
 
@@ -41,7 +45,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
         <link rel="stylesheet" type="text/css" href="../css/report-style-biType.css">
 
 
-                <script type="text/javascript" src="../js/storeRep/storeRep.js?_dc<?= __VPRODUCT_; ?>"></script>
+        <script type="text/javascript" src="../js/storeRep/storeRep.js?_dc<?= __VPRODUCT_; ?>"></script>
 
 </head>
 
@@ -164,48 +168,48 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                 <div class="dataview-wrap">
                                         <table id="dvTable" class="table-dv">
                                                 <thead>
-                                                <tr>
-                                                        <th rowspan="3" >ลำดับ</th>
-                                                        <th rowspan="3" >รหัสงบประมาณ / หมวดค่าใช้จ่าย</th>
-                                                </tr>
-                                                <tr id="subHeaderRow">
-                                                </tr>
-                                                <tr id="subSubHeaderRow">
-                                                        <th class="group-income th-income">ที่ใช้ไป(จอง)</th>
-                                                        <th class="group-income th-income">ตรวจรับแล้ว</th>
-                                                        <th class="group-income th-income">คงเหลือ</th>
-                                                        <th class="group-income th-income">%</th>
+                                                        <tr>
+                                                                <th rowspan="3">ลำดับ</th>
+                                                                <th rowspan="3">รหัสงบประมาณ / หมวดค่าใช้จ่าย</th>
+                                                        </tr>
+                                                        <tr id="subHeaderRow">
+                                                        </tr>
+                                                        <tr id="subSubHeaderRow">
+                                                                <th class="group-income th-income">ที่ใช้ไป(จอง)</th>
+                                                                <th class="group-income th-income">ตรวจรับแล้ว</th>
+                                                                <th class="group-income th-income">คงเหลือ</th>
+                                                                <th class="group-income th-income">%</th>
                                                         </tr>
                                                 </thead>
                                                 <tbody id="dvBody"></tbody>
                                         </table>
                                 </div>
-                                </div>
                         </div>
                 </div>
         </div>
+        </div>
 
-                <script>
-                        (function(){
-                                const _open = window.open;
-                                window.open = function(url, target, features){
-                                        try{
-                                                if(typeof url === 'string' && url.indexOf('/supplies/bi/reports/Rep_DetailByTypeV5.php') !== -1){
-                                                        url = url.replace('/supplies/bi/reports/Rep_DetailByTypeV5.php', '/procure/bi/reports/Rep_DetailByTypeV5.php');
-                                                }
-                                        }catch(e){}
-                                        return _open.call(window, url, target, features);
-                                };
-                        })();
-                </script>
-                <script type="text/javascript" src="../js/Budget_Monitoring_Dashboard_New.js?_dc<?= __VPRODUCT_; ?>"></script>
+        <script>
+                (function() {
+                        const _open = window.open;
+                        window.open = function(url, target, features) {
+                                try {
+                                        if (typeof url === 'string' && url.indexOf('/supplies/bi/reports/Rep_DetailByTypeV5.php') !== -1) {
+                                                url = url.replace('/supplies/bi/reports/Rep_DetailByTypeV5.php', '/procure/bi/reports/Rep_DetailByTypeV5.php');
+                                        }
+                                } catch (e) {}
+                                return _open.call(window, url, target, features);
+                        };
+                })();
+        </script>
+        <script type="text/javascript" src="../js/Budget_Monitoring_Dashboard_New.js?_dc<?= __VPRODUCT_; ?>"></script>
         <!-- <script>
                 if (typeof loadAll === 'function') {
                         loadAll({
                                 year_en: 2026
                         }); // ปรับพารามิเตอร์ได้
                 }
-        </!--> 
+        </!-->
         <div id="pageLoader" class="page-loader" style="display:none">
                 <div class="spinner"></div>
                 <p>กำลังโหลดข้อมูล...</p>

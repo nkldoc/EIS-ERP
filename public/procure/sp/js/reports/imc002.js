@@ -1,4 +1,4 @@
-﻿/* global Ext */
+/* global Ext */
 
 // The data store containing the list of states
 /*

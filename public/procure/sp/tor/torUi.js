@@ -22,8 +22,8 @@ function purchase2(id, bg_reserve_money_id, ii) {
         },
     });
     Ext.getCmp("button" + ii).disable();
-}
-function setDisabled_button(i, v) {
+  }
+  function setDisabled_button(i, v) {
     // v1 == button
     // v2 ==
     if (v == 1) {
@@ -35,8 +35,8 @@ function setDisabled_button(i, v) {
         var combotype_name = "dc_expense_budget_type_hdr_id" + i;
         Ext.getCmp(combotype_name).setReadOnly(true);
     }
-}
-function purchase1(id, bg_reserve_money_id, ii) {
+  }
+  function purchase1(id, bg_reserve_money_id, ii) {
     console.log(id + " == " + bg_reserve_money_id + " == " + ii);
     Ext.Ajax.request({
         url: "tor/api/mnTorController.php",
@@ -59,9 +59,9 @@ function purchase1(id, bg_reserve_money_id, ii) {
         },
     });
     // Ext.getCmp("buttonDtlID").disable();
-}
-
-function genBooklink(v, i) {
+  }
+  
+  function genBooklink(v, i) {
     var ii = i;
     var i_type = "dc_expense_budget_type" + i + "_id";
     var dc_expense_budget_type = Ext.selectRow.get(i_type);
@@ -70,7 +70,7 @@ function genBooklink(v, i) {
     var i_pr_type = Ext.selectRow.get(pr_type);
     var ip = Ext.session.ip_booking; // 192
     var i_amount_bg = Ext.getCmp("i_amount_bgID").getValue().inputValue;
-
+  
     var i_yyyy = Ext.getCmp("i_yyyyID").getValue();
     if (i_yyyy != Ext.selectRow.get("i_yyyy")) {
         var i_yyyy = Ext.getCmp("i_yyyyID").getValue();
@@ -146,7 +146,7 @@ function genBooklink(v, i) {
             "/i_last/1" +
             "/f_amt/" +
             v;
-
+  
     var link2 =
             Ext.session.IPAPIBG +
             "/?/bg/BgBudgetAllSupplies" +
@@ -263,11 +263,11 @@ function genBooklink(v, i) {
             Ext.MessageBox.alert("Failed", result.responseText); // connect error
         },
     });
-
+  
     return link;
-}
-Ext.bgMode = Ext.apply({i_amount_bgID: 1, isbook: false});
-Ext.getBodyMultiBudget = function (rec, status) {
+  }
+  Ext.bgMode = Ext.apply({i_amount_bgID: 1, isbook: false});
+  Ext.getBodyMultiBudget = function (rec, status) {
     i_amount_bg = Ext.selectRow.get("i_amount_bg") || Ext.selectRow.json.i_amount_bg
     if (Ext.selectRow.json.sp_type_bg == 1) {
         var bg_reserve_money1_id = Ext.selectRow.get("bg_reserve_money1_id") > 0 || Ext.selectRow.json.bg_reserve_money1_id > 0 ? true : false;
@@ -373,7 +373,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
         selectOnFocus: true,
         typeAhead: false,
         emptyText: "กรุณาเลือกแหล่งเงิน...",
-
+  
         listeners: {
             afterrender: function () {
                 this.fn = function () {
@@ -420,7 +420,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
         selectOnFocus: true,
         typeAhead: false,
         emptyText: "กรุณาเลือกแหล่งเงิน...",
-
+  
         listeners: {
             afterrender: function () {
                 this.fn = function () {
@@ -466,7 +466,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
         selectOnFocus: true,
         typeAhead: false,
         emptyText: "กรุณาเลือกแหล่งเงิน...",
-
+  
         listeners: {
             afterrender: function () {
                 this.fn = function () {
@@ -627,7 +627,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             f_type_amt2 = Ext.getCmp("f_type_amtID2").getValue().replace(/,/g, "") / 1;
                             f_type_amt3 = Ext.getCmp("f_type_amtID3").getValue().replace(/,/g, "") / 1;
                             f_sum_type_amt = f_type_amt + f_type_amt2 + f_type_amt3;
-
+  
                             if (f_sum_type_amt > f_total_pr || [null, 0, ""].includes(f_total_pr)) {
                                 Ext.Msg.alert("แจ้งเตือน", "ยอดเงินเกิน PR");
                                 Ext.getCmp("f_type_amtID").setValue(0);
@@ -794,7 +794,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
                                 Ext.Msg.alert("แจ้งเตือน", "จองเงินไปแล้วไม่สามารถแก้ไขรายการได้");
                                 // Ext.getCmp("i_pr_type2ID").setValue(Ext.selectRow.get("i_pr_type2"));
                                 Ext.getCmp("i_pr_type2ID").setValue(i_pr_type2);
-
+  
                             }
                         },
                     },
@@ -813,7 +813,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             f_type_amt2 = Ext.getCmp("f_type_amtID2").getValue().replace(/,/g, "") / 1;
                             f_type_amt3 = Ext.getCmp("f_type_amtID3").getValue().replace(/,/g, "") / 1;
                             f_sum_type_amt = f_type_amt + f_type_amt2 + f_type_amt3;
-
+  
                             // console.log(f_sum_type_amt);
                             if (f_sum_type_amt > f_total_pr || [null, 0, ""].includes(f_total_pr)) {
                                 Ext.Msg.alert("แจ้งเตือน", "ยอดเงินเกิน PR");
@@ -847,7 +847,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
                     xtype: "tbspacer",
                     width: 18,
                 },
-
+  
                 {
                     xtype: "buttongroup",
                     id: "buttongroup2",
@@ -882,7 +882,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
                                     return;
                                 } else {
                                     Ext.getCmp(Ext.poFormID).getEl().mask("Please wait...", "x-mask-loading");
-
+  
                                     // Ext.getCmp("winDcExpTypeDddID").getEl().mask("Please wait...", "x-mask-loading");
                                     this.setDisabled(true);
                                     genBooklink(Ext.getCmp("f_type_amtID2").getValue(), 2);
@@ -958,7 +958,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             f_type_amt2 = Ext.getCmp("f_type_amtID2").getValue().replace(/,/g, "") / 1;
                             f_type_amt3 = Ext.getCmp("f_type_amtID3").getValue().replace(/,/g, "") / 1;
                             f_sum_type_amt = f_type_amt + f_type_amt2 + f_type_amt3;
-
+  
                             console.log(f_sum_type_amt);
                             if (f_sum_type_amt > f_total_pr || [null, 0, ""].includes(f_total_pr)) {
                                 Ext.Msg.alert("แจ้งเตือน", "ยอดเงินเกิน PR");
@@ -1034,9 +1034,9 @@ Ext.getBodyMultiBudget = function (rec, status) {
             ],
         },
     ];
-};
-// UiEditBudget
-const UiEditBudget = function (status, menu) {
+  };
+  // UiEditBudget
+  const UiEditBudget = function (status, menu) {
     var statusx = status;
     // Ext.getCmp('po_expense_id_dtlID').setValue(Ext.getCmp('po_expense_hdr_idID').getValue());
     if (Ext.selectRow != null) {
@@ -1110,12 +1110,12 @@ const UiEditBudget = function (status, menu) {
         selectOnFocus: true,
         typeAhead: false,
         emptyText: "กรุณาเลือกแหล่งเงิน...",
-
+  
         listeners: {
-
+  
             afterrender: function () {
                 Ext.getCmp("dc_expense_budget_type_edit_id").setValue(Ext.selectRow.data.dc_expense_budget_type_id)
-
+  
                 this.fn = function () {
                     // Ext.getCmp('dc_expense_budget_type_idTxtID').setValue(Ext.getCmp('dc_expense_budget_type_hdr_id').getValue());
                     Ext.i_bg_type = Ext.getStoreItems(this.store, this.getValue(), "i_bg_type")
@@ -1162,13 +1162,13 @@ const UiEditBudget = function (status, menu) {
         selectOnFocus: true,
         typeAhead: false,
         emptyText: "กรุณาเลือกแหล่งเงิน...",
-
+  
         listeners: {
-
+  
             afterrender: function () {
                 // Ext.getCmp("dc_expense_budget_type_edit_id").setValue(Ext.selectRow.data.dc_expense_budget_type_id)
                 Ext.getCmp("dc_expense_budget_type_edit_id2").setValue(Ext.selectRow.data.dc_expense_budget_type2_id)
-
+  
                 this.fn = function () {
                     // Ext.getCmp('dc_expense_budget_type_idTxtID').setValue(Ext.getCmp('dc_expense_budget_type_hdr_id').getValue());
                     Ext.i_bg_type = Ext.getStoreItems(this.store, this.getValue(), "i_bg_type")
@@ -1214,12 +1214,12 @@ const UiEditBudget = function (status, menu) {
         selectOnFocus: true,
         typeAhead: false,
         emptyText: "กรุณาเลือกแหล่งเงิน...",
-
+  
         listeners: {
-
+  
             afterrender: function () {
                 Ext.getCmp("dc_expense_budget_type_edit_id3").setValue(Ext.selectRow.data.dc_expense_budget_type3_id)
-
+  
                 this.fn = function () {
                     // Ext.getCmp('dc_expense_budget_type_idTxtID').setValue(Ext.getCmp('dc_expense_budget_type_hdr_id').getValue());
                     Ext.i_bg_type = Ext.getStoreItems(this.store, this.getValue(), "i_bg_type")
@@ -1248,7 +1248,7 @@ const UiEditBudget = function (status, menu) {
             },
         },
     });
-
+  
     if (Ext.isEmpty(Ext.selectRow))
         Ext.Msg.alert("แจ้งเตือน", "กรุณา click เลือกข้อมูลที่จะยกเลิกรายการ", function (form, action) {
             return false;
@@ -1270,7 +1270,7 @@ const UiEditBudget = function (status, menu) {
             maximizable: true,
             plain: true,
             autoScroll: true,
-
+  
             width: 750,
             height: height,
             layout: "form",
@@ -1284,9 +1284,9 @@ const UiEditBudget = function (status, menu) {
                     Ext.getCmp("i_pr_type_edit_ID3").setValue(Ext.selectRow.get("i_pr_type3"));
                     Ext.getCmp("f_total_edit_ID").setValue(Ext.selectRow.get("f_total_amt"));
                     // if()
-                    //
+                    // 
                     // Ext.getCmp('dc_expense_budget_type_hdr_id').getStore().reload({
-                    //     callback: function (records, operation, success) {
+                    //     callback: function (records, operation, success) { 
                     //         Ext.getCmp('dc_expense_budget_type_hdr_id').fn();
                     //     }
                     // });
@@ -1297,10 +1297,10 @@ const UiEditBudget = function (status, menu) {
                     } else if (Ext.selectRow.get("i_amount_bg") == 2) {
                         Ext.getCmp("fidldser_edit_bg3").hide();
                     }
-
+  
                     // fidldser_edit_bg2
                     // fidldser_edit_bg3
-
+  
                 }
             },
             // html: "ท่านต้องการที่จะ ?",
@@ -1702,9 +1702,9 @@ const UiEditBudget = function (status, menu) {
                                         } else if (Ext.getCmp("i_amount_edit_bgID").getValue().inputValue == 2) {
                                             // if()
                                         } else {
-
+  
                                         }
-
+  
                                         // alert_text += "จำนวนเงิน : " + floatRenderer(floatMinus(String(Ext.selectRow.get("f_total_amt")).replace(/,/g, ""), 2)) + "\n";
                                         Ext.Ajax.request({
                                             url: Ext.session.Notif_line,
@@ -1714,7 +1714,7 @@ const UiEditBudget = function (status, menu) {
                                                 mode: 3
                                             },
                                         });
-                                        // return ;
+                                        // return ; 
                                         Ext.MessageBox.alert("Success", jsonData.msg, function () {
                                             Ext.getCmp("win-msg-edit_tor").destroy();
                                             Ext.getCmp("tabpanel1").getStore().reload();
@@ -1741,8 +1741,8 @@ const UiEditBudget = function (status, menu) {
             ],
         }).show();
     }
-};
-const edit_tor = function (status, menu) {
+  };
+  const edit_tor = function (status, menu) {
     var statusx = status;
     // if (statusx == "reverse") {
     //     Ext.getCmp("Cancel_reservationID").show();
@@ -1924,8 +1924,8 @@ const edit_tor = function (status, menu) {
             ],
         }).show();
     }
-};
-const cancel_tor = function (status, menu) {
+  };
+  const cancel_tor = function (status, menu) {
     console.log(Ext.selectRow);
 //   && Ext.session.dc_department_id != 1
     // if (menu == "st0002" ) {
@@ -2268,12 +2268,12 @@ const cancel_tor = function (status, menu) {
             ],
         }).show();
     }
-};
-
-
-
-
-Ext.runStatus = function (menu) {
+  };
+  
+  
+  
+  
+  Ext.runStatus = function (menu) {
     return Ext.apply({
         name: menu,
         process: function (menuCode, record) {
@@ -2312,8 +2312,8 @@ Ext.runStatus = function (menu) {
             });
         },
     });
-};
-Ext.AppConfig = function () {
+  };
+  Ext.AppConfig = function () {
     Ext.user_right_add = user_right_add;
     Ext.user_right_edit = user_right_edit;
     Ext.user_right_delete = user_right_delete;
@@ -2346,7 +2346,7 @@ Ext.AppConfig = function () {
             });
             id++;
         }
-
+  
         Ext.bgYear = now - 1;
         return years;
     };
@@ -2488,7 +2488,7 @@ Ext.AppConfig = function () {
     }
     Ext.realTimeSentMsg = function (id, textSent) {
         var wsUri = "ws://" + window.parent.Ext.ipServer + ":9000/demo/server.php";
-
+  
         websocket = new WebSocket(wsUri);
         websocket.onopen = function (ev) {
             // connection is open
@@ -2514,29 +2514,29 @@ Ext.AppConfig = function () {
                 Ext.Msg.alert("แจ้งเตือน", "ต้องบันทึกลงทะเบียนก่อนผ่านรายการ", function (bu, action) {
                     return false;
                 });
-                // } else if (rec.get("sp_cate_id") == 0 && Ext.menu_code == 'ST0005') {
-                //     Ext.Msg.alert("แจ้งเตือน", "<span style='white-space: nowrap;'>! PR ยังไม่กรอกภาระงานตรวจสอบให้ถูกต้อง</span><br>", function (bu, action) {
-                //         Ext.workScore();//line 3
-                //         return false;
-                //     });
-                //                Ext.Msg.show({
-                //                    title: 'แจ้งเตือน',
-                //                    msg: "<span style='white-space: nowrap;'> ! PR ยังไม่กรอกภาระงานตรวจสอบให้ถูกต้อง</span><br>",
-                //                    width: 440,
-                //                    icon: Ext.MessageBox.QUESTION,
-                //                    buttons: {
-                //                        yes: "เพิ่มภาระงาน",
-                //                        no: "ผ่านรายการ",
-                //                    },
-                //                    fn: function (btn) {
-                //                        if (btn === 'yes')
-                //                            Ext.workScore();//line 3
-                //                        else
-                //                            winProcess(rec);
-                //                    }
-                //                });
+            // } else if (rec.get("sp_cate_id") == 0 && Ext.menu_code == 'ST0005') {
+            //     Ext.Msg.alert("แจ้งเตือน", "<span style='white-space: nowrap;'>! PR ยังไม่กรอกภาระงานตรวจสอบให้ถูกต้อง</span><br>", function (bu, action) {
+            //         Ext.workScore();//line 3
+            //         return false;
+            //     });
+  //                Ext.Msg.show({
+  //                    title: 'แจ้งเตือน',
+  //                    msg: "<span style='white-space: nowrap;'> ! PR ยังไม่กรอกภาระงานตรวจสอบให้ถูกต้อง</span><br>",
+  //                    width: 440,
+  //                    icon: Ext.MessageBox.QUESTION,
+  //                    buttons: {
+  //                        yes: "เพิ่มภาระงาน",
+  //                        no: "ผ่านรายการ",
+  //                    },
+  //                    fn: function (btn) {
+  //                        if (btn === 'yes')
+  //                            Ext.workScore();//line 3
+  //                        else
+  //                            winProcess(rec);
+  //                    }
+  //                });
             } else if (rec.get("sp_cate_id") == 1 && Ext.menu_code == 'ST0006') {
-
+  
                 Ext.Msg.show({
                     title: 'แจ้งเตือน',
                     msg: "<span style='white-space: nowrap;'> ! PR เกณฑ์ราคาประกอบเกณฑ์อื่น กรณีที่ผู้ยื่นเกินกว่า 3 รายให้ท่านกรอกภาระงานด้วย</span><br>",
@@ -2557,13 +2557,13 @@ Ext.AppConfig = function () {
             } else {
                 winProcess(rec);
             }
-
+  
         }
     } // Controller
     function cellClick(grid, rowIndex, columnIndex, e) {
         var record = grid.getStore().getAt(rowIndex);
         Ext.selectRow = record;
-
+  
         if (columnIndex === grid.getColumnModel().getIndexById("processDueID")) {
             console.log(Ext.selectRow.data.i_is_register);
             console.log(Ext.selectRow.data.index_receive);
@@ -2721,7 +2721,7 @@ Ext.AppConfig = function () {
                         layout: "form",
                         defaults: {width: 230},
                         defaultType: "textfield",
-
+  
                         items: [
                             {
                                 fieldLabel: "First Name",
@@ -2751,7 +2751,7 @@ Ext.AppConfig = function () {
                         layout: "form",
                         defaults: {width: 230},
                         defaultType: "textfield",
-
+  
                         items: [
                             {
                                 fieldLabel: "Home",
@@ -2799,7 +2799,7 @@ Ext.AppConfig = function () {
             plain: true,
             bodyStyle: "padding:5px;",
             buttonAlign: "center",
-
+  
             items: [
                 {
                     layout: "column",
@@ -2907,7 +2907,7 @@ Ext.AppConfig = function () {
                                     fieldLabel: "เลือกดูข้อมูล",
                                     id: "searchPostID1",
                                     // hidden: Ext.session.i_level >= 3 ? true : false,
-
+  
                                     items: [
                                         {
                                             name: "i_post1",
@@ -2961,12 +2961,12 @@ Ext.AppConfig = function () {
                             Ext.storeDtl.setBaseParam("act", "SEARCH");
                             Ext.storeDtl.setBaseParam("d_tor_date", Ext.getCmp("sd_tor_dateID").getValue());
                             Ext.storeDtl.setBaseParam("tor_type_id", Ext.getCmp("stor_type_idID").getValue());
-
+  
                             Ext.storeDtl.setBaseParam("c_code", Ext.getCmp("sc_codeID").getValue());
                             Ext.storeDtl.setBaseParam("c_name", Ext.getCmp("sc_nameID").getValue());
                             Ext.storeDtl.setBaseParam("i_enabled", Ext.getCmp("searchEnabledID").getValue().inputValue);
                             Ext.storeDtl.setBaseParam("i_post", Ext.getCmp("searchPostID").getValue().inputValue);
-
+  
                             Ext.storeDtl.load();
                         },
                         scope: this,
@@ -3017,7 +3017,7 @@ Ext.AppConfig = function () {
              }
              }]*/
         });
-
+  
         var tb = new Ext.Toolbar({
             text: " รายการเมนู ",
             border: false,
@@ -3058,7 +3058,7 @@ Ext.AppConfig = function () {
     Ext.gridMainfn = function (editAbled) {
         if (!Ext.isEmpty(Ext.getCmp("tabpanel1")))
             Ext.getCmp("contenterCenter").remove(Ext.getCmp("tabpanel1"), true) || {};
-
+  
         var gridMains = new gridMain();
         Ext.getCmp("contenterCenter").add(gridMains);
         Ext.getCmp("contenterCenter").setActiveTab(gridMains);
@@ -3069,7 +3069,7 @@ Ext.AppConfig = function () {
             Ext.getCmp("buSaveGridID").show();
         else
             Ext.getCmp("buSaveGridID").hide();
-
+  
         return gridMains;
     };
     /////////////////// searchGrid Extend
@@ -3163,7 +3163,7 @@ Ext.AppConfig = function () {
                                             d_inv_date: v.data.d_inv_date.add("Y", -543).dateFormat("Y-m-d"),
                                         });
                                     });
-
+  
                                     //console.log(JSON.stringify(jsonArr));
                                     //console.log(jsonArr);
                                     //TODO @ setGridDirty to idCmp
@@ -3273,7 +3273,7 @@ Ext.AppConfig = function () {
                                 IconImg = "../images/icons/application_form.png";
                             }
                             var style = "font-size:12px;border:1px solid #ccc; width:110px; padding:3px 3px 3px 10px; background: #f0f0f0 url(" + IconImg + ") no-repeat 3px center; cursor: pointer;";
-
+  
                             return '<button style="' + style + '" type="button">' + BtnText + "</button>";
                         },
                     },
@@ -3303,17 +3303,17 @@ Ext.AppConfig = function () {
                                     val = 4;
                                 }
                             }
-
+  
                             let arrPeriod = [
                                 "",
                                 "<font color=red>/ส่งคำขอ<font>",
                                 "<font color=red>/รออนุมัติฝ่ายจัดสรร<font>",
-                                "<font color=red>/รอฝ่ายจัดสรร ผ่านรายการ <font>",
+                                "<font color=red>/รอฝ่ายจัดสรร ผ่านรายการ<font>",
                                 "<font color=red>/ฝ่ายจัดสรรอนุมัติเงินแล้ว<font>",
                             ];
-
+  
                             let arrContract = ["", "สัญญา", "ใบสั่ง", "จะซื้อจะขาย"];
-
+  
                             return arrContract[value] + arrPeriod[val];
                         },
                     },
@@ -3424,7 +3424,7 @@ Ext.AppConfig = function () {
                     //     BtnText = "&nbspย้อนรายการ";
                     //     IconImg = "../images/icons/date_previous.png";
                     //     var style = "font-size:12px;border:1px solid #ccc; width:100px; padding:3px 3px 3px 10px; background: #f0f0f0 url(" + IconImg + ") no-repeat 3px center; cursor: pointer;";
-
+  
                     //     return '<button style="' + style + '" type="button">' + BtnText + "</button>";
                     //   },
                     // },
@@ -3440,7 +3440,7 @@ Ext.AppConfig = function () {
                             BtnText = "&nbspยกเลิกรายการ";
                             IconImg = "../images/icons/page_cancel.png";
                             var style = "font-size:12px;border:1px solid #ccc; width:100px; padding:3px 3px 3px 10px; background: #f0f0f0 url(" + IconImg + ") no-repeat 3px center; cursor: pointer;";
-
+  
                             return '<button style="' + style + '" type="button">' + BtnText + "</button>";
                         },
                     },
@@ -3456,7 +3456,7 @@ Ext.AppConfig = function () {
                             BtnText = "&nbspแจ้งแอดมิน";
                             IconImg = "../images/icons/television_out.png";
                             var style = "font-size:12px;border:1px solid #ccc; width:100px; padding:3px 3px 3px 10px; background: #f0f0f0 url(" + IconImg + ") no-repeat 3px center; cursor: pointer;";
-
+  
                             return '<button style="' + style + '" type="button">' + BtnText + "</button>";
                         },
                     },
@@ -3496,7 +3496,7 @@ Ext.AppConfig = function () {
                         beforerender: function (g) {
                             console.log(Ext.menu_code);
                             switch (Ext.menu_code) {
-
+  
                                 case "ST0005":
                                     Ext.displayMenuId = false;
                                     break;
@@ -3507,7 +3507,7 @@ Ext.AppConfig = function () {
                                     Ext.displayMenuId = true;
                                     break;
                             }
-
+  
                             this.contextMenu = new Ext.menu.Menu({
                                 items: [
                                     // {
@@ -3534,9 +3534,9 @@ Ext.AppConfig = function () {
                                         id: "workMenuID",
                                         hidden: Ext.displayMenuId,
                                         handler: function (e) {
-
+  
                                             Ext.workScore();//line 3
-
+  
                                         },
                                         scope: this,
                                     },
@@ -3562,14 +3562,12 @@ Ext.AppConfig = function () {
                                         scope: this,
                                     },
                                     {
-                                        text: "ย้อนรายการ (" + Ext.menu_name + ")",
-                                        icon: "../images/icons/application_form_edit.png",
-                                        id: "returnPrID",
-//                                        hidden: Ext.displayMenuId,
+                                        text: "ย้อนรายการ",
+                                        hidden: true,
+                                        icon: "../images/icons/date_previous.png",
                                         handler: function (e) {
-
-                                            Ext.returnPr();//line 3
-
+                                            // Ext.buAct = "update";
+                                            // cancel_tor("reverse");
                                         },
                                         scope: this,
                                     },
@@ -3597,7 +3595,7 @@ Ext.AppConfig = function () {
                         afterrender: function (g) {
                             //g.getStore().getAt(rowIndex);
                             //  console.log();
-
+  
                             this.on("cellclick", cellClick, this); //cellClick
                             this.on(
                                     "contextmenu",
@@ -3713,12 +3711,12 @@ Ext.AppConfig = function () {
         baseParams: {
             type: "dc_cost",
         },
-
+  
         root: "data",
         idProperty: "id",
         fields: ["id", "c_code", "c_name"],
     });
-
+  
     Ext.po_creditor_transfer = new Ext.data.JsonStore({
         autoDestroy: false,
         autoLoad: true,
@@ -3745,7 +3743,7 @@ Ext.AppConfig = function () {
         autoDestroy: false,
         autoLoad: true,
         url: "api/All_PoWorkingImpHdr.php",
-
+  
         baseParams: {
             type: "po_expense_group",
         },
@@ -3786,9 +3784,6 @@ Ext.AppConfig = function () {
             },
             {
                 name: "id",
-            },
-            {
-                name: "reasonText",
             },
             {
                 name: "c_doc_ref",
@@ -4046,11 +4041,11 @@ Ext.AppConfig = function () {
             {name: "sp_contract_year"},
         ],
     });
-    /*
+    /*            
      // "i_hire_type" => $row["i_hire_type"],
      "i_is_inv" => $row["i_is_inv"],
      "i_type_fix_rate" => $row["i_type_fix_rate"],
-     "i_product_type" => $row["i_product_type"]
+     "i_product_type" => $row["i_product_type"] 
      */
     Ext.store_year = new Ext.data.JsonStore({
         fields: ["id", "c_name"],
@@ -4089,4 +4084,5 @@ Ext.AppConfig = function () {
             return dd.substr(-2) + "-" + mm.substr(-2) + "-" + yy.toString();
         },
     });
-};
+  };
+  

@@ -1,5 +1,12 @@
 <?php
-// ===== Yearly PR Performance Summary — EIS_procure edition =====
+include("../../conf/config.php");
+// ===== Budget Dashboard Demo (PHP, with Data View colored by fund) =====
+
+if (isset($_GET['action']) && $_GET['action'] === 'data') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['budget' => $rowsBudget, 'status' => $rowsStatus, 'year_th_default' => 2568], JSON_UNESCAPED_UNICODE);
+        exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="th">

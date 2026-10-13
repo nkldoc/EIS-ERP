@@ -4,6 +4,9 @@ include("../../lib/database/DatabaseServer.php");
 include("../../lib/database/apiUtil.php");
 include("../../lib/date/i_date.class.php");
 
+header("Cache-Control: no-store, no-cache, must-revalidate");
+header("Pragma: no-cache");
+
 $db     = new DatabaseServer();
 $date     = new i_date();
 $util    = new apiUtil();

@@ -10,6 +10,7 @@
 *.cache
 
 # Local environment files
+/public/supplies/sp/_conf/mysql_credentials.local.php
 .env
 .env.*
 !.env.example

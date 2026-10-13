@@ -129,6 +129,7 @@ if ($type == "Sp_Tor_Edit_Bg") {
 			a.numrow ,
 			a.tor_id  ,
             b.i_enabled ,
+            b.tor_status_id ,
             b.c_code ,
             c.c_code as c_code_po ,
 			isnull(b.c_name,c.c_name)as c_name ,
@@ -311,6 +312,7 @@ if ($type == "Sp_Tor_Edit_Bg") {
             "c_code_po" => $row["c_code_po"],
             "i_is_upload" => $row["i_is_upload"],
             "c_name_status" => $row["c_name_status"],
+            "tor_status_id" => $row["tor_status_id"],
             "c_type_name" => $row["c_type_name"],
             "tor_type_id" => $row["tor_type_id"],
             //
@@ -411,6 +413,7 @@ if ($type == "Sp_Tor_Edit_Bg") {
 			a.numrow ,
 			a.tor_id  ,
             b.i_enabled ,
+            b.tor_status_id ,
             b.c_code ,
             c.c_code as c_code_po ,
 			isnull(b.c_name,c.c_name)as c_name ,

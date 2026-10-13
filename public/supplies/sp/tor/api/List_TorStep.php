@@ -87,7 +87,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
 
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['d_doc_ref'] != "") ? " and a.d_doc_ref like '%" . $_REQUEST['d_doc_ref'] . "%'" : "";
         $wh .= (str_replace(",", "", $_REQUEST['f_total']) != "") ? " and a.f_total_amt like '%" . str_replace(",", "", $_REQUEST['f_total']) . "%'" : "";
@@ -245,6 +245,10 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -368,7 +372,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
 
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
         $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
@@ -449,6 +453,7 @@ if ($type == "ownnerPr") {
                         , s.c_remake
                         , s.plan_status
                         , s.plan_code
+                        , s.plan_seq
                         , s.i_amount_bg
                         ,s.f_type_amt
                         , s.bg_reserve_money1_id
@@ -559,6 +564,10 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#000080";
                 $i_type_bgTxt = 'PR ก่อนปีงบประมาณ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -640,6 +649,7 @@ if ($type == "ownnerPr") {
             "c_remake" => $row["c_remake"],
             "plan_status" => $row["plan_status"],
             "plan_code" => $row["plan_code"],
+            "plan_seq" => $row["plan_seq"],
             "po_creditor_id" => intval($row["po_creditor_id"]),
             "po_creditor_idTxt" => $row["po_creditor_idTxt"],
             "i_hire_type" => $row["i_hire_type"],
@@ -696,7 +706,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
 
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
         $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
@@ -870,6 +880,10 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -1016,7 +1030,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
 
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
         $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
@@ -1210,6 +1224,10 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -1352,15 +1370,21 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
     $i_post1 = $_REQUEST['i_post1'] ?? null;
     if ($act == "SEARCH") {
-        //  $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
-        $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
-        $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
-        if ($_SESSION['i_level'] != 1) {
-            $wh .= ($_REQUEST['sp_emp_id'] != 0) ? " and a.sp_emp_id = " . $_REQUEST['sp_emp_id'] : " and a.dc_department_id =" . $_SESSION['dc_department_id'];
-        }
-        $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
+        $s_c_code = $_REQUEST['c_code'] ?? '';
+        $s_c_name = $_REQUEST['c_name'] ?? '';
+        $s_sp_emp_id = $_REQUEST['sp_emp_id'] ?? 0;
+        //  $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
+        $wh .= ($s_c_code !== "") ? " and a.c_code like '%" . $s_c_code . "%'" : "";
+        $wh .= ($s_c_name !== "") ? " and a.c_name like '%" . $s_c_name . "%'" : "";
+        // เดิม SEARCH บังคับ a.sp_emp_id = ตัวเอง -> หัวหน้าสายงาน (level 2) ที่ตอน browse เห็นทั้งสายงาน
+        // พอค้นหากลับเจอแค่ของตัวเอง (ค้น PR ของเพื่อนในสายงานไม่เจอ)
+        // ให้ใช้ scope เดียวกับ browse (บล็อก i_level ด้านล่างรันทั้งสองโหมด) + ปุ่ม "ดูของตัวเอง" (i_post1)
+        // if ($_SESSION['i_level'] != 1) {
+        //     $wh .= ($s_sp_emp_id != 0) ? " and a.sp_emp_id = " . $s_sp_emp_id : " and a.dc_department_id =" . $_SESSION['dc_department_id'];
+        // }
+        $wh .= " and a.i_enabled =" . intval($_REQUEST['i_enabled'] ?? 1);
         if ($i_post1 == 1) {
-            $wh .= " and a.sp_emp_id =" . $_REQUEST['sp_emp_id'];
+            $wh .= " and a.sp_emp_id =" . intval($s_sp_emp_id);
         }
         if ($i_post != 0) {
             if ($i_post == 1) {
@@ -1508,6 +1532,7 @@ if ($type == "ownnerPr") {
         , s.project_code
         , s.plan_status
         , s.plan_code
+        , s.plan_seq
         , s.dc_sub_cost_id
         , s.reason_winner
         , convert(varchar, (select top 1 act_date_dt from sp_tor_item where tor_id = s.tor_id and sp_status_hdr_id = 26 order by id desc ), 120) as d_act_date_dt26
@@ -1516,7 +1541,9 @@ if ($type == "ownnerPr") {
         , (select i_type from sp_type_bg where i_value =  i_type_bg ) as sp_type_bg
         , (select top 1 i_enabled from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as sp_tor_delete
         , (select top 1 c_comment from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as tor_delete_comment
-        , (select top 1 i_edit from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) as sp_bg_edit
+        -- ยังไม่ได้กดส่งคืนจากฝ่ายจัดสรร = อยู่ระหว่างแก้ไข (1) แม้จะบันทึกแก้ไขแล้วก็ตาม
+        , case when exists (select 1 from sp_tor_bg_log where s.tor_id = sp_tor_id and i_edit = 1 and isnull(c_comment_edit1,'') = '') then 1
+               else (select top 1 i_edit from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) end as sp_bg_edit
         , isnull((select top 1 sp_cate_id from NMU_ERP.dbo.[view_sp_tor_work_socore] where sp_tor_id=a.tor_id order by sp_cate_id desc),0) as sp_cate_id
         , (SELECT c_name FROM NMU.dbo.dc_creditor aa WHERE aa.dc_creditor_id =v.dc_creditor_id) AS winner
         "
@@ -1626,15 +1653,21 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#000080";
                 $i_type_bgTxt = 'PR ก่อนปีงบประมาณ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
                 break;
         }
-        if ($row["sp_bg_edit"] == 1) {
+        // sp_bg_edit = 1 และมีหมายเหตุ c_comment_edit1 = ฝ่ายจัดสรรส่งคืนโดยไม่แก้ไข
+        $bgReturnedNoEdit = ($row["sp_bg_edit"] == 1 && trim($row["c_comment_edit1"] ?? '') != '');
+        if ($row["sp_bg_edit"] == 1 && !$bgReturnedNoEdit) {
             $i_type_bg = "color:#F5B041";
             $i_type_bgTxt = 'PR อยู่ระหว่างแก้ไขงบประมาณ';
-        } else if ($row["sp_bg_edit"] == 2) {
+        } else if ($row["sp_bg_edit"] == 2 || $bgReturnedNoEdit) {
             $i_type_bg = "color:#006400";
             $i_type_bgTxt = 'รับเรื่องคืนจากฝ่ายจัดสรร';
         }
@@ -1712,6 +1745,7 @@ if ($type == "ownnerPr") {
             "project_code" => $row["project_code"],
             "plan_status" => $row["plan_status"],
             "plan_code" => $row["plan_code"],
+            "plan_seq" => $row["plan_seq"],
             "txtsp_emp_idID" => $row["sp_emp_name"],
             "sp_emp_id" => intval($row["sp_emp_id"]),
             "dc_department_id" => intval($row["dc_department_id"]),
@@ -1818,7 +1852,7 @@ if ($type == "ownnerPr") {
     $addConfDay1 = (!empty($i_alarm)) ? $i_alarm : 0;
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
     if ($act == "SEARCH") {
-//        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+//        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
@@ -1874,7 +1908,7 @@ if ($type == "ownnerPr") {
                         , (select count (sp_tor_dtl_id) from sp_tor_dtl aa where  aa. sp_tor_id = a.tor_id ) as tor_hdr_dtl
                         , a.i_type_contract, a.i_hire_type, isnull(a.i_product_type,0) as i_product_type, a.i_is_inv, a.i_type_fix_rate,i_delivery_date
                         , row_number() over (order by a.tor_id DESC) as row
-                        from dbo.sp_tor a  where a.i_is_notor = 0 and a.i_type_bg = 1   {$wh}";
+                        from dbo.sp_tor a  where a.i_is_notor = 0 and a.i_type_bg <> 12   {$wh}"; // ทุกประเภท PR ยกเว้น 12 = PR ก่อนปีงบประมาณ (มีเมนูติดตามแยกต่างหาก)
 
     //    if ($tor_status_id == 13) {
     //        $sqlTempTable .= " and (a.i_edit in (3 , 5) or a.tor_status_id in (" . $step . '))' . $wh . $util->viewDepartment('a', 0, $type_menu); //
@@ -2031,6 +2065,18 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#AE00FF";
                 $i_type_bgTxt = 'PR จองเงินตรวจรับ';
                 break;
+            case 11:
+                $i_type_bg = "color:#B8860B";
+                $i_type_bgTxt = 'PR ไม่จองเงินทำถึงตรวจรับ';
+                break;
+            case 12:
+                $i_type_bg = "color:#000080";
+                $i_type_bgTxt = 'PR ก่อนปีงบประมาณ';
+                break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -2183,7 +2229,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
 
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
         $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
@@ -2300,7 +2346,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
     $i_post1 = $_REQUEST['i_post1'] ?? null;
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
         if ($_SESSION['i_level'] != 1) {
@@ -2513,6 +2559,10 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#AE00FF";
                 $i_type_bgTxt = 'PR จองเงินตรวจรับ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -2658,7 +2708,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
 
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
         $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
@@ -2816,6 +2866,7 @@ if ($type == "ownnerPr") {
         , s.i_pr_type5
         , s.plan_status
         , s.plan_code
+        , s.plan_seq
         "
             . " from ({$sqlTempTable}) a "
             . " inner join dbo.sp_tor s on s.tor_id=a.tor_id"
@@ -2864,6 +2915,10 @@ if ($type == "ownnerPr") {
             case 7:
                 $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
+                break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                 break;
             default:
                 $i_type_bg = "color:#F43217";
@@ -2974,6 +3029,7 @@ if ($type == "ownnerPr") {
             "bg_reserve_money5_id" => $row["bg_reserve_money5_id"],
             "plan_status" => $row["plan_status"],
             "plan_code" => $row["plan_code"],
+            "plan_seq" => $row["plan_seq"],
         );
         ${$root}[] = $temp;
     }
@@ -3005,7 +3061,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
 
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
         $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
@@ -3198,6 +3254,10 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -3323,7 +3383,7 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
 
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
+        $wh .= (intval($_REQUEST['tor_type_id'] ?? 0) != 0) ? " and a.tor_type_id =" . intval($_REQUEST['tor_type_id']) : "";
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
         $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
@@ -3392,6 +3452,7 @@ if ($type == "ownnerPr") {
                         , s.c_remake
                         , s.plan_status
                         , s.plan_code
+                        , s.plan_seq
                         , s.i_yyyy as i_yyyy
                         , s.i_amount_bg
                         ,s.f_type_amt
@@ -3487,6 +3548,10 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#000080";
                 $i_type_bgTxt = 'PR ก่อนปีงบประมาณ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -3561,6 +3626,7 @@ if ($type == "ownnerPr") {
             "c_remake" => $row["c_remake"],
             "plan_status" => $row["plan_status"],
             "plan_code" => $row["plan_code"],
+            "plan_seq" => $row["plan_seq"],
             "po_creditor_id" => intval($row["po_creditor_id"]),
             "po_creditor_idTxt" => $row["po_creditor_idTxt"],
             "i_hire_type" => $row["i_hire_type"],
@@ -3611,15 +3677,20 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
     $i_post1 = $_REQUEST['i_post1'] ?? null;
     if ($act == "SEARCH") {
-        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
-        $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
-        $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
+        // PHP 8: "text" != 0 และ "" != 0 เป็น true -> ต้องเช็ค is_numeric ก่อน กัน SQL พัง
+        $s_tor_type_id = $_REQUEST['tor_type_id'] ?? null;
+        $s_c_code = $_REQUEST['c_code'] ?? '';
+        $s_c_name = $_REQUEST['c_name'] ?? '';
+        $s_sp_emp_id = $_REQUEST['sp_emp_id'] ?? null;
+        $wh .= (is_numeric($s_tor_type_id) && $s_tor_type_id != 0) ? " and a.tor_type_id =" . intval($s_tor_type_id) : "";
+        $wh .= ($s_c_code !== "") ? " and a.c_code like '%" . $s_c_code . "%'" : "";
+        $wh .= ($s_c_name !== "") ? " and a.c_name like '%" . $s_c_name . "%'" : "";
         if ($_SESSION['i_level'] != 1) {
-            $wh .= ($_REQUEST['sp_emp_id'] != 0) ? " and a.sp_emp_id = " . $_REQUEST['sp_emp_id'] : " and a.dc_department_id =" . $_SESSION['dc_department_id'];
+            $wh .= (is_numeric($s_sp_emp_id) && $s_sp_emp_id != 0) ? " and a.sp_emp_id = " . intval($s_sp_emp_id) : " and a.dc_department_id =" . $_SESSION['dc_department_id'];
         }
-        $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
-        if ($i_post1 == 1) {
-            $wh .= " and a.sp_emp_id =" . $_REQUEST['sp_emp_id'];
+        $wh .= " and a.i_enabled =" . intval($_REQUEST['i_enabled'] ?? 1);
+        if ($i_post1 == 1 && is_numeric($s_sp_emp_id) && $s_sp_emp_id != 0) {
+            $wh .= " and a.sp_emp_id =" . intval($s_sp_emp_id);
         }
         if ($i_post != 0) {
             if ($i_post == 1) {
@@ -3762,11 +3833,14 @@ if ($type == "ownnerPr") {
         , s.i_amount_bg
         , s.plan_status
         , s.plan_code
+        , s.plan_seq
         , (select i_type from sp_type_bg where i_value =  i_type_bg ) as sp_type_bg
         , (select i_value from sp_type_bg where i_value =  i_type_bg ) as sp_type_value
         , (select top 1 i_enabled from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as sp_tor_delete
         , (select top 1 c_comment from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as tor_delete_comment
-        , (select top 1 i_edit from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) as sp_bg_edit
+        -- ยังไม่ได้กดส่งคืนจากฝ่ายจัดสรร = อยู่ระหว่างแก้ไข (1) แม้จะบันทึกแก้ไขแล้วก็ตาม
+        , case when exists (select 1 from sp_tor_bg_log where s.tor_id = sp_tor_id and i_edit = 1 and isnull(c_comment_edit1,'') = '') then 1
+               else (select top 1 i_edit from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) end as sp_bg_edit
         , (select top 1 c_comment_edit1 from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) as c_comment_edit1
         "
             . " from ({$sqlTempTable}) a "
@@ -3830,15 +3904,21 @@ if ($type == "ownnerPr") {
                 $i_type_bg = "color:#000080";
                 $i_type_bgTxt = 'PR ก่อนปีงบประมาณ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default:
                 $i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
                 break;
         }
-        if ($row["sp_bg_edit"] == 1) {
+        // sp_bg_edit = 1 และมีหมายเหตุ c_comment_edit1 = ฝ่ายจัดสรรส่งคืนโดยไม่แก้ไข
+        $bgReturnedNoEdit = ($row["sp_bg_edit"] == 1 && trim($row["c_comment_edit1"] ?? '') != '');
+        if ($row["sp_bg_edit"] == 1 && !$bgReturnedNoEdit) {
             $i_type_bg = "color:#F5B041";
             $i_type_bgTxt = 'PR อยู่ระหว่างแก้ไขงบประมาณ';
-        } else if ($row["sp_bg_edit"] == 2) {
+        } else if ($row["sp_bg_edit"] == 2 || $bgReturnedNoEdit) {
             $i_type_bg = "color:#006400";
             $i_type_bgTxt = 'รับเรื่องคืนจากฝ่ายจัดสรร';
         }
@@ -3862,6 +3942,7 @@ if ($type == "ownnerPr") {
             "i_amount_bg" => $row["i_amount_bg"] == null ? 1 : $row["i_amount_bg"],
             "plan_status" => $row["plan_status"],
             "plan_code" => $row["plan_code"],
+            "plan_seq" => $row["plan_seq"],
             "tor_delete_comment" => $row["tor_delete_comment"],
             "i_receive" => intval($row["i_receive"]),
             "i_is_entrance" => intval($row["i_is_entrance"]),

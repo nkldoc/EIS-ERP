@@ -1592,6 +1592,7 @@ Ext.onReady(function () {
             items: [
                 new Ext.Toolbar({
                     border: false,
+                    enableOverflow: true,
                     items: [
                         {
                             xtype: "button",

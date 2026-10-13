@@ -1,0 +1,43 @@
+﻿@import url("../css/font/TH_Sarabun.css");
+@import url("../js/ext-3.4.0/resources/css/ext-all.css");
+@import url("../js/ext-3.4.0/resources/css/xtheme-gray.css");
+@import url("../css/icon_all.css");
+@import url("../js/ComboCheckBox/css/Ext.ux.form.LovCombo.css");
+
+/* Template css รายงาน*/
+html {
+  font-family: "Sarabun";
+}
+address,
+caption,
+cite,
+code,
+dfn,
+em,
+strong,
+th,
+var {
+  font-style: normal;
+  font-weight: normal;
+}
+caption,
+thead th {
+  text-align: center;
+}
+
+/* @media */
+@media print {
+  .outer {
+    display: unset;
+    flex-flow: unset;
+  }
+
+  .table-overflow {
+    overflow: unset;
+  }
+
+  .class-sticky {
+    position: unset;
+    top: 0;
+  }
+}

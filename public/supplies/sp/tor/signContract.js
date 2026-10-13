@@ -1077,6 +1077,73 @@ DeleteNoTor_dtl = function (record) {
   //    }
 };
 
+//---- ล็อควันที่เริ่มสัญญา (ชั่วคราว) ---------------------------------------------
+// ช่วง from..until : สัญญาใหม่ถูกล็อควันที่เริ่มสัญญาเป็น lockDate
+// ผู้ใช้กด "ปลดล็อค" ได้ -> กลับไปใช้วันที่ปัจจุบันตามปกติ
+// เลย until แล้วปลดล็อคอัตโนมัติ (ระบบทำงานเหมือนเดิมทุกอย่าง)
+// ต้องแก้ช่วงวันที่ให้ตรงกับ tor/api/mnTorController.php (case UP_SP_TOR_CONTRACT) ด้วย
+Ext.contractDateLock = {
+  lockDate: new Date(2026, 9, 1), // 1 ต.ค. 2569
+  from: new Date(2026, 9, 5, 0, 0, 0), // 5 ต.ค. 2569
+  until: new Date(2026, 9, 15, 23, 59, 59), // 15 ต.ค. 2569
+  editableWhenUnlocked: false, // true = ปลดล็อคแล้วให้ผู้ใช้เลือกวันที่เองได้
+  locked: false,
+  isActive: function () {
+    var now = new Date();
+    // ล็อคเฉพาะสัญญาตระกูล จ. (พวช.จ. / จ.) = จัดจ้าง (i_purchase = 2) เท่านั้น
+    if (Ext.isEmpty(Ext.selectRow) || Ext.selectRow.data.i_purchase != 2) return false;
+    return now >= this.from && now <= this.until;
+  },
+  setLocked: function (locked) {
+    var f = Ext.getCmp("d_contract_dateID"),
+      flag = Ext.getCmp("i_contract_date_unlockID"),
+      bu = Ext.getCmp("buContractDateLockID"),
+      lb = Ext.getCmp("txtContractDateLockID");
+    if (!f) return;
+    this.locked = locked;
+    f.setValue((locked ? this.lockDate : new Date()).format("d-m-Y"));
+    if (this.editableWhenUnlocked) f.setReadOnly(locked);
+    if (flag) flag.setValue(locked ? 0 : 1);
+    if (bu) bu.setText(locked ? "ปลดล็อควันที่สัญญา" : "ล็อคกลับเป็น 1 ต.ค. 2569");
+    if (lb)
+      lb.setValue(
+        locked
+          ? "<font color='red'>* ล็อควันที่เริ่มสัญญาเป็น 1 ต.ค. 2569 (ถึง 15 ต.ค. 2569)</font>"
+          : "<font color='green'>* ปลดล็อคแล้ว ใช้วันที่ปัจจุบัน</font>"
+      );
+  },
+  // เรียกตอนเปิดฟอร์ม "เพิ่มรายการสัญญา"
+  apply: function () {
+    if (!this.isActive()) return;
+    var row = Ext.getCmp("contractDateLockRowID");
+    if (row) row.show();
+    this.setLocked(true);
+  },
+  // เลือกสัญญาเดิมที่มีเลขอยู่แล้ว -> ใช้วันที่ของสัญญานั้น ไม่ล็อค
+  release: function () {
+    var row = Ext.getCmp("contractDateLockRowID"),
+      flag = Ext.getCmp("i_contract_date_unlockID");
+    this.locked = false;
+    if (flag) flag.setValue(1);
+    if (row) row.hide();
+  },
+  toggle: function () {
+    var me = this;
+    if (!me.locked) {
+      me.setLocked(true);
+      d_doc_dateID_Change();
+      return;
+    }
+    Ext.Msg.confirm("ยืนยัน", "ต้องการปลดล็อควันที่เริ่มสัญญา (ไม่ใช้วันที่ 1 ต.ค. 2569) ใช่หรือไม่ ?", function (btn) {
+      if (btn === "yes") {
+        me.setLocked(false);
+        d_doc_dateID_Change();
+      }
+    });
+  },
+};
+//------------------------------------------------------------------------------
+
 GenCode_CTS = function () {
   var date_Ymd = Ext.util.Format.date(Ext.getCmp("d_contract_dateID").getValue(), "Ymd");
   var date_Ym = Ext.selectRow.get("i_yyyy") / 1 + 543; //date_Ymd.substr(0, 4) / 1 + 543;
@@ -1882,6 +1949,7 @@ Ext.AppUx = function (app, menu) {
       Ext.getCmp("codeCTS").setValue(record.data.c_code);
       Ext.getCmp("f_totalID").setValue(record.data.f_total_amt);
       Ext.getCmp("d_contract_dateID").setValue(record.data.d_doc_date);
+      Ext.contractDateLock.release(); // สัญญาเดิม ไม่ล็อควันที่
       Ext.getCmp("dc_creditor_idID").setValue(record.data.dc_creditor_id);
       Ext.getCmp(nameID).setValue(TextShow);
       Ext.getCmp(nameID2).setValue(TextShow2);
@@ -3410,9 +3478,10 @@ function d_period_dateID_change() {
                                     Ext.Msg.alert("Success", action.result.msg, function (form, action) {
                                       Ext.getCmp("tabpanel1").getStore().reload();
                                       Ext.selectRow = null;
-                                      Ext.getCmp(Ext.poFormID).destroy();
-                                      Ext.getCmp("winChequeID").destroy();
-                                      Ext.getCmp("tabpanelMain2ID").destroy();
+                                      ["", "winChequeID", "tabpanelMain2ID"].forEach(function (cid) {
+                                        var c = Ext.getCmp(cid || Ext.poFormID);
+                                        if (c) { c.destroy(); }
+                                      });
                                     });
                                   },
                                   failure: function (form, action) {
@@ -3546,7 +3615,10 @@ function d_period_dateID_change() {
                             },
                             afterrender: function () {
                               Ext.getCmp("buSaveSubID").hide();
-                              if(Ext.selectRow.data.i_type_bg == 12){
+                              // PR ทำก่อนปีงบประมาณ (12) ทำสัญญาได้เมื่อปีงบของ PR เริ่มแล้ว (ปีงบเริ่ม 1 ต.ค.)
+                              var today = new Date();
+                              var currentBudgetYear = today.getFullYear() + (today.getMonth() >= 9 ? 1 : 0);
+                              if(Ext.selectRow.data.i_type_bg == 12 && !(currentBudgetYear >= Ext.selectRow.data.i_yyyy / 1)){
                                 Ext.getCmp("btn_save_Contract").hide();
                               }
                               if (Ext.SelectStore != null) {
@@ -3573,6 +3645,7 @@ function d_period_dateID_change() {
                                 } else {
                                   var d =  new Date().format("d-m-Y")
                                   Ext.getCmp('d_contract_dateID').setValue(d);
+                                  Ext.contractDateLock.apply(); // ล็อควันที่เริ่มสัญญา (สัญญาใหม่)
                                 }
                             },
                           },
@@ -3773,6 +3846,42 @@ function d_period_dateID_change() {
                                           d_doc_dateID_Change();
                                       },
                                   },
+                              },
+                              {
+                                  // 0 = ล็อค (server บังคับ 1 ต.ค. 2569), 1 = ปลดล็อค/ไม่อยู่ในช่วงล็อค
+                                  xtype: "hidden",
+                                  id: "i_contract_date_unlockID",
+                                  name: "i_contract_date_unlock",
+                                  value: 1,
+                              },
+                              {
+                                  xtype: "buttongroup",
+                                  fieldLabel: "ล็อควันที่สัญญา",
+                                  id: "contractDateLockRowID",
+                                  hidden: true,
+                                  width: 500,
+                                  frame: false,
+                                  border: false,
+                                  items: [
+                                      {
+                                          xtype: "button",
+                                          id: "buContractDateLockID",
+                                          text: "ปลดล็อควันที่สัญญา",
+                                          handler: function () {
+                                              Ext.contractDateLock.toggle();
+                                          },
+                                      },
+                                      {
+                                          xtype: "tbspacer",
+                                          width: 18,
+                                      },
+                                      {
+                                          xtype: "displayfield",
+                                          id: "txtContractDateLockID",
+                                          value: "",
+                                          width: 350,
+                                      },
+                                  ],
                               },
                               {
                                   xtype: "radiogroup",
@@ -4543,7 +4652,7 @@ function d_period_dateID_change() {
                               iconCls: "icon-save",
                               listeners: {
                                 afterrender: function () {
-                                  if (Ext.selectRow.get("bg_check_id") > 0 || [2,4,8,11].includes(Ext.selectRow.get("i_type_bg"))){ 
+                                  if (Ext.selectRow.get("bg_check_id") > 0 || [2,4,8,11].includes(Ext.selectRow.get("i_type_bg"))){
                                     this.show();
                                   } else { 
                                     this.hide();
@@ -4704,15 +4813,15 @@ function d_period_dateID_change() {
                             Ext.getCmp("d_expire_warrantyID").hide();
                             Ext.getCmp("frmPopBankID").hide();
                           }
-                          if (Ext.SelectStore.data.i_is_cashiercheque_warranty == 1) {
+                          if (Ext.SelectStore.data.cashiercheque_on != null || Ext.SelectStore.data.cashiercheque_seq != null) {
                             Ext.getCmp("i_is_bank_warranty0ID").setValue(null);
                             Ext.getCmp("i_is_cashiercheque_warrantyID").setValue(true);
 
+                            Ext.getCmp("i_cashiercheque_typeID").show();
                             Ext.getCmp("f_warranty_amtID2").show();
                             // Ext.getCmp("c_books_cashierchequeID").show();
                             Ext.getCmp("c_receipt_cashierchequeID").show();
                             Ext.getCmp("d_cashiercheque_dateID").show();
-                            Ext.getCmp("f_warranty_amtID2").show();
                             Ext.getCmp("c_commentID2").show();
                           } else {
                             Ext.getCmp("i_is_bank_warranty0ID").setValue(true);
@@ -4827,7 +4936,7 @@ function d_period_dateID_change() {
                             Ext.getCmp("c_commentID").hide();
                           }
 
-                          if (Ext.SelectStore.get("c_books_cashiercheque") != null) {
+                          if (Ext.SelectStore.get("cashiercheque_on") != null || Ext.SelectStore.get("cashiercheque_seq") != null) {
                             Ext.getCmp("i_is_cashiercheque_warrantyID").setValue(true);
                             Ext.getCmp("i_cashiercheque_typeID").show();
                             // Ext.getCmp("c_books_cashierchequeID").show();

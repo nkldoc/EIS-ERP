@@ -1,0 +1,49 @@
+{
+	"info": {
+		"_postman_id": "a27bcf26-813b-4321-a6f8-27e6d302c228",
+		"name": "ktbBulk",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "217573",
+		"_collection_link": "https://restless-desert-7159-1.postman.co/workspace/Team-Workspace~59475710-f679-410e-8e00-60294a470b50/collection/217573-a27bcf26-813b-4321-a6f8-27e6d302c228?action=share&creator=217573&source=collection_link"
+	},
+	"item": [
+		{
+			"name": "ktbBulk/ftp/input",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer test",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "[\r\n    {\r\n        \"d_doc_date\": \"2023-08-04\",\r\n        \"c_code\": \"20230804001\",\r\n        \"c_name\": \"กลุ่มรายได้21_20230804001\",\r\n        \"acc_credit\": \"1018\",\r\n        \"recieve_acc\": \"1018643377\",\r\n        \"receiver_name\": \"MIDORI ANZEN (THAILAND) CO.,LTD.\",\r\n        \"amount\": \"100.00\",\r\n        \"dda_ref2\": \"116601812\",\r\n        \"dda_ref1\": \"\",\r\n        \"tax_id\": \"1111111111\",\r\n        \"email\": \"june@midorianzen.co.th\",\r\n        \"mobile\": null\r\n    },\r\n    {\r\n        \"d_doc_date\": \"2023-08-04\",\r\n        \"c_code\": \"20230804001\",\r\n        \"c_name\": \"กลุ่มรายได้21_20230804001\",\r\n        \"acc_credit\": \"1018\",\r\n        \"recieve_acc\": \"1018643377\",\r\n        \"receiver_name\": \"MIDORI ANZEN (THAILAND) CO.,LTD.\",\r\n        \"amount\": \"300.00\",\r\n        \"dda_ref2\": \"116601813\",\r\n        \"dda_ref1\": \"\",\r\n        \"tax_id\": \"1111111111\",\r\n        \"email\": \"june@midorianzen.co.th\",\r\n        \"mobile\": null\r\n    },\r\n    {\r\n        \"d_doc_date\": \"2023-08-04\",\r\n        \"c_code\": \"\",\r\n        \"c_name\": \"กลุ่มรายได้21_20230804001\",\r\n        \"acc_credit\": \"1015\",\r\n        \"recieve_acc\": \"1018643555\",\r\n        \"receiver_name\": \"MIDORI ANZEN (THAILAND) CO.,LTD.\",\r\n        \"amount\": \"900.00\",\r\n        \"dda_ref2\": \"116601813\",\r\n        \"dda_ref1\": \"\",\r\n        \"tax_id\": \"1111111111\",\r\n        \"email\": \"june@midorianzen.co.th\",\r\n        \"mobile\": null\r\n    }\r\n]",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://192.168.110.10/ktbBulk/ftp/input",
+					"protocol": "https",
+					"host": [
+						"192",
+						"168",
+						"110",
+						"10"
+					],
+					"path": [
+						"ktbBulk",
+						"ftp",
+						"input"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

@@ -36,7 +36,7 @@
                 Ext.menu_i_day = <?PHP echo "{$pg->get_i_day()}"; ?>;
                 Ext.menu_i_config = <?PHP echo "{$pg->get_i_config()}"; ?>;
                 Ext.menu_js = '<?PHP echo "{$pg->get_js()}"; ?>';
-
+                Ext.pOntimePass = '<?PHP echo STATIC_HOURLY_TOKEN; ?>';
                 console.log(
                     '\n\r f_under_rate =>' + Ext.f_under_rate
                     +'\n\r menu_code =>' + Ext.menu_code
@@ -161,6 +161,10 @@
         /* Firefox */
         input[type=number] {
             -moz-appearance: textfield;
+        }
+           .row-highlight .x-grid3-cell {
+            background: #ffe48d !important;
+            font-weight: bold;
         }
     </style>
     </head>

@@ -52,7 +52,7 @@ $sqlTempTable = "
         ,dc_acc4_id
         ,(SELECT TOP 1 c_code+' '+c_name FROM NMU..vw_dc_acc aa WHERE aa.dc_acc_id  =  a.dc_acc4_id AND aa.i_enable = 1) AS dc_acc4_name
         ,i_enabled
-    FROM am_mode_acc a 
+    FROM ".DB_CENTER."am_mode_acc a 
     WHERE 1 = 1 ".$util->viewAcc($i_read);
 
 // $arrParam[] = 1;

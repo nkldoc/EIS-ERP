@@ -1,0 +1,177 @@
+@import url("../css/font/TH_Sarabun.css");
+@import url("../js/ext-3.4.0/resources/css/ext-all.css");
+@import url("../js/ext-3.4.0/resources/css/xtheme-blue.css");
+/* @import url("../css/icon_all.css"); */
+@import url("../js/ComboCheckBox/css/Ext.ux.form.LovCombo.css");
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  margin-right: 10px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  background-color: #ccc;
+  border-radius: 34px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transition: 0.4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.4s;
+}
+
+input:checked + .slider {
+  background-color: #2c3e50;
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+.mode-label {
+  vertical-align: middle;
+  font-size: 16px;
+}
+
+/* Template css รายงาน*/
+body {
+  font-family: "Sarabun";
+}
+html {
+  font-family: "Sarabun";
+}
+address,
+caption,
+cite,
+code,
+dfn,
+em,
+strong,
+th,
+var {
+  font-style: normal;
+  font-weight: normal;
+}
+caption,
+thead th {
+  text-align: center;
+}
+.table_report {
+  font-size: 13px;
+  color: #000;
+} /* ขนาดฟ้อนต์ตาราง */
+.table_report thead td,
+.table_report thead th {
+  /* หัวตาราง */
+  background: #f4f4f5;
+  color: #000;
+}
+.table_report {
+  border-collapse: collapse;
+}
+.table_report thead td,
+.table_report thead th,
+.table_report tbody td,
+.table_report tbody th {
+  border: 1px solid #e0e0e0;
+}
+.table_report tbody td,
+.table_report tbody th {
+  padding: 1px 4px;
+}
+.table_report .active,
+.table_report tbody tr:hover {
+  background-color: #ececec !important;
+}
+.text-overflow {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 0px;
+}
+
+.outer {
+  display: flex;
+  flex-flow: column;
+  height: 100%;
+}
+
+.table-overflow {
+  position: relative;
+  overflow: auto;
+}
+
+.class-sticky {
+  position: sticky;
+  top: 0;
+}
+
+/* @media */
+@media print {
+  .outer {
+    display: unset;
+    flex-flow: unset;
+  }
+
+  .table-overflow {
+    overflow: unset;
+  }
+
+  .class-sticky {
+    position: unset;
+    top: 0;
+  }
+}
+.bootstrap-select .dropdown-menu.inner {
+  max-width: 400px;
+  max-height: 300px !important; /* จำกัดความสูง dropdown */
+  overflow-y: auto !important; /* แสดง scrollbar แนวตั้ง */
+  overflow-x: hidden; /* ไม่ให้เลื่อนด้านข้าง */
+  /* ✅ จำกัด dropdown ไม่ให้กว้างเกิน */
+  word-break: break-word;
+  /* ✅ ตัดบรรทัดในรายการยาว */
+}
+form button {
+  width: 190px;
+  height: 35px;
+  background-color: #e6f5f1;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  color: #008375;
+  font-weight: bold;
+}
+form button img {
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+form button:hover {
+  background-color: #008375;
+  color: #fff;
+  transition: background-color 0.3s ease;
+}

@@ -1,0 +1,10 @@
+﻿ลำดับการรัน SQL สำหรับเมนู "ยืนยันรายการ Api จัดซื้อจาก ERP" (ST00094)
+รันตามเลขนำหน้าไฟล์ 1 -> 7 ห้ามสลับ (ทุกไฟล์ idempotent รันซ้ำได้ไม่มีปัญหา)
+
+1_dc_menu_medsup_period_bill.sql          - ลงทะเบียนเมนู ST00092 (ถ้ายังไม่มี)
+2_dc_menu_medsup_purchase_track.sql       - ลงทะเบียนเมนู ST00093 (จุดอ้างอิงของ ST00094)
+3_dc_menu_delete_medsup_purchase_track.sql- ซ่อนเมนู ST00093 (ไม่ใช้งานจริง เหมือนเครื่อง dev)
+4_sp_medsup_ir_confirm.sql                - สร้างตาราง sp_medsup_ir_confirm_hdr/dtl
+5_sp_medsup_ir_confirm_source_cols.sql    - เพิ่มคอลัมน์อ้างอิงที่มาของข้อมูล (ต้องหลัง #4)
+6_sp_status_hdr_medsup_ir_confirm.sql     - เพิ่มแถวเมนูใน sp_status_hdr
+7_dc_menu_medsup_ir_confirm.sql           - ลงทะเบียนเมนู ST00094 จริง (ต้องรันสุดท้ายเสมอ)

@@ -1,4 +1,17 @@
 /* global Ext v-pro*/
+/* Preserve POST parameters when IIS redirects PHP API endpoints. */
+(function () {
+        if (!Ext.data || !Ext.data.Connection || Ext.iisPostUrlNormalizerInstalled) return;
+        if (window.location.hostname !== "dev-eis.nmu.ac.th") return;
+        var originalRequest = Ext.data.Connection.prototype.request;
+        Ext.data.Connection.prototype.request = function (options) {
+                if (options && typeof options.url === "string") {
+                        options.url = options.url.replace(/(mnCheckingController|All_PoWorkingImpHdr)\.php(?=([?#]|$))/i, "$1");
+                }
+                return originalRequest.call(this, options);
+        };
+        Ext.iisPostUrlNormalizerInstalled = true;
+}());
 Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
@@ -4130,6 +4143,8 @@ Ext.handleZeroTransfAfterRender = function () {
         }
 };
 Ext.editHistoryAp = (statusx) => {
+        var allowPostedGlEdit = statusx === "editPostedGl";
+        if (allowPostedGlEdit) statusx = "editMaingrid";
         console.log("at line setep ", Ext.stempDbClickRow, "Ext.editHistoryAp START", "status =", statusx, "row =", Ext.selectRow ? Ext.selectRow.data : null);
         Ext.stempDbClickRow++;
 
@@ -4286,8 +4301,10 @@ Ext.editHistoryAp = (statusx) => {
                                         // Ext.getCmp("modeEditID(intval($row["i_period"]) ==  1  && intval($row["i_is_last"]) == 1  )").getValue()
                                         // var  arrEdit = Ext.getCmp("modeEditID").getValue()
                                         // if()
-                                        if (Ext.selectRow.data.po_working_hdr_id_edit == "0") {
-                                                Ext.arrEdit = Ext.getCmp("modeEditID").getValue().split(",");
+                                        if (allowPostedGlEdit) {
+                                                Ext.arrEdit = ["Edit_i_product_type"];
+                                        } else if (Ext.selectRow.data.po_working_hdr_id_edit == "0") {
+                                                var modeEdit = Ext.getCmp("modeEditID"); Ext.arrEdit = modeEdit ? String(modeEdit.getValue() || "").split(",") : ["showID"];
                                         } else if (Ext.selectRow.data.po_working_hdr_id_edit > 0) {
                                                 Ext.arrEdit = "showID";
                                         } else if ([null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
@@ -4312,6 +4329,10 @@ Ext.editHistoryAp = (statusx) => {
                                         window.setTimeout(function () {
                                                 console.log("at line setep ", Ext.stempDbClickRow, "setTimeout UI setup callback START", "arrEdit =", Ext.arrEdit);
                                                 Ext.stempDbClickRow++;
+                                                if (allowPostedGlEdit) {
+                                                        Ext.getCmp("buSaveSub3ID").show();
+                                                        Ext.getCmp("buSavePostedGlEditID").show();
+                                                }
                                                 myGrid = Ext.getCmp("gridSub4ID");
                                                 Ext.getCmp("ButtonsproductID").hide();
                                                 Ext.getCmp("upload_pdf1").hide();
@@ -10064,6 +10085,15 @@ function showCustomEditForm(rec) {
                                                 }, 100);
                                         }
                                 }, {
+                                        text: 'เปิดให้แก้ไข (บันทึก GL แล้ว)',
+                                        iconCls: 'icon-edit',
+                                        hidden: ![3, 4, 5, 6, 99].includes(Number(rec.get('i_send_gl_dr'))),
+                                        handler: function () {
+                                                Ext.selectRow = rec;
+                                                win.close();
+                                                Ext.editHistoryAp("editPostedGl");
+                                        }
+                                }, {
                                         text: 'OTP Generator',
                                         iconCls: 'icon-star', // (ถ้ามี) ใส่เพื่อให้มีไอคอนสวยงามขึ้น
                                         handler: function () {
@@ -10327,7 +10357,7 @@ Ext.AppUx = function (app, menu) {
         Ext.storeDtl = new Ext.data.JsonStore({
                 storeId: "storeDtl",
                 autoDestroy: false,
-                autoLoad: true,
+                autoLoad: false,
                 url: "tor/api/mnCheckingController.php",
                 baseParams: { mode: "LIST_SUB_PERIOD_HDR" },
                 root: "data",
@@ -10755,7 +10785,7 @@ Ext.AppUx = function (app, menu) {
         Ext.bg_budget_year = new Ext.data.JsonStore({
                 autoDestroy: false,
                 storeId: 'bg_budget_year',
-                autoLoad: true,
+                autoLoad: false,
                 url: "api/All_PoWorkingImpHdr.php",
                 baseParams: {
                         type: "bg_budget_year",
@@ -13887,13 +13917,6 @@ Ext.AppUx = function (app, menu) {
                                                                                                                         }
                                                                                                                         return true; // ผ่านเงื่อนไข
                                                                                                                 }
-                                                                                                        }, {
-                                                                                                                fieldLabel: "วันที่รับของ",
-                                                                                                                xtype: "hidden",
-                                                                                                                name: "d_arrive_date",
-                                                                                                                id: "d_arrive_dateID",
-                                                                                                                readOnly: true,
-                                                                                                                submitFormat: "Y-m-d", // ส่งเป็น 2025-07-09
                                                                                                         },
                                                                                                         {
                                                                                                                 xtype: 'button',
@@ -13901,15 +13924,18 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 width: 80,
                                                                                                                 iconCls: "icon-building-edit", // (ถ้ามี) ใส่เพื่อให้มีไอคอนสวยงามขึ้น
                                                                                                                 handler: function () {
-                                                                                                                        // ตัวอย่าง Logic การดึงค่าจากช่อง Textfield ข้างๆ มาใช้งาน
-                                                                                                                        var codeValue = this.previousSibling().getValue();
+                                                                                                                        // อ่านค่าจากช่อง datefield "วันที่รับของเอกสารสมบูรณ์" โดยตรง
+                                                                                                                        // (เดิมใช้ this.previousSibling() ซึ่งชี้ไป hidden field ที่ไม่เคยมีค่า ทำให้บันทึกไม่ได้)
+                                                                                                                        var arriveDateField = Ext.getCmp('d_doc_arrive_validationID');
+                                                                                                                        var codeValue = arriveDateField ? arriveDateField.getValue() : '';
+                                                                                                                        var codeValueYmd = codeValue ? Ext.util.Format.gridDate(codeValue, "Y-m-d") : '';
                                                                                                                         if (Ext.arrive_dt) {
                                                                                                                                 Ext.Msg.alert('แจ้งเตือน', 'วันที่รับของ ห้ามเกินวันที่ตรวจรับ!');
                                                                                                                                 return;
                                                                                                                         }
 
-                                                                                                                        if (!codeValue) {
-                                                                                                                                Ext.Msg.alert('แจ้งเตือน', 'กรุณากรอกเลขที่ตรวจรับก่อนบันทึก');
+                                                                                                                        if (!codeValueYmd) {
+                                                                                                                                Ext.Msg.alert('แจ้งเตือน', 'กรุณาระบุวันที่รับของเอกสารสมบูรณ์ก่อนบันทึก');
                                                                                                                                 return;
                                                                                                                         }
                                                                                                                         if (Ext.glAcctionNo) {
@@ -13927,22 +13953,25 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                 method: 'POST',
                                                                                                                                                 params: {
                                                                                                                                                         mode: 'updateBillingDate',
-                                                                                                                                                        d_doc_arrive_dt: Ext.util.Format.gridDate(codeValue, "Y-m-d"),
+                                                                                                                                                        d_doc_arrive_dt: codeValueYmd,
                                                                                                                                                         sp_tor_id: Ext.selectRow.get('sp_tor_id'),
                                                                                                                                                         sp_tor_contract_id: Ext.selectRow.get('sp_tor_contract_id'),
                                                                                                                                                         sp_check_period_hdr_id: Ext.selectRow.get('sp_check_period_hdr_id'),
                                                                                                                                                         sp_tor_hdr_period_id: Ext.selectRow.get('sp_tor_hdr_period_id'),
                                                                                                                                                         sp_tor_hdr_period_ids: JSON.stringify([Ext.selectRow.get('sp_tor_hdr_period_id')]),
-                                                                                                                                                        d_doc_arrive_dts: JSON.stringify([Ext.util.Format.gridDate(codeValue, "Y-m-d")])
+                                                                                                                                                        d_doc_arrive_dts: JSON.stringify([codeValueYmd])
                                                                                                                                                 },
                                                                                                                                                 success: function (response) {
                                                                                                                                                         try {
                                                                                                                                                                 var result = Ext.decode(response.responseText);
                                                                                                                                                                 if (result.success === 'Success' || result.reval === 0) {
-                                                                                                                                                                        Ext.Msg.alert('สำเร็จ', result.msg || 'อัพเดทประเภทการจองเงินเรียบร้อยแล้ว', function () {
-                                                                                                                                                                                // update the local record so reopening the form keeps the value
-                                                                                                                                                                                if (rec && rec.set) {
-                                                                                                                                                                                        rec.set('i_pr_type1', codeValue);
+                                                                                                                                                                        Ext.Msg.alert('สำเร็จ', result.msg || 'บันทึกวันที่รับของเอกสารสมบูรณ์เรียบร้อยแล้ว', function () {
+                                                                                                                                                                                // อัปเดต record ที่เลือกไว้ เพื่อให้เปิดฟอร์มใหม่แล้วยังเห็นค่าล่าสุด
+                                                                                                                                                                                if (Ext.selectRow && Ext.selectRow.set && Ext.isDate(codeValue)) {
+                                                                                                                                                                                        var arriveBe = codeValue.format('d-m-') + (codeValue.getFullYear() + 543);
+                                                                                                                                                                                        Ext.selectRow.set('d_arrive_date', arriveBe);
+                                                                                                                                                                                        Ext.selectRow.set('d_doc_arrive_dt', arriveBe);
+                                                                                                                                                                                        Ext.selectRow.commit();
                                                                                                                                                                                 }
 
                                                                                                                                                                                 updateModifyDate('วันที่วางบิล');
@@ -16371,6 +16400,16 @@ Ext.AppUx = function (app, menu) {
                                 buttonAlign: "left",
                                 buttons: [
                                         {
+                                                id: "buSavePostedGlEditID",
+                                                text: "บันทึกการแก้ไข",
+                                                icon: "../images/icons/save.png",
+                                                hidden: true,
+                                                handler: function () {
+                                                        var saveButton = Ext.getCmp("buSaveSub3ID");
+                                                        saveButton.handler.call(saveButton.scope || saveButton, saveButton);
+                                                },
+                                        },
+                                        {
                                                 id: "buSaveSub3ID",
                                                 //                                                                                                                                                                                                                                                                        iconCls: "icon-save",
                                                 icon: "../images/icons/save.png",
@@ -16405,6 +16444,46 @@ Ext.AppUx = function (app, menu) {
                                                                 return false;
                                                         }
                                                         validationSaveButton.receiveValidationPassed = false;
+                                                        // ---- เช็คงวดปิด (gl_dc_period.i_status = 2) ----
+if (!validationSaveButton.periodCheckPassed) {
+    var chkDateVal = Ext.getCmp("d_checking_dateID").getValue();
+    if (chkDateVal) {
+        var winMask = Ext.getCmp("winPeriodHdrID").getEl();
+        winMask.mask("ตรวจสอบงวดบัญชี...", "x-mask-loading");
+        Ext.Ajax.request({
+            url: "tor/api/mnCheckingController.php",
+            method: "POST",
+            params: {
+                mode: "CHECK_PERIOD_CLOSE",
+                d_checking_date: Ext.util.Format.date(chkDateVal, "Y-m-d"),
+            },
+            success: function (result) {
+                winMask.unmask();
+                var json;
+                try { json = Ext.decode(result.responseText); }
+                catch (e) { Ext.Msg.alert("ผิดพลาด", "ตรวจสอบงวดไม่สำเร็จ (ข้อมูลตอบกลับไม่ถูกต้อง)"); return; }
+
+                if (json.i_status == 2) {
+                    Ext.Msg.alert("แจ้งเตือน",
+                        "วันที่ตรวจรับถูกปิดงวดแล้ว กรุณาเปิดงวด เดือน " + json.c_mm + " ปี " + json.c_yyyy_be,
+                        function () { Ext.getCmp("d_checking_dateID").focus(); });
+                    return;
+                }
+                // ผ่าน -> เรียก handler ซ้ำ (ต้องตั้งทั้งสองแฟล็ก เพราะบรรทัดบนรีเซ็ต receiveValidationPassed ทุกรอบ)
+                validationSaveButton.receiveValidationPassed = true;
+                validationSaveButton.periodCheckPassed = true;
+                validationSaveButton.handler.call(validationSaveButton.scope || validationSaveButton, validationSaveButton);
+            },
+            failure: function () {
+                winMask.unmask();
+                Ext.Msg.alert("ผิดพลาด", "ไม่สามารถตรวจสอบงวดบัญชีได้");
+            },
+        });
+        return false;
+    }
+}
+validationSaveButton.periodCheckPassed = false;
+// ---- จบเช็คงวดปิด ----
                                                         Ext.getCmp('gridSub4ID').stopEditing(); // ✅ เพิ่มบรรทัดนี้
                                                         const text = Ext.getCmp('c_name_dtlID').getValue();
                                                         // ใช้ Regex ค้นหาคำว่า "งวดที่ : ตามด้วยตัวเลข" ทั้งหมดในข้อความ
@@ -16571,7 +16650,7 @@ Ext.AppUx = function (app, menu) {
                                                                 if (Ext.sum_minus == 1) {
                                                                         msg += "<span style='white-space: nowrap;'>- วงเงินแหล่งเงินไม่เพียงพอ</span><br>";
                                                                 }
-                                                                if (Ext.util.Format.date(Ext.getCmp("d_checking_dateID").getValue(), "Y-m-d") < Ext.util.Format.date(Ext.getCmp("d_arrive_dateID").getValue(), "Y-m-d")) {
+                                                                if (Ext.util.Format.date(Ext.getCmp("d_checking_dateID").getValue(), "Y-m-d") < Ext.util.Format.date(Ext.getCmp("d_doc_arrive_validationID").getValue(), "Y-m-d")) {
                                                                         msg += "วันที่ตรวจรับ น้อยกว่าวันที่รับของ ";
                                                                 }
                                                                 if (msg != "") {
@@ -17638,7 +17717,7 @@ Ext.onReady(function () {
                                                                         if (success) {
                                                                                 resolve(store); // โหลดสำเร็จ ส่งสัญญานไปต่อ
                                                                         } else {
-                                                                                reject('ไม่สามารถโหลดข้อมูล Store ได้'); // โหลดพัง ส่งสัญญาณหยุด
+                                                                                reject('Store load failed: ' + (store.storeId || 'unknown') + ' (URL: ' + (store.url || 'unknown') + ')'); // โหลดพัง ส่งสัญญาณหยุด
                                                                         }
                                                                 }
                                                         });

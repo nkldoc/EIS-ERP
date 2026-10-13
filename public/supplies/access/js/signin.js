@@ -9,6 +9,7 @@ Ext.onReady(function() {
 					var res = new Object();
 					res = Ext.util.JSON.decode(response.response.responseText);
 					console.log(res.success);
+					if (res.duplicate_login) { location.href = res.confirm_url; return; }
 					if(res.success == 'Success'){
 						location.href = "../index.php";
 					}else{
@@ -16,6 +17,7 @@ Ext.onReady(function() {
 					}
 				},
 				failure:  function(form, response) {
+					if (response.result && response.result.duplicate_login) { location.href = response.result.confirm_url; return; }
 					switch (response.failureType) {
 						case Ext.form.Action.CLIENT_INVALID:
 							Ext.Msg.alert('Failure', 'Form fields may not be submitted with invalid values');

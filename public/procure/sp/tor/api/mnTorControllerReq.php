@@ -8,7 +8,22 @@ include("../../../lib/date/i_date.class.php");
 $db = new DatabaseServer();
 $date = new i_date();
 $util = new apiUtil();
+if (empty($_SESSION['user_id'])) {
+    $msg = "Session หมดอายุ";
+    echo json_encode(array(
+        "reval" => 1,
+        "success" => false,
+        "session_expired" => true,
+        "msg" => $msg
+    ));
+    exit;
+} else {
 
+    $info[1] = $_SESSION['user_id'];
+    $info[2] = $_SESSION['dc_cost_id'];
+    $info[3] = date('Y-m-d H:i:s'); // วันที่และเวลา ปัจจุบัน
+// toDoLog
+}
 if (empty($_SESSION['user_id'])) {
     $msg = "Session หมดอายุ";
     echo json_encode(array(
@@ -27,17 +42,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 $mode = $_REQUEST["mode"];
-<<<<<<< HEAD
-////Java Session
-//require_once("../../../java/Java.inc");
-//$session = procure_java_session();
-$dc_cost_id = $_SESSION['dc_cost_id']; //java_values($session->get("dc_cost_id"));
-=======
-//Java Session
-require_once("../../../java/Java.inc");
-$session = procure_java_session();
-$dc_cost_id = java_values($session->get("dc_cost_id"));
->>>>>>> 262f23a (bi)
+$dc_cost_id = $_SESSION["dc_cost_id"] ?? null;
 
 $table = "dbo.sp_tor";
 $keyName = "tor_id";

@@ -646,6 +646,9 @@ Ext.AppUx = function (app, menu) {
       {
         name: "plan_code",
       },
+      {
+        name: "plan_seq",
+      },
     ],
   });
   const sp_tor_delete = function (status, menu) {
@@ -1594,6 +1597,16 @@ Ext.AppUx = function (app, menu) {
                 }
               },
               //haddler
+            },
+            {
+              text: "ถอยรายการ",
+              iconCls: "icon-arrow_undo",
+              handler: function () {
+                // ปิดฟอร์มแล้วเปิดหน้าต่างเลือกเมนูที่จะถอย (เช่น กลับไปจัดสรรงบประมาณ เพื่อแก้ประเภท PR)
+                Ext.getCmp("winChequeID").hide();
+                Ext.getCmp("winChequeID").destroy();
+                cancel_tor("reverse");
+              },
             },
             {
               text: Ext.GLOBAL_BU_BACK_TH,

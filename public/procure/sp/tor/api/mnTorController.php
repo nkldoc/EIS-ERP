@@ -4,25 +4,6 @@ include("../../../conf/config.php");
 include("../../../lib/database/DatabaseServer.php");
 include("../../../lib/database/apiUtil.php");
 include("../../../lib/date/i_date.class.php");
-
-// config ปิด session แล้ว สามารถใช้ค่าที่อ่านมาได้
-$userId = $_SESSION['user_id'] ?? null;
-
-if (!$userId) {
-    http_response_code(401);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Session expired',
-    ]);
-
-    exit;
-} else {
-
-    $info[1] = $_SESSION['user_id'];
-    $info[2] = $_SESSION['dc_cost_id'];
-    $info[3] = date('Y-m-d H:i:s'); // วันที่และเวลา ปัจจุบัน
-}
 $db = new DatabaseServer();
 $date = new i_date();
 $util = new apiUtil();
@@ -3714,6 +3695,36 @@ switch ($mode) {
         exit();
         break;
 
+    case "ALL_STATUS_MENU":
+        $root = "data";
+        $data = array();
+
+        $sqlMain = "SELECT sp_status_hdr_id, c_code, c_name
+                FROM dbo.sp_status_hdr
+                ORDER BY sp_type_status_id, i_seq";
+        $stmt = $db->QueryParam($sqlMain, array());
+        while ($row = $db->Fetch($stmt)) {
+            $temp = array(
+                "id" => intval($row["sp_status_hdr_id"]),
+                "c_name" => $row["c_code"] . " : " . $row["c_name"],
+            );
+            ${$root}[] = $temp;
+        }
+
+        echo json_encode(array("debug" => true, $root => ${$root}));
+        exit();
+        break;
+
+    case "GET_CONTRACT_SIGN_DATE":
+        $sp_tor_contract_id = $_REQUEST['sp_tor_contract_id'] ?? null;
+        $d_sign_date = $db->GetDataBySQL("SELECT CONVERT(varchar, d_sign_date, 120) FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ?", array($sp_tor_contract_id));
+        echo json_encode(array(
+            "success" => true,
+            "d_sign_date" => (!empty($d_sign_date)) ? $date->extDateBuddha($d_sign_date) : "",
+        ));
+        exit();
+        break;
+
     case "RETURNMENU":
         $root = "data";
         $data = array();
@@ -6529,6 +6540,7 @@ switch ($mode) {
           d_due_date = 17-07-2569 */
 
         $data["d_doc_date"] = !empty($_REQUEST['d_doc_date']) ? $date->bc_to_ad($_REQUEST['d_doc_date']) : null;
+        $data["d_sign_date"] = !empty($_REQUEST['d_sign_date']) ? $date->bc_to_ad($_REQUEST['d_sign_date']) : null;
         $data["d_start_date"] = !empty($_REQUEST['d_start_date']) ? $date->bc_to_ad($_REQUEST['d_start_date']) : null;
         $data["d_due_date"] = !empty($_REQUEST['d_due_date']) ? $date->bc_to_ad($_REQUEST['d_due_date']) : null;
         //   !empty($_REQUEST['d_doc_date1']) ? $date->bc_to_ad($_REQUEST['d_doc_date1']) : null;
@@ -7115,12 +7127,11 @@ switch ($mode) {
         exit;
         break;
     case "LIST_PERIOD_IN_SPMNCONTRACT":
-        #########################
+        ###########################################
         $root = "data";
         $data = array();
         $con = '';
-        $i_is_po ?? $_REQUEST['i_is_po'] ?? 0;
-        if ($i_is_po == 0) {
+        if (@$_REQUEST['i_is_po'] == 0) {
             $con = " AND a.sp_tor_contract_id= {$_REQUEST['sp_contract_po_id']}";
         } else {
             $con = "AND a.sp_po_id= {$_REQUEST['sp_contract_po_id']}";
@@ -8540,6 +8551,41 @@ switch ($mode) {
                 FROM sp_tor_contract
                 WHERE sp_tor_contract_id = ?
                 ";
+        $stmt = $db->QueryParam($sql, $arrParam);
+        break;
+    case "UP_SP_TOR_CONTRACT_AMEND":
+        // save handler for the "แก้ไขสัญญา" amendment form (contract.js form_edit_contract).
+        // Note: "Edit_contract" above is dead code left over from an older sp_tor_contract_edit
+        // schema and cannot run against the current table, so this mode updates the live
+        // sp_tor / sp_tor_contract rows and logs a matching sp_tor_contract_edit history row instead.
+        $sp_tor_id = $_REQUEST["sp_tor_id"];
+        $sp_tor_contract_id = $_REQUEST["sp_tor_contract_id"];
+
+        $tor_type_id = $_REQUEST["tor_type_id"];
+        $c_name = $_REQUEST["c_name"];
+        $d_doc_date = !empty($_REQUEST['d_doc_date']) ? $date->bc_to_ad($_REQUEST['d_doc_date']) : null;
+        $d_start_date = !empty($_REQUEST['d_start_date']) ? $date->bc_to_ad($_REQUEST['d_start_date']) : null;
+        $d_due_date = !empty($_REQUEST['d_due_date']) ? $date->bc_to_ad($_REQUEST['d_due_date']) : null;
+        $c_comment = $_REQUEST["c_comment"];
+
+        $f_total_amt = $db->GetDataBySQL('SELECT f_total_amt FROM sp_tor_contract WHERE sp_tor_contract_id = ?', array($sp_tor_contract_id));
+        $row_edit = $db->GetDataBySQL('SELECT ISNULL(MAX(row_edit), 0) + 1 FROM sp_tor_contract_edit WHERE sp_tor_id = ?', array($sp_tor_id));
+
+        $d_now = date("Y-m-d H:i:s");
+        $user_id = $_SESSION["user_id"];
+        $cost_id = $_SESSION["dc_cost_id"];
+
+        $sql = "UPDATE sp_tor SET tor_type_id = ? WHERE tor_id = ?;
+                UPDATE sp_tor_contract SET c_name = ?, d_doc_date = ?, d_start_date = ?, d_due_date = ? WHERE sp_tor_contract_id = ?;
+                INSERT INTO sp_tor_contract_edit
+                    (sp_tor_id, sp_tor_contract_id, row_edit, i_enabled, c_comment, d_doc_date, d_due_date, f_total_amt, d_create, dc_user_create_id, dc_user_create_cost_id, d_update, dc_user_update_id, dc_user_update_cost_id)
+                VALUES
+                    (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $arrParam = array(
+            $tor_type_id, $sp_tor_id,
+            $c_name, $d_doc_date, $d_start_date, $d_due_date, $sp_tor_contract_id,
+            $sp_tor_id, $sp_tor_contract_id, $row_edit, $c_comment, $d_doc_date, $d_due_date, $f_total_amt, $d_now, $user_id, $cost_id, $d_now, $user_id, $cost_id,
+        );
         $stmt = $db->QueryParam($sql, $arrParam);
         break;
     case "Edit_bg_Tor":

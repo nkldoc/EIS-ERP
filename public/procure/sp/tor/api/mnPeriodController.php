@@ -4,26 +4,6 @@ include("../../../conf/config.php");
 include("../../../lib/database/DatabaseServer.php");
 include("../../../lib/database/apiUtil.php");
 include("../../../lib/date/i_date.class.php");
-
-// config ปิด session แล้ว สามารถใช้ค่าที่อ่านมาได้
-$userId = $_SESSION['user_id'] ?? null;
-
-if (!$userId) {
-    http_response_code(401);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Session expired',
-    ]);
-
-    exit;
-} else {
-
-    $info[1] = $_SESSION['user_id'];
-    $info[2] = $_SESSION['dc_cost_id'];
-    $info[3] = date('Y-m-d H:i:s'); // วันที่และเวลา ปัจจุบัน
-}
-
 $db = new DatabaseServer();
 $date = new i_date();
 $util = new apiUtil();
@@ -287,8 +267,7 @@ switch ($mode) {
         $root = "data";
         $data = array();
         $con = '';
-        $i_is_po = $_REQUEST['i_is_po'] ?? 0;
-        if ($i_is_po == 0) {
+        if (@$_REQUEST['i_is_po'] == 0) {
             $con = " and a.sp_tor_contract_id = {$_REQUEST['sp_contract_po_id']}";
         } else {
             $con = " and a.sp_po_id = {$_REQUEST['sp_contract_po_id']}";
@@ -391,8 +370,8 @@ switch ($mode) {
 
         $arrParam[] = $_REQUEST['sp_contract_po_id'];
 
-        error_log("SQL LIST_PERIOD_IN_SPMNCONTRACT: " . $sqlMain);
-        error_log("Params LIST_PERIOD_IN_SPMNCONTRACT: " . print_r($arrParam, true));
+        // error_log("SQL LIST_PERIOD_IN_SPMNCONTRACT: " . $sqlMain);
+        // error_log("Params LIST_PERIOD_IN_SPMNCONTRACT: " . print_r($arrParam, true));
 
         $stmt = $db->QueryParam($sqlMain, $arrParam);
         $i = @$start + 1;

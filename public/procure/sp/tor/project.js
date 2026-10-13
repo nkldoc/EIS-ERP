@@ -4112,8 +4112,9 @@ formAdd = function (event, record) {
       }),
       {
         xtype: "radiogroup",
-        columns: [98, 98],
+        columns: [98, 98, 110],
         fieldLabel: "ใช้เงินจาก",
+        width: 470,
         id: "i_booking_bgID",
         name: "i_booking_bg",
         items: [
@@ -4127,6 +4128,11 @@ formAdd = function (event, record) {
             inputValue: 2,
             name: "i_booking_bg",
             boxLabel: "เงินกันเหลื่อม",
+          },
+          {
+            inputValue: 3,
+            name: "i_booking_bg",
+            boxLabel: "ไม่จองเงิน",
           },
         ],
         listeners: {
@@ -4179,7 +4185,7 @@ formAdd = function (event, record) {
           afterrender: function () {
             this.fn = function () {
               var booking = Ext.getCmp("i_booking_bgID").getValue().inputValue;
-              if (booking === 2) {
+              if (booking == 2 || booking == 3) {
                 Ext.getCmp("i_pr_type2ID").hide();
               } else {
                 Ext.getCmp("i_pr_type2ID").show();
@@ -6170,6 +6176,18 @@ Ext.AppUx = function (app, menu) {
                     } else {
                       Ext.getCmp("winDcExpTypeDdd2ID").hide();
                       Ext.getCmp("winChequeID").getEl().mask("Please wait...", "x-mask-loading");
+
+                      // Exception: โครงการ 2 สัญญานี้ ไม่ต้องเช็คเงิน (bg/BgBudgetAllSupplies) และไม่ต้องจองเงิน (mn_BgReserveMoney)
+                      if (rec.get("project_code") == "25/2566/2569" || rec.get("project_code") == "26/2566/2569") {
+                        Ext.MessageBox.alert("Success", "โครงการนี้ไม่ต้องจองเงิน ระบบดำเนินการบันทึกรายการให้แล้ว", function () {
+                          //End Property
+                          Ext.getCmp("winDcExpTypeDdd2ID").destroy();
+                          Ext.getCmp("winChequeID").getEl().unmask(); //end
+                          Ext.storeProject.reload();
+                        });
+                        return false;
+                      }
+
                       Ext.Ajax.request({
                         url: genLinkBg("c_pr", rec), //genLink();
                         method: "GET", //POST
@@ -6704,6 +6722,8 @@ Ext.AppUx = function (app, menu) {
                       renderer: function (value, metaData, record, row, col, store, gridView) {
                         if (record.get("no") === 9999) {
                           return "";
+                        } else if (record.get("i_booking_bg") == 3) {
+                          return "ไม่จองเงิน";
                         } else if (record.get("i_booking_bg") === 1) {
                           if (record.get("bg_reserve_money1_id") > 0) {
                             return "จองแล้ว";
@@ -6828,6 +6848,7 @@ Ext.AppUx = function (app, menu) {
                           Ext.hdrProject = record;
                           Ext.getCmp("grid-periodID").setTitle("งวด PO ย่อย " + record.get("c_code"));
                         } else if (columnIndex === grid.getColumnModel().getIndexById("hdrProjectBooking")) {
+                          if (record.get("i_booking_bg") == 3) return false;
                           Ext.selectRow.set("i_pr_type1", record.get("i_pr_type1"));
                           Ext.selectRow.set("c_f_type_amt", record.get("f_total_amt"));
                           if (record.get("bg_reserve_money1_id") > 0 || record.get("i_overlap") === 1) {

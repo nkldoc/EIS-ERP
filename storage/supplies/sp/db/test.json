@@ -1,0 +1,36 @@
+[
+  {
+    "sp_status_type_config_id": 2,
+    "c_name": "ปี 64",
+    "c_detail": "เริ่มต้นระบบ",
+    "bg_yyyy": "2021",
+    "start_date": "2021-11-23T00:00:00",
+    "end_date": "2022-11-23T00:00:00",
+    "i_is_active": null,
+    "i_enabled": 1,
+    "i_delete": 2,
+    "dc_user_create_id": null,
+    "dc_user_create_cost_id": null,
+    "d_create": "2021-11-23T14:41:46.253",
+    "dc_user_update_id": null,
+    "dc_user_update_cost_id": null,
+    "d_update": "2021-11-23T14:41:46.253"
+  },
+  {
+    "sp_status_type_config_id": 4,
+    "c_name": "ปี 64",
+    "c_detail": "เริ่มต้นระบบ",
+    "bg_yyyy": "2021",
+    "start_date": "2021-11-23T00:00:00",
+    "end_date": "2022-11-23T00:00:00",
+    "i_is_active": null,
+    "i_enabled": 1,
+    "i_delete": 2,
+    "dc_user_create_id": null,
+    "dc_user_create_cost_id": null,
+    "d_create": "2021-11-23T14:41:46.253",
+    "dc_user_update_id": null,
+    "dc_user_update_cost_id": null,
+    "d_update": "2021-11-23T14:41:46.253"
+  }
+]

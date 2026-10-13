@@ -1,10 +1,10 @@
-﻿/* global Ext */
+/* global Ext */
 
 Ext.onReady(function () {
     Ext.QuickTips.init();
     Ext.idRep = 'frm-repSpEmp';
     //Spring Boot cross context
-    Ext.urlReport = (true) ? 'https://eis.nmu.ac.th:8443/reports/pro/reportSpEmp' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
+    Ext.urlReport = 'https://eis.nmu.ac.th:8443/reports/pro/reportSpEmp';
     //
 //    Ext.urlReport = (false) ? 'https://eis.nmu.ac.th:8443/reports/pro/reportSpEmp' : 'https://eis.nmu.ac.th:8443/reports/printr.php?get=true'; //DEBUG  
  
@@ -58,7 +58,6 @@ Ext.onReady(function () {
         //set submit post report with ajax
         var frm = Ext.getCmp(Ext.idRep).getForm().el.dom;
         frm.setAttribute('target', Ext.idRep);
-        frm.setAttribute('method', 'POST');
         frm.setAttribute('action', Ext.urlReport);
         frm.submit();
         frm.focus();

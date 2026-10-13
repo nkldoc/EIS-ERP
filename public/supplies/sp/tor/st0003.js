@@ -1636,6 +1636,9 @@ Ext.AppUx = function (app, menu) {
             {
                 name: "plan_code",
             },
+            {
+                name: "plan_seq",
+            },
         ],
     });
 

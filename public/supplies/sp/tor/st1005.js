@@ -295,7 +295,7 @@ Ext.AppUx = function (app, menu) {
                             Ext.getCmp("i_pr_type1ID").setValue(Ext.selectRow.json.i_pr_type1);
                             Ext.getCmp("i_pr_type2ID").setValue(Ext.selectRow.json.i_pr_type2);
                             Ext.getCmp("i_pr_type3ID").setValue(Ext.selectRow.json.i_pr_type3);
-                            Ext.getCmp("f_type_amtID").setValue(Ext.selectRow.json.f_total_amt);
+                            Ext.getCmp("f_type_amtID").setValue((parseFloat(String(Ext.selectRow.json.f_type_amt || 0).replace(/,/g, "")) > 0) ? Ext.selectRow.json.f_type_amt : Ext.selectRow.json.f_total_amt);
                             Ext.getCmp("f_type_amtID2").setValue(Ext.selectRow.json.f_type2_amt);
                             Ext.getCmp("f_type_amtID3").setValue(Ext.selectRow.json.f_type3_amt);
                         },

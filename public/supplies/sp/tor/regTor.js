@@ -848,6 +848,21 @@ Ext.AppUx = function (app, menu) {
         name: "c_code",
       },
       {
+        name: "sp_tor_delete_flag",
+      },
+      {
+        name: "tor_delete_comment",
+      },
+      {
+        name: "tor_delete_user",
+      },
+      {
+        name: "tor_delete_cost",
+      },
+      {
+        name: "tor_delete_date",
+      },
+      {
         name: "bg_budget_dtl_project_id",
       },
       {
@@ -1051,6 +1066,94 @@ Ext.AppUx = function (app, menu) {
   });
   //    console.log(' >>> ' + Ext.getDate.getNowCarlen());
   //    console.log(' >>> ' + Ext.getDate.defaultDate());
+
+  // PR ที่ถูกถอยรายการกลับมาให้แก้ไข (sp_tor_delete_flag = 1): double click แล้วโชว์หมายเหตุก่อน
+  // ว่าต้องแก้ไขอะไรบ้าง กด "รับทราบและแก้ไขรายการ" เพื่อเคลียร์ flag แล้วเปิดฟอร์มแก้ไขต่อ
+  var spTorReverseNote = function () {
+    new Ext.Window({
+      id: "win-reverse-note",
+      title: "เหตุผลในการถูกถอยรายการ (ต้องแก้ไข)",
+      resizable: false,
+      modal: true,
+      width: 600,
+      layout: "form",
+      bodyStyle: "padding:8px;",
+      items: [
+        {
+          xtype: "displayfield",
+          fieldLabel: "รหัส PR",
+          value: "<b>" + (Ext.selectRow.get("c_code") || "(ยังไม่ออกเลข PR)") + "</b>",
+        },
+        {
+          xtype: "displayfield",
+          fieldLabel: "ผู้ถอยรายการ",
+          value:
+            "<b>" +
+            (Ext.selectRow.get("tor_delete_user") || "-") +
+            "</b>" +
+            (Ext.selectRow.get("tor_delete_cost") ? " (" + Ext.selectRow.get("tor_delete_cost") + ")" : ""),
+        },
+        {
+          xtype: "displayfield",
+          fieldLabel: "วันเวลาที่ถอย",
+          value: Ext.selectRow.get("tor_delete_date") || "-",
+        },
+        {
+          xtype: "textarea",
+          fieldLabel: "หมายเหตุ/สิ่งที่ต้องแก้ไข",
+          name: "tor_delete_comment",
+          id: "reverseNoteCommentID",
+          width: 400,
+          height: 120,
+          readOnly: true,
+          value: Ext.selectRow.get("tor_delete_comment"),
+        },
+      ],
+      buttons: [
+        {
+          text: "รับทราบและแก้ไขรายการ",
+          iconCls: "icon-table_delete",
+          handler: function () {
+            Ext.Ajax.request({
+              url: "tor/api/mnTorController.php",
+              method: "GET",
+              params: {
+                mode: "Recognize_Reason",
+                id: Ext.selectRow.get("id"),
+                sp_status_hdr_id: Ext.selectRow.get("tor_status_id"),
+                c_comment_delete: Ext.getCmp("reverseNoteCommentID").getValue(),
+                sp_emp_id: Ext.selectRow.get("sp_emp_id"),
+                i_enabled: 2,
+              },
+              success: function (result) {
+                var jd = Ext.util.JSON.decode(result.responseText);
+                if (jd.success) {
+                  Ext.getCmp("win-reverse-note").destroy();
+                  Ext.selectRow.set("sp_tor_delete_flag", 0);
+                  Ext.selectRow.set("tor_delete_comment", null);
+                  Ext.selectRow.commit();
+                  Ext.loadStore("edit", true);
+                  if (Ext.storeDtl) Ext.storeDtl.reload();
+                } else {
+                  Ext.MessageBox.alert("Failed", jd.msg);
+                }
+              },
+              failure: function (result) {
+                Ext.MessageBox.alert("Failed", result.responseText);
+              },
+            });
+          },
+        },
+        {
+          text: Ext.GLOBAL_BU_BACK_TH,
+          iconCls: "icon-clear",
+          handler: function () {
+            Ext.getCmp("win-reverse-note").destroy();
+          },
+        },
+      ],
+    }).show();
+  };
   //interlizing
   Ext.loadStore = function (status, show) {
     var statusx = status;
@@ -1107,6 +1210,11 @@ Ext.AppUx = function (app, menu) {
       winApp.show();
       Ext.getCmp("winChequeID").hideTabStripItem(1);
     } else if (statusx === "edit") {
+      // PR ถูกถอยรายการกลับมาให้แก้ไข -> โชว์หมายเหตุก่อน แล้วค่อยเปิดฟอร์ม
+      if (Ext.selectRow && Ext.selectRow.get && Ext.selectRow.get("sp_tor_delete_flag") == 1) {
+        spTorReverseNote();
+        return;
+      }
       Ext.HDR_ID = Ext.selectRow.data.id;
       Ext.tor_type_id = Ext.selectRow.data.tor_type_id; // default start เจาะจงน้อวกว่า 5 แสน
       Ext.i_is_more = Ext.selectRow.data.i_is_more;
@@ -1686,6 +1794,56 @@ Ext.AppUx = function (app, menu) {
                           readOnly: true,
                           name: "c_code",
                         },
+                        {
+                          xtype: "hidden",
+                          name: "parent_id",
+                          id: "parent_idID",
+                        },
+                        {
+                          xtype: "checkbox",
+                          fieldLabel: "เป็น PR ลูกของ",
+                          id: "isChildPrCheckID",
+                          hidden: statusx != "add",
+                          boxLabel: "ผูกกับ PR แม่ (ใช้เลข PR เดียวกัน ไม่ออกเลขใหม่)",
+                          listeners: {
+                            check: function (cb, checked) {
+                              Ext.getCmp("parentPrComboID").setVisible(checked);
+                              if (!checked) {
+                                Ext.getCmp("parentPrComboID").clearValue();
+                                Ext.getCmp("parent_idID").setValue(null);
+                                Ext.getCmp("codeHdrID").setValue(null);
+                              }
+                            },
+                          },
+                        },
+                        new Ext.form.ComboBox({
+                          id: "parentPrComboID",
+                          fieldLabel: "ค้นหา PR แม่",
+                          hidden: true,
+                          anchor: "60%",
+                          store: new Ext.data.JsonStore({
+                            autoLoad: false,
+                            url: "tor/api/List_spTorDocRef.php",
+                            baseParams: { type: "ParentPr" },
+                            root: "data",
+                            idProperty: "id",
+                            fields: ["id", "c_code", "c_name", "f_total_amt"],
+                          }),
+                          valueField: "id",
+                          displayField: "c_code",
+                          mode: "remote",
+                          minChars: 2,
+                          queryParam: "c_code",
+                          hideTrigger: true,
+                          emptyText: "พิมพ์เลข PR แม่เพื่อค้นหา แล้วเลือกจากรายการ",
+                          tpl: '<tpl for="."><div class="x-combo-list-item">{c_code} - {c_name} ({f_total_amt})</div></tpl>',
+                          listeners: {
+                            select: function (combo, record) {
+                              Ext.getCmp("parent_idID").setValue(record.data.id);
+                              Ext.getCmp("codeHdrID").setValue(record.data.c_code);
+                            },
+                          },
+                        }),
                         {
                           fieldLabel: "เลขที่สารบัญรับ",
                           //  emptyText: "", //readOnly: true,
@@ -3417,6 +3575,16 @@ Ext.AppUx = function (app, menu) {
           align: "left",
           dataIndex: "c_codeStatus",
           width: 140,
+          renderer: function (value, metaData, record, row, col, store, gridView) {
+            // PR ที่ถูกถอยรายการกลับมาให้แก้ไข -> รหัส PR ตัวแดง + (แก้ไข)
+            // เหตุผลว่าต้องแก้ไขอะไร ดูได้ตอน double click (Ext.loadStore -> spTorReverseNote())
+            if (record.get("sp_tor_delete_flag") == 1) {
+              metaData.attr = "style='cursor:pointer';";
+              var pr = record.get("c_code") || "(ยังไม่ออกเลข PR)";
+              return "<b style='color:#F43217'>" + pr + "</b> <span style='font-weight:bold;color:#F43217'>(แก้ไข)</span>";
+            }
+            return value;
+          },
         },
         /*  {
                         header: "ผ่านรายการ",

@@ -636,7 +636,7 @@ if ($type == "WITHDRAW") {
         $wh .= (!empty($_REQUEST['dc_creditor_id'])) ? " and a.dc_creditor_id =" . $_REQUEST['dc_creditor_id'] : "";
         $wh .= (!empty($_REQUEST['c_code'])) ? " and e.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= (!empty($_REQUEST['c_arrive_code'])) ? " and a.c_arrive_code like '%" . $_REQUEST['c_arrive_code'] . "%'" : "";
-        $wh .= (!empty($_REQUEST['c_doc_ref'])) ? " and a.c_doc_ref like '%" . $_REQUEST['c_doc_ref'] . "%'" : "";
+        $wh .= (!empty($_REQUEST['c_doc_ref'])) ? " and a.c_code like '%" . $_REQUEST['c_doc_ref'] . "%'" : "";
         $wh .= (!empty($_REQUEST['f_contract_amt'])) ? " and a.f_contract_amt like '%" . $_REQUEST['f_contract_amt'] . "%'" : "";
     }
     $wh .= " and a.i_status_billing >= 4";

@@ -1,4 +1,4 @@
-﻿/* global Ext */
+/* global Ext */
 Ext.onReady(function () {
   Ext.QuickTips.init();
   Ext.idRep = "frm-repTor";

@@ -1,5 +1,7 @@
 <?php
 include("conf/config.php");
+require_once __DIR__ . '/conf/presence/AdminIdentity.php';
+if (ProcureAdminIdentity::needsName()) { header('Location: /procure/access/admin-identity.php'); exit; }
 ob_start();     // Turn on output buffering
 system('ipconfig/all');  // Execute external program to display output
 $mycom = ob_get_contents(); // Capture the output into a variable
@@ -208,5 +210,6 @@ echo htmlspecialchars(
         </style>
     </head>
     <body>
+        <?php require_once __DIR__ . '/conf/presence/Presence.php'; echo ProcurePresence::script(); ?>
     </body>
 </html>

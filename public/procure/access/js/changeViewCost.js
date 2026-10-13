@@ -51,9 +51,14 @@ Ext.onReady(function () {
         url: "login_1.php",
         method: "POST",
         params: {
-          ss_user_id: dc_user_id,
+          ss_center_user_id: dc_user_id,
         },
         success: function (result, request) {
+          var loginResult = Ext.util.JSON.decode(result.responseText);
+          if (loginResult.reval !== 0) {
+            Ext.Msg.alert("Login", loginResult.msg || "Procure user was not found");
+            return;
+          }
           /*** NMU_PERMISSION ***/
           var iframe = document.createElement("iframe");
           iframe.style.visibility = "hidden";

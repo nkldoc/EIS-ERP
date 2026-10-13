@@ -269,7 +269,7 @@ function thaiDate($dateStr)
             <table class="table-modern" id="prTable">
                 <thead>
                     <tr>
-                        <th class="text-center" width="50">#</th>
+                        <th class="text-center" width="50">ลำดับที่</th>
                         <th>เลขที่ PR</th>
                         <th>ชื่อรายการ</th>
                         <th>ประเภทความก้าวหน้า</th>
@@ -370,7 +370,7 @@ function thaiDate($dateStr)
             <table class="table-modern" id="contractTable">
                 <thead>
                     <tr>
-                        <th class="text-center" width="50">#</th>
+                        <th class="text-center" width="50">ลำดับที่</th>
                         <th>เลขที่ PO</th>
                         <th>ชื่อรายการ</th>
                         <th>หน่วยงาน</th>
@@ -484,7 +484,7 @@ function thaiDate($dateStr)
             prRows.push(row);
         });
 
-        var prHeaders = ["#","เลขที่ PR","ชื่อรายการ","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","มี PO","เงินจอง PR (บาท)"];
+        var prHeaders = ["ลำดับที่","เลขที่ PR","ชื่อรายการ","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","มี PO","เงินจอง PR (บาท)"];
         var numFmt = '#,##0.00';
 
         // ===== Style helpers =====
@@ -638,7 +638,7 @@ function thaiDate($dateStr)
             contractRows.push(row);
         });
 
-        var contractHeaders = ["#","เลขที่ PO","ชื่อรายการ","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจองสัญญา (บาท)"];
+        var contractHeaders = ["ลำดับที่","เลขที่ PO","ชื่อรายการ","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจองสัญญา (บาท)"];
         var numFmt = '#,##0.00';
 
         // ===== Style helpers =====

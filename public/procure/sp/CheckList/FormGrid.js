@@ -3247,17 +3247,6 @@ Ext.AppUx = function (app, menu) {
           align: "left",
           dataIndex: "c_name",
           width: 250,
-                  },
-        {
-          header: "ราคากลาง",
-          sortable: false,
-          align: "center",
-          dataIndex: "f_total_average",
-          width: 110,
-          renderer: function (value, metaData, record, rowIndex, colIndex, store) {
-              metaData.attr = "style='color:blue;text-align: right;'";
-              return floatRenderer(value);
-          },
         },
         {
           header: "เอกสาร PR",
@@ -3344,7 +3333,17 @@ Ext.AppUx = function (app, menu) {
           align: "center",
           width: 110,
           dataIndex: "c_name_egp",
-
+        },
+        {
+          header: "ราคากลาง",
+          sortable: false,
+          align: "center",
+          dataIndex: "f_total_average",
+          width: 110,
+          renderer: function (value, metaData, record, rowIndex, colIndex, store) {
+              metaData.attr = "style='color:blue;text-align: right;'";
+              return floatRenderer(value);
+          },
         },
         {
           header: "จำนวนเงิน",

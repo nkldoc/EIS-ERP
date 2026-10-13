@@ -11,7 +11,7 @@ $con	= null;
 
 if ($_REQUEST["type"] == "dc_expense_budget_type") {
 
-	$sqlMain	= "SELECT * FROM ".DB_CENTER." dc_expense_budget_type WHERE i_enable = ? ORDER BY c_name";
+	$sqlMain	= "SELECT * FROM dbo.dc_expense_budget_type WHERE i_enable = ? ORDER BY c_name";
 	$arrParam	= array(STATUS_ENABLE);
 	$stmt = $db->QueryParam($sqlMain, $arrParam);
 	if ($stmt) {
@@ -33,7 +33,7 @@ if ($_REQUEST["type"] == "dc_expense_budget_type") {
 	}
 } else if ($_REQUEST["type"] == "po_expense") {
 
-	$sqlMain	= "SELECT * FROM ".DB_NMU_EIS."bg_expense WHERE i_enable = ?  and i_level = 4 ORDER BY c_code";
+	$sqlMain	= "SELECT * FROM NMU.dbo.bg_expense WHERE i_enable = ?  and i_level = 4 ORDER BY c_code";
 	$arrParam	= array(STATUS_ENABLE);
 	$stmt = $db->QueryParam($sqlMain, $arrParam);
 	if ($stmt) {
@@ -79,17 +79,17 @@ if ($_REQUEST["type"] == "dc_expense_budget_type") {
 
 	$sqlMain = "
 		select i_year from (
-			select i_yyyy as i_year from " . DB_NMU_ERP . "sp_tor
+			select i_yyyy as i_year from EIS_PROCURE..sp_tor
 			--union all
-			--select i_yyyy as i_year from " . DB_NMU_ERP . "sp_tor_contract
+			--select i_yyyy as i_year from EIS_PROCURE..sp_tor_contract
 			union all
-			select i_yyyy_overlap as i_year from " . DB_NMU_ERP . "sp_tor_contract
+			select i_yyyy_overlap as i_year from EIS_PROCURE..sp_tor_contract
 			union all
-			select i_yyyy as i_year from " . DB_NMU_ERP . "sp_check_period_hdr
+			select i_yyyy as i_year from EIS_PROCURE..sp_check_period_hdr
 			union all
-			select i_yyyy_overlap as i_year from " . DB_NMU_ERP . "sp_check_period_hdr
+			select i_yyyy_overlap as i_year from EIS_PROCURE..sp_check_period_hdr
 			--union all i_yyyy
-			--select i_budget_year_overlap as i_year from " . DB_NMU_ERP . "po_working_dtl
+			--select i_budget_year_overlap as i_year from EIS_PROCURE..po_working_dtl
 		) a
 		group by i_year
         HAVING i_year <> 0
@@ -112,6 +112,7 @@ if ($_REQUEST["type"] == "dc_expense_budget_type") {
 		}
 	}
 }
+
 
 echo json_encode(array("debug" => true, $root => ${$root}));
 exit;

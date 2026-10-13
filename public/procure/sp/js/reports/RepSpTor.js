@@ -1,4 +1,4 @@
-﻿/* global Ext  dfasdf*/
+/* global Ext  dfasdf*/
 
 Ext.onReady(function () {
         Ext.QuickTips.init();

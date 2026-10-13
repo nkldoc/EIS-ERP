@@ -9,25 +9,8 @@ $db = new DatabaseServer();
 $date = new i_date();
 $util = new apiUtil();
 
-// config ปิด session แล้ว สามารถใช้ค่าที่อ่านมาได้
-$userId = $_SESSION['user_id'] ?? null;
-
-if (!$userId) {
-    http_response_code(401);
-
-    echo json_encode([
-        'success' => false,
-        'message' => 'Session expired',
-    ]);
-
-    exit;
-} else {
-
-    $info[1] = $_SESSION['user_id'];
-    $info[2] = $_SESSION['dc_cost_id'];
-    $info[3] = date('Y-m-d H:i:s'); // วันที่และเวลา ปัจจุบัน
-}
 $mode = $_REQUEST["mode"];
+$dc_cost_id = $_SESSION["dc_cost_id"] ?? null;
 
 $table = "dbo.sp_tor";
 $keyName = "tor_id";
@@ -67,7 +50,8 @@ switch ($mode) {
         $sort = $_REQUEST["sort"] ?? null;
         $start = $_REQUEST["start"] ?? null;
 
-        function get($a) {
+        function get($a)
+        {
             return $a ?? 0;
         }
 
@@ -111,17 +95,17 @@ switch ($mode) {
             if ($_REQUEST["value"] != "") {
 
                 if ($_REQUEST["filter"] == "c_code") {
-                    $wh .= " AND a.c_code LIKE '%" . $_REQUEST["value"] . "%' ";
+                    $wh    .= " AND a.c_code LIKE '%" . $_REQUEST["value"] . "%' ";
                 } else if ($_REQUEST["filter"] == "c_code") {
-                    $wh .= " AND a.d_doc_ref  LIKE '%" . $_REQUEST["value"] . "%' ";
+                    $wh    .= " AND a.d_doc_ref  LIKE '%" . $_REQUEST["value"] . "%' ";
                 } else if ($_REQUEST["filter"] == "dc_creditor_tax_numbe") {
-                    $wh .= " AND  (select top 1 c_tax_number_imp from " . DB_NMU . "dc_creditor where dc_creditor_id = (select top 1 dc_creditor_id from sp_tor_contract where sp_tor_id = a.tor_id ) )  LIKE '%" . $_REQUEST["value"] . "%' ";
+                    $wh    .= " AND  (select top 1 c_tax_number_imp from ".DB_NMU."dc_creditor where dc_creditor_id = (select top 1 dc_creditor_id from sp_tor_contract where sp_tor_id = a.tor_id ) )  LIKE '%" . $_REQUEST["value"] . "%' ";
                 } else if ($_REQUEST["filter"] == "dc_creditor_name") {
-                    $wh .= " AND (select top 1 c_name from " . DB_NMU . "dc_creditor where dc_creditor_id = (select top 1 dc_creditor_id from sp_tor_contract where sp_tor_id = a.tor_id ) )  LIKE '%" . $_REQUEST["value"] . "%' ";
+                    $wh    .= " AND (select top 1 c_name from ".DB_NMU."dc_creditor where dc_creditor_id = (select top 1 dc_creditor_id from sp_tor_contract where sp_tor_id = a.tor_id ) )  LIKE '%" . $_REQUEST["value"] . "%' ";
                 } else if ($_REQUEST["filter"] == "c_code_contract") {
-                    $wh .= " AND (select top 1 c_code from sp_tor_contract where sp_tor_id = a.tor_id ) LIKE '%" . $_REQUEST["value"] . "%' ";
+                    $wh    .= " AND (select top 1 c_code from sp_tor_contract where sp_tor_id = a.tor_id ) LIKE '%" . $_REQUEST["value"] . "%' ";
                 } else if ($_REQUEST["filter"] == "c_doc_ref") {
-                    $wh .= " AND a.d_doc_ref LIKE '%" . $_REQUEST["value"] . "%' ";
+                    $wh    .= " AND a.d_doc_ref LIKE '%" . $_REQUEST["value"] . "%' ";
                 }
                 //     $wh    .= " AND bbb.c_name LIKE '%" . $_REQUEST["value"] . "%' ";
                 // }  else if ($_REQUEST["filter"] == "dc_creditor_tax_numbe") {
@@ -151,14 +135,14 @@ switch ($mode) {
                 $wh .= " AND  a.tor_status_id  = " . $_REQUEST["sp_tor_status_id"];
             }
         }
-        if (@$_REQUEST['i_show'] == 1) {
+        if(@$_REQUEST['i_show'] == 1 ){
             $wh .= "  and   a.d_egp_date  is null  and a.sp_emp_id is not null and a.dc_department_id is not null  and a.i_type_bg in (1,2,4)  "; //and a.tor_status_id = 21
-        } else if (@$_REQUEST['i_show'] == 2) {
-            $wh .= " ";
-        } else {
-            if ($_SESSION['i_level'] == 1) {
+        }else if ( @$_REQUEST['i_show'] == 2 ) {
+            $wh .=" ";
+        }else {
+            if ( $_SESSION['i_level'] == 1 ) {
                 $wh .= "  ";
-            } else if ($_SESSION['i_level'] == 2) {
+            } else if ( $_SESSION['i_level'] == 2 ){
                 $wh .= " and a.dc_department_id  = " . $_SESSION['dc_department_id'];
             } else {
                 $wh .= " and a.sp_emp_id  = " . $_SESSION['sp_emp_id'];
@@ -179,7 +163,7 @@ switch ($mode) {
                                 , a.i_is_rename
                                 , a.index_receive
                                 , a.txtsub_cost
-                                , a.tor_type_id
+                                , a.tor_type_id 
                                 , a.i_is_more
                                 , ISNULL(a.i_purchase,1) AS i_purchase
                                 , ISNULL(a.i_product_type,1) AS i_product_type
@@ -195,19 +179,19 @@ switch ($mode) {
                                 , a.i_type_bg
                                 , a.i_enabled
                                 , ROW_NUMBER() OVER (ORDER BY a.d_update DESC , a.i_edit DESC, a.tor_id DESC) AS row
-                            FROM dbo.sp_tor a
+                            FROM dbo.sp_tor a 
                             -- LEFT JOIN dbo.sp_tor_contract ss ON a.tor_id= ss.sp_tor_id
-                            -- LEFT JOIN  vw_sp_tor_period_po_working b on  ss.sp_tor_contract_id  = b.sp_tor_contract_id and isnull(b.i_is_last,0) = 1 and b.i_sys = 3
+                            -- LEFT JOIN  vw_sp_tor_period_po_working b on  ss.sp_tor_contract_id  = b.sp_tor_contract_id and isnull(b.i_is_last,0) = 1 and b.i_sys = 3 
                             WHERE a.i_type_bg <> 3 and a.i_is_notor<>1  " . $wh;
         $arrParam[] = $start;
         $arrParam[] = $limit;
-        $sqlMain = "SET NOCOUNT ON
+        $sqlMain = "SET NOCOUNT ON 
            SELECT *
                 into #temp
                     FROM (SELECT
                             aa.stats_period_int  ,
-                            aa.sp_tor_contract_id,
-                            aa.stats_period ,
+                            aa.sp_tor_contract_id, 
+                            aa.stats_period , 
                             aa.stats_con ,
                             ROW_NUMBER() OVER (PARTITION BY aa.sp_tor_hdr_period_id ORDER BY aa.sp_tor_contract_id ASC) AS rn
                         FROM EIS_PROCURE.dbo.vw_sp_tor_period_po_working aa
@@ -227,7 +211,7 @@ switch ($mode) {
                             , (SELECT TOP 1 c_code FROM dbo.sp_status_hdr WHERE sp_status_hdr_id=s.tor_status_id)  AS c_code_status
                             , (SELECT TOP 1 c_name FROM dbo.sp_status_hdr WHERE sp_status_hdr_id=s.tor_status_id)  AS c_name_status
                             , (SELECT TOP 1 c_name FROM dbo.sp_type_status WHERE sp_type_status_id=s.tor_type_id)  AS c_type_name
-                            , isnull((select top 1 sp_tor_contract_id  from sp_tor_contract  where sp_tor_id = a.tor_id),0) as sp_contract_id
+                            , isnull((select top 1 sp_tor_contract_id  from sp_tor_contract  where sp_tor_id = a.tor_id),0) as sp_contract_id 
                             , ISNULL(s.i_purchase,1) AS i_purchase
                             , ISNULL(s.tor_type_id,1) AS tor_type_id
                             , s.f_period_amt
@@ -273,14 +257,14 @@ switch ($mode) {
                                                         -- , ss.f_total_amt as f_total_contract   stats_con
 
 
-                            , (select top 1 stats_period_int from  #temp  aaa where aaa.sp_tor_contract_id  =  (select top 1 sp_tor_contract_id from sp_tor_contract where sp_tor_id = a. tor_id )) as stats_period_int
-                            , (select top 1 stats_period from  #temp  aaa where  aaa.sp_tor_contract_id  = (select top 1 sp_tor_contract_id from sp_tor_contract where sp_tor_id = a. tor_id )) as stats_period
-                            , isnull((select top 1  stats_con from  #temp  aaa where  aaa.sp_tor_contract_id  = (select top 1 sp_tor_contract_id from sp_tor_contract where sp_tor_id = a. tor_id )),'กำลังดำเนินการ') as stats_con
+                            , (select top 1 stats_period_int from  #temp  aaa where aaa.sp_tor_contract_id  =  (select top 1 sp_tor_contract_id from sp_tor_contract where sp_tor_id = a. tor_id )) as stats_period_int 
+                            , (select top 1 stats_period from  #temp  aaa where  aaa.sp_tor_contract_id  = (select top 1 sp_tor_contract_id from sp_tor_contract where sp_tor_id = a. tor_id )) as stats_period 
+                            , isnull((select top 1  stats_con from  #temp  aaa where  aaa.sp_tor_contract_id  = (select top 1 sp_tor_contract_id from sp_tor_contract where sp_tor_id = a. tor_id )),'กำลังดำเนินการ') as stats_con 
 
-                            , (select top 1 c_name from " . DB_NMU . "dc_creditor where dc_creditor_id =
-                            (select top 1 isnull(dc_creditor_id,0) as dc_creditor_id from sp_tor_contract where sp_tor_id = a.tor_id )
+                            , (select top 1 c_name from ".DB_NMU."dc_creditor where dc_creditor_id =
+                            (select top 1 isnull(dc_creditor_id,0) as dc_creditor_id from sp_tor_contract where sp_tor_id = a.tor_id ) 
                             ) as dc_creditor_name
-                            , (select top 1 c_tax_number_imp from " . DB_NMU . "dc_creditor where dc_creditor_id =
+                            , (select top 1 c_tax_number_imp from ".DB_NMU."dc_creditor where dc_creditor_id = 
                             (select top 1 isnull(dc_creditor_id,0) as dc_creditor_id from sp_tor_contract where sp_tor_id = a.tor_id ) ) as c_tax_number_imp
                             , s.dc_user_create_cost_id as dc_create_cost_id
                             , (select top 1 i_enabled from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as sp_tor_delete
@@ -293,13 +277,13 @@ switch ($mode) {
                             , (SELECT TOP 1 c_full_name FROM dbo.dc_user WHERE dc_user_id=s.dc_user_update_id) AS c_update_name
                             , (SELECT TOP 1 c_name FROM NMU_DATACENTER.dbo.dc_cost WHERE dc_cost_id=s.dc_user_update_cost_id) AS c_cost_update_name
                             , CONVERT(VARCHAR, s.d_update, 120) AS d_update "
-                . " FROM ({$sqlTempTable}) a "
-                . " INNER JOIN dbo.sp_tor s ON s.tor_id=a.tor_id"
-                // . " LEFT JOIN dbo.sp_tor_contract ss ON s.tor_id= ss.sp_tor_id"
-                // . " LEFT JOIN  vw_sp_tor_period_po_working b on  ss.sp_tor_contract_id  = b.sp_tor_contract_id and isnull(b.i_is_last,0) = 1 and b.i_sys = 3 "
-                . " WHERE a.row > ? AND a.row <= ?";
+            . " FROM ({$sqlTempTable}) a "
+            . " INNER JOIN dbo.sp_tor s ON s.tor_id=a.tor_id"
+            // . " LEFT JOIN dbo.sp_tor_contract ss ON s.tor_id= ss.sp_tor_id"
+            // . " LEFT JOIN  vw_sp_tor_period_po_working b on  ss.sp_tor_contract_id  = b.sp_tor_contract_id and isnull(b.i_is_last,0) = 1 and b.i_sys = 3 "
+            . " WHERE a.row > ? AND a.row <= ?";
         if (false) {
-            /*             * ****echo sql***** */
+            /******echo sql******/
             $sql = (@$sqlMain) ? $sqlMain : $sql;
             $arr = (@$arrParam) ? $arrParam : ((@$arrValue) ? $arrValue : array());
 
@@ -309,7 +293,7 @@ switch ($mode) {
             }
             echo $sql;
             exit;
-            /*             * ***************** */
+            /********************/
         }
         $stmt = $db->QueryParam($sqlMain, $arrParam);
         $i = $start + 1;
@@ -328,12 +312,12 @@ switch ($mode) {
 
         while ($row = $db->Fetch($stmt)) {
             /* การจัดทำ PR ปกติ
-              การจัดทำ PR หลักโครงการต่อเนื่อง(ไม่จองเงิน)
-              การจัดทำ PR ย่อยโครงการต่อเนื่อง(จองเงิน)
-              การจัดทำ PR ไม่จองเงิน (ใช้เงินกันเหลื่อม)
-              การจัดทำ PR จองเงินข้ามส่งเบิก
-              การจัดทำ PR จองเงิsนทำถึงสัญญา
-              การจัดทำ PR จองเงินทำถึงตรวจรับ */
+                  การจัดทำ PR หลักโครงการต่อเนื่อง(ไม่จองเงิน)
+                  การจัดทำ PR ย่อยโครงการต่อเนื่อง(จองเงิน)
+                  การจัดทำ PR ไม่จองเงิน (ใช้เงินกันเหลื่อม)
+                  การจัดทำ PR จองเงินข้ามส่งเบิก
+                  การจัดทำ PR จองเงิsนทำถึงสัญญา
+                  การจัดทำ PR จองเงินทำถึงตรวจรับ */
             $txtEdit = ($row['i_edit'] == (1 || 4 || 5 || 6)) ? $editArry[$row['i_edit']] : '';
             $i_type_bg = null;
             $i_type_bgTxt = null;
@@ -382,101 +366,103 @@ switch ($mode) {
             $c_codeStatus = "<b style='{$i_type_bg}'>" . $row["c_code"] . "</b>" . ($row["tor_status_id"] > 0 ? "<image id='img-" . $row['tor_id'] . "' src='../images/icons/database_start.png'/>" : "");
             // pure
             $temp = array(
-                "no" => $i++,
-                "id" => intval($row["tor_id"]),
-                "i_amount_bg" => intval($row["i_amount_bg"]),
-                "sp_tor_delete" => $sp,
-                "sp_contract_id" => $row["sp_contract_id"],
-                "stats_con" => $row["stats_con"],
-                "code" => $row["code"],
-                "c_name_egp" => $row["c_name_egp"],
-                "f_total_average" => number_format($row["f_total_average"], 2),
-                "dc_creditor_name" => $row["dc_creditor_name"],
-                "c_tax_number_imp" => $row["c_tax_number_imp"],
-                "i_purchase" => intval($row["i_purchase"]), //i_purchase	i_product_type	i_hire_type	i_is_inv i_delivery_date
-                "i_product_type" => intval($row["i_product_type"]),
-                "dc_create_cost_id" => intval($row["dc_create_cost_id"]),
-                "i_hire_type" => intval($row["i_hire_type"]),
-                "i_is_inv" => intval($row["i_is_inv"]),
-                "i_pr_type1" => intval($row["i_pr_type1"]),
-                "i_pr_type2" => intval($row["i_pr_type2"]),
-                "i_pr_type3" => intval($row["i_pr_type3"]),
-                "i_type_fix_rate" => intval($row["i_type_fix_rate"]),
-                "i_delivery_date" => intval($row["i_delivery_date"]),
-                "i_type_bg" => intval($row["i_type_bg"]),
-                "bg_reserve_money1_id" => intval($row["bg_reserve_money1_id"]),
-                "bg_reserve_money2_id" => intval($row["bg_reserve_money2_id"]),
-                "bg_reserve_money3_id" => intval($row["bg_reserve_money3_id"]),
-                "i_type_bgTxt" => $i_type_bgTxt,
-                "i_step" => intval($row["i_step"]),
-                "index_receive" => $row["index_receive"],
-                "i_is_upload" => intval($row["i_is_upload"]),
-                "upload" => $row["upload"],
-                "c_emp_name" => $row["c_emp_name"],
-                "txtsub_cost" => $row["txtsub_cost"],
-                "i_forword" => intval($row["i_forword"]),
-                "i_backword" => intval($row["i_backword"]),
-                "i_edit" => intval($row["i_edit"]),
-                "i_type_bg" => intval($row["i_type_bg"]),
-                "sp_type_id" => intval($row["sp_type_id"]),
-                "c_code" => $row["c_code"],
-                "c_codeStatus" => $c_codeStatus, //database_start.png
-                "bg_budget_dtl_project_id" => intval($row["bg_budget_dtl_project_id"]),
-                "i_is_more" => intval($row["i_is_more"]),
-                "f_total_amt" => number_format($row["f_total_amt"], 2),
-                "f_total_contract" => number_format($row["f_total_contract"], 2),
-                "i_is_rename" => intval($row["i_is_rename"]),
-                "c_budget_dtl_project" => $row["c_budget_dtl_project"], //dc_department_name
-                "txtdc_department_idID" => $row["dc_department_name"], //
-                "c_name" => $row["c_name"],
-                "tor_status_id" => $row["tor_status_id"],
-                "c_code_status" => $row["c_code_status"],
-                "c_name_status" => $row["c_name_status"],
-                "tor_status_id" => $row["tor_status_id"],
-                "dc_cost_id" => intval($row["dc_cost_id"]),
-                "dc_cost2_id" => intval($row["dc_cost2_id"]),
-                "tag" => ($row["tag"]),
-                "dc_cost_idTxt" => $row["dc_cost_idTxt"],
-                "dc_cost2_idTxt" => $row["dc_cost2_idTxt"] ?? '',
-                "dc_department_id" => intval($row["dc_department_id"]),
-                "c_department" => $row["c_department"],
-                "i_parent" => $row["i_parent"],
-                "i_is_parent" => $row["i_is_parent"],
-                "d_doc_ref" => $row["d_doc_ref"],
-                "i_yyyy" => $row["i_yyyy"],
-                "c_year" => intval($row["i_yyyy"] + 543),
-                "tor_type_id" => $row["tor_type_id"],
-                "c_tor_type" => $row["c_type_name"], // $tor_type[$row["tor_type_id"]],
-                "i_purchase" => intval($row["i_purchase"]),
-                "c_purchase" => $i_purchase[$row["i_purchase"]],
-                "dc_expense_budget_type_id" => intval($row["dc_expense_budget_type_id"]),
-                "dc_expense_budget_type_id0" => intval($row["dc_expense_budget_type_id"]),
-                "dc_expense_budget_type_id1" => intval($row["dc_expense_budget_type2_id"]),
-                "dc_expense_budget_type_id2" => intval($row["dc_expense_budget_type3_id"]),
-                "f_type_amt" => number_format($row["f_type_amt"], 2),
-                "f_type_amt0" => number_format($row["f_type_amt"], 2),
-                "f_type_amt1" => number_format($row["f_type2_amt"], 2),
-                "f_type_amt2" => number_format($row["f_type3_amt"], 2),
-                "po_expense_id" => intval($row["po_expense_id"]),
-                "dc_user_create_id" => $row["c_create_name"],
-                "dc_user_create_cost_id" => $row["c_cost_creat_name"],
-                "d_tor_date" => ((empty($row["d_tor_date"])) ? "" : $date->extDateBuddha($row["d_tor_date"])), //d_tor_date
-                "d_egp_date" => ((empty($row["d_egp_date"])) ? "" : $date->extDateBuddha($row["d_egp_date"])), //d_tor_date
-                "d_doc_date" => ((empty($row["d_doc_date"])) ? "" : $date->extDateBuddha($row["d_doc_date"])), //d_tor_date
-                "d_doc_content" => ((empty($row["d_doc_content"])) ? "" : $date->shot_date_from_db($row["d_doc_content"])), //d_tor_date
-                "d_start_content" => ((empty($row["d_start_content"])) ? "" : $date->shot_date_from_db($row["d_start_content"])), //d_tor_date
-                "d_due_content" => ((empty($row["d_due_content"])) ? "" : $date->shot_date_from_db($row["d_due_content"])), //d_tor_date
-                "d_create" => $date->extDateBuddha($row["d_create"]), //
-                "dc_user_update_id" => $row["c_update_name"],
-                "dc_user_update_cost_id" => $row["c_cost_update_name"],
-                "d_update" => $date->extDateBuddha($row["d_update"]),
-                "start_date" => $date->extDateBuddha($row["start_date"]),
-                "end_date" => $date->extDateBuddha($row["end_date"]),
-                "i_enabled" => intval($row["i_enabled"]),
-                "c_comment" => $row["c_comment"],
-                "c_remake" => $row["c_remake"],
-                "po_creditor_id" => intval($row["po_creditor_id"]),
-                "po_creditor_idTxt" => $row["po_creditor_idTxt"],
+                "no"                            => $i++,
+                "id"                            => intval($row["tor_id"]),
+                "i_amount_bg"                   => intval($row["i_amount_bg"]),
+                "sp_tor_delete"                 => $sp,
+                "sp_contract_id"                => $row["sp_contract_id"],
+                "stats_con"                     => $row["stats_con"],
+                "code"                          => $row["code"],
+                "c_name_egp"                    => $row["c_name_egp"],
+                "f_total_average"               => number_format($row["f_total_average"],2),
+                "dc_creditor_name"              => $row["dc_creditor_name"],
+                "c_tax_number_imp"              => $row["c_tax_number_imp"],
+                "i_purchase"                    => intval($row["i_purchase"]), //i_purchase	i_product_type	i_hire_type	i_is_inv i_delivery_date
+                "i_product_type"                => intval($row["i_product_type"]),
+                "dc_create_cost_id"             => intval($row["dc_create_cost_id"]),
+                "i_hire_type"                   => intval($row["i_hire_type"]),
+                "i_is_inv"                      => intval($row["i_is_inv"]),
+                "i_pr_type1"                    => intval($row["i_pr_type1"]),
+                "i_pr_type2"                    => intval($row["i_pr_type2"]),
+                "i_pr_type3"                    => intval($row["i_pr_type3"]),
+                "i_type_fix_rate"               => intval($row["i_type_fix_rate"]),
+                "i_delivery_date"               => intval($row["i_delivery_date"]),
+                "i_type_bg"                     => intval($row["i_type_bg"]),
+                "bg_reserve_money1_id"          => intval($row["bg_reserve_money1_id"]),
+                "bg_reserve_money2_id"          => intval($row["bg_reserve_money2_id"]),
+                "bg_reserve_money3_id"          => intval($row["bg_reserve_money3_id"]),
+                "i_type_bgTxt"                  => $i_type_bgTxt,
+                "i_step"                        => intval($row["i_step"]),
+                "index_receive"                 => $row["index_receive"],
+                "i_is_upload"                   => intval($row["i_is_upload"]),
+                "upload"                        => $row["upload"],
+                "c_emp_name"                    => $row["c_emp_name"],
+                "txtsub_cost"                   => $row["txtsub_cost"],
+                "i_forword"                     => intval($row["i_forword"]),
+                "i_backword"                    => intval($row["i_backword"]),
+                "i_edit"                        => intval($row["i_edit"]),
+                "i_type_bg"                     => intval($row["i_type_bg"]),
+                "sp_type_id"                    => intval($row["sp_type_id"]),
+                "c_code"                        => $row["c_code"],
+                "c_codeStatus"                  => $c_codeStatus, //database_start.png
+                "bg_budget_dtl_project_id"      => intval($row["bg_budget_dtl_project_id"]),
+                "i_is_more"                     => intval($row["i_is_more"]),
+                "f_total_amt"                   => number_format($row["f_total_amt"], 2),
+                "f_total_contract"              => number_format($row["f_total_contract"], 2),
+                "i_is_rename"                   => intval($row["i_is_rename"]),
+                "c_budget_dtl_project"          => $row["c_budget_dtl_project"], //dc_department_name
+                "txtdc_department_idID"         => $row["dc_department_name"], //
+                "c_name"                        => $row["c_name"],
+                "tor_status_id"                 => $row["tor_status_id"],
+                "c_code_status"                 => $row["c_code_status"],
+                "c_name_status"                 => $row["c_name_status"],
+                "tor_status_id"                 => $row["tor_status_id"],
+                "dc_cost_id"                    => intval($row["dc_cost_id"]),
+                "dc_cost2_id"                   => intval($row["dc_cost2_id"]),
+                "tag"                           => ($row["tag"]),
+                "dc_cost_idTxt"                 => $row["dc_cost_idTxt"],
+                "dc_cost2_idTxt"                => $row["dc_cost2_idTxt"] ?? '',
+                "dc_department_id"              => intval($row["dc_department_id"]),
+                "c_department"                  => $row["c_department"],
+                "i_parent"                      => $row["i_parent"],
+                "i_is_parent"                   => $row["i_is_parent"],
+                "d_doc_ref"                     => $row["d_doc_ref"],
+                "i_yyyy"                        => $row["i_yyyy"],
+                "c_year"                        => intval($row["i_yyyy"] + 543),
+                "tor_type_id"                   => $row["tor_type_id"],
+                "c_tor_type"                    => $row["c_type_name"], // $tor_type[$row["tor_type_id"]],
+                "i_purchase"                    => intval($row["i_purchase"]),
+                "c_purchase"                    => $i_purchase[$row["i_purchase"]],
+                "dc_expense_budget_type_id"     => intval($row["dc_expense_budget_type_id"]),
+                "dc_expense_budget_type_id0"    => intval($row["dc_expense_budget_type_id"]),
+                "dc_expense_budget_type_id1"    => intval($row["dc_expense_budget_type2_id"]),
+                "dc_expense_budget_type_id2"    => intval($row["dc_expense_budget_type3_id"]),
+                "f_type_amt"                    => number_format($row["f_type_amt"], 2),
+                "f_type_amt0"                   => number_format($row["f_type_amt"], 2),
+                "f_type_amt1"                   => number_format($row["f_type2_amt"], 2),
+                "f_type_amt2"                   => number_format($row["f_type3_amt"], 2),
+                "po_expense_id"                 => intval($row["po_expense_id"]),
+                "dc_user_create_id"             => $row["c_create_name"],
+                "dc_user_create_cost_id"        => $row["c_cost_creat_name"],
+                "d_tor_date"                    => ((empty($row["d_tor_date"])) ? "" : $date->extDateBuddha($row["d_tor_date"])), //d_tor_date
+                "d_egp_date"                    => ((empty($row["d_egp_date"])) ? "" : $date->extDateBuddha($row["d_egp_date"])), //d_tor_date
+                "d_doc_date"                    => ((empty($row["d_doc_date"])) ? "" : $date->extDateBuddha($row["d_doc_date"])), //d_tor_date
+                "d_doc_content"                 => ((empty($row["d_doc_content"])) ? "" : $date->shot_date_from_db($row["d_doc_content"])), //d_tor_date
+                "d_start_content"               => ((empty($row["d_start_content"])) ? "" : $date->shot_date_from_db($row["d_start_content"])), //d_tor_date
+                "d_due_content"                 => ((empty($row["d_due_content"])) ? "" : $date->shot_date_from_db($row["d_due_content"])), //d_tor_date
+                "d_create"                      => $date->extDateBuddha($row["d_create"]), //
+                "dc_user_update_id"             => $row["c_update_name"],
+                "dc_user_update_cost_id"        => $row["c_cost_update_name"],
+                "d_update"                      => $date->extDateBuddha($row["d_update"]),
+                "start_date"                    => $date->extDateBuddha($row["start_date"]),
+                "end_date"                      => $date->extDateBuddha($row["end_date"]),
+                "i_enabled"                     => intval($row["i_enabled"]),
+                "c_comment"                     => $row["c_comment"],
+                "c_remake"                      => $row["c_remake"],
+                "po_creditor_id"                => intval($row["po_creditor_id"]),
+                "po_creditor_idTxt"             => $row["po_creditor_idTxt"],
+
+
             );
             ${$root}[] = $temp;
         }
@@ -488,7 +474,7 @@ switch ($mode) {
         // }
         break;
     case "sp_Per_dtl":
-        $root = "data";
+        $root = "data";  
         $data = array();
         $arrParam = array($_REQUEST['id']);
         $sqlMain = "SELECT ROW_NUMBER() OVER(ORDER BY a.c_code,c.i_period  ASC) as row
@@ -510,7 +496,7 @@ switch ($mode) {
                         ,a.c_code
                         , case when  i_is_last = 1 and gg.c_code_ref is not null then 'ปิดสัญญาแล้ว'
                         else 'กำลังดำเนินการ' end as stats_con
-                        , aa.dc_expense_budget_type_id
+                        , aa.dc_expense_budget_type_id 
                         , aa.po_expense_id
                         ,(select c_name from dc_expense_budget_type where dc_expense_budget_type_id = aa.dc_expense_budget_type_id)   as dc_expense_budget_type
                         ,(select c_name from NMU_EIS.dbo.bg_expense where bg_expense_id = aa.po_expense_id ) as bg_expense
@@ -532,7 +518,7 @@ switch ($mode) {
                         , g.i_is_url_pdf_hdr
                         , g.i_is_url_pdf_dtl
                 from dbo.sp_tor_contract a
-                inner join dbo.sp_tor aa on a.sp_tor_id =aa.tor_id
+                inner join dbo.sp_tor aa on a.sp_tor_id =aa.tor_id 
                 left join dbo.sp_tor_hdr_period c on a.sp_tor_contract_id = c.sp_tor_contract_id and isnull(c.i_enabled,1) =1
                 left join dbo.sp_check_period_hdr d on c.sp_tor_hdr_period_id = d.sp_tor_hdr_period_id
                 left join dbo.sp_check_period_dtl e on d.sp_check_period_hdr_id = e.sp_check_period_hdr_id
@@ -549,25 +535,25 @@ switch ($mode) {
                                 ,c_file_pdf_protest_hdr
                                 ,c_file_pdf_protest_dtl
                                 -- INTO #temp_s2
-                                FROM " . DB_NMU_EIS . "po_working_item aa
+                                FROM ".DB_NMU_EIS."po_working_item aa
                                 INNER JOIN (
-                                SELECT
+                                SELECT  
                                     po_working_hdr_id
-                                    ,MAX(isnull(po_working_item_id,0)) AS po_working_item_id
+                                    ,MAX(isnull(po_working_item_id,0)) AS po_working_item_id 
                                     ,MAX(isnull(CONVERT(FLOAT,i_sub_status),0)) AS max_sub_status
-                                FROM  " . DB_NMU_EIS . "po_working_item
+                                FROM  ".DB_NMU_EIS."po_working_item
                                 WHERE i_enable = 1
                                 GROUP BY po_working_hdr_id ) bb ON aa.po_working_item_id = bb.po_working_item_id AND aa.po_working_hdr_id = bb.po_working_hdr_id AND bb.max_sub_status = i_sub_status
                 ) g  on d.po_working_hdr_id = g.po_working_hdr_id
-            left join " . DB_NMU_EIS . "po_working_hdr  gg  on g.po_working_hdr_id = gg.po_working_hdr_id
+            left join ".DB_NMU_EIS."po_working_hdr  gg  on g.po_working_hdr_id = gg.po_working_hdr_id
             where a.i_enabled = 1
             and a.c_code is not null
-            and a.sp_tor_id = ?
+            and a.sp_tor_id = ? 
             order by a.c_code,c.i_period
             ";
-        $stmt = $db->QueryParam($sqlMain, $arrParam);
+            $stmt = $db->QueryParam($sqlMain, $arrParam);
         if (@$_REQUEST["show_sql"]) {
-            /*             * ****echo sql***** */
+            /******echo sql******/
             $sql = (@$sqlMain) ? $sqlMain : $sql;
             $arr = (@$arrParam) ? $arrParam : ((@$arrValue) ? $arrValue : array());
 
@@ -577,59 +563,63 @@ switch ($mode) {
             }
             echo $sql;
             exit;
-            /*             * ***************** */
+            /********************/
         }
         $i = @$start + 1;
         $total = 0;
         $total_sum = 0;
         while ($row = $db->Fetch($stmt)) {
-            // $total = $row["i_qty"] * $row["f_unit_price"];  total
-            $temp = array(
-                "no" => $i++,
-                "id" => intval($row["sp_tor_hdr_period_id"]),
-                "row" => intval($row["row"]),
-                "i_period" => intval($row["i_period"]),
-                "i_is_url_pdf_hdr" => $row["i_is_url_pdf_hdr"],
-                "i_is_url_pdf_dtl" => $row["i_is_url_pdf_dtl"],
-                "pr_code" => $row["pr_code"],
-                "c_name" => $row["c_name"],
-                "c_file_pdf_hdr" => $row["c_file_pdf_hdr"],
-                "c_file_pdf_dtl" => $row["c_file_pdf_dtl"],
-                "d_doc_date" => ((empty($row["d_doc_date"])) ? "" : $date->extDateBuddha($row["d_doc_date"])),
-                "d_due_date" => ((empty($row["d_due_date"])) ? "" : $date->extDateBuddha($row["d_due_date"])),
-                "d_arrive_date" => ((empty($row["d_arrive_date"])) ? "" : $date->extDateBuddha($row["d_arrive_date"])),
-                "d_checking_date" => ((empty($row["d_checking_date"])) ? "" : $date->extDateBuddha($row["d_checking_date"])),
-                "d_doc_billing" => ((empty($row["d_doc_billing"])) ? "" : $date->extDateBuddha($row["d_doc_billing"])),
-                "d_po_working_hdr" => ((empty($row["d_po_working_hdr"])) ? "" : $date->extDateBuddha($row["d_po_working_hdr"])),
-                "dc_department" => $row["dc_department"],
-                "stats_period" => $row["stats_period"],
-                "c_code" => $row["c_code"],
-                "stats_con" => $row["stats_con"],
-                "dc_expense_budget_type" => $row["dc_expense_budget_type"],
-                "dc_expense_budget_type_id" => intval($row["dc_expense_budget_type_id"]),
-                "bg_expense" => $row["bg_expense"],
-                "po_expense_id" => intval($row["po_expense_id"]),
-                "dc_creditor_name" => $row["dc_creditor_name"],
-                "c_tax_number_imp" => $row["c_tax_number_imp"],
-                "f_total_amt" => number_format($row["f_total_amt"], 2),
-                "f_type_amt" => number_format($row["f_type_amt"], 2),
-                "f_period" => number_format($row["f_period"], 2),
-                "sp_emp" => $row["sp_emp"],
-                "f_chk" => number_format($row["f_chk"], 2),
-                "c_arrive_code" => $row["c_arrive_code"],
-                "c_code_chk" => $row["c_code_chk"],
-                "c_code_bl" => $row["c_code_bl"],
-                "c_code_d" => $row["c_code_d"],
-                    // "i_is_inv" => $row["i_is_inv"] == 1 ? true : false,
-                    // "am_mode_id" => intval($row["am_mode_id"]),
-                    // "sp_bg_mode_id" => intval($row["sp_bg_mode_id"]),
-                    // "f_peroid_amt" => intval($row["f_peroid_amt"]),
-                    // "f_total_amt" => number_format($total, 2),
-                    // "i_qty" => intval($row["i_qty"]),
-                    // "sp_tor_id" => intval($row["sp_tor_id"]),
-                    // "po_expense_id" => intval($row["po_expense_id"]),
-                    // "dc_expense_budget_type_id" => intval($row["dc_bg_budget_type_id"]),
-                    // "bg_reserve_money_id" => intval($row["bg_reserve_money_id"])
+            // $total = $row["i_qty"] * $row["f_unit_price"];  total 
+            $temp = array( 
+                "no"                            => $i++,
+                "id"                            => intval($row["sp_tor_hdr_period_id"]),
+                "row"                           => intval($row["row"]),
+                "i_period"                      => intval($row["i_period"]),
+                "i_is_url_pdf_hdr"              => $row["i_is_url_pdf_hdr"],
+                "i_is_url_pdf_dtl"              => $row["i_is_url_pdf_dtl"],
+                "pr_code"                       => $row["pr_code"],
+                "c_name"                        => $row["c_name"],
+                "c_file_pdf_hdr"                => $row["c_file_pdf_hdr"],
+                "c_file_pdf_dtl"                => $row["c_file_pdf_dtl"],
+                "d_doc_date"                    => ((empty($row["d_doc_date"])) ? "" : $date->extDateBuddha($row["d_doc_date"])), 
+                "d_due_date"                    => ((empty($row["d_due_date"])) ? "" : $date->extDateBuddha($row["d_due_date"])), 
+                "d_arrive_date"                 => ((empty($row["d_arrive_date"])) ? "" : $date->extDateBuddha($row["d_arrive_date"])), 
+                "d_checking_date"               => ((empty($row["d_checking_date"])) ? "" : $date->extDateBuddha($row["d_checking_date"])), 
+                "d_doc_billing"                 => ((empty($row["d_doc_billing"])) ? "" : $date->extDateBuddha($row["d_doc_billing"])), 
+                "d_po_working_hdr"              => ((empty($row["d_po_working_hdr"])) ? "" : $date->extDateBuddha($row["d_po_working_hdr"])), 
+                "dc_department"                 => $row["dc_department"],
+                "stats_period"                  => $row["stats_period"],
+                "c_code"                        => $row["c_code"],
+                "stats_con"                     => $row["stats_con"],
+                "dc_expense_budget_type"        => $row["dc_expense_budget_type"],
+                "dc_expense_budget_type_id"     => intval($row["dc_expense_budget_type_id"]),
+                "bg_expense"                    => $row["bg_expense"],
+                "po_expense_id"                 => intval($row["po_expense_id"]),
+                "dc_creditor_name"              => $row["dc_creditor_name"],
+                "c_tax_number_imp"              => $row["c_tax_number_imp"],
+                "f_total_amt"                   => number_format($row["f_total_amt"], 2),
+                "f_type_amt"                    => number_format($row["f_type_amt"], 2),
+                "f_period"                      => number_format($row["f_period"], 2),
+                "sp_emp"                        => $row["sp_emp"],
+                "f_chk"                         => number_format($row["f_chk"], 2),                             
+                "c_arrive_code"                 => $row["c_arrive_code"],
+                "c_code_chk"                    => $row["c_code_chk"],
+                "c_code_bl"                     => $row["c_code_bl"],
+                "c_code_d"                      => $row["c_code_d"],
+
+
+
+
+                // "i_is_inv" => $row["i_is_inv"] == 1 ? true : false,
+                // "am_mode_id" => intval($row["am_mode_id"]),
+                // "sp_bg_mode_id" => intval($row["sp_bg_mode_id"]),
+                // "f_peroid_amt" => intval($row["f_peroid_amt"]),
+                // "f_total_amt" => number_format($total, 2),
+                // "i_qty" => intval($row["i_qty"]),
+                // "sp_tor_id" => intval($row["sp_tor_id"]),
+                // "po_expense_id" => intval($row["po_expense_id"]),
+                // "dc_expense_budget_type_id" => intval($row["dc_bg_budget_type_id"]),
+                // "bg_reserve_money_id" => intval($row["bg_reserve_money_id"])
             );
             ${$root}[] = $temp;
             $total_sum += $total;

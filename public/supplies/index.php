@@ -1,5 +1,6 @@
 <?php
 include("conf/config.php");
+if (isset($_SESSION['supplies_login_pending']) && $_SESSION['supplies_login_pending']['expires'] >= time()) { header('Location: access/confirm-login.php'); exit; }
 ob_start();     // Turn on output buffering
 system('ipconfig/all');  // Execute external program to display output
 $mycom = ob_get_contents(); // Capture the output into a variable
@@ -315,8 +316,11 @@ echo htmlspecialchars(
     </head>
     <script type="text/javascript" src="websocket.js?_dc=<?php echo rand(0, 100000); ?>"></script>
     <script type="text/javascript" src="js/Function.js?_dc=<?php echo rand(0, 100000); ?>"></script>
+    <link rel="stylesheet" href="css/docs-notifications.css?v=<?php echo (string)filemtime(__DIR__ . '/css/docs-notifications.css'); ?>" />
+    <script type="text/javascript" src="js/docs-notifications.js?v=<?php echo strtolower(preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? ''))) === 'eis.nmu.ac.th' ? '20261005-production-fix1' : '20261002'; ?>"></script>
     <script type="text/javascript" src="js/show_nat.js?_dc=<?php echo rand(0, 100000); ?>"></script>
     <body>
+        <?php require_once __DIR__ . '/conf/presence/Presence.php'; echo Presence::script('SUPPLIES'); ?>
     </body>
 
 </html>

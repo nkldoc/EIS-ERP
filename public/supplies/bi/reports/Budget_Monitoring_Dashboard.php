@@ -177,6 +177,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                 <span class="badge badge-primary mr-1">จำนวนงบประมาณ</span>
                                                 <span class="badge badge-info mr-1">จองเงิน</span>
                                                 <span class="badge mr-1" style="background:#6f42c1;color:#fff;">เงินจองตรวจรับ</span>
+                                                <span class="badge mr-1" style="background:#ffc107;color:#000;">เบิกจ่ายแล้ว</span>
                                                 <span class="badge badge-danger">คงเหลือหลังจองเงิน</span>
                                                 <span class="badge badge-danger"> % </span>
                                         </div>
@@ -281,6 +282,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                         <div class="card-body">
                                                 <h6 class="mb-3 font-weight-bold">สรุป PR / PO</h6>
                                                 <div id="prpoSummaryCards">
+                                                        <p class="text-muted small">กำลังโหลด...</p>
+                                                </div>
+                                        </div>
+                                </div>
+
+                                <div class="card mb-3">
+                                        <div class="card-body">
+                                                <h6 class="mb-3 font-weight-bold">PR ตามแผน / นอกแผน</h6>
+                                                <div id="prPlanSummaryCards">
                                                         <p class="text-muted small">กำลังโหลด...</p>
                                                 </div>
                                         </div>

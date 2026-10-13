@@ -35,7 +35,7 @@ if ($_REQUEST["type"] == "sp_department") {
 }
 else  if ($_REQUEST["type"] == "sp_emp") {
 
-	$sqlMain	= "select * from sp_emp a inner join dc_user b on b.dc_emp_id = a.dc_emp_id   where a.dc_emp_id>1 and a.dc_department_id  > 0  " ;
+	$sqlMain	= "select * from sp_emp a inner join dc_user b on b.dc_emp_id = a.dc_emp_id   where a.dc_emp_id>1  and a.dc_department_id > 0 " ;
 	$arrParam	= array(STATUS_ENABLE);
 	$stmt = $db->QueryParam($sqlMain, $arrParam);
 	if ($stmt) {

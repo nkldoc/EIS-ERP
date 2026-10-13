@@ -1454,6 +1454,9 @@ Ext.AppUx = function (app, menu) {
             {
                 name: "plan_code",
             },
+            {
+                name: "plan_seq",
+            },
         ],
     });
     Ext.store_year = new Ext.data.JsonStore({
@@ -1962,9 +1965,14 @@ Ext.AppUx = function (app, menu) {
             };
             var planStatusCmp = Ext.getCmp("plan_statusID");
             var planCodeCmp = Ext.getCmp("plan_codeID");
+            var planSeqCmp = Ext.getCmp("plan_seqID");
             if (planStatusCmp) {
                 params.plan_status = planStatusCmp.getValue().inputValue;
                 params.plan_code = planCodeCmp ? planCodeCmp.getValue() : "";
+                params.plan_seq = planSeqCmp ? planSeqCmp.getValue() : "";
+            }
+            if (Ext.getCmp("c_remakeID")) {
+                params.c_remake = Ext.getCmp("c_remakeID").getValue();
             }
             Ext.Ajax.request({
                 url: "tor/api/mnTorController.php",
@@ -2927,7 +2935,7 @@ Ext.AppUx = function (app, menu) {
     id: 'plan_statusID',
     columns: 1, // หรือใส่เป็นจำนวนคอลัมน์ที่ต้องการจัดเรียง
     items: [
-        { boxLabel: 'ยังไม่ระบุ', name: 'plan_status', inputValue: 0, checked: Ext.selectRow.get('plan_status') ? false : true },
+        { boxLabel: 'ไม่ระบุ', name: 'plan_status', inputValue: 0, checked: Ext.selectRow.get('plan_status') ? false : true },
         { boxLabel: 'ตามแผน (1)', name: 'plan_status', inputValue: 1, checked: Ext.selectRow.get('plan_status') == 1 },
         { boxLabel: 'นอกแผน (2)', name: 'plan_status', inputValue: 2, checked: Ext.selectRow.get('plan_status') == 2 }
     ],
@@ -2935,19 +2943,34 @@ Ext.AppUx = function (app, menu) {
         afterrender: function () {
             var v = Ext.selectRow.get('plan_status');
             Ext.getCmp('plan_codeID').setVisible(v == 1);
+            if (Ext.getCmp('plan_seqID')) Ext.getCmp('plan_seqID').setVisible(v == 1);
         },
         change: function (grp, radio) {
-            if (radio.inputValue == 1) {
-                Ext.getCmp('plan_codeID').show();
-            } else {
-                Ext.getCmp('plan_codeID').hide();
-                Ext.getCmp('plan_codeID').setValue('');
-                Ext.getCmp('plan_codeID').clearInvalid();
-            }
+            var on = radio.inputValue == 1;
+            ['plan_codeID', 'plan_seqID'].forEach(function (id) {
+                var c = Ext.getCmp(id);
+                if (!c) return;
+                if (on) {
+                    c.show();
+                } else {
+                    c.hide();
+                    c.setValue('');
+                    c.clearInvalid();
+                }
+            });
         },
     },
 },
 {
+    xtype: 'textfield',
+    fieldLabel: 'ลำดับที่',
+    name: 'plan_seq',
+    id: 'plan_seqID',
+    anchor: '80%',
+    value: Ext.selectRow.get('plan_seq') || '',
+    hidden: Ext.selectRow.get('plan_status') != 1,
+                            },
+                            {
     xtype: 'textfield',
     fieldLabel: 'รหัสแผน',
     name: 'plan_code',
@@ -2955,8 +2978,6 @@ Ext.AppUx = function (app, menu) {
     anchor: '80%',
     value: Ext.selectRow.get('plan_code') || '',
     hidden: Ext.selectRow.get('plan_status') != 1,
-    allowBlank: false,
-                                blankText: 'กรุณากรอกรหัสแผน',
                             },
                             {
                                 xtype: 'textarea',
@@ -3506,6 +3527,9 @@ Ext.AppUx = function (app, menu) {
                                         var msg = "";
                                         if (Ext.getCmp("plan_statusID") && Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
                                             msg += "- กรุณากรอกรหัสแผน" + "\n";
+                                        }
+                                        if (Ext.getCmp("plan_statusID") && Ext.getCmp("plan_statusID").getValue().inputValue == 1 && Ext.getCmp("plan_seqID") && [null, 0, ""].includes(Ext.getCmp("plan_seqID").getValue())) {
+                                            msg += "- กรุณากรอกลำดับที่" + "\n";
                                         }
                                         if (msg != "") {
                                             Ext.example.msg("แจ้งเตือน", msg, 1);

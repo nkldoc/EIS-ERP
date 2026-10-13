@@ -1,6 +1,8 @@
 <?php
 include("../../conf/config.php");
 include("../../lib/database/DatabaseServer.php");
+header("Cache-Control: no-store, no-cache, must-revalidate");
+header("Pragma: no-cache");
 $db = new DatabaseServer();
 $user_id = $_SESSION["user_id"];
 

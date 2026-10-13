@@ -1,0 +1,11 @@
+# ERP medical-supply confirmation
+
+The Supplies menu **ยืนยันข้อมูลจาก ERP** appears immediately before **ส่งมอบงาน**, inheriting its visibility and server-side access check. The page is `/supplies/sp/erpConfirmation`. Its API uses the extensionless `/supplies/sp/api/erpConfirmation` URL so IIS redirects do not turn a confirmation POST into a GET.
+
+Run `php sql/erp-confirmation-migration.php` before enabling the receiver changes. It creates `sp_erp_confirmation` in the incoming service's MySQL database, then backfills successful receipts from exactly `/procure/incoming/irV1`. Re-running it preserves confirmations. Deploy the shared `classes/ErpConfirmation.php`, updated `classes/IncomingEndpoint.php`, Supplies page/JS/API/bootstrap and `api/userMenu/userTree.php` together. The Supplies bootstrap uses `sp/_conf/mysql_connect.php`; configure its selected environment profile to connect to the same MySQL database as the incoming service. See `sp/_conf/README.md`. No credentials are sent to the browser.
+
+Each element of the received `body.data` becomes a pending item. The receiver persists its log and queue in one transaction; failure returns 503. Request ID + item index prevents duplicate backfill. A new HTTP receipt is a new request: business-level deduplication across resubmissions is not assumed without an ERP document/version identifier. Invalid scalar/empty items can be inspected but cannot be confirmed. Empty batches create no items. Rejected requests and other routes create no pending items.
+
+Reviewers can inspect the redacted original item, confirm it, and view confirmation history with the Supplies user ID/name and UTC timestamp (displayed in Bangkok time). Confirmation is a review status only: it does not invoke legacy IR processing, create delivery documents, or block unrelated existing delivery work. Concurrent or repeated confirmation cannot overwrite the first reviewer. Session authentication, delivery-menu authorization, POST and CSRF checks are required.
+
+Validation: `php test/erp-confirmation-test.php`, `php test/erp-confirmation-http-test.php`, and `php test/incoming-endpoints-test.php`. Tests create uniquely identified fixture receipts and remove only those fixtures in `finally`. The HTTP test uses a temporary loopback-only server and synthetic test sessions; it does not create accounts or change access grants.

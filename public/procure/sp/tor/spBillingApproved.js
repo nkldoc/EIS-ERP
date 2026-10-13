@@ -817,7 +817,8 @@ Ext.AppUx = function (app, menu) {
         },
     });
     //interlizing
-    Ext.loadStore = function (status, show) {
+    Ext.loadStore = function (status, show, record) {
+        if (record) Ext.selectRow = record;
         if (status === 'edit') {
 
             new Ext.Window({
@@ -832,7 +833,7 @@ Ext.AppUx = function (app, menu) {
                 items: [{
                         xtype: 'form',
                         bodyStyle: "padding:5px;",
-                        url: "../FileUploadServletJson",
+                    url: "./FileUploadServletJson",
                         fileUpload: true,
                         id: 'frm-showID',
                         labelWidth: 180,
@@ -897,17 +898,13 @@ Ext.AppUx = function (app, menu) {
                                 },
 
                             }, {
-                                xtype: 'fieldset',
-                                title: 'รายละเอียดเอกสาร',
-                                id: "fileuploadID",
-                                hidden: true,
-//                                hidden: (rec.data.dc_tax_customer_id == 0) ? false : true,
-//                                collapsible: true,
-//                                autoHeight: true,
-                                height: Ext.getCmp("contenterCenter").getHeight() - 260,
-                                html: '<iframe id="ifpdfID" src="' + window.location.protocol + '//' + window.location.hostname + '/sp_mn/api/upload_ap/' + Ext.selectRow.get('upload_name') + '?T=Tap_' + Math.floor(Math.random() * 100) + '" frameborder="0" width="100%" height="100%"></iframe>',
-
-                            }],
+                            xtype: 'fieldset',
+                            title: 'รายละเอียดเอกสาร',
+                            id: "fileuploadID",
+                            hidden: true,
+                            height: Ext.getCmp("contenterCenter").getHeight() - 260,
+                            html: '<div id="ifpdfWrapID"></div>',
+                        }],
                         listeners: {
                             beforerender: function () {
                                 Ext.updateStatu = function (name, id) {
@@ -945,11 +942,29 @@ Ext.AppUx = function (app, menu) {
                                 };
                             },
                             afterrender: function () {
-                                if (["", null, undefined].includes(Ext.selectRow.get('upload_name'))) {
+                                if (!Ext.selectRow || !Ext.selectRow.get) {
+                                    Ext.getCmp('fileuploadID').hide();
+                                    return;
+                                }
+
+                                var uploadName = Ext.selectRow.get('upload_name');
+
+                                if (!uploadName || uploadName === 'null' || uploadName === '') {
                                     Ext.getCmp('fileuploadID').hide();
                                 } else {
                                     Ext.getCmp('fileuploadID').show();
-                                }
+
+                                  Ext.getCmp('fileuploadID').on('afterrender', function () {
+                                      var src = window.location.protocol + '//' + window.location.hostname
+                                          + '/sp_mn/api/upload_ap/' + uploadName
+                                          + '?T=Tap_' + Math.floor(Math.random() * 100);
+
+                                      document.getElementById('ifpdfWrapID').innerHTML =
+                                          '<iframe id="ifpdfID" src="' + src
+                                          + '" frameborder="0" width="100%" height="100%"></iframe>';
+                                  }, this, { single: true });
+                              }
+
                                 Ext.getCmp('frm-showID').getForm().loadRecord(Ext.selectRow);
                             }
                         }
@@ -1006,7 +1021,7 @@ Ext.AppUx = function (app, menu) {
                                 formData.append('dir', dir);
 //                                formData.append('c_code_inv', fileNameDoc);
                                 const xhr = new XMLHttpRequest();
-                                xhr.open('POST', '../FileUploadServletJson', true);
+                                xhr.open('POST', './FileUploadServletJson', true);
                                 Ext.MessageBox.show({
                                     title: 'โปรแกรมทำงานอยู่',
                                     msg: 'กำลังประมวลผล กรุณารอสักครู่...',
@@ -1474,17 +1489,21 @@ Ext.AppUx = function (app, menu) {
     );
 /////////////////// gridMain
     Ext.extend(
-            (gridMain = function () {
-                Ext.openPDF = function (rs) {
-//              alert();
-//              return false;
-                    Ext.buAct = "FlowcartL2";
-                    var linkDownload = window.location.protocol + '//' + window.location.hostname + '/sp_mn/api/upload_ap/';
-                    if (Ext.isEmpty(Ext.selectRow))
-                        Ext.selectRow = rs;
-                    // Ext.MessageBox.alert("แจ้งเตือน", "กรุณากดเลือกข้อมูลที่จะแสดง");
-                    window.open(linkDownload + Ext.selectRow.get('upload_name') + '?T=Tap_' + Math.floor(Math.random() * 100000), 'Monitoring', 'fullscreen="yes"');
-                };
+        (gridMain = function () {
+            Ext.openPDF = function (rs) {
+                Ext.buAct = "FlowcartL2";
+                var linkDownload = window.location.protocol + '//' + window.location.hostname + '/sp_mn/api/upload_ap/';
+                if (Ext.isEmpty(Ext.selectRow))
+                    Ext.selectRow = rs;
+
+                var uploadName = Ext.selectRow.get('upload_name');
+                if (!uploadName || uploadName === 'null') {
+                    Ext.MessageBox.alert("แจ้งเตือน", "ไม่มีเอกสารแนบ");
+                    return false;
+                }
+
+                window.open(linkDownload + uploadName + '?T=Tap_' + Math.floor(Math.random() * 100000), 'Monitoring', 'fullscreen="yes"');
+            };
                 Ext.colmnn = [
                     new Ext.grid.RowNumberer({
                         header: "ที่",
@@ -1678,10 +1697,12 @@ Ext.AppUx = function (app, menu) {
 
                         rowclick: function (grid, rowIndex, e) {
                             var record = grid.getStore().getAt(rowIndex);
-                            Ext.selectObj(record);
+                            Ext.selectRow = record;  // set โดยตรงเลย
                         },
-                        dblclick: function () {
-                            Ext.formPanelMain(Ext.selectObj());
+                        rowdblclick: function (grid, rowIndex, e) {
+                            var record = Ext.storeDtl.getAt(rowIndex);
+                            Ext.selectRow = record;
+                            Ext.loadStore("edit", true, record);
                         },
                         cellclick: function (grid, rowIndex, columnIndex, e) {
                             var record = grid.getStore().getAt(rowIndex);

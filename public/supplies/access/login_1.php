@@ -12,6 +12,10 @@ $requestUserId = filter_var($requestUserId, FILTER_VALIDATE_INT, [
 ]);
 
 if ($requestUserId === false || $requestUserId === null) {
+    if (isset($jsonInput['userf'], $jsonInput['passwordf'])) {
+        $_POST['userf'] = $jsonInput['userf']; $_POST['passwordf'] = $jsonInput['passwordf'];
+        require __DIR__ . '/login.php'; exit;
+    }
     http_response_code(400);
     echo json_encode([
         "reval" => 1,
@@ -47,7 +51,7 @@ $sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
                 left join dbo.sp_emp c on c.dc_emp_id = b.dc_emp_id
                 left join dbo.sp_department d on d.dc_department_id = c.dc_department_id
                 left join dbo.sp_department_type e on e.dc_department_type_id = d.dc_department_type_id
-    WHERE a.dc_user_id = ?";
+    WHERE a.dc_user_id = ? AND a.i_enable=1 AND a.i_delete=2";
 $arrParam = [$requestUserId];
 $re = [
     "reval" => 1,
@@ -56,37 +60,20 @@ $re = [
 ];
 $stmt = $db->QueryParam($sqlMain, $arrParam);
 while ($data = $db->Fetch($stmt)) {
-    // Do not carry any authenticated fields from the previous user.
-    $_SESSION = array();
-    session_regenerate_id(true);
-    $_SESSION["DOMAIN"] = DOMAIN['en']; //id ผู้ใช้งาน 
-    $_SESSION["DOMAIN_NAME"] = DOMAIN['th']; //id ผู้ใช้งาน  
-    $_SESSION["menu"] = 'sp/dashBard.php'; //id ผู้ใช้งาน  
-    
-    $_SESSION["user_id"] = intval($data["dc_user_id"]); //id ผู้ใช้งาน
-     $_SESSION["user_name"] = $data["c_full_name"]; //ชื่อผู้ใช้งาน
-     $_SESSION["dc_emp_id"] = intval($data["dc_emp_id"]); //พนักงานผู้รับผิดชอบ
-    // c_sp_emp c_department_type c_department c_position sp_emp_id dc_department_id dc_department_type_id i_seq i_level
-     $_SESSION["sp_emp_id"] = intval($data["sp_emp_id"]) ?? null; //
-     $_SESSION["dc_department_id"] = intval($data["dc_department_id"]) ?? null; //
-     $_SESSION["dc_department_type_id"] = intval($data["dc_department_type_id"]) ?? null; //
-     $_SESSION["i_seq"] = intval($data["i_seq"]) ?? null; //
-     $_SESSION["i_level"] = intval($data["i_level"]) ?? null; //
-
-     $_SESSION["c_sp_emp"] = $data["c_sp_emp"] ?? null; //
-     $_SESSION["c_department_type"] = $data["c_department_type"] ?? null; //
-     $_SESSION["c_department"] = $data["c_department"] ?? null; //
-     $_SESSION["c_position"] = $data["c_position"] ?? null; //
-     $_SESSION["dc_center_user"] = intval($data["dc_center_user"]) ?? null; // 
-
-     /* dc_department_type_id department_type_name dc_department_id department_name */
-     $_SESSION["dc_cost_id"] = intval($data["dc_cost_id"]); //id หน่วยงาน
-     $_SESSION["cost_name"] = $data["cost_name"]; //หน่วยงาน
-     $_SESSION["cost_code"] = $data["cost_code"]; //รหัสหน่วยงาน
-     $_SESSION["dc_area_id"] = intval($data["dc_area_id"]); //id หน่วยธุรกิจ
-     $_SESSION["i_type_user"] = intval($data["i_type_user"]); //ประเภทผู้ใช้งาน
-     $_SESSION["dc_cost_acc_id"] = intval($data["dc_cost_acc_id"]); //id ศูนย์ต้นทุนทางบัญชีของหน่วยงานที่ log in
-     $_SESSION["last_login"] = date("Y-m-d H:i:s");
+    if (Presence::enabled() && !SuppliesLogin::ssoAllowed($data)) {
+        http_response_code(401); echo json_encode(['reval'=>1, 'success'=>false, 'msg'=>'กรุณาเข้าสู่ระบบผ่าน NMU_permission']); exit;
+    }
+    // Portal re-entry preserves the valid login and named operator.
+    if ((string)($_SESSION['user_id'] ?? '') === (string)$data['dc_user_id']
+        && !isset($_SESSION['impersonation_admin_center_id'])
+        && (int)($_SESSION['i_type_user'] ?? 0) === (int)$data['i_type_user']
+        && SuppliesLogin::validate()) {
+        $_SESSION['last_activity'] = time();
+        $re = ['reval'=>0, 'success'=>'Success', 'msg'=>'Login Success'];
+        break;
+    }
+    $instance = SuppliesLogin::begin($data, ['menu'=>'sp/dashBard.php'], !empty($_GET['portal_entry']));
+        SuppliesLogin::activate($data, $instance, ['menu'=>'sp/dashBard.php']);
      $_SESSION["last_activity"] = time();
      $_SESSION['created'] = time();
     //Java Session
@@ -119,6 +106,7 @@ while ($data = $db->Fetch($stmt)) {
 }
 
 session_write_close();
+if (!empty($_GET['portal_entry']) && $re['reval'] === 0) { header('Location: /supplies/', true, 303); exit; }
 echo json_encode($re);
 exit;
 

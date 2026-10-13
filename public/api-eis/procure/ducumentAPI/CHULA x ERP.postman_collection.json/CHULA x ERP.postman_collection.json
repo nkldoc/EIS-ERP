@@ -1,0 +1,144 @@
+{
+	"info": {
+		"_postman_id": "f0e5c9a2-38c9-45ca-af40-06056c229568",
+		"name": "CHULA x ERP",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "16781185"
+	},
+	"item": [
+		{
+			"name": "Authen Dev",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"jsonrpc\": \"2.0\", \n    \"params\": {\n    \"db\": \"ERPDB1_230323\", \n    \"login\": \"chulaAPI\", \n    \"password\":\"chula@erptest1234\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://erpdev.vajira.ac.th/web/session/authenticate",
+					"protocol": "https",
+					"host": [
+						"erpdev",
+						"vajira",
+						"ac",
+						"th"
+					],
+					"path": [
+						"web",
+						"session",
+						"authenticate"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Contract Type",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://erpdev.vajira.ac.th/api/chula/getContractType",
+					"protocol": "https",
+					"host": [
+						"erpdev",
+						"vajira",
+						"ac",
+						"th"
+					],
+					"path": [
+						"api",
+						"chula",
+						"getContractType"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Purchase Method",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://erpdev.vajira.ac.th/api/chula/getPurchaseMethod",
+					"protocol": "https",
+					"host": [
+						"erpdev",
+						"vajira",
+						"ac",
+						"th"
+					],
+					"path": [
+						"api",
+						"chula",
+						"getPurchaseMethod"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Contract",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "\n    {\n        \"datatype\" : \"contract\",\n        \"data\" : [\n            {\n            \"pr_id\" : 1,\n            \"contract_id\" : 33,\n            \"contract_code\" : \"พวช.ซ.01024\",\n            \"bg_budget_type_id\" : 1,\n            \"bg_exp_id\" : 2,\n            \"f_total_amt\" : 20000.0,\n            \"partner\" : \"ดี เค เอสเอสจำกัด\",\n            \"contract_type_id\" : \"API Get Contract Type (field id - Int)\",\n            \"purchase_method_id\" : \"API Get Purchase Method (field id - Int)\",\n            \"date_end\" : \"2022-10-01 00:00:00.000\",\n            \"ordering_date\" : \"2025-09-30\"\n            },\n            {\n            \"pr_id\" : 2,\n            \"contract_id\" : 33,\n            \"contract_code\" : \"พวช.ซ.01024\",\n            \"bg_budget_type_id\" : 1,\n            \"bg_exp_id\" : 2,\n            \"f_total_amt\" : 20000.0,\n            \"partner\" : \"ดี เค เอสเอสจำกัด\",\n            \"contract_type_id\" : \"API Get Contract Type (field id - Int)\",\n            \"purchase_method_id\" : \"API Get Purchase Method (field id - Int)\",\n            \"date_end\" : \"2022-10-01 00:00:00.000\",\n            \"ordering_date\" : \"2025-09-30\"\n        }\n        ]\n    }\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://erpdev.vajira.ac.th/api/chula/createContract",
+					"protocol": "https",
+					"host": [
+						"erpdev",
+						"vajira",
+						"ac",
+						"th"
+					],
+					"path": [
+						"api",
+						"chula",
+						"createContract"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

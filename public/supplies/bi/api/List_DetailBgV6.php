@@ -46,8 +46,12 @@ function List_QueryParam()
 	// 	$where    .= " AND a.i_year LIKE '%" . $_REQUEST["year_en"] . "%' ";
 	// }
 	if (@$_REQUEST["Performance_Summary"] == 1) {
-		$where  .= "   AND TRY_CONVERT(INT, SUBSTRING(b.c_code, 3, 4)) = ". $_REQUEST['year']
-				." AND TRY_CONVERT(INT, SUBSTRING(b.c_code, 7, 2)) =  ". $_REQUEST['month'] ;
+		// เงื่อนไขเดียวกับกราฟสรุป (List_Rep_Yearly_PR_Performance_Summary): PR เท่านั้น + แยกปี/เดือนจากรหัสเอกสาร
+		$psYear  = (int) $_REQUEST['year'];
+		$psMonth = (int) $_REQUEST['month'];
+		$where  .= " AND b.c_code LIKE 'PR%'"
+				. " AND TRY_CONVERT(INT, SUBSTRING(b.c_code, 3, 4)) = " . $psYear
+				. " AND TRY_CONVERT(INT, SUBSTRING(b.c_code, 7, 2)) = " . $psMonth;
 	}
 	$sqlMain = "SET NOCOUNT ON 
 						select 

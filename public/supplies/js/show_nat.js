@@ -915,7 +915,7 @@ Ext.onReady(function () {
     var loader = new Ext.tree.TreeLoader({
         dataUrl: "/supplies/api/userMenu/userTree.php",
         requestMethod: "get",
-        baseParams: {url: window.location.href, parent_id: localStorage.getItem("parentId")}
+        baseParams: {url: window.location.href, parent_id: localStorage.getItem("supplies_parentId")}
     });
     Ext.urlEIS =
             location.protocol + '//' +
@@ -1097,8 +1097,8 @@ Ext.onReady(function () {
     if (isNaN(widthWest)) {
         widthWest = 400;
         collapsed = true;
-        if (localStorage.getItem("parentId") === null) {
-            localStorage.setItem("parentId", 10646);
+        if (localStorage.getItem("supplies_parentId") === null) {
+            localStorage.setItem("supplies_parentId", 10646);
             location.reload();
         }
     }
@@ -1196,19 +1196,20 @@ Ext.onReady(function () {
                     dataType: "json",
                     data: {
                         type: "GET_PARENT_MENU",
-                        parent_id: localStorage.getItem("parentId"),
+                        parent_id: localStorage.getItem("supplies_parentId"),
                     },
                     success: function (obj) {
                         if (obj.success == true) {
                             Ext.getCmp("txt-system").setIconClass("icon-report-start");
                             Ext.getCmp("txt-system").setText("<span style='font-weight: bold; font-size: 12px; margin: 0px 1px;'>" + obj.c_name + "</span>");
-                            localStorage.setItem("parentId", obj.parent_id);
+                            localStorage.setItem("supplies_parentId", obj.parent_id);
+                            loader.baseParams.parent_id = obj.parent_id;
                             $.each(obj.data || [], function (index, v) {
                                 Ext.getCmp("menu-system").add({
                                     text: v.c_name,
                                     iconCls: "icon-report",
                                     handler: function () {
-                                        localStorage.setItem("parentId", v.id);
+                                        localStorage.setItem("supplies_parentId", v.id);
                                         location.reload();
                                     },
                                 });
@@ -1283,7 +1284,6 @@ Ext.onReady(function () {
                 localStorage.setItem("collapsedNorth", "1");
             },
             afterrender: function () {
-
                 Ext.MessageBox.minWidth = 300;
                 Ext.userOnline = null;
                 Ext.receiveJson = function (obj) {
@@ -1739,7 +1739,8 @@ Ext.onReady(function () {
             items: [new Ext.Toolbar({
                     border: false,
                     id: 'topToolBarID',
-                    items: [btnNotify, /*onlineCountLabel,*/ Ext.toogleTemp, {
+                    enableOverflow: true,
+                    items: [/*onlineCountLabel,*/ Ext.toogleTemp, {
                             xtype: 'displayfield',
                             width: 50,
                             id: 'disNumberID',
@@ -2545,7 +2546,18 @@ Ext.onReady(function () {
 //                            width: 50,
 //                            id: '2notif',
 //                            value: 5
-                        }
+                        }, '-', btnNotify, '-', new Ext.BoxComponent({
+                            id: 'supplies-docs-bell',
+                            autoEl: {tag: 'div'},
+                            style: 'position:static; margin:0 8px; z-index:auto;',
+                            listeners: {
+                                afterrender: function (component) {
+                                    if (window.mountDocsNotifications) {
+                                        window.mountDocsNotifications(component.el.dom);
+                                    }
+                                }
+                            }
+                        })
 
                     ]
                 })]
@@ -2714,7 +2726,7 @@ Ext.onReady(function () {
         } else {
             Ext.get('header').show();
         }
-Ext.btnConnect();
+if (typeof Ext.btnConnect === 'function') { Ext.btnConnect(); } // websocket.js โหลดเฉพาะ index.php - กัน error ในหน้าที่เปิดตรง
         Ext.textEditor = function () {
             if (!Ext.isEmpty(Ext.getCmp('winMsgID'))) {
                 Ext.getCmp('winMsgID').show();

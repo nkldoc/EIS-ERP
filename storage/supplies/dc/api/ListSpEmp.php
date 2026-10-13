@@ -1,0 +1,157 @@
+﻿<?php
+ include("../../conf/config.php");
+ include("../conf/configDc.php");
+ include("../../lib/database/DatabaseServer.php");
+ include("../../lib/database/apiUtil.php");
+ include("../../lib/date/i_date.class.php");
+
+###################
+ $db = new DatabaseServer();
+ $date = new i_date();
+ $util = new apiUtil();
+############################################################################################################
+ $mode = @$_REQUEST["mode"];
+ $filter = @$_REQUEST["filter"];
+ $value = @$_REQUEST["value"];
+ $i_read = @$_REQUEST["i_read"];
+###################
+ $root = "data";
+ $data = array();
+###################
+ $limit = @$_REQUEST["limit"];
+ $dir = @$_REQUEST["dir"];
+ $sort = @$_REQUEST["sort"];
+ $start = @$_REQUEST["start"];
+###################
+ if (!$util->get($start)) {
+     $start = 0;
+ }
+ if (!$util->get($limit)) {
+     $limit = 20;
+ } else {
+     $limit = ($limit + $start);
+ }
+ if (!$util->get($dir)) {
+     $dir = "ASC";
+ }
+ if (!$util->get($sort)) {
+     $sort = "bb.dc_department_id , bb.i_level , aa.c_code";
+ }
+
+#################################
+ $arrParam = array();
+ $arrCountParam = array();
+ $wh = null ;
+ if ($mode == "SEARCH") {
+    if (isset($filter) && $filter != "") {
+        if ($filter == "dc_cost_name") {
+            $sqlTempTable .= " and dc_cost_id in (select dc_cost_id from dbo.dc_cost where c_name like ?)";
+            $arrParam[] = "%{$value}%";
+        } else {
+            if ($filter === "c_name") $wh .= " and bb.c_name like '%{$value}%'";
+            if ($filter === "c_code") $wh .= " and aa.c_code like '%{$value}%'";
+            if ($filter === "emp_code") $wh .= " and bb.emp_code like '%{$value}%'";
+
+        }
+    }
+}
+
+ $sqlTempTable = "SELECT aa.dc_emp_id
+   , aa.dc_cost_id
+   , (select top 1 c_code+' '+c_name from vw_dc_cost where dc_cost_id=aa.dc_cost_id) as c_cost_name
+
+   , (select top 1 c_name from sp_department_type where dc_department_type_id=bb.dc_department_type_id) as txtdc_department_type_idID
+   , (select top 1 c_name from sp_department where dc_department_id=bb.dc_department_id) as txtdc_department_idID
+   , isnull(bb.dc_department_type_id,0) as dc_department_type_id
+   , isnull(bb.dc_department_id,0) as dc_department_id
+   , isnull(bb.i_level,0) as i_level
+   , isnull((select top 1 i_seq from sp_department where dc_department_id=bb.dc_department_id),null) as i_seq
+   , aa.dc_title_id
+   , aa.c_code
+   , aa.c_title
+   , bb.c_name
+   , aa.c_ref_value
+   , aa.c_tax_value
+   , aa.c_tel_home
+   , aa.c_tel_office
+   , aa.c_mobile
+   , aa.c_email
+   , aa.c_address
+   , aa.c_address_card
+   , aa.c_comment
+   , bb.emp_code 
+   , isnull(convert(varchar(10),d_birth,120), '') as d_birth
+   , isnull(convert(varchar(10),d_begin,120), '') as d_begin
+   , isnull(convert(varchar(10),d_resign,120), '') as d_resign
+   , aa.i_enable
+   ,(select top 1 c_full_name from dc_user where dc_user_id=aa.dc_user_create_id) as c_create_name
+   ,(select top 1 c_name from dc_cost where dc_cost_id=aa.dc_user_create_cost_id) as c_cost_creat_name
+   , convert(varchar, aa.d_create, 120) as d_create
+   ,(select top 1 c_full_name from dc_user where dc_user_id=aa.dc_user_update_id) as c_update_name
+   ,(select top 1 c_name from dc_cost where dc_cost_id=aa.dc_user_update_cost_id) as c_cost_update_name
+   , convert(varchar, aa.d_update, 120) as d_update
+   , ROW_NUMBER() OVER (ORDER BY $sort $dir) as row
+   FROM sp_emp bb
+        left join dc_emp aa on bb.dc_emp_id=aa.dc_emp_id
+        WHERE aa.dc_cost_id = ? and aa.i_delete=2 ".$wh ;
+ $arrParam[] = SUPPLIES_ID;
+ $arrCountParam [] = SUPPLIES_ID;
+
+
+
+ $arrParam[] = $start;
+ $arrParam[] = $limit;
+
+ $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
+ $stmt = $db->QueryParam($sqlMain, $arrParam);
+ $i = $start + 1;
+ while ($row = $db->Fetch($stmt)) {
+     $d_birth = ($row["d_birth"] != "") ? $date->extDateBuddha($row["d_birth"]) : "";
+     $d_begin = ($row["d_begin"] != "") ? $date->extDateBuddha($row["d_begin"]) : "";
+     $d_resign = ($row["d_resign"] != "") ? $date->extDateBuddha($row["d_resign"]) : "";
+     $arr_department = array(1 => "หัวหน้า", 2 => "หัวหน้าสายงาน", 3 => "ปฏิบัตงาน");
+     $temp = array("no" => ($i++),
+         "id" => $row["dc_emp_id"],
+         "dc_cost_id" => $row["dc_cost_id"],
+         "txtdc_cost_idID" => $row["c_cost_name"],
+         "txtdc_department_type_idID" => ($row["txtdc_department_type_idID"] != "" ? $row["txtdc_department_type_idID"] : "-ไม่ระบุ-"),
+         "dc_department_type_id" => ($row["dc_department_type_id"] != "" ? $row["dc_department_type_id"] : "-ไม่ระบุ-"),
+         "txtdc_department_idID" => ($row["txtdc_department_idID"] != "" ? $row["txtdc_department_idID"] : "-ไม่ระบุ-"),
+         "i_level" => $row["i_level"],
+         "txti_levelID" => @$arr_department[$row["i_level"]],
+         "i_seq" => $row["i_seq"],
+         "dc_title_id" => $row["dc_title_id"],
+         "c_code" => $row["c_code"],
+         "dc_department_id" => $row["dc_department_id"],
+         "c_name" => $row["c_name"],
+         "c_full_name" => $row["c_name"],
+         "c_ref_value" => $row["c_ref_value"],
+         "c_tax_value" => $row["c_tax_value"],
+         "c_tel_home" => $row["c_tel_home"],
+         "c_tel_office" => $row["c_tel_office"],
+         "c_mobile" => $row["c_mobile"],
+         "c_email" => $row["c_email"],
+         "emp_code" => $row["emp_code"],
+         "c_address" => $row["c_address"],
+         "c_address_card" => $row["c_address_card"],
+         "c_comment" => $row["c_comment"],
+         "d_birth" => $d_birth,
+         "d_begin" => $d_begin,
+         "d_resign" => $d_resign,
+         "i_enable" => $row["i_enable"],
+         "dc_user_create_id" => $row["c_create_name"],
+         "dc_user_create_cost_id" => $row["c_cost_creat_name"],
+         "d_create" => $date->extDateBuddha($row["d_create"]),
+         "dc_user_update_id" => $row["c_update_name"],
+         "dc_user_update_cost_id" => $row["c_cost_update_name"],
+         "d_update" => $date->extDateBuddha($row["d_update"])
+     );
+     ${$root}[] = $temp;
+ }
+ $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
+ $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
+ echo json_encode(array("debug" => true, "totalCount" => $totalCount, $root => ${$root}));
+
+ function get($a) {
+     return isset($a) && !empty($a) ? $a : null;
+ }

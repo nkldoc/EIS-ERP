@@ -146,6 +146,7 @@ function List_Detail()
         while ($row = $db->Fetch($stmt)) {
             $data[] = [
                 'no'               => ++$i,
+                'tor_id'           => intval($row['tor_id'] ?? 0),
                 'doc_no'           => $row['doc_no']           !== null ? $row['doc_no']           : '-',
                 'project_name'     => $row['project_name']     !== null ? $row['project_name']     : '-',
                 'officer'          => $row['officer']          !== null ? $row['officer']          : '-',

@@ -1,10 +1,4 @@
 <?php
-// ============================================================
-// API: Yearly PR Performance Summary — EIS_procure edition
-// query ตรงจาก sp_tor (ไม่ต้องสร้าง staging table)
-// โครงสร้าง response เหมือน NMU_supplies ทุกประการ
-// ============================================================
-
 include("../../conf/config.php");
 include("../../lib/database/DatabaseServer.php");
 include("../../lib/date/i_date.class.php");
@@ -19,50 +13,47 @@ function List_QueryParam()
 {
     global $db, $root, $data;
 
-    // -------------------------------------------------------
-    // Query ตรงจาก sp_tor แปลง d_create → fiscal year/month
-    // แล้วคำนวณ cumulative_total ด้วย window function
-    // เหมือน NMU_supplies แต่ใช้ sp_tor ของ EIS_procure
-    // -------------------------------------------------------
+    // แปลง d_create (ปฏิทิน ค.ศ.) → fiscal year/month (พ.ศ.)
     $sqlMain = "
         WITH base AS (
             SELECT
-                fiscal_year  AS year_th,
-                fiscal_month AS month_no,
-                COUNT(*)     AS total_pr
+                fiscal_year,
+                fiscal_month,
+                COUNT(*) AS total_pr
             FROM (
                 SELECT
-                    YEAR(d_create) AS doc_year,
+                    YEAR(d_create)  AS doc_year,
                     MONTH(d_create) AS doc_month,
+                    -- แปลง doc → fiscal
                     CASE
                         WHEN MONTH(d_create) >= 10
-                            THEN YEAR(d_create) + 544   /* ต.ค.–ธ.ค. → ปีงบถัดไป (บวก 543+1) */
-                        ELSE YEAR(d_create) + 543       /* ม.ค.–ก.ย. → ปีงบเดียวกัน */
+                            THEN YEAR(d_create) + 544   -- ต.ค.-ธ.ค. → ปีงบถัดไป
+                        ELSE YEAR(d_create) + 543       -- ม.ค.-ก.ย. → ปีงบเดียวกัน
                     END AS fiscal_year,
                     CASE
                         WHEN MONTH(d_create) >= 10
-                            THEN MONTH(d_create) - 9    /* ต.ค.=1, พ.ย.=2, ธ.ค.=3 */
-                        ELSE MONTH(d_create) + 3        /* ม.ค.=4 … ก.ย.=12 */
+                            THEN MONTH(d_create) - 9    -- 10→1, 11→2, 12→3
+                        ELSE MONTH(d_create) + 3        -- 1→4, 2→5, ..., 9→12
                     END AS fiscal_month
-                FROM dbo.sp_tor
-                WHERE i_enabled  = 1
-                  AND i_type_bg  = 1
-                  AND d_create  IS NOT NULL
+                                FROM dbo.sp_tor
+                                WHERE i_enabled = 1
+                                    AND i_type_bg = 1
+                                    AND d_create IS NOT NULL
             ) X
-            WHERE fiscal_year >= 2566   /* แสดงตั้งแต่ปีงบ 2566 */
+            WHERE fiscal_year >= 2566
             GROUP BY fiscal_year, fiscal_month
         )
         SELECT
-            year_th,
-            month_no,
+            fiscal_year AS year_th,
+            fiscal_month AS month_no,
             total_pr,
             SUM(total_pr) OVER (
-                PARTITION BY year_th
-                ORDER BY month_no
+                PARTITION BY fiscal_year
+                ORDER BY fiscal_month
                 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
             ) AS cumulative_total
         FROM base
-        ORDER BY year_th, month_no;
+        ORDER BY fiscal_year, fiscal_month;
     ";
 
     $stmt = $db->QueryParam($sqlMain, []);
@@ -88,7 +79,6 @@ function List_QueryParam()
     ], JSON_UNESCAPED_UNICODE);
 }
 
-/* ===== Router ===== */
 $fn = $_GET['fn'] ?? '';
 if ($fn === 'List_QueryParam') {
     List_QueryParam();

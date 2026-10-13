@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>บัญชีผู้ใช้ | NMU Procure</title>
+  <link rel="stylesheet" href="style.css?v=7">
+  <script src="app.js?v=6" defer></script>
+  <script src="endpoint-query.js?v=1" defer></script>
+  <script src="incoming-endpoints.js?v=1" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="#profile"><span class="logo">N</span> NMU <b>PROCURE</b></a><span>ระบบจัดซื้อจัดจ้าง</span></header>
+  <main>
+    <aside><p class="eyebrow">ACCOUNT CENTER</p><h1>จัดการบัญชี<br>และการเข้าใช้งาน</h1><p>เข้าสู่ระบบเพื่อดูข้อมูลบัญชี อีเมล<br>และรายละเอียดโทเคนของคุณ</p><div class="note">มหาวิทยาลัยนวมินทราธิราช<br><small>ระบบบริการข้อมูลจัดซื้อจัดจ้าง</small></div></aside>
+    <section class="card">
+      <nav aria-label="เมนูบัญชี"><a href="#login">เข้าสู่ระบบ</a><a href="#register">สมัครสมาชิก</a><a href="#profile">ข้อมูลผู้ใช้</a></nav>
+      <div id="message" role="status" aria-live="polite" hidden></div>
+      <section id="login" hidden>
+        <p class="eyebrow">WELCOME BACK</p><h2>เข้าสู่ระบบ</h2><p class="muted">ใช้ชื่อผู้ใช้หรืออีเมล และรหัสผ่านของบัญชีคุณ</p>
+        <form id="login-form"><label for="login-email">ชื่อผู้ใช้หรืออีเมล</label><input id="login-email" name="email" type="text" autocomplete="username" required maxlength="254" placeholder="ชื่อผู้ใช้ หรือ name@example.com">
+          <label for="login-password">รหัสผ่าน</label><input id="login-password" name="password" type="password" autocomplete="current-password" required minlength="8">
+          <label for="token-lifetime">อายุโทเคน</label>
+          <select id="token-lifetime" name="token_lifetime" aria-describedby="lifetime-hint">
+            <option value="3600">1 ชั่วโมง</option>
+            <option value="28800">8 ชั่วโมง</option>
+            <option value="86400" selected>1 วัน (ค่าเริ่มต้น)</option>
+            <option value="604800">7 วัน</option>
+            <option value="2592000">30 วัน</option>
+          </select>
+          <small id="lifetime-hint">มีผลกับโทเคนใหม่ หากผู้ดูแลกำหนดอายุไว้ ระบบจะใช้ค่าของผู้ดูแล</small>
+          <button type="submit">เข้าสู่ระบบ</button></form><p class="foot">ยังไม่มีบัญชี? <a href="#register">สมัครสมาชิก</a></p>
+      </section>
+      <section id="register" hidden>
+        <p class="eyebrow">CREATE ACCOUNT</p><h2>สมัครสมาชิก</h2><p class="muted">กรอกข้อมูลเพื่อสร้างบัญชีใหม่</p>
+        <form id="register-form"><label for="register-name">ชื่อผู้ใช้</label><input id="register-name" name="name" autocomplete="name" required minlength="3" maxlength="100">
+          <label for="register-email">อีเมล</label><input id="register-email" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="name@example.com">
+          <label for="register-password">รหัสผ่าน</label><input id="register-password" name="password" type="password" autocomplete="new-password" required minlength="8" aria-describedby="password-hint"><small id="password-hint">อย่างน้อย 8 ตัวอักษร</small>
+          <label for="confirm-password">ยืนยันรหัสผ่าน</label><input id="confirm-password" name="confirm" type="password" autocomplete="new-password" required minlength="8">
+          <button type="submit">สร้างบัญชี</button></form><p class="foot">มีบัญชีแล้ว? <a href="#login">เข้าสู่ระบบ</a></p>
+      </section>
+      <section id="profile" hidden>
+        <p class="eyebrow">YOUR ACCOUNT</p><h2>ข้อมูลผู้ใช้</h2><p class="muted">ข้อมูลบัญชีและโทเคนสำหรับการเข้าใช้งานครั้งนี้</p>
+        <div id="profile-data" hidden><div class="table-wrap"><table><caption>บัญชีที่เข้าสู่ระบบ</caption><thead><tr><th scope="col">User</th><th scope="col">Email</th><th scope="col">Expire token</th></tr></thead><tbody><tr><td id="user-name"></td><td id="user-email"></td><td id="token-expiry"></td></tr></tbody></table></div>
+        <p>สิทธิ์ผู้ใช้: <strong id="user-role"></strong></p>
+        <p id="token-lifetime-summary" class="muted"></p>
+        <div class="token-heading"><label for="token-value">Access token</label><span id="token-status" class="badge"></span></div><textarea id="token-value" readonly rows="4" spellcheck="false" aria-label="Access token"></textarea>
+        <div class="actions"><button id="toggle-token" class="secondary" type="button">แสดงโทเคน</button><button id="copy-token" class="secondary" type="button">คัดลอกโทเคน</button></div><small>โทเคนใช้เข้าถึงบัญชีของคุณ กรุณาเก็บเป็นความลับ</small></div>
+        <div class="actions"><button id="refresh" class="secondary" type="button">โหลดข้อมูลใหม่</button><button id="logout" class="danger" type="button">ออกจากระบบ</button></div>
+        <section id="admin-panel" hidden>
+          <hr><p class="eyebrow">SUPERADMIN</p><h2>จัดการผู้ใช้ทั้งหมด</h2>
+          <p class="muted">ปรับอายุโทเคน หรือเปิด/ปิดบัญชี จะยกเลิกโทเคนเดิมทั้งหมด ผู้ใช้ต้อง Login ใหม่<br>Expire now ยกเลิกโทเคนทันที แต่ยัง Login ใหม่ได้ถ้าบัญชีใช้งานอยู่</p>
+          <div class="actions"><input id="user-search" type="search" placeholder="ค้นหาชื่อผู้ใช้หรืออีเมล" aria-label="ค้นหาผู้ใช้"><button id="reload-users" type="button" class="secondary">โหลดรายชื่อใหม่</button></div>
+          <p id="admin-message" role="status" aria-live="polite"></p>
+          <div class="table-wrap"><table><caption id="users-count">ผู้ใช้ทั้งหมด</caption><thead><tr><th>User / Email</th><th>สิทธิ์</th><th>สถานะบัญชี</th><th>Expire token ล่าสุด</th><th>อายุโทเคน</th><th>จัดการ</th></tr></thead><tbody id="users-body"></tbody></table></div>
+
+          <hr><p class="eyebrow">API ENDPOINTS · erpsendapi</p><h2>จัดการ Endpoint ส่งข้อมูลออก</h2>
+          <p class="muted">กำหนด URI ปลายทางและ Query สำหรับดึงข้อมูลไปประกอบ body ที่บัญชี <code>erpsendapi</code> ใช้ส่งออก (เช่น <code>/procure/ir</code>) ทดสอบส่งใช้ข้อมูลที่บันทึกแล้วและส่งจริงไปยังปลายทาง</p>
+          <div class="actions"><button id="add-endpoint" type="button">+ เพิ่ม Endpoint</button><button id="reload-endpoints" class="secondary" type="button">โหลดรายการใหม่</button></div>
+          <p id="endpoint-message" role="status" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table>
+              <caption id="endpoints-count">Endpoint ทั้งหมด</caption>
+              <thead><tr><th scope="col">ชื่อ</th><th scope="col">URI</th><th scope="col">Method</th><th scope="col">สถานะ</th><th scope="col">ส่งล่าสุด</th><th scope="col">จัดการ</th></tr></thead>
+              <tbody id="endpoints-body"></tbody>
+            </table>
+          </div>
+
+          <div id="endpoint-editor" hidden>
+            
+            <hr><h3 id="editor-title">เพิ่ม Endpoint ใหม่</h3>
+            <input type="hidden" id="edit-endpoint-id">
+            <label for="edit-name">ชื่อ Endpoint</label>
+            <input id="edit-name" maxlength="200" required placeholder="เช่น ส่งข้อมูลตรวจรับ (ir) ไป ERP">
+            
+            <label for="edit-uri">URI ปลายทาง</label>
+            <input id="edit-uri" maxlength="500" required placeholder="/procure/ir">
+            <label for="edit-method">Method</label>
+            <select id="edit-method"><option value="POST" selected>POST</option><option value="GET">GET</option><option value="PUT">PUT</option></select>
+            <label for="edit-database">ฐานข้อมูลต้นทาง (MSSQL)</label>
+            <select id="edit-database"><option value="">เลือกฐานข้อมูล MSSQL</option></select>
+            <label for="edit-query">Query (SQL) สำหรับดึงข้อมูลเข้า data[]</label>
+            <textarea id="edit-query" rows="8" spellcheck="false" placeholder="SELECT * FROM sp_tor_contract"></textarea>
+            <small>ผลลัพธ์แต่ละแถวของ query นี้จะกลายเป็นสมาชิกหนึ่งตัวใน array <code>body.data</code> ที่ส่งออก</small>
+            <div class="actions"><button id="load-query-fields" class="secondary" type="button">อ่านฟิลด์และดูตัวอย่าง</button></div>
+            <p id="query-message" role="status" aria-live="polite"></p>
+            <div id="query-mapping" class="table-wrap" hidden>
+              <table><caption>เลือกฟิลด์ที่จะส่ง และแก้ชื่อ เช่น tor_id → pr_id (เทียบเท่า tor_id AS pr_id)</caption>
+                <thead><tr><th>ส่ง</th><th>ฟิลด์ต้นทาง</th><th>ชื่อฟิลด์ปลายทาง</th></tr></thead><tbody id="query-fields"></tbody>
+              </table>
+            </div>
+            <section id="query-preview-panel" hidden><h3>ตัวอย่างข้อมูลที่จะส่ง (สูงสุด 10 แถว)</h3><pre id="query-preview"></pre></section>
+            <label><input type="checkbox" id="edit-active" checked> เปิดใช้งาน Endpoint นี้</label>
+            <div class="actions">
+              <button id="save-endpoint" type="button">ยืนยันบันทึก</button>
+              <button id="test-endpoint" class="secondary" type="button">ทดสอบส่ง</button>
+              <button id="cancel-endpoint" class="secondary" type="button">ยกเลิก</button>
+            </div>
+          </div>
+
+          <pre id="endpoint-result" aria-live="polite" hidden></pre>
+          <details id="payload-preview">
+            <summary>ดูรูปแบบข้อมูลที่ erpsendapi ส่งออก (ตัวอย่าง)</summary>
+            <pre id="payload-sample"></pre>
+          </details>
+
+          <hr>
+          <section id="incoming-manager" aria-labelledby="incoming-heading">
+            <p class="eyebrow">API ENDPOINTS · ขาเข้า</p>
+            <h2 id="incoming-heading">จัดการรับข้อมูลเข้า (Incoming)</h2>
+            <p class="muted">กำหนด URL และ Method เลือกผู้ใช้เดิมที่อนุญาตให้ส่งข้อมูล แล้วตรวจ JSON ที่ได้รับจากประวัติด้านล่าง</p>
+            <div class="incoming-summary"><strong>รับ JSON → ตรวจสิทธิ์ผู้ใช้ → บันทึก Log</strong><span>เก็บ headers และ body พร้อมซ่อนรหัสผ่าน · ขนาดสูงสุด 2 MB ต่อคำขอ</span></div>
+            <div class="actions"><button id="incoming-add" type="button">+ เพิ่ม URL ขารับ</button><button id="incoming-reload" type="button" class="secondary">โหลดรายการใหม่</button></div>
+            <p id="incoming-message" role="status" aria-live="polite"></p>
+            <div class="table-wrap"><table>
+              <caption id="incoming-count">URL ขารับทั้งหมด</caption>
+              <thead><tr><th>ชื่อ / URL</th><th>Method</th><th>ผู้ใช้ที่อนุญาต</th><th>สถานะ</th><th>รับล่าสุด</th><th>จัดการ</th></tr></thead>
+              <tbody id="incoming-body"></tbody>
+            </table></div>
+            <form id="incoming-form" class="incoming-editor" hidden>
+              <h3 id="incoming-editor-title">เพิ่ม URL ขารับ</h3>
+              <fieldset id="incoming-fields">
+                <input id="incoming-id" type="hidden">
+                <label for="incoming-name">ชื่อขารับ</label><input id="incoming-name" required maxlength="200" placeholder="เช่น รับข้อมูลตรวจรับจาก ERP">
+                <label for="incoming-uri">URL ขารับ</label><input id="incoming-uri" required maxlength="240" placeholder="/api-eis/procure/incoming/ir" aria-describedby="incoming-url-help">
+                <small id="incoming-url-help">ใช้เส้นทาง /api-eis/procure/incoming/ ตามด้วยชื่อขารับ เช่น ir หรือ contract</small>
+                <div class="incoming-grid">
+                  <div><label for="incoming-method">Method</label><select id="incoming-method"><option>POST</option><option>PUT</option><option>PATCH</option></select></div>
+                  <div><label for="incoming-user">ผู้ใช้ที่มีสิทธิ์ส่งข้อมูล</label><select id="incoming-user" required><option value="">เลือกผู้ใช้ที่มีในระบบ</option></select></div>
+                </div>
+                <small>ระบบภายนอกส่ง username และ password ของผู้ใช้ที่เลือกใน JSON body ผู้ใช้ที่ถูกปิดใช้งานจะส่งข้อมูลไม่ได้</small>
+                <label class="incoming-check"><input id="incoming-active" type="checkbox" checked> เปิดใช้งาน URL ขารับนี้</label>
+                <div class="actions"><button type="submit">บันทึก URL ขารับ</button><button id="incoming-cancel" type="button" class="secondary">ยกเลิก</button></div>
+              </fieldset>
+            </form>
+            <section id="incoming-example-panel" class="incoming-editor" hidden>
+              <h3>ตัวอย่างการส่งข้อมูล</h3><p id="incoming-example-url"></p>
+              <small>ส่งเฉพาะ JSON body นี้ พร้อม Header Content-Type: application/json ระบบจะบันทึก headers และ body ให้เอง</small>
+              <pre id="incoming-example"></pre>
+            </section>
+            <div class="incoming-log-heading"><div><h3>ประวัติ JSON ที่รับเข้ามา</h3><small>แสดงทั้งคำขอที่สำเร็จและที่ถูกปฏิเสธสำหรับ URL ที่ตั้งค่าไว้ ครั้งละ 50 รายการ</small></div><button id="incoming-log-reload" class="secondary" type="button">โหลด Log ใหม่</button></div>
+            <label for="incoming-log-filter">เลือก URL</label><select id="incoming-log-filter"><option value="">ทุก URL รวมรายการที่ลบแล้ว</option></select>
+            <p id="incoming-log-message" role="status" aria-live="polite"></p>
+            <div class="table-wrap"><table><caption>ประวัติรับข้อมูล (เวลาไทย)</caption><thead><tr><th>เวลาที่รับ</th><th>Method / URL</th><th>Username</th><th>ผลการรับ</th><th>JSON</th></tr></thead><tbody id="incoming-log-body"></tbody></table></div>
+            <div class="actions"><button id="incoming-log-more" class="secondary" type="button" hidden>โหลดรายการก่อนหน้า</button></div>
+            <section id="incoming-log-detail" class="incoming-editor" hidden><h3>รายละเอียด JSON</h3><p id="incoming-log-meta"></p><div class="actions"><button id="incoming-log-download" type="button" class="secondary">ดาวน์โหลด JSON</button><button id="incoming-log-close" type="button" class="secondary">ปิดรายละเอียด</button></div><pre id="incoming-log-json"></pre></section>
+          </section>
+          <details class="incoming-legacy"><summary>จัดการบัญชี Service แบบเดิม (แยกจากผู้ใช้ในระบบ)</summary>
+          <h3>บัญชีรับข้อมูลเข้าแบบเดิม</h3>
+          <p class="muted">บัญชี service ที่ระบบภายนอกใช้ยืนยันตัวตนด้วย username/password ใน body เพื่อส่งข้อมูลเข้ามาที่ endpoint ขารับ พร้อมกำหนดสิทธิ์เข้าถึงแต่ละ route (route_key) ต่อบัญชี</p>
+          <div class="actions"><button id="add-api-account" type="button">+ เพิ่มบัญชี</button><button id="reload-api-accounts" class="secondary" type="button">โหลดรายการใหม่</button></div>
+          <p id="api-account-message" role="status" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table>
+              <caption id="api-accounts-count">บัญชีขาเข้าทั้งหมด</caption>
+              <thead><tr><th scope="col">Username</th><th scope="col">สถานะ</th><th scope="col">Route ที่มีสิทธิ์</th><th scope="col">หมายเหตุ</th><th scope="col">จัดการ</th></tr></thead>
+              <tbody id="api-accounts-body"></tbody>
+            </table>
+          </div>
+
+          <div id="api-account-editor" hidden>
+            <hr><h3 id="api-account-editor-title">เพิ่มบัญชีขาเข้าใหม่</h3>
+            <input type="hidden" id="edit-api-account-id">
+            <label for="edit-api-username">Username</label>
+            <input id="edit-api-username" maxlength="100" required placeholder="เช่น erpsendapi">
+            <label for="edit-api-password">Password <small class="muted">(เว้นว่างไว้ถ้าไม่ต้องการเปลี่ยน)</small></label>
+            <input id="edit-api-password" type="password" autocomplete="new-password" minlength="8">
+            <label for="edit-api-note">หมายเหตุ</label>
+            <input id="edit-api-note" maxlength="255" placeholder="เช่น ระบบ EIS ส่งข้อมูลตรวจรับ">
+            <label><input type="checkbox" id="edit-api-active" checked> เปิดใช้งานบัญชีนี้</label>
+            <h4>สิทธิ์เข้าถึง Route</h4>
+            <p class="muted">ระบุ route_key ที่ endpoint ขารับใช้ตรวจสอบ เช่น <code>procure.ir</code>, <code>procure.contract</code></p>
+            <div id="api-account-permissions"></div>
+            <div class="actions">
+              <input id="new-permission-route" placeholder="route_key เช่น procure.ir" maxlength="100">
+              <button id="add-permission" class="secondary" type="button">+ เพิ่มสิทธิ์</button>
+            </div>
+            <div class="actions">
+              <button id="save-api-account" type="button">ยืนยันบันทึก</button>
+              <button id="cancel-api-account" class="secondary" type="button">ยกเลิก</button>
+            </div>
+          </div>
+          </details>
+        </section>
+      </section>
+    </section>
+  </main><footer>NMU Procure · Account management</footer>
+  <script>
+  // Endpoint manager (erpsendapi) — wires to REST resources under API_BASE.
+  // Expected backend contract (implement under D:\EIS-ERP\public\api-eis\procure):
+  //   GET    {API_BASE}/endpoints            -> [{id,name,uri,method,query,active,last_sent_at}, ...]
+  //   POST   {API_BASE}/endpoints            -> create {name,uri,method,query,active}
+  //   PUT    {API_BASE}/endpoints/{id}       -> update {name,uri,method,query,active}
+  //   DELETE {API_BASE}/endpoints/{id}
+  //   POST   {API_BASE}/endpoints/{id}/test  -> runs the query, sends one test payload, returns the request/response
+  (function () {
+    const API_BASE = '/api-eis/procure';
+    const $ = (id) => document.getElementById(id);
+    const authHeaders = () => {
+      const t = window.currentToken; // set by the existing login flow in app.js
+      return t ? { 'Authorization': 'Bearer ' + t } : {};
+    };
+
+    function showMessage(text, isError) {
+      const el = $('endpoint-message');
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = isError ? '#b3261e' : '';
+    }
+
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    let listGeneration = 0, testing = false;
+    async function checkResponse(res) {
+      if (!res.ok) { const data = await res.json(); throw new Error(data.message || ('HTTP ' + res.status)); }
+    }
+    function methodBadge(m) { return '<span class="badge">' + m + '</span>'; }
+
+    async function loadEndpoints() {
+      const current = ++listGeneration;
+      try {
+        const res = await fetch(API_BASE + '/endpoints', { headers: authHeaders() });
+        await checkResponse(res);
+        const rows = await res.json();
+        if (current !== listGeneration || $('admin-panel').hidden) return;
+        const body = $('endpoints-body');
+        body.innerHTML = '';
+        rows.forEach((entry) => {
+          const r = Object.fromEntries(Object.entries(entry).map(([key,value]) => [key, key === 'active' ? !!Number(value) : escapeHtml(value)]));
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td>' + r.name + '</td>' +
+            '<td><code>' + r.uri + '</code></td>' +
+            '<td>' + methodBadge(r.method || 'POST') + '</td>' +
+            '<td>' + (r.active ? 'เปิดใช้งาน' : 'ปิดใช้งาน') + '</td>' +
+            '<td>' + (r.last_sent_at || '-') + '</td>' +
+            '<td class="actions">' +
+              '<button type="button" class="secondary" data-act="edit" data-id="' + r.id + '">แก้ไข</button>' +
+              '<button type="button" class="secondary" data-act="test" data-id="' + r.id + '">ทดสอบส่ง</button>' +
+              '<button type="button" class="danger" data-act="delete" data-id="' + r.id + '">ลบ</button>' +
+            '</td>';
+          body.appendChild(tr);
+        });
+        $('endpoints-count').textContent = 'Endpoint ทั้งหมด (' + rows.length + ')';
+        window.__endpoints = rows;
+      } catch (e) {
+        showMessage('โหลดรายการ endpoint ไม่สำเร็จ: ' + e.message, true);
+      }
+    }
+
+    function openEditor(row) {
+      $('endpoint-editor').hidden = false;
+      $('editor-title').textContent = row ? 'แก้ไข Endpoint: ' + row.name : 'เพิ่ม Endpoint ใหม่';
+      $('edit-endpoint-id').value = row ? row.id : '';
+      $('edit-name').value = row ? row.name : '';
+      $('edit-uri').value = row ? row.uri : '';
+      $('edit-method').value = row ? (row.method || 'POST') : 'POST';
+      $('edit-query').value = row ? row.query : '';
+      $('edit-active').checked = row ? !!Number(row.active) : true;
+      $('test-endpoint').disabled = !row || !row.active;
+      window.endpointQuery.reset(row);
+    }
+
+    function closeEditor() {
+      $('endpoint-editor').hidden = true;
+      window.endpointQuery?.clear();
+    }
+
+    function currentForm() {
+      return {
+        name: $('edit-name').value.trim(),
+        uri: $('edit-uri').value.trim(),
+        method: $('edit-method').value,
+        query: $('edit-query').value,
+        active: $('edit-active').checked,
+        ...window.endpointQuery.values(),
+      };
+    }
+
+    let savingEndpoint = false;
+    async function saveEndpoint() {
+      if (savingEndpoint) return;
+      const id = $('edit-endpoint-id').value;
+      const payload = currentForm();
+      if (!payload.name || !payload.uri || !payload.query) {
+        showMessage('กรุณากรอกชื่อ, URI และ Query ให้ครบ', true);
+        return;
+      }
+      try {
+        window.endpointQuery.confirmReady();
+        if (!confirm('ยืนยันบันทึก Endpoint และการเลือกฟิลด์ตามตัวอย่าง? ขั้นตอนนี้ยังไม่ส่งข้อมูล')) return;
+        savingEndpoint = true; $('save-endpoint').disabled = true;
+        const res = await fetch(API_BASE + '/endpoints' + (id ? '/' + id : ''), {
+          method: id ? 'PUT' : 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+          body: JSON.stringify(payload),
+        });
+        await checkResponse(res);
+        const result = await res.json();
+        $('edit-endpoint-id').value = result.id;
+        $('editor-title').textContent = 'แก้ไข Endpoint: ' + payload.name;
+        $('test-endpoint').disabled = !payload.active;
+        showMessage('บันทึก endpoint สำเร็จ ตรวจตัวอย่างแล้วกดทดสอบส่งได้');
+        window.endpointQuery.showSaved();
+        loadEndpoints();
+      } catch (e) {
+        showMessage('บันทึกไม่สำเร็จ: ' + e.message, true);
+      } finally { savingEndpoint = false; $('save-endpoint').disabled = false; }
+    }
+
+    async function deleteEndpoint(id) {
+      if (!confirm('ยืนยันลบ endpoint นี้?')) return;
+      try {
+        const res = await fetch(API_BASE + '/endpoints/' + id, { method: 'DELETE', headers: authHeaders() });
+        await checkResponse(res);
+        showMessage('ลบ endpoint แล้ว');
+        loadEndpoints();
+      } catch (e) {
+        showMessage('ลบไม่สำเร็จ: ' + e.message, true);
+      }
+    }
+
+    async function testEndpoint(id) {
+      id = id || $('edit-endpoint-id').value;
+      if (!id || testing) return;
+      if (!$('endpoint-editor').hidden && String(id) === $('edit-endpoint-id').value) {
+        const saved = (window.__endpoints || []).find(row => String(row.id) === String(id));
+        const form = currentForm();
+        if (!saved || ['name', 'uri', 'method', 'query', 'database', 'active'].some(key => form[key] !== saved[key]) || JSON.stringify(form.fields) !== JSON.stringify(saved.fields || [])) {
+          showMessage('กรุณายืนยันบันทึกการแก้ไขก่อนทดสอบส่ง เพื่อให้ตรงกับตัวอย่าง', true); return;
+        }
+      }
+      if (!confirm('ทดสอบนี้จะรัน Query ที่บันทึกและส่งข้อมูลจริงไปยังปลายทาง ยืนยันส่ง?')) return;
+      testing = true;
+      $('test-endpoint').disabled = true;
+      const current = listGeneration;
+      showMessage('กำลังทดสอบส่ง...');
+      try {
+        const res = await fetch(API_BASE + '/endpoints/' + id + '/test', { method: 'POST', headers: authHeaders() });
+        const data = await res.json();
+        if ($('admin-panel').hidden || current !== listGeneration) return;
+        $('endpoint-result').hidden = false;
+        $('endpoint-result').textContent = JSON.stringify(data, null, 2);
+        showMessage(res.ok ? 'ทดสอบส่งสำเร็จ' : (data.message || 'ปลายทางตอบกลับไม่สำเร็จ'), !res.ok);
+        await loadEndpoints();
+      } catch (e) {
+        showMessage('ทดสอบส่งไม่สำเร็จ: ' + e.message + ' ตรวจปลายทางก่อนส่งซ้ำ', true);
+      } finally { testing = false; $('test-endpoint').disabled = !$('edit-endpoint-id').value; }
+    }
+
+    function renderPayloadSample() {
+      const sample = {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Original-Url': '/procure/ir',
+          'User-Agent': 'python-requests/2.21.0',
+        },
+        body: {
+          username: 'erpsendapi',
+          password: '***HIDDEN***',
+          data: [
+            { pr_id: 1768, po_id: 448, period_id: 4082, chk_id: 1, c_contract_code: '1C103/2568', '...': '...' },
+          ],
+        },
+      };
+      $('payload-sample').textContent = JSON.stringify(sample, null, 2);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!$('endpoint-panel') && !$('add-endpoint')) return;
+      renderPayloadSample();
+      $('add-endpoint').addEventListener('click', () => openEditor(null));
+      $('reload-endpoints').addEventListener('click', loadEndpoints);
+      $('cancel-endpoint').addEventListener('click', closeEditor);
+      $('save-endpoint').addEventListener('click', saveEndpoint);
+      $('test-endpoint').addEventListener('click', () => testEndpoint());
+      $('endpoints-body').addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-act]');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.dataset.act === 'edit') {
+          const row = (window.__endpoints || []).find((r) => String(r.id) === id);
+          openEditor(row);
+        } else if (btn.dataset.act === 'test') {
+          testEndpoint(id);
+        } else if (btn.dataset.act === 'delete') {
+          deleteEndpoint(id);
+        }
+      });
+      // Load only once the profile/admin section is actually shown (superadmin only).
+      const adminPanel = document.getElementById('admin-panel');
+      if (adminPanel && !adminPanel.hidden) loadEndpoints();
+      const obs = new MutationObserver(() => {
+        if (!adminPanel.hidden) loadEndpoints();
+        else { listGeneration++; window.__endpoints = []; $('endpoints-body').replaceChildren(); closeEditor(); $('endpoint-result').textContent = ''; $('endpoint-result').hidden = true; showMessage(''); }
+      });
+      if (adminPanel) obs.observe(adminPanel, { attributes: true, attributeFilter: ['hidden'] });
+    });
+  })();
+  </script>
+  <script>
+  // Incoming API account manager — wires to REST resources under API_BASE.
+  // This is the ADMIN side (superadmin Bearer token, same as adminUsers.php) — separate from
+  // the service-account auth (username/password in body) that the incoming endpoints themselves check.
+  // Expected backend contract (implement under D:\EIS-ERP\public\api-eis\procure):
+  //   GET    {API_BASE}/apiAccounts             -> [{id,username,is_active,note,permissions:[route_key,...]}, ...]
+  //   POST   {API_BASE}/apiAccounts             -> create {username,password,note,active,permissions:[...]}
+  //   PUT    {API_BASE}/apiAccounts/{id}        -> update {password?(optional),note,active,permissions:[...]}
+  //                                                 (password omitted = keep existing; permissions fully replace the set)
+  //   DELETE {API_BASE}/apiAccounts/{id}
+  (function () {
+    const API_BASE = '/api-eis/procure';
+    const $ = (id) => document.getElementById(id);
+    const authHeaders = () => {
+      const t = window.currentToken;
+      return t ? { 'Authorization': 'Bearer ' + t } : {};
+    };
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    function showAccountMessage(text, isError) {
+      const el = $('api-account-message');
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = isError ? '#b3261e' : '';
+    }
+
+    async function checkResponse(res) {
+      if (!res.ok) {
+        let data = {}; try { data = await res.json(); } catch (_) {}
+        throw new Error(data.message || ('ระบบตอบกลับผิดพลาด (HTTP ' + res.status + ')'));
+      }
+    }
+
+    let accountListGeneration = 0;
+    let currentPermissions = [];
+
+    async function loadApiAccounts() {
+      const current = ++accountListGeneration;
+      try {
+        const res = await fetch(API_BASE + '/apiAccounts', { headers: authHeaders(), cache: 'no-store' });
+        await checkResponse(res);
+        const rows = await res.json();
+        if (!Array.isArray(rows)) throw new Error('รูปแบบข้อมูลบัญชีไม่ถูกต้อง');
+        if (current !== accountListGeneration || $('admin-panel').hidden) return;
+        const body = $('api-accounts-body');
+        body.innerHTML = '';
+        if (!rows.length) body.innerHTML = '<tr><td colspan="5">ยังไม่มีบัญชีขาเข้า กด + เพิ่มบัญชี เพื่อเริ่มใช้งาน</td></tr>';
+        rows.forEach((entry) => {
+          const permissions = Array.isArray(entry.permissions) ? entry.permissions : [];
+          const tr = document.createElement('tr');
+          tr.innerHTML =
+            '<td><code>' + escapeHtml(entry.username) + '</code></td>' +
+            '<td>' + (Number(entry.is_active) ? 'เปิดใช้งาน' : 'ปิดใช้งาน') + '</td>' +
+            '<td>' + (permissions.length ? permissions.map(p => '<span class="badge">' + escapeHtml(p) + '</span>').join(' ') : '-') + '</td>' +
+            '<td>' + escapeHtml(entry.note || '') + '</td>' +
+            '<td class="actions">' +
+              '<button type="button" class="secondary" data-act="edit" data-id="' + escapeHtml(entry.id) + '">แก้ไข</button>' +
+              '<button type="button" class="danger" data-act="delete" data-id="' + entry.id + '">ลบ</button>' +
+            '</td>';
+          body.appendChild(tr);
+        });
+        $('api-accounts-count').textContent = 'บัญชีขาเข้าทั้งหมด (' + rows.length + ')';
+        window.__apiAccounts = rows;
+      } catch (e) {
+        showAccountMessage('โหลดรายการบัญชีไม่สำเร็จ: ' + e.message, true);
+      }
+    }
+
+    function renderPermissionChips() {
+      const wrap = $('api-account-permissions');
+      wrap.innerHTML = '';
+      if (!currentPermissions.length) {
+        wrap.innerHTML = '<p class="muted">ยังไม่มีสิทธิ์ route ใดๆ</p>';
+        return;
+      }
+      currentPermissions.forEach((route, idx) => {
+        const span = document.createElement('span');
+        span.className = 'badge';
+        span.style.marginRight = '6px';
+        span.innerHTML = escapeHtml(route) + ' <button type="button" data-idx="' + idx + '" aria-label="ลบสิทธิ์ ' + escapeHtml(route) + '">&times;</button>';
+        wrap.appendChild(span);
+      });
+    }
+
+    function openApiAccountEditor(row) {
+      if (savingAccount) return;
+      $('new-permission-route').value = '';
+      showAccountMessage('');
+      $('api-account-editor').hidden = false;
+      $('api-account-editor-title').textContent = row ? 'แก้ไขบัญชี: ' + row.username : 'เพิ่มบัญชีขาเข้าใหม่';
+      $('edit-api-account-id').value = row ? row.id : '';
+      $('edit-api-username').value = row ? row.username : '';
+      $('edit-api-username').disabled = !!row; // ห้ามเปลี่ยน username ตอนแก้ไข
+      $('edit-api-password').value = '';
+      $('edit-api-password').required = !row;
+      $('edit-api-note').value = row ? (row.note || '') : '';
+      $('edit-api-active').checked = row ? !!Number(row.is_active) : true;
+      currentPermissions = row && Array.isArray(row.permissions) ? [...row.permissions] : [];
+      renderPermissionChips();
+    }
+
+    function closeApiAccountEditor() {
+      $('api-account-editor').hidden = true;
+      currentPermissions = [];
+      $('edit-api-password').value = '';
+      $('new-permission-route').value = '';
+    }
+
+    let savingAccount = false;
+    async function saveApiAccount() {
+      if (savingAccount) return;
+      const id = $('edit-api-account-id').value;
+      const username = $('edit-api-username').value.trim();
+      const password = $('edit-api-password').value;
+      if (!username) { showAccountMessage('กรุณากรอก username', true); return; }
+      if (!id && !password) { showAccountMessage('กรุณากรอก password สำหรับบัญชีใหม่', true); return; }
+      if (password && password.length < 8) { showAccountMessage('password ต้องมีอย่างน้อย 8 ตัวอักษร', true); return; }
+      if ($('new-permission-route').value.trim()) { showAccountMessage('กรุณากด + เพิ่มสิทธิ์ เพื่อเพิ่ม route ที่พิมพ์ไว้ก่อนบันทึก', true); return; }
+      const payload = {
+        username, note: $('edit-api-note').value.trim(),
+        active: $('edit-api-active').checked,
+        permissions: [...currentPermissions],
+      };
+      if (password) payload.password = password;
+      if (!confirm((id ? 'ยืนยันบันทึกการแก้ไขบัญชี' : 'ยืนยันสร้างบัญชีใหม่') + ' ' + username + '?')) return;
+      savingAccount = true; $('save-api-account').disabled = true; $('cancel-api-account').disabled = true;
+      try {
+        const res = await fetch(API_BASE + '/apiAccounts' + (id ? '/' + id : ''), {
+          method: id ? 'PUT' : 'POST',
+          headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+          body: JSON.stringify(payload),
+        });
+        await checkResponse(res);
+        showAccountMessage('บันทึกบัญชีสำเร็จ');
+        closeApiAccountEditor();
+        loadApiAccounts();
+      } catch (e) {
+        showAccountMessage('บันทึกไม่สำเร็จ: ' + e.message, true);
+      } finally { savingAccount = false; $('save-api-account').disabled = false; $('cancel-api-account').disabled = false; }
+    }
+
+    async function deleteApiAccount(id) {
+      if (!confirm('ยืนยันลบบัญชีนี้? ระบบภายนอกที่ใช้บัญชีนี้จะส่งข้อมูลเข้าไม่ได้อีก')) return;
+      try {
+        const res = await fetch(API_BASE + '/apiAccounts/' + id, { method: 'DELETE', headers: authHeaders() });
+        await checkResponse(res);
+        showAccountMessage('ลบบัญชีแล้ว');
+        loadApiAccounts();
+      } catch (e) {
+        showAccountMessage('ลบไม่สำเร็จ: ' + e.message, true);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!$('add-api-account')) return;
+      $('add-api-account').addEventListener('click', () => openApiAccountEditor(null));
+      $('reload-api-accounts').addEventListener('click', loadApiAccounts);
+      $('cancel-api-account').addEventListener('click', closeApiAccountEditor);
+      $('save-api-account').addEventListener('click', saveApiAccount);
+      $('add-permission').addEventListener('click', () => {
+        const input = $('new-permission-route');
+        const route = input.value.trim();
+        if (!route) return;
+        if (!/^[A-Za-z0-9._-]{1,100}$/.test(route)) { showAccountMessage('route_key ใช้ได้เฉพาะ a-z, 0-9, . _ -', true); return; }
+        if (currentPermissions.includes(route)) { showAccountMessage('มีสิทธิ์นี้อยู่แล้ว', true); return; }
+        currentPermissions.push(route); input.value = ''; renderPermissionChips();
+      });
+      $('new-permission-route').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('add-permission').click(); } });
+      $('api-account-permissions').addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-idx]');
+        if (!btn) return;
+        currentPermissions.splice(Number(btn.dataset.idx), 1);
+        renderPermissionChips();
+      });
+      $('api-accounts-body').addEventListener('click', (ev) => {
+        const btn = ev.target.closest('button[data-act]');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        if (btn.dataset.act === 'edit') {
+          const row = (window.__apiAccounts || []).find((r) => String(r.id) === id);
+          openApiAccountEditor(row);
+        } else if (btn.dataset.act === 'delete') {
+          deleteApiAccount(id);
+        }
+      });
+      const adminPanel = document.getElementById('admin-panel');
+      if (adminPanel && !adminPanel.hidden) loadApiAccounts();
+      const obs = new MutationObserver(() => {
+        if (!adminPanel.hidden) loadApiAccounts();
+        else { accountListGeneration++; window.__apiAccounts = []; $('api-accounts-body').replaceChildren(); closeApiAccountEditor(); showAccountMessage(''); }
+      });
+      if (adminPanel) obs.observe(adminPanel, { attributes: true, attributeFilter: ['hidden'] });
+    });
+  })();
+  </script>
+</body>
+</html>

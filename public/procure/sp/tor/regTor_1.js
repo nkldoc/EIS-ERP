@@ -1825,8 +1825,15 @@ Ext.AppUx = function (app, menu) {
         render: function (combo) {
           tooltip_ComboBox(combo, "c_name");
         },
-        afterrender: function () {
+        afterrender: function (combo) {
           this.fn = function () {};
+          if (combo.getValue()) {
+            Ext.dc_expense_budget_type.load({ params: { dc_cost_acc_id: combo.getValue() } });
+          }
+        },
+        select: function (combo, record) {
+          Ext.dc_expense_budget_type.load({ params: { dc_cost_acc_id: record.data.id } });
+          this.fn();
         },
         Change: function () {
           this.fn();

@@ -119,6 +119,8 @@ function List_QueryParam()
 							,(SELECT c_name FROM " . DB_NMU_ERP . "sp_department WHERE dc_department_id = b.dc_department_id) AS dc_department
 							,b.c_name
 							,b.c_code
+							,ISNULL(b.plan_status,0) AS plan_status
+							,b.plan_code
 							,(SELECT c_name FROM " . DB_NMU_ERP . "sp_type_event ac WHERE ac.sp_type_event_id =
 								(SELECT TOP 1 event_type FROM " . DB_NMU_ERP . "sp_tor_event WHERE sp_tor_id = b.tor_id
 								ORDER BY d_create DESC)) AS event_type
@@ -154,7 +156,7 @@ function List_QueryParam()
 						SELECT
 							s.dc_expense_budget_type_id
 							,s.bg_expense_id
-							,CASE WHEN s.dc_expense_budget_type_id IN (4,5)
+							,CASE WHEN s.dc_expense_budget_type_id IN (5)
 								THEN SUM(s.f_period_begin) + SUM(s.f_period_transfer)
 								ELSE SUM(s.f_plan_begin)  + SUM(s.f_plan_transfer)
 							END AS f_budget_total
@@ -336,6 +338,8 @@ function List_QueryParam()
 				"dc_expense_budget_type"    => $row["dc_expense_budget_type"],
 				"event_type"                => $row["event_type"],
 				"sp_event_detail"           => $row["sp_event_detail"],
+				"plan_status"               => (int)($row["plan_status"] ?? 0),
+				"plan_code"                 => $row["plan_code"],
 				"f_amt"                     => $f_amt,
 				"has_po"                    => $has_po,
 				"children"                  => isset($detailMap[$sp_tor_id]) ? $detailMap[$sp_tor_id] : [],

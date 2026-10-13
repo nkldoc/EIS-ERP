@@ -686,6 +686,7 @@ Ext.storeNew3 = new Ext.data.JsonStore({
         {name: "c_discription"},
         {name: "po_expense_per_dtl_id"},
         {name: "sp_check_period"},
+        {name: "c_arrive_code"},
         {name: "dc_expense_budget_type_txt"},
         {name: "i_is_book"}, // Primary
         {

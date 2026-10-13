@@ -181,6 +181,13 @@ switch ($mode){
             $sql2 = "UPDATE {$table} SET i_menu = 2 ,c_code= '{$c_code}', i_register_status =  {$i_product_type} ,sp_emp_id   = {$_SESSION['sp_emp_id']} WHERE {$keyName} = ?;";
             //update code
             $stmt2 = $db->QueryParam($sql2, array($data["sp_check_period_hdr_id"]));
+            // ออกเลขตรวจรับโดยไม่เช็คเงินและใบกัน (checkbox ในหน้าตรวจรับ): เก็บร่องรอยไว้ให้ตามจองเงินย้อนหลังได้
+            // (ถ้ายังไม่ได้เพิ่มคอลัมน์ตาม scriptBaseUpdate/sp_check_period_hdr_skip_bg_check.sql การออกเลขยังทำงานปกติ แค่ไม่มีร่องรอย)
+            if (($_REQUEST["i_skip_bg_check"] ?? 0) == 1) {
+                $db->QueryParam("IF COL_LENGTH('dbo.sp_check_period_hdr', 'i_skip_bg_check') IS NOT NULL
+                    EXEC sp_executesql N'UPDATE dbo.sp_check_period_hdr SET i_skip_bg_check = 1, dc_user_skip_bg_check_id = @u, d_skip_bg_check = GETDATE() WHERE sp_check_period_hdr_id = @id',
+                        N'@u BIGINT, @id BIGINT', @u = ?, @id = ?;", array($_SESSION['user_id'], $ret_id));
+            }
              /*sp_status_hdr_id	c_code	c_name
                             4	ST0012	รอส่งมอบงาน
                             5	ST0013	รอตรวจรับพัสดุ/ครุภัณฑ์
@@ -204,7 +211,7 @@ switch ($mode){
                             inner join sp_tor_hdr_period b on b.sp_tor_hdr_period_id = a.sp_tor_hdr_period_id
                             where b.i_is_last = 1 and sp_check_period_hdr_id = ?";
             $f1 = $db->GetDataBySQL($subSql, array($ret_id));
-            $i_last_period = $f1['i_is_last'];
+            $i_last_period = $f1['i_is_last'] ?? null; // ไม่ใช่งวดสุดท้าย = ไม่มีแถว ($f1 เป็น null)
 
             $stmt3 = $db->QueryParam(" EXEC dbo.SP_CHECKING_GL ?, ?, ?", array($data["sp_check_period_hdr_id"], $data['dc_user_create_id'], $data['dc_user_create_cost_id']));
             if ($i_last_period) {

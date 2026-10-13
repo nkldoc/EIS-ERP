@@ -1,0 +1,30 @@
+body { font-family: Tahoma, Arial, sans-serif; margin: 0; color: #243447; background: #f4f7fa; }
+#app { max-width: 960px; margin: 64px auto; padding: 32px; background: #fff; border-radius: 8px; }
+.login-page { min-height: 100vh; display: grid; place-items: center; background: linear-gradient(135deg, #0b4f6c, #17324d); }
+.login-card { width: min(390px, calc(100% - 48px)); box-sizing: border-box; padding: 40px; background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
+.brand-mark { width: 56px; height: 56px; margin: 0 auto 16px; display: grid; place-items: center; border-radius: 14px; color: #fff; background: #0b6b72; font-size: 30px; font-weight: 700; }
+.login-card h1 { margin: 0; text-align: center; color: #17324d; }
+.login-subtitle, .login-note { text-align: center; color: #687786; }
+.login-card label { display: block; margin: 18px 0 7px; font-weight: 700; }
+.login-card input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #c8d2dc; border-radius: 8px; font: inherit; }
+.login-card input:focus { outline: 3px solid rgba(11,107,114,.18); border-color: #0b6b72; }
+.login-card button { width: 100%; margin-top: 24px; padding: 13px; border: 0; border-radius: 8px; background: #0b6b72; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.login-card button:hover { background: #08565c; }
+.alert { margin: 20px 0 0; padding: 12px; border-radius: 8px; color: #8a1c1c; background: #fde8e8; }
+.login-note { margin: 22px 0 0; font-size: 13px; }
+.user-summary { display: grid; grid-template-columns: 120px 1fr; gap: 10px; }
+.user-summary dt { font-weight: 700; }
+.user-summary dd { margin: 0; }
+.logout-link { display: inline-block; margin-top: 24px; color: #a12222; }
+.confirmation-status { margin: 24px 0 0; padding: 18px; display: flex; align-items: flex-start; gap: 12px; border: 1px solid #c8d2dc; border-radius: 12px; background: #f4f7fa; line-height: 1.6; }
+.confirmation-status[hidden] { display: none; }
+.confirmation-status strong { display: block; font-size: 20px; line-height: 1.4; }
+.confirmation-status small { display: block; margin-top: 6px; font-size: 14px; }
+.confirmation-status-icon { flex: 0 0 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: #dce5ed; font-size: 22px; font-weight: 700; }
+.confirmation-status[data-status="approved"], .confirmation-status[data-status="stale"] { color: #14532d; background: #ecfdf3; border: 2px solid #15803d; box-shadow: 0 0 0 4px #15803d14; }
+.confirmation-status[data-status="approved"] .confirmation-status-icon { background: #15803d; color: #fff; }
+.confirmation-status[data-status="denied"], .confirmation-status[data-status="expired"] { color: #8a1c1c; background: #fff1f2; border-color: #e6a3a3; }
+.login-card button.login-approved { background: #15803d; font-size: 18px; box-shadow: 0 4px 12px #15803d33; }
+.login-card button.login-approved:hover { background: #166534; }
+.login-card button:focus-visible { outline: 3px solid #17324d; outline-offset: 4px; }
+.login-card button:disabled { opacity: .6; cursor: wait; }

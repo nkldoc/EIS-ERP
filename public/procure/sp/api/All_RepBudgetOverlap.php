@@ -12,7 +12,7 @@ $DBNAME =  "NMU..";
 
 if ($_REQUEST["type"] == "dc_expense_budget_type") {
 
-	$sqlMain	= "SELECT * FROM   ".DB_CENTER."dc_expense_budget_type WHERE i_enable = ? ORDER BY c_name";
+	$sqlMain	= "SELECT * FROM {$DBNAME} dc_expense_budget_type WHERE i_enable = ? ORDER BY c_name";
 	$arrParam	= array(STATUS_ENABLE);
 	$stmt = $db->QueryParam($sqlMain, $arrParam);
 	if ($stmt) {
