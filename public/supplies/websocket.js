@@ -239,7 +239,7 @@ Ext.onReady(function () {
             let protocol = (location.protocol === 'https:') ? 'wss://' : 'ws://';
             let port = (location.protocol === 'https:') ? ':8443' : ':8080';
             let ctx = pathNotif.replace(/[^\/]*$/, '');
-            let wsUrl = protocol + location.host + port + ctx + 'ws/notify/' + uid;
+            let wsUrl = protocol + location.hostname + port + ctx + 'ws/notify/' + uid;
 
             try {
                 window._notifySocket = new WebSocket(wsUrl);

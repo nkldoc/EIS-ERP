@@ -1335,9 +1335,10 @@ Ext.onReady(function () {
             afterrender: function () {
                 Ext.MessageBox.minWidth = 300;
                 Ext.userOnline = null;
-                Ext.Chat = {};
-                Ext.Chat.socket = null;
+                Ext.Chat = Ext.Chat || {};
+                Ext.Chat.socket = Ext.Chat.socket || null;
                 Ext.Chat.connect = function (host) {
+                    if (Ext.Chat.socket && Ext.Chat.socket.readyState < 2) return;
                     if ("WebSocket" in window) {
                         Ext.Chat.socket = new WebSocket(host);
                     } else if ("MozWebSocket" in window) {
