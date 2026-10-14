@@ -1,17 +1,4 @@
 /* global Ext v-pro*/
-/* Preserve POST parameters when IIS redirects PHP API endpoints. */
-(function () {
-        if (!Ext.data || !Ext.data.Connection || Ext.iisPostUrlNormalizerInstalled) return;
-        if (window.location.hostname !== "dev-eis.nmu.ac.th") return;
-        var originalRequest = Ext.data.Connection.prototype.request;
-        Ext.data.Connection.prototype.request = function (options) {
-                if (options && typeof options.url === "string") {
-                        options.url = options.url.replace(/(mnCheckingController|All_PoWorkingImpHdr)\.php(?=([?#]|$))/i, "$1");
-                }
-                return originalRequest.call(this, options);
-        };
-        Ext.iisPostUrlNormalizerInstalled = true;
-}());
 Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
@@ -4143,8 +4130,6 @@ Ext.handleZeroTransfAfterRender = function () {
         }
 };
 Ext.editHistoryAp = (statusx) => {
-        var allowPostedGlEdit = statusx === "editPostedGl";
-        if (allowPostedGlEdit) statusx = "editMaingrid";
         console.log("at line setep ", Ext.stempDbClickRow, "Ext.editHistoryAp START", "status =", statusx, "row =", Ext.selectRow ? Ext.selectRow.data : null);
         Ext.stempDbClickRow++;
 
@@ -4301,10 +4286,8 @@ Ext.editHistoryAp = (statusx) => {
                                         // Ext.getCmp("modeEditID(intval($row["i_period"]) ==  1  && intval($row["i_is_last"]) == 1  )").getValue()
                                         // var  arrEdit = Ext.getCmp("modeEditID").getValue()
                                         // if()
-                                        if (allowPostedGlEdit) {
-                                                Ext.arrEdit = ["Edit_i_product_type"];
-                                        } else if (Ext.selectRow.data.po_working_hdr_id_edit == "0") {
-                                                var modeEdit = Ext.getCmp("modeEditID"); Ext.arrEdit = modeEdit ? String(modeEdit.getValue() || "").split(",") : ["showID"];
+                                        if (Ext.selectRow.data.po_working_hdr_id_edit == "0") {
+                                                Ext.arrEdit = Ext.getCmp("modeEditID").getValue().split(",");
                                         } else if (Ext.selectRow.data.po_working_hdr_id_edit > 0) {
                                                 Ext.arrEdit = "showID";
                                         } else if ([null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
@@ -4329,10 +4312,6 @@ Ext.editHistoryAp = (statusx) => {
                                         window.setTimeout(function () {
                                                 console.log("at line setep ", Ext.stempDbClickRow, "setTimeout UI setup callback START", "arrEdit =", Ext.arrEdit);
                                                 Ext.stempDbClickRow++;
-                                                if (allowPostedGlEdit) {
-                                                        Ext.getCmp("buSaveSub3ID").show();
-                                                        Ext.getCmp("buSavePostedGlEditID").show();
-                                                }
                                                 myGrid = Ext.getCmp("gridSub4ID");
                                                 Ext.getCmp("ButtonsproductID").hide();
                                                 Ext.getCmp("upload_pdf1").hide();
@@ -6300,7 +6279,20 @@ Ext.upMoneyId = function (id, req, f, bgid) {
                 },
         });
 };
-Ext.genCode = function (rec) {
+// checkbox "ออกเลขตรวจรับโดยไม่เช็คเงิน" ในหน้าทำรายการตรวจรับ
+Ext.isSkipBgCheck = function () {
+        var skipBgCheck = Ext.getCmp("i_skip_bg_checkID");
+        return !!(skipBgCheck && skipBgCheck.getValue());
+};
+// ออกเลขตรวจรับโดยไม่จองเงิน/ไม่หักใบกัน (ข้าม Ext.bookingOverall ทั้งหมด)
+Ext.genCodeSkipBg = function (rec) {
+        if (rec.c_code != null && rec.c_code != "") {
+                Ext.MessageBox.alert("Notification", "มีเลขCHK ไม่สามารถออกเลขซ้ำได้ ");
+                return;
+        }
+        Ext.genCode(rec, true);
+};
+Ext.genCode = function (rec, skipBgCheck) {
         Ext.Ajax.request({
                 url: "tor/api/mnCheckCode.php",
                 method: "POST",
@@ -6314,11 +6306,12 @@ Ext.genCode = function (rec) {
                         dc_cost_origin_id: Ext.getCmp("dc_cost2_idID").getValue(),
                         d_checking_date: Ext.util.Format.date(Ext.getCmp("d_checking_dateID").getValue(), "Y-m-d"),
                         i_budget_year: Ext.getCmp("i_budget_year").getValue(),
+                        i_skip_bg_check: skipBgCheck === true ? 1 : 0,
                 },
                 success: function (result, request) {
                         if (result.statusText) {
                                 Ext.storeDtl.reload();
-                                Ext.Msg.alert("แจ้งเตือน", "หักเงินและออกเลขเรียบร้อยแล้ว");
+                                Ext.Msg.alert("แจ้งเตือน", skipBgCheck === true ? "ออกเลขตรวจรับเรียบร้อยแล้ว (ไม่ได้เช็คเงินและใบกัน)" : "หักเงินและออกเลขเรียบร้อยแล้ว");
                                 Ext.getCmp("winPeriodHdrID").destroy();
                         }
                 },
@@ -10085,15 +10078,6 @@ function showCustomEditForm(rec) {
                                                 }, 100);
                                         }
                                 }, {
-                                        text: 'เปิดให้แก้ไข (บันทึก GL แล้ว)',
-                                        iconCls: 'icon-edit',
-                                        hidden: ![3, 4, 5, 6, 99].includes(Number(rec.get('i_send_gl_dr'))),
-                                        handler: function () {
-                                                Ext.selectRow = rec;
-                                                win.close();
-                                                Ext.editHistoryAp("editPostedGl");
-                                        }
-                                }, {
                                         text: 'OTP Generator',
                                         iconCls: 'icon-star', // (ถ้ามี) ใส่เพื่อให้มีไอคอนสวยงามขึ้น
                                         handler: function () {
@@ -10357,7 +10341,7 @@ Ext.AppUx = function (app, menu) {
         Ext.storeDtl = new Ext.data.JsonStore({
                 storeId: "storeDtl",
                 autoDestroy: false,
-                autoLoad: false,
+                autoLoad: true,
                 url: "tor/api/mnCheckingController.php",
                 baseParams: { mode: "LIST_SUB_PERIOD_HDR" },
                 root: "data",
@@ -10785,7 +10769,7 @@ Ext.AppUx = function (app, menu) {
         Ext.bg_budget_year = new Ext.data.JsonStore({
                 autoDestroy: false,
                 storeId: 'bg_budget_year',
-                autoLoad: false,
+                autoLoad: true,
                 url: "api/All_PoWorkingImpHdr.php",
                 baseParams: {
                         type: "bg_budget_year",
@@ -14080,6 +14064,15 @@ Ext.AppUx = function (app, menu) {
                                                                                                 name: "i_chk_bgTxt",
                                                                                                 // value: "ปี",
                                                                                         },
+                                                                                        {
+                                                                                                // ติ๊กแล้ว "บันทึกรายการหลัก" จะออกเลขตรวจรับเลย โดยไม่จองเงิน/ไม่หักใบกัน และไม่เช็ควงเงิน
+                                                                                                xtype: "checkbox",
+                                                                                                id: "i_skip_bg_checkID",
+                                                                                                fieldLabel: "ออกเลขตรวจรับ",
+                                                                                                boxLabel: '<span style="color:red">ออกเลขตรวจรับโดยไม่เช็คเงิน</span>',
+                                                                                                checked: true, // ค่าเริ่มต้น: ไม่เช็คเงินและใบกัน (เอาติ๊กออกเพื่อกลับไปจองเงิน/หักใบกันแบบเดิม)
+                                                                                                submitValue: false,
+                                                                                        },
                                                                                         new Ext.form.ComboBox({
                                                                                                 mode: "local",
                                                                                                 // allowBlank: false,
@@ -16400,16 +16393,6 @@ Ext.AppUx = function (app, menu) {
                                 buttonAlign: "left",
                                 buttons: [
                                         {
-                                                id: "buSavePostedGlEditID",
-                                                text: "บันทึกการแก้ไข",
-                                                icon: "../images/icons/save.png",
-                                                hidden: true,
-                                                handler: function () {
-                                                        var saveButton = Ext.getCmp("buSaveSub3ID");
-                                                        saveButton.handler.call(saveButton.scope || saveButton, saveButton);
-                                                },
-                                        },
-                                        {
                                                 id: "buSaveSub3ID",
                                                 //                                                                                                                                                                                                                                                                        iconCls: "icon-save",
                                                 icon: "../images/icons/save.png",
@@ -16444,46 +16427,6 @@ Ext.AppUx = function (app, menu) {
                                                                 return false;
                                                         }
                                                         validationSaveButton.receiveValidationPassed = false;
-                                                        // ---- เช็คงวดปิด (gl_dc_period.i_status = 2) ----
-if (!validationSaveButton.periodCheckPassed) {
-    var chkDateVal = Ext.getCmp("d_checking_dateID").getValue();
-    if (chkDateVal) {
-        var winMask = Ext.getCmp("winPeriodHdrID").getEl();
-        winMask.mask("ตรวจสอบงวดบัญชี...", "x-mask-loading");
-        Ext.Ajax.request({
-            url: "tor/api/mnCheckingController.php",
-            method: "POST",
-            params: {
-                mode: "CHECK_PERIOD_CLOSE",
-                d_checking_date: Ext.util.Format.date(chkDateVal, "Y-m-d"),
-            },
-            success: function (result) {
-                winMask.unmask();
-                var json;
-                try { json = Ext.decode(result.responseText); }
-                catch (e) { Ext.Msg.alert("ผิดพลาด", "ตรวจสอบงวดไม่สำเร็จ (ข้อมูลตอบกลับไม่ถูกต้อง)"); return; }
-
-                if (json.i_status == 2) {
-                    Ext.Msg.alert("แจ้งเตือน",
-                        "วันที่ตรวจรับถูกปิดงวดแล้ว กรุณาเปิดงวด เดือน " + json.c_mm + " ปี " + json.c_yyyy_be,
-                        function () { Ext.getCmp("d_checking_dateID").focus(); });
-                    return;
-                }
-                // ผ่าน -> เรียก handler ซ้ำ (ต้องตั้งทั้งสองแฟล็ก เพราะบรรทัดบนรีเซ็ต receiveValidationPassed ทุกรอบ)
-                validationSaveButton.receiveValidationPassed = true;
-                validationSaveButton.periodCheckPassed = true;
-                validationSaveButton.handler.call(validationSaveButton.scope || validationSaveButton, validationSaveButton);
-            },
-            failure: function () {
-                winMask.unmask();
-                Ext.Msg.alert("ผิดพลาด", "ไม่สามารถตรวจสอบงวดบัญชีได้");
-            },
-        });
-        return false;
-    }
-}
-validationSaveButton.periodCheckPassed = false;
-// ---- จบเช็คงวดปิด ----
                                                         Ext.getCmp('gridSub4ID').stopEditing(); // ✅ เพิ่มบรรทัดนี้
                                                         const text = Ext.getCmp('c_name_dtlID').getValue();
                                                         // ใช้ Regex ค้นหาคำว่า "งวดที่ : ตามด้วยตัวเลข" ทั้งหมดในข้อความ
@@ -16536,7 +16479,9 @@ validationSaveButton.periodCheckPassed = false;
                                                                         var totalVatFromGrid = 0;
                                                                         Ext.getCmp("gridSub4ID").getStore().each(function (rec) {
                                                                                 var v = 0;
-                                                                                if (rec._vatManual) {
+                                                                                if (!Ext.getCmp("i_vat_amtID").getValue()) {
+                                                                                        v = 0; // ไม่ติ๊ก "ภาษีมูลค่าเพิ่ม" = ไม่มี VAT
+                                                                                } else if (rec._vatManual) {
                                                                                         v = parseFloat((rec.get("f_vat_amt") || "0").toString().replace(/,/g, "")) || 0;
                                                                                 } else {
                                                                                         var net = parseFloat((rec.get("f_net_total") || "0").toString().replace(/,/g, "")) || 0;
@@ -16575,6 +16520,10 @@ validationSaveButton.periodCheckPassed = false;
                                                                                 d_date: Ext.util.Format.gridDate(v.data.d_doc_date, "Y-m-d"),
                                                                                 c_comment: v.data.c_comment,
                                                                                 f_vat_amt: (function () {
+                                                                                        // ไม่ติ๊ก "ภาษีมูลค่าเพิ่ม" = รายการนี้ไม่มี VAT ไม่ต้องคำนวณ 7% ให้รายการตั้งหนี้
+                                                                                        if (!Ext.getCmp("i_vat_amtID").getValue()) {
+                                                                                                return 0;
+                                                                                        }
                                                                                         if (v._vatManual) {
                                                                                                 return parseFloat((v.data.f_vat_amt + "").replace(/,/g, "")) || 0;
                                                                                         }
@@ -16622,7 +16571,7 @@ validationSaveButton.periodCheckPassed = false;
                                                                                 msg += "ออกเลขตรวจรับแล้ว ไม่สามารถทำรายการซ้ำได้";
                                                                         }
                                                                         var i_year = Ext.bg_budget_year.data.items[0].data.i_year_be;
-                                                                        if (Ext.selectRow.get("c_yyyy") != i_year && Ext.selectRow.data.i_chk_bg == 1) {
+                                                                        if (Ext.selectRow.get("c_yyyy") != i_year && Ext.selectRow.data.i_chk_bg == 1 && !Ext.isSkipBgCheck()) {
                                                                                 msg += "ใช้เงินปีงบประมาณ ไม่ตรงกับปีงบที่เปิด ";
                                                                         }
                                                                         if (Ext.getCmp("i_is_warrantyID").getValue().inputValue == 1) {
@@ -16647,7 +16596,7 @@ validationSaveButton.periodCheckPassed = false;
                                                                 if (Ext.not_equal == 1) {
                                                                         //  msg += "<span style='white-space: nowrap;'>- กรุณาตั้งหนี้ค่าใช้ค่าให้กับพอดีวงเงิน</span><br>";
                                                                 }
-                                                                if (Ext.sum_minus == 1) {
+                                                                if (Ext.sum_minus == 1 && !Ext.isSkipBgCheck()) {
                                                                         msg += "<span style='white-space: nowrap;'>- วงเงินแหล่งเงินไม่เพียงพอ</span><br>";
                                                                 }
                                                                 if (Ext.util.Format.date(Ext.getCmp("d_checking_dateID").getValue(), "Y-m-d") < Ext.util.Format.date(Ext.getCmp("d_doc_arrive_validationID").getValue(), "Y-m-d")) {
@@ -16821,6 +16770,9 @@ validationSaveButton.periodCheckPassed = false;
                                                                                                                                                                                                                                                                         },
                                                                                                                                                                                                                                                                 });
                                                                                                                                                                                                                                                         });
+                                                                                                                                                                                                                                                } else if (Ext.isSkipBgCheck()) {
+                                                                                                                                                                                                                                                        // ออกเลขตรวจรับโดยไม่เช็คเงินและใบกัน: ข้ามการจองเงิน/หักใบกัน
+                                                                                                                                                                                                                                                        Ext.genCodeSkipBg(record[0].data);
                                                                                                                                                                                                                                                 } else {
                                                                                                                                                                                                                                                         Ext.bookingOverall(record, rec);
                                                                                                                                                                                                                                                 }
@@ -17717,7 +17669,7 @@ Ext.onReady(function () {
                                                                         if (success) {
                                                                                 resolve(store); // โหลดสำเร็จ ส่งสัญญานไปต่อ
                                                                         } else {
-                                                                                reject('Store load failed: ' + (store.storeId || 'unknown') + ' (URL: ' + (store.url || 'unknown') + ')'); // โหลดพัง ส่งสัญญาณหยุด
+                                                                                reject('ไม่สามารถโหลดข้อมูล Store ได้'); // โหลดพัง ส่งสัญญาณหยุด
                                                                         }
                                                                 }
                                                         });

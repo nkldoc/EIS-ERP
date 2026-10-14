@@ -3155,28 +3155,6 @@ switch ($mode) {
 // =======================
 // exit;
         break;
-    case "CHECK_PERIOD_CLOSE":
-        // ตรวจว่าวันที่บันทึกการตรวจรับอยู่ในงวดที่ปิดแล้วหรือไม่ (gl_dc_period.i_status = 2)
-        $chkDate = trim((string) ($_REQUEST["d_checking_date"] ?? ""));
-        $ts = $chkDate !== "" ? strtotime($chkDate) : false;
-        if ($ts === false) {
-            echo json_encode(array("success" => false, "msg" => "วันที่ตรวจรับไม่ถูกต้อง"));
-            exit();
-        }
-        $mm = date("m", $ts);       // '06'
-        $yy = intval(date("Y", $ts)); // ค.ศ. เช่น 2025
-        $sqlPeriod = "SELECT TOP 1 i_status
-                      FROM " . DB_NMU . "gl_dc_period
-                      WHERE i_system = '4' AND c_mm = ? AND c_yyyy = ? AND i_last_period = 1";
-        $stmtPeriod = $db->QueryParam($sqlPeriod, array($mm, $yy));
-        $rowPeriod = $stmtPeriod ? $db->Fetch($stmtPeriod) : false;
-        echo json_encode(array(
-            "success" => true,
-            "i_status" => $rowPeriod ? intval($rowPeriod["i_status"]) : null,
-            "c_mm" => $mm,
-            "c_yyyy_be" => $yy + 543
-        ));
-        exit();
     case "UPDATE_DCACC_CONFIRM":
         $arrData = json_decode($_POST['dc_acc_arr'], true);
         if (empty($_SESSION['user_id'])) {
