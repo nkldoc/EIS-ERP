@@ -5,8 +5,10 @@ final class ProcurePresence
 {
     private static function config(): array
     {
+        static $config = null;
+        if ($config !== null) return $config;
         $file = getenv('EIS_PRESENCE_CONFIG') ?: __DIR__ . '/presence.config.php';
-        return is_file($file) ? (array)require $file : [];
+        return $config = is_readable($file) ? (array)require $file : [];
     }
     private static function host(): string
     {
@@ -40,17 +42,23 @@ final class ProcurePresence
     }
     public static function token(string $system, string $uid, string $name, string $department, string $login, bool $admin = false): array
     {
-        if (!self::enabled() || !in_array($system, ['PROCURE'], true)) throw new RuntimeException('Presence is not enabled for this deployment');
+        if (!self::enabled() || !in_array($system, ['PROCURE'], true)) throw new RuntimeException('PRESENCE_CONFIG_REQUIRED');
         require_once __DIR__ . '/AdminIdentity.php';
         if (ProcureAdminIdentity::needsName()) throw new UnexpectedValueException('Admin operator required');
         $key = self::sessionKey($system, $uid, $login);
         $operator = ProcureAdminIdentity::operator();
         if ($operator !== '' && (string)$_SESSION['user_id'] === $uid) { $uid .= '@' . $operator; $name = $operator . '-procure'; }
         if (is_file(self::directory() . '/revoked/' . $key)) throw new UnexpectedValueException('Session revoked');
-        $file = self::directory() . '/' . strtolower($system) . '.secret';
-        if (!is_readable($file)) throw new RuntimeException('Presence service is not configured');
+        $directory = self::directory();
+        if (!is_dir($directory) || !is_readable($directory)) throw new RuntimeException('PRESENCE_STORAGE_UNAVAILABLE');
+        $file = $directory . '/' . strtolower($system) . '.secret';
+        if (!is_readable($file)) throw new RuntimeException('PRESENCE_KEY_UNREADABLE');
+        $secret = @file_get_contents($file);
+        if ($secret === false) throw new RuntimeException('PRESENCE_KEY_UNREADABLE');
+        $secret = trim($secret);
+        if ($secret === '') throw new RuntimeException('PRESENCE_KEY_EMPTY');
         $encoded = rtrim(strtr(base64_encode(json_encode(['system'=>$system, 'uid'=>$uid, 'name'=>$name, 'department'=>$department, 'admin'=>false, 'session'=>$key, 'exp'=>time()+60], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
-        return ['token'=>$encoded . '.' . hash_hmac('sha256', $encoded, trim(file_get_contents($file))), 'url'=>self::websocketUrl()];
+        return ['token'=>$encoded . '.' . hash_hmac('sha256', $encoded, $secret), 'url'=>self::websocketUrl()];
     }
     private static function websocketUrl(): string
     {

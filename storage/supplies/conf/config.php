@@ -100,7 +100,7 @@ define("DELETE_FALSE", 2); // ใช้งานได้ตามปกติ
 define("STATUS_ENABLE", 1); // ใช้งาน
 define("STATUS_DISABLE", 0); // ไม่ใช้งาน
 define("LINE_NOTIF", MAIN_HOST_NAME . NMU_SUPPLIES_PORT . "/supplies/lib/lineNotif/send_line_dev.php"); //URL ระบบ NMU_API
-define("IPAPIBG", "https://api-eis.nmu.ac.th/api-nmu"); //สำหรับจอง (ไม่ระบุ default port :443)
+define("IPAPIBG", "https://dev-eis.nmu.ac.th/api-nmu"); //สำหรับจอง (ไม่ระบุ default port :443)
 $arr_status = array(
     0 => "เลือกทั้งหมด",
     STATUS_ENABLE => "ใช้งาน",

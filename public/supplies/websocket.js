@@ -88,8 +88,9 @@ Ext.onReady(function () {
                 });
 
                 // hover pause auto-close
-                var remaining = cfg.ttl, start = Date.now(), timer = null;
+                var remaining = cfg.ttl, start = Date.now(), timer = null, closing = false;
                 function schedule() {
+                    if (closing || !el.dom) return;
                     clearTimer();
                     timer = setTimeout(remove, remaining);
                     start = Date.now();
@@ -101,8 +102,10 @@ Ext.onReady(function () {
                     }
                 }
                 function remove() {
+                    if (closing) return;
+                    closing = true;
                     clearTimer();
-                    el.fadeOut({duration: .2, callback: function () {
+                    if (el.dom) el.fadeOut({duration: .2, callback: function () {
                             try {
                                 el.remove();
                             } catch (e) {
