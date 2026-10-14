@@ -3,8 +3,7 @@
 /public/procure/conf/config.php
 
 # Runtime data
-/storage/sessions/
-/storage/logs/
+/storage/
 *.log
 *.tmp
 *.cache
@@ -26,3 +25,7 @@ nbproject/private/private.xml
 nbproject/project.properties
 nbproject/project.xml
 nbproject/private/private.properties
+
+# Archive files
+*.[rR][aA][rR]
+*.[zZ][iI][pP]

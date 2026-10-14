@@ -1,2 +1,0 @@
-<?php
-// LINE Notify integration
