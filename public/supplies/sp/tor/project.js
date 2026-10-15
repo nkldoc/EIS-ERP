@@ -4,6 +4,31 @@
  * @returns {undefined}
  */
 const ip = Ext.session.ip_booking; // 192
+// เช็คเซสชันก่อนกดจองเงินทุกครั้ง - การจองที่ระบบงบ (API ภายนอก) ไม่ใช้เซสชันของเรา แต่ขั้นบันทึกเลขอ้างอิง
+// กลับระบบเรา (updateBookingContract / UPDATE_CONTRACT_* ใน mnTorController.php) ต้องใช้เซสชัน ถ้าเซสชันหมดอายุ
+// ระหว่างนั้นจะจองสำเร็จที่ระบบงบแต่บันทึกกลับไม่ได้ (เงินจองค้าง กดจองซ้ำเจอ "Duplicate reserve") - จึงเช็คก่อน
+// ถ้าเซสชันหมดอายุให้แจ้งเตือนและหยุดไว้ก่อน ไม่ยิงจองเงิน (ใช้ SESSION_PING เดียวกับ torUi.js genBooklink)
+Ext.fnCheckSessionBeforeBook = function (onOk) {
+  Ext.Ajax.request({
+    url: "tor/api/mnTorController.php",
+    method: "POST",
+    params: { mode: "SESSION_PING" },
+    success: function () {
+      onOk();
+    },
+    failure: function (result) {
+      if (result.status === 401) {
+        Ext.Msg.alert(
+          "เซสชันหมดอายุ",
+          "เซสชันการใช้งานหมดอายุ กรุณากด Ctrl+F5 หรือออกจากระบบแล้วเข้าใหม่ ก่อนกดจองเงิน<br>" +
+            "(ป้องกันกรณีจองเงินสำเร็จที่ระบบงบ แต่บันทึกเลขอ้างอิงกลับมาระบบเราไม่สำเร็จ ทำให้จองซ้ำได้)"
+        );
+      } else {
+        Ext.Msg.alert("แจ้งเตือน", "ตรวจสอบสถานะการเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+      }
+    },
+  });
+};
 const genLinkBg = function (event, rec) {
   //c_overlap genLinkBg('c_overlap')
   let link = null;
@@ -228,6 +253,12 @@ const bookingPRPO = function (i, link) {
   });
 };
 const bookingOverlap = function (i, link, rec) {
+  // เช็คเซสชันก่อนยิงจอง/ตัดใบกัน (ดูเหตุผลที่ Ext.fnCheckSessionBeforeBook ด้านบน)
+  Ext.fnCheckSessionBeforeBook(function () {
+    bookingOverlapDo(i, link, rec);
+  });
+};
+const bookingOverlapDo = function (i, link, rec) {
   var ii = i;
 
   Ext.getCmp("winDcExpTypeDdd2ID").hide();
@@ -5774,6 +5805,11 @@ Ext.AppUx = function (app, menu) {
                     if (Ext.isEmpty(Ext.getCmp("f_type_amtID").getValue())) {
                       Ext.MessageBox.alert("Failed", " กรุณากรอกเงินที่ทำสัญญา แยกแหล่งเงิน ");
                       return false;
+                    } else if (!Ext.getCmp("i_pr_type1ID").getValue()) {
+                      // ยังไม่ได้เลือก "จองแบบแผน / จองแบบงวด" - เดิมไม่เช็ค ทำให้ขั้นตรวจยอดคงเหลือพัง (getValue() เป็น null)
+                      // แล้วหน้าจอค้าง "Please wait..." ไม่มีข้อความอะไรเลย
+                      Ext.MessageBox.alert("แจ้งเตือน", "กรุณาเลือก \"จองแบบแผน\" หรือ \"จองแบบงวด\" ก่อนกดบันทึกรายการจอง");
+                      return false;
                     } else {
                       var doBooking = function () {
                       Ext.getCmp("winDcExpTypeDdd2ID").hide();
@@ -5783,12 +5819,22 @@ Ext.AppUx = function (app, menu) {
                         method: "GET", //POST
                         disableCaching: false,
                         success: function (result, request) {
-                          var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-                          var cheVal = parseFloat(Ext.getCmp("f_type_amtID").getValue().replace(/\,/g, ""));
-                          if (Ext.getCmp("i_pr_type1ID").getValue().inputValue === 1) {
-                            f_amt = parseFloat(jsonData.data[0].f_total_plan.replace(/\,/g, ""));
-                          } else {
-                            f_amt = parseFloat(jsonData.data[0].f_total_dtl.replace(/\,/g, ""));
+                          var f_amt;
+                          var cheVal;
+                          try {
+                            var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                            cheVal = parseFloat(Ext.getCmp("f_type_amtID").getValue().replace(/\,/g, ""));
+                            if (Ext.getCmp("i_pr_type1ID").getValue().inputValue === 1) {
+                              f_amt = parseFloat(jsonData.data[0].f_total_plan.replace(/\,/g, ""));
+                            } else {
+                              f_amt = parseFloat(jsonData.data[0].f_total_dtl.replace(/\,/g, ""));
+                            }
+                          } catch (err) {
+                            // เดิมถ้าตรงนี้พัง (ระบบงบตอบข้อมูลไม่ครบ/เซสชันหลุด) จะค้าง "Please wait..." เงียบๆ
+                            Ext.getCmp("winChequeID").getEl().unmask();
+                            Ext.getCmp("winDcExpTypeDdd2ID").show();
+                            Ext.MessageBox.alert("แจ้งเตือน", "ตรวจสอบยอดคงเหลือกับระบบงบประมาณไม่สำเร็จ กรุณาลองใหม่อีกครั้ง<br>(ถ้ายังไม่ได้ให้กด Ctrl+F5 หรือออกจากระบบแล้วเข้าใหม่)");
+                            return false;
                           }
                           // console.log("F_amt"+f_amt);
                           // console.log("cheVal"+cheVal);
@@ -5811,6 +5857,8 @@ Ext.AppUx = function (app, menu) {
                           return false;
                         },
                         failure: function (result, request) {
+                          Ext.getCmp("winChequeID").getEl().unmask();
+                          Ext.getCmp("winDcExpTypeDdd2ID").show();
                           Ext.MessageBox.alert("Failed", result.responseText); // connect error
                         },
                       });
@@ -5818,6 +5866,8 @@ Ext.AppUx = function (app, menu) {
                       // ลิงก์จองเงินใช้แหล่งเงินของ PO ย่อย (rec) ถ้าแหล่งเงินที่เลือก (ตามแผน) ต่างจากที่บันทึกไว้
                       // ให้บันทึกลง PO ย่อยก่อน แล้วจองด้วยแหล่งเงินนั้น
                       var selBgTypeId = Ext.getCmp("dc_expense_budget_type_id1TxtID").getValue();
+                      // เช็คเซสชันก่อน (ก่อนทั้งบันทึกแหล่งเงินและก่อนยิงจอง) - เซสชันหมดอายุจะแจ้งเตือนและหยุด
+                      Ext.fnCheckSessionBeforeBook(function () {
                       if (selBgTypeId > 0 && selBgTypeId != rec.get("dc_expense_budget_type_id")) {
                         Ext.Ajax.request({
                           url: "tor/api/mnContractProject.php",
@@ -5845,6 +5895,7 @@ Ext.AppUx = function (app, menu) {
                       } else {
                         doBooking();
                       }
+                      }); // Ext.fnCheckSessionBeforeBook
                     }
                   },
                 },
