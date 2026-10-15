@@ -150,6 +150,29 @@ switch ($mode){
             $data['dc_user_create_id'] = $_SESSION['user_id'];  // ลงยัญชี
             $ret_id = $_REQUEST["sp_check_period_hdr_id"] ?? null;
 
+            $apCostId = $_REQUEST['dc_cost_id'] ?? null;
+            $apCost = $db->GetDataBySQL(
+                "SELECT c_sub FROM NMU_DATACENTER.dbo.dc_cost WHERE dc_cost_id = ?",
+                array($apCostId)
+            );
+            $apCostSub = trim((string)($apCost['c_sub'] ?? ''));
+            $rejectApCode = function ($reason) use ($db, $apCostId, $apCostSub, $ret_id) {
+                $db->RollBackTran();
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(array(
+                    "reval" => 1,
+                    "success" => "Error",
+                    "msg" => "ไม่บันทึกการออกเลข AP: " . $reason
+                        . " (dc_cost_id=" . (string)$apCostId
+                        . ", NMU_DATACENTER.dbo.dc_cost.c_sub=" . ($apCostSub !== '' ? $apCostSub : 'ไม่พบค่า')
+                        . ") ระบบ procure มหาวิทยาลัยต้องใช้ c_sub=02 กรุณาตรวจสอบหน่วยงานและเข้าสู่ระบบใหม่",
+                    "id" => $ret_id
+                ), JSON_UNESCAPED_UNICODE);
+                exit;
+            };
+            if ($apCostSub !== '02') {
+                $rejectApCode("หน่วยงานที่ส่งมาไม่ใช่หน่วยงานสำหรับออกเลขมหาวิทยาลัย");
+            }
             $arrValue   =    array();
             $arrValue[] =  $_REQUEST['dc_cost_id'];
             // $arrValue[] =  date("y");
@@ -168,6 +191,10 @@ switch ($mode){
             ";
             $stmt = $db->QueryParam($sql, $arrValue);
             $arr_gen_code = $db->Fetch($stmt);
+            $generatedApCode = trim((string)($arr_gen_code['c_code'] ?? ''));
+            if (strpos($generatedApCode, '02AP') !== 0) {
+                $rejectApCode("เลขที่ฐานข้อมูลสร้างไม่ขึ้นต้นด้วย 02AP (เลขที่ได้รับ=" . $generatedApCode . ")");
+            }
 
             $cf = $db->GetDataBySQL("SELECT c_sub as c_code FROM NMU_DATACENTER.dbo.dc_cost aa WHERE aa.dc_cost_id =(  
             SELECT  dc_cost_id FROM NMU_DATACENTER.dbo.dc_cost WHERE c_code = (SELECT LEFT(c_code,2) + '000000' 

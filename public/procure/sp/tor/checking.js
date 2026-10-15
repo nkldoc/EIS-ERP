@@ -6340,7 +6340,20 @@ Ext.genCode = function (rec) {
                         i_budget_year: Ext.getCmp("i_budget_year").getValue(),
                 },
                 success: function (result, request) {
-                        if (result.statusText) {
+                        var response;
+                        var periodWindow = Ext.getCmp("winPeriodHdrID");
+                        if (periodWindow) periodWindow.getEl().unmask();
+                        try {
+                                response = Ext.decode(result.responseText);
+                        } catch (e) {
+                                Ext.Msg.alert("แจ้งเตือน", "ไม่สามารถตรวจสอบผลการออกเลข AP ได้ กรุณาโหลดข้อมูลใหม่เพื่อตรวจสอบก่อนลองอีกครั้ง");
+                                return;
+                        }
+                        if (!response || response.success !== "Success") {
+                                Ext.Msg.alert("ไม่สามารถออกเลข AP", Ext.util.Format.htmlEncode((response && response.msg) || "ไม่สามารถออกเลข AP ได้"));
+                                return;
+                        }
+                        if (response.success === "Success") {
                                 Ext.storeDtl.reload();
                                 Ext.Msg.alert("แจ้งเตือน", Ext.isCheckingNoBooking(Ext.perioidHdr) ? "ออกเลขตรวจรับเรียบร้อยแล้ว (ไม่จองเงิน)" : "หักเงินและออกเลขเรียบร้อยแล้ว");
                                 Ext.getCmp("winPeriodHdrID").destroy();
