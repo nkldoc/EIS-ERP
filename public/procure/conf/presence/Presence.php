@@ -69,6 +69,6 @@ final class ProcurePresence
     public static function script(): string
     {
         if (!self::enabled() || empty($_SESSION['user_id'])) return '';
-        return '<link rel="stylesheet" href="/procure/assets/css/presence-chat.css?v=20261013-ws-safe"><script>window.EISPresenceConfig={tokenUrl:"/procure/access/presence-token.php",loginUrl:"/NMU_permission/"};</script><script src="/procure/assets/js/presence-client.js?v=20261013-ws-safe"></script><script src="/procure/assets/js/presence-image-viewer.js?v=20261013-ws-safe"></script><script src="/procure/assets/js/presence-chat.js?v=20261013-ws-safe"></script>';
+        return '<link rel="stylesheet" href="/procure/assets/css/presence-chat.css?v=20261015-chat-dock-v2"><script>window.EISPresenceConfig={tokenUrl:"/procure/access/presence-token.php",loginUrl:"/NMU_permission/"};</script><script src="/procure/assets/js/presence-client.js?v=20261013-ws-safe"></script><script src="/procure/assets/js/presence-image-viewer.js?v=20261013-ws-safe"></script><script src="/procure/assets/js/presence-chat.js?v=20261015-chat-dock-v2"></script>';
     }
 }
