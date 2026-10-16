@@ -1,5 +1,11 @@
 <?php
 include("../../conf/config.php");
+require_once __DIR__ . '/../../conf/WorkspacePolicy.php';
+$externalUnit = SuppliesWorkspacePolicy::externalUnit($_SESSION);
+if ($externalUnit) {
+    header('Location: /supplies/sp/CheckList.php', true, 303);
+    exit;
+}
 
 //print_r($_SESSION);
 //exit();
@@ -371,7 +377,7 @@ include("../../conf/config.php");
                             html: iframeHtml(PR_URL),
                             iconCls: 'icon-pr'
                         },
-                        {
+                        <?php if (!$externalUnit): ?> {
                             title: 'ชุดเอกสาร/วิธีการดำเนินงาน',
                             id: 'tab-template',
                             html: iframeHtml(TOR_TYPE),
@@ -389,7 +395,7 @@ include("../../conf/config.php");
                             id: 'tab-sign',
                             html: iframeHtml(SIGN_URL),
                             iconCls: 'icon-sign'
-                        }
+                        } <?php endif; ?>
                     ],
                     listeners: {
                         tabchange: function (tp, newTab) {

@@ -95,6 +95,9 @@ switch ($mode) {
             $catid1 = 2;
             $catid2 = 3;
         }
+        $arr = [];
+        $arrValue = [];
+        $last_id = 0;
         if (sqlsrv_has_rows($stmt0)) {
             while ($row = $db->Fetch($stmt0)) {
                 $arr[] = array("id" => $row["id"], "sp_cate_id" => $catid1, "c_name" => $row["c_name"], "score" => $row["score"]);
@@ -102,8 +105,10 @@ switch ($mode) {
             }
         }
         $last_id += 1;
-        foreach ($data["c_name"] as $k => $val) {
-            $arr[] = array("id" => ($last_id++), "sp_cate_id" => $catid2, "c_name" => $val, "score" => $data["score"][$k]);
+        $cNameList = isset($data["c_name"]) && is_array($data["c_name"]) ? $data["c_name"] : [];
+        $scoreList = isset($data["score"]) && is_array($data["score"]) ? $data["score"] : [];
+        foreach ($cNameList as $k => $val) {
+            $arr[] = array("id" => ($last_id++), "sp_cate_id" => $catid2, "c_name" => $val, "score" => $scoreList[$k] ?? null);
         }
 
 
@@ -120,13 +125,22 @@ switch ($mode) {
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"];
         $data["d_update"] = date("Y-m-d H:i:s");
 
-        foreach ($data as $fldA => $value) {
+        // only real columns of sp_tor_work_score may go into the UPDATE
+        $allowed = array(
+            "c_name", "score", "i_delete",
+            "dc_user_update_id", "dc_user_update_cost_id", "d_update",
+        );
+        foreach ($allowed as $fldA) {
+            if (!array_key_exists($fldA, $data) || is_array($data[$fldA])) {
+                continue;
+            }
+            $value = $data[$fldA];
             $arrValue[] = ($value != "") ? $value : null;
             $addField .= ",
             {$fldA} = ?";
         }
 
-        $arrValue[] = $_REQUEST["id"];
+        $arrValue[] = $data["sp_tor_id"];
         $sql = "UPDATE dbo.sp_tor_work_score SET " . substr($addField, 1) . " WHERE sp_tor_id = ?";
 //        echo $sql;
 //        exit();

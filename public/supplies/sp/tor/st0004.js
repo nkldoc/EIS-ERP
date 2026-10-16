@@ -1,5 +1,75 @@
 /* global Ext, user_right_add, user_right_edit, user_right_delete */
 
+// [เพิ่ม] ปิดคำขอแก้ไขงบประมาณที่ค้างอยู่ (sp_tor_bg_log, i_edit=1, c_comment_edit1 ว่าง) ผ่าน UI แทนการรัน SQL มือ
+// เดิมมีแค่ API (mnCancelEditBg.php mode=return) แต่ไม่มีปุ่มเรียกใช้เลยสักจุด ทำให้ PR ติดค้างสถานะ
+// "อยู่ระหว่างแก้ไขงบประมาณ" แม้จะแก้ไขเสร็จไปแล้วจริง (เปิด/ถอย/ผ่านรายการไม่ได้) ต้องรัน SQL ปลดล็อกเอง
+Ext.fnCloseBgEdit = function (record) {
+    var torId = record.get("id");
+    var win = new Ext.Window({
+        id: "win-close-bg-edit",
+        title: "ปิดคำขอแก้ไขงบประมาณ",
+        resizable: false,
+        modal: true,
+        width: 500,
+        layout: "form",
+        bodyStyle: "padding:8px;",
+        items: [
+            {
+                xtype: "displayfield",
+                fieldLabel: "รหัส PR",
+                value: "<b>" + Ext.util.Format.htmlEncode(record.get("c_code") || "") + "</b>",
+            },
+            {
+                xtype: "textarea",
+                fieldLabel: "ผลการแก้ไข / หมายเหตุปิดคำขอ",
+                name: "comment",
+                id: "closeBgEditCommentID",
+                width: 330,
+                height: 90,
+            },
+        ],
+        buttons: [
+            {
+                text: "ยืนยันปิดคำขอ",
+                iconCls: "icon-save",
+                handler: function () {
+                    var comment = Ext.getCmp("closeBgEditCommentID").getValue();
+                    if ([null, "", undefined].includes((comment || "").trim())) {
+                        Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกผลการแก้ไข / หมายเหตุปิดคำขอ");
+                        return;
+                    }
+                    win.getEl().mask("Please wait...", "x-mask-loading");
+                    Ext.Ajax.request({
+                        url: "tor/api/mnCancelEditBg.php",
+                        method: "POST",
+                        params: { mode: "return", id: torId, comment: comment },
+                        success: function (result) {
+                            var jsonData = Ext.util.JSON.decode(result.responseText);
+                            win.getEl().unmask();
+                            if (jsonData.success === "Success" || jsonData.reval === 0) {
+                                Ext.Msg.alert("สำเร็จ", "ปิดคำขอแก้ไขงบประมาณแล้ว", function () {
+                                    win.destroy();
+                                    if (Ext.storeDtl) {
+                                        Ext.storeDtl.reload();
+                                    }
+                                });
+                            } else {
+                                Ext.Msg.alert("ผิดพลาด", jsonData.msg || "ปิดคำขอไม่สำเร็จ");
+                            }
+                        },
+                        failure: function (result) {
+                            win.getEl().unmask();
+                            Ext.Msg.alert("ผิดพลาด", result.responseText);
+                        },
+                    });
+                },
+            },
+            { text: "ยกเลิก", handler: function () { win.destroy(); } },
+        ],
+    });
+    win.show();
+};
+
 Ext.workScore = function () {
   if (!Ext.isEmpty(Ext.getCmp("frmTab2"))) Ext.getCmp("frmTab2").destroy();
   Ext.i_pr_about = 1;
@@ -696,14 +766,19 @@ Ext.AppUx = function (app, menu) {
   function cellClick(grid, rowIndex, columnIndex, e) {
     var record = grid.getStore().getAt(rowIndex);
     Ext.selectRow = record;
-    if (columnIndex === grid.getColumnModel().getIndexById("processDueID")) {
+    if (columnIndex === grid.getColumnModel().getIndexById("closeBgEditID")) {
+      if (Ext.selectRow.get("sp_bg_edit") == 1 && Ext.isEmpty(Ext.selectRow.get("c_comment_edit1"))) {
+        Ext.fnCloseBgEdit(Ext.selectRow);
+      }
+      return;
+    } else if (columnIndex === grid.getColumnModel().getIndexById("processDueID")) {
       //ttf
       controller(Ext.selectRow, "processUpdate"); //on
     } else if (columnIndex === grid.getColumnModel().getIndexById("editEmpTorID")) {
       controller(Ext.selectRow, "editEmpTorID");
     } else if (columnIndex === grid.getColumnModel().getIndexById("processreverseID")) {
       // reversemenu();
-      if (Ext.selectRow.get("sp_bg_edit") == 1) {
+      if (Ext.selectRow.get("sp_bg_edit") == 1 && Ext.isEmpty(Ext.selectRow.get("c_comment_edit1"))) {
         Ext.Msg.alert("แจ้งเตือน", "<span style='white-space: nowrap;'>รายการนี้อยู่ระหว่างการขอแก้ไข 1</span><br>", function (bu, action) {});
         return false;
       }
@@ -865,7 +940,7 @@ Ext.AppUx = function (app, menu) {
         });
         return;
       }
-      if (rec.get("sp_bg_edit") == 1) {
+      if (rec.get("sp_bg_edit") == 1 && Ext.isEmpty(rec.get("c_comment_edit1"))) {
         Ext.Msg.alert("แจ้งเตือน", "<span style='white-space: nowrap;'>PR อยู่ระหว่างแก้ไขงบประมาณ</span><br>", function (bu, action) {
           return false;
         });
@@ -1174,7 +1249,7 @@ Ext.AppUx = function (app, menu) {
     autoLoad: true,
     url: "api/All_PoWorkingImpHdr.php",
     baseParams: {
-      type: "dc_expense_budget_type2",
+      type: "dc_expense_budget_type",
     },
     root: "data",
     idProperty: "id",
@@ -1560,6 +1635,15 @@ Ext.AppUx = function (app, menu) {
       {
         name: "d_act_date_dt26",
       },
+      {
+        name: "plan_status",
+      },
+      {
+        name: "plan_code",
+      },
+      {
+        name: "plan_seq",
+      },
     ],
   });
   Ext.store_year = new Ext.data.JsonStore({
@@ -1640,7 +1724,7 @@ Ext.AppUx = function (app, menu) {
                                       if (!Ext.selectRow.get("dc_cost_id")) Ext.selectRow.set("dc_cost_id", null);
                                       if (!Ext.selectRow.get("dc_cost2_id")) Ext.selectRow.set("dc_cost2_id", null);
                                       // console.log(Ext.selectRow
-                                      if (Ext.selectRow.get("sp_bg_edit") == 1) {
+                                      if (Ext.selectRow.get("sp_bg_edit") == 1 && Ext.isEmpty(Ext.selectRow.get("c_comment_edit1"))) {
                                         Ext.Msg.alert("แจ้งเตือน", "<span style='white-space: nowrap;'>รายการนี้อยู่ระหว่างการขอแก้ไข 2</span><br>", function (bu, action) {});
                                         return false;
                                       }
@@ -1881,14 +1965,26 @@ Ext.AppUx = function (app, menu) {
     }
     function purchase2(id, bg_reserve_money_id, ii) {
       console.log(id + " == " + bg_reserve_money_id + " == " + ii);
+      var params = {
+        mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
+        hdr_id: id, //sp_dtl_id
+        bg_reserve_money_id: bg_reserve_money_id,
+        ii: ii,
+      };
+      var planStatusCmp = Ext.getCmp("plan_statusID");
+      var planCodeCmp = Ext.getCmp("plan_codeID");
+      var planSeqCmp = Ext.getCmp("plan_seqID");
+      if (planStatusCmp) {
+        params.plan_status = planStatusCmp.getValue().inputValue;
+        params.plan_code = planCodeCmp ? planCodeCmp.getValue() : "";
+        params.plan_seq = planSeqCmp ? planSeqCmp.getValue() : "";
+      }
+      if (Ext.getCmp("c_remakeID")) {
+        params.c_remake = Ext.getCmp("c_remakeID").getValue();
+      }
       Ext.Ajax.request({
         url: "tor/api/mnTorController.php",
-        params: {
-          mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
-          hdr_id: id, //sp_dtl_id
-          bg_reserve_money_id: bg_reserve_money_id,
-          ii: ii,
-        },
+        params: params,
         method: "POST", //POST
         success: function (result, request) {
           Ext.store2.load({
@@ -3297,56 +3393,81 @@ Ext.AppUx = function (app, menu) {
                           name: "c_comment",
                           value: "รายละเอียดต่างๆ",
                         },
-                        new Ext.form.ComboBox({
-                          mode: "local",
-                          store: Ext.i_type_bg,
-                          anchor: "50%",
+                        {
+                          xtype: "compositefield",
                           fieldLabel: "ประเภท PR",
-                          submitValue: true,
-                          readOnly: true,
-                          hiddenName: "i_type_bg",
-                          name: "i_type_c_name_bg",
-                          id: "i_type_bgID",
-                          valueField: "id",
-                          displayField: "c_name",
-                          triggerAction: "all",
-                          forceSelection: true,
-                          selectOnFocus: true,
-                          typeAhead: false,
-                          emptyText: "กรุณาเลือก",
-                          validator: function (val) {
-                            if (!Ext.isEmpty(val)) {
-                              return true;
-                            } else {
-                              return "กรุณาระบุ ข้อมูลให้ถูกต้อง";
-                            }
-                          },
-                          listeners: {
-                            afterrender: function () {
-                              this.fn = function () {
-                                // if (this.getValue() == 1) {
-                                //     //tor_type_id === 1 (เจาะจง)
-                                //     Ext.getCmp("lableLessID").show();
-                                // } else {
-                                //     Ext.getCmp("lableLessID").hide();
-                                // }
-                              };
+                          anchor: "70%",
+                          items: [
+                            new Ext.form.ComboBox({
+                              mode: "local",
+                              store: Ext.i_type_bg,
+                              width: 260,
+                              submitValue: true,
+                              readOnly: true,
+                              hiddenName: "i_type_bg",
+                              name: "i_type_c_name_bg",
+                              id: "i_type_bgID",
+                              valueField: "id",
+                              displayField: "c_name",
+                              triggerAction: "all",
+                              forceSelection: true,
+                              selectOnFocus: true,
+                              typeAhead: false,
+                              emptyText: "กรุณาเลือก",
+                              validator: function (val) {
+                                if (!Ext.isEmpty(val)) {
+                                  return true;
+                                } else {
+                                  return "กรุณาระบุ ข้อมูลให้ถูกต้อง";
+                                }
+                              },
+                              listeners: {
+                                afterrender: function () {
+                                  this.fn = function () {
+                                    // if (this.getValue() == 1) {
+                                    //     //tor_type_id === 1 (เจาะจง)
+                                    //     Ext.getCmp("lableLessID").show();
+                                    // } else {
+                                    //     Ext.getCmp("lableLessID").hide();
+                                    // }
+                                  };
+                                },
+                                Change: function () {
+                                  this.fn();
+                                },
+                                beforequery: function (q) {
+                                  if (q.query) {
+                                    var length = q.query.length;
+                                    q.query = new RegExp(Ext.escapeRe(q.query));
+                                    q.query.length = length;
+                                  }
+                                },
+                                blur: function () {
+                                  this.getStore().clearFilter();
+                                },
+                              },
+                            }),
+                            {
+                              xtype: "tbspacer",
+                              width: 5,
                             },
-                            Change: function () {
-                              this.fn();
+                            {
+                              xtype: "button",
+                              text: "แก้ไข",
+                              id: "buEditTypeBgID",
+                              width: 60,
+                              handler: function () {
+                                Ext.Msg.confirm("ยืนยัน", "ต้องการแก้ไขประเภท PR ใช่หรือไม่?", function (btn) {
+                                  if (btn === "yes") {
+                                    Ext.getCmp("i_type_bgID").setReadOnly(false);
+                                    Ext.getCmp("i_type_bgID").getEl().setStyle("background", "#fff");
+                                    Ext.getCmp("buEditTypeBgID").hide();
+                                  }
+                                });
+                              },
                             },
-                            beforequery: function (q) {
-                              if (q.query) {
-                                var length = q.query.length;
-                                q.query = new RegExp(Ext.escapeRe(q.query));
-                                q.query.length = length;
-                              }
-                            },
-                            blur: function () {
-                              this.getStore().clearFilter();
-                            },
-                          },
-                        }),
+                          ],
+                        },
                         {
                           xtype: disp,
                           fieldLabel: "รหัส PR",
@@ -4174,6 +4295,13 @@ Ext.AppUx = function (app, menu) {
                   },
                 }, //haddler
                 {
+                  text: "แยก PR (เพิ่ม PR ลูก)",
+                  iconCls: "icon-add",
+                  handler: function () {
+                    winSplitPr(Ext.selectRow);
+                  },
+                },
+                {
                   text: Ext.GLOBAL_BU_BACK_TH,
                   handler: function () {
                     Ext.getCmp("winMain").hide();
@@ -4187,6 +4315,313 @@ Ext.AppUx = function (app, menu) {
       ],
     });
   }; //End App
+
+  function winSplitPr(rec) {
+    // หมวดงบประมาณของ PR แม่แยกเก็บคนละฟิลด์ตามแหล่งเงินที่ 1/2/3 (dc_expense_budget_type_id / 2_id / 3_id)
+    // ต้องดูว่าแหล่งไหนยังจองเงินอยู่ (bg_reserve_moneyN_id > 0) แล้วอ่านหมวดงบของแหล่งนั้นมาโดยเฉพาะ
+    // ไม่ใช่อ่าน dc_expense_budget_type_id เฉยๆ เพราะถ้าตัวจริงจองไว้ที่แหล่ง 2 หรือ 3 ฟิลด์นี้จะว่างเปล่าอยู่แล้ว
+    var budgetFieldBySlot = { 1: "dc_expense_budget_type_id", 2: "dc_expense_budget_type2_id", 3: "dc_expense_budget_type3_id" };
+    // backend ส่งฟิลด์เหล่านี้ผ่าน intval() เสมอ (intval(NULL) = 0) ดังนั้น "ไม่มีค่า" ต้องเช็คว่า <= 0 ด้วย ไม่ใช่แค่ isEmpty
+    function resolveParentBudgetType() {
+      for (var n = 1; n <= 3; n++) {
+        if (rec.get("bg_reserve_money" + n + "_id") > 0) {
+          var v = rec.get(budgetFieldBySlot[n]);
+          if (!Ext.isEmpty(v) && v > 0) return v;
+        }
+      }
+      // ไม่มีแหล่งไหนจองอยู่แล้ว (ยกเลิกไปหมดแล้ว) ลองไล่หาค่าที่ยังไม่ถูกล้างจากฟิลด์ไหนก็ได้
+      for (var m = 1; m <= 3; m++) {
+        var v2 = rec.get(budgetFieldBySlot[m]);
+        if (!Ext.isEmpty(v2) && v2 > 0) return v2;
+      }
+      return null;
+    }
+    // เก็บหมวดงบประมาณของ PR แม่ไว้ใน localStorage ทุกครั้งที่เปิด popup นี้ (ถ้ายังมีค่าอยู่)
+    // เพราะตอนยกเลิกการจองเงิน ค่านี้ใน sp_tor จะถูกล้างเป็น null จึงต้องกันไว้ก่อนล่วงหน้า
+    // ไม่ผูกกับ branch "ยังมีการจองเงินอยู่" อย่างเดียว เผื่อกรณีบางแหล่งถูกยกเลิกไปก่อนหน้านี้แล้ว
+    try {
+      var budgetTypeToKeep = resolveParentBudgetType();
+      if (!Ext.isEmpty(budgetTypeToKeep)) {
+        localStorage.setItem("splitPrBudgetType_" + rec.get("id"), budgetTypeToKeep);
+      }
+    } catch (e) {}
+
+    var activeSlots = [];
+    for (var n = 1; n <= 3; n++) {
+      if (rec.get("bg_reserve_money" + n + "_id") > 0) activeSlots.push(n);
+    }
+    if (activeSlots.length > 0) {
+      Ext.Msg.alert(
+        "แจ้งเตือน",
+        "PR แม่ยังมีการจองเงินอยู่ที่แหล่งเงินที่ " +
+          activeSlots.join(", ") +
+          "<br>ต้องยกเลิกการจองเงินให้หมดทุกแหล่งก่อน จึงจะแยก PR ลูกได้",
+        function () {
+          cancelBookingPr(activeSlots[0]);
+        }
+      );
+      return;
+    }
+    var keptBudgetType = null;
+    try {
+      var storedBudgetType = localStorage.getItem("splitPrBudgetType_" + rec.get("id"));
+      if (!Ext.isEmpty(storedBudgetType) && storedBudgetType != "0") keptBudgetType = storedBudgetType;
+    } catch (e) {}
+    if (!Ext.isEmpty(Ext.getCmp("winSplitPrID"))) {
+      Ext.getCmp("winSplitPrID").destroy();
+    }
+
+    var rowIndices = [];
+    var rowSeq = 0;
+
+    function buildSplitPrRow() {
+      rowSeq++;
+      var idx = rowSeq;
+      rowIndices.push(idx);
+      var rowPanel = new Ext.Panel({
+        id: "splitPrRowID" + idx,
+        border: true,
+        bodyStyle: "padding:6px;",
+        style: "margin-bottom:8px;background:#f7f7f7;",
+        layout: "form",
+        labelWidth: 130,
+        items: [
+          new Ext.form.ComboBox({
+            mode: "local",
+            store: Ext.i_type_bg,
+            anchor: "95%",
+            fieldLabel: "ประเภท PR (ของลูก)",
+            id: "splitPrTypeBgID" + idx,
+            valueField: "id",
+            displayField: "c_name",
+            triggerAction: "all",
+            forceSelection: true,
+            selectOnFocus: true,
+            typeAhead: false,
+            allowBlank: false,
+            emptyText: "กรุณาเลือก",
+          }),
+          new Ext.form.ComboBox({
+            mode: "local",
+            store: Ext.dc_expense_budget_type,
+            anchor: "95%",
+            fieldLabel: "หมวดงบประมาณ",
+            id: "splitPrBudgetTypeID" + idx,
+            valueField: "id",
+            displayField: "c_name",
+            value: resolveParentBudgetType() || keptBudgetType, // เกาะแหล่งเงินจาก PR แม่มาให้เลย (หรือค่าที่เก็บไว้ก่อนยกเลิกจองเงิน ถ้า PR แม่ถูกล้างค่าไปแล้ว)
+            triggerAction: "all",
+            forceSelection: true,
+            selectOnFocus: true,
+            typeAhead: false,
+            emptyText: "กรุณาเลือก",
+          }),
+          {
+            xtype: "numberfield",
+            fieldLabel: "จำนวนเงิน (ของลูก)",
+            id: "splitPrAmtID" + idx,
+            anchor: "95%",
+            allowBlank: false,
+            decimalPrecision: 2,
+            minValue: 0.01,
+          },
+          {
+            xtype: "textarea",
+            fieldLabel: "หมายเหตุ",
+            id: "splitPrRemarkID" + idx,
+            anchor: "95%",
+            height: 40,
+          },
+        ],
+        buttons: [
+          {
+            text: "- ลบรายการนี้",
+            handler: function () {
+              if (rowIndices.length <= 1) {
+                Ext.Msg.alert("แจ้งเตือน", "ต้องมีอย่างน้อย 1 รายการ");
+                return;
+              }
+              var pos = rowIndices.indexOf(idx);
+              if (pos > -1) rowIndices.splice(pos, 1);
+              Ext.getCmp("splitPrRowsCtID").remove(rowPanel);
+              Ext.getCmp("splitPrRowsCtID").doLayout();
+            },
+          },
+        ],
+      });
+      return rowPanel;
+    }
+
+    var winSplitPrWin = new Ext.Window({
+      id: "winSplitPrID",
+      title: "เพิ่ม PR ลูก (แยกจาก " + rec.get("c_code") + ")",
+      modal: true,
+      resizable: true,
+      width: 460,
+      height: 520,
+      layout: "fit",
+      items: [
+        {
+          xtype: "panel",
+          border: false,
+          layout: "form",
+          labelWidth: 130,
+          bodyStyle: "padding:8px;",
+          autoScroll: true,
+          items: [
+            {
+              xtype: "displayfield",
+              fieldLabel: "PR แม่",
+              value: "<b>" + rec.get("c_code") + "</b> - " + rec.get("c_name"),
+            },
+            {
+              xtype: "box",
+              autoEl: { tag: "hr" },
+            },
+            {
+              xtype: "container",
+              id: "splitPrRowsCtID",
+              layout: "anchor",
+            },
+            {
+              xtype: "button",
+              text: "+ เพิ่มรายการ PR ลูกอีก",
+              handler: function () {
+                Ext.getCmp("splitPrRowsCtID").add(buildSplitPrRow());
+                Ext.getCmp("splitPrRowsCtID").doLayout();
+              },
+            },
+          ],
+        },
+      ],
+      buttonAlign: "center",
+      buttons: [
+        {
+          text: "บันทึกทั้งหมด",
+          iconCls: "icon-save",
+          id: "buSplitPrSaveID",
+          handler: function () {
+            var rows = [];
+            for (var i = 0; i < rowIndices.length; i++) {
+              var idx = rowIndices[i];
+              var i_type_bg = Ext.getCmp("splitPrTypeBgID" + idx).getValue();
+              var f_total_amt = Ext.getCmp("splitPrAmtID" + idx).getValue();
+              if (Ext.isEmpty(i_type_bg) || Ext.isEmpty(f_total_amt)) {
+                Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกประเภท PR และกรอกจำนวนเงินของ PR ลูกให้ครบทุกรายการ (รายการที่ " + (i + 1) + " ยังไม่ครบ)");
+                return;
+              }
+              rows.push({
+                i_type_bg: i_type_bg,
+                dc_expense_budget_type_id: Ext.getCmp("splitPrBudgetTypeID" + idx).getValue(),
+                f_total_amt: f_total_amt,
+                c_comment: Ext.getCmp("splitPrRemarkID" + idx).getValue(),
+              });
+            }
+            var sumAmt = 0;
+            for (var j = 0; j < rows.length; j++) sumAmt += parseFloat(rows[j].f_total_amt) || 0;
+            Ext.Msg.confirm(
+              "ยืนยัน",
+              "ต้องการเพิ่ม PR ลูกของ " + rec.get("c_code") + " จำนวน " + rows.length + " รายการ รวมเป็นเงิน " + sumAmt + " บาท ใช่หรือไม่?",
+              function (btn) {
+                if (btn !== "yes") return;
+                if (Ext.getCmp("buSplitPrSaveID").disabled) return; // กันกดซ้ำ/ยืนยันซ้ำ ยิง request ซ้อนกัน
+                Ext.getCmp("buSplitPrSaveID").disable();
+                var okCount = 0;
+                var errMsgs = [];
+
+                function submitOne(i) {
+                  if (i >= rows.length) {
+                    // เสร็จทุกรายการแล้ว (สำเร็จบางส่วนหรือทั้งหมด)
+                    if (okCount > 0) {
+                      try {
+                        localStorage.removeItem("splitPrBudgetType_" + rec.get("id"));
+                      } catch (e) {}
+                    }
+                    var summary = "เพิ่ม PR ลูกสำเร็จ " + okCount + " จาก " + rows.length + " รายการ";
+                    if (errMsgs.length > 0) summary += "<br>รายการที่ผิดพลาด:<br>" + errMsgs.join("<br>");
+                    Ext.Msg.alert(errMsgs.length > 0 ? "เสร็จบางส่วน" : "สำเร็จ", summary, function () {
+                      if (okCount > 0) {
+                        Ext.getCmp("tabpanel1").getStore().reload();
+                      }
+                      if (errMsgs.length === 0) {
+                        Ext.getCmp("winSplitPrID").destroy();
+                      } else {
+                        Ext.getCmp("buSplitPrSaveID").enable();
+                      }
+                    });
+                    return;
+                  }
+                  var row = rows[i];
+                  var params = {
+                    mode: "ADD",
+                    id: rec.get("id"), // แหล่งที่จะคัดลอกรายละเอียดจัดซื้อ (sp_tor_dtl) มาให้ PR ลูก
+                    i_dtl_add: 1,
+                    parent_id: rec.get("id"), // ผูก PR ลูกกับ PR แม่ ใช้เลข PR เดียวกัน
+                    sp_emp_id: rec.get("sp_emp_id"), // inherit ผู้รับผิดชอบจาก PR แม่
+                    c_name: rec.get("c_name"),
+                    i_type_bg: row.i_type_bg,
+                    dc_expense_budget_type_id: row.dc_expense_budget_type_id,
+                    f_total_amt: row.f_total_amt,
+                    f_type_amt: row.f_total_amt,
+                    c_comment: row.c_comment,
+                    dc_cost_id: rec.get("dc_cost_id"),
+                    dc_cost2_id: rec.get("dc_cost2_id"),
+                    dc_sub_cost_id: rec.get("dc_sub_cost_id"),
+                    po_expense_id: rec.get("po_expense_id"),
+                    tor_type_id: rec.get("tor_type_id"),
+                    i_purchase: rec.get("i_purchase"),
+                    i_hire_type: rec.get("i_hire_type"),
+                    i_product_type: rec.get("i_product_type"),
+                    i_is_inv: rec.get("i_is_inv"),
+                    i_type_fix_rate: rec.get("i_type_fix_rate"),
+                    i_yyyy: rec.get("i_yyyy"),
+                    i_enabled: 1,
+                    // เริ่ม PR ลูกที่ขั้นตอนเดียวกับ PR แม่ ไม่งั้นจะไม่ขึ้นในหน้ารายการ/ค้นหาของเมนูปัจจุบัน
+                    tor_status_id: rec.get("tor_status_id"),
+                    i_step: rec.get("i_step"),
+                    i_forword: rec.get("i_forword"),
+                    i_backword: rec.get("i_backword"),
+                    dc_department_id: rec.get("dc_department_id"), // สายงาน เกาะจาก PR แม่
+                  };
+                  Ext.iterate(params, function (key, val) {
+                    if (Ext.isEmpty(val)) delete params[key];
+                  });
+                  Ext.Ajax.request({
+                    url: "tor/api/mnTorController.php",
+                    method: "POST",
+                    params: params,
+                    success: function (response) {
+                      var result = Ext.decode(response.responseText);
+                      if (result.success) {
+                        okCount++;
+                      } else {
+                        errMsgs.push("รายการที่ " + (i + 1) + ": " + (result.msg || "ไม่สามารถเพิ่มได้"));
+                      }
+                      submitOne(i + 1);
+                    },
+                    failure: function () {
+                      errMsgs.push("รายการที่ " + (i + 1) + ": ไม่สามารถติดต่อเซิร์ฟเวอร์ได้");
+                      submitOne(i + 1);
+                    },
+                  });
+                }
+                submitOne(0);
+              }
+            );
+          },
+        },
+        {
+          text: "ยกเลิก",
+          handler: function () {
+            Ext.getCmp("winSplitPrID").destroy();
+          },
+        },
+      ],
+    });
+    winSplitPrWin.show();
+    Ext.getCmp("splitPrRowsCtID").add(buildSplitPrRow());
+    Ext.getCmp("splitPrRowsCtID").doLayout();
+  }
 
   function SearchFrm() {
     return new Ext.Window({
@@ -4653,7 +5088,23 @@ Ext.AppUx = function (app, menu) {
           width: 200,renderer: function (value, metaData, record, row, col, store, gridView) {
               return value;
           }
-          
+
+        },
+        {
+          // [เพิ่ม] ปิดคำขอแก้ไขงบประมาณที่ค้างอยู่ (เดิมติดต้องรัน SQL ปลดล็อกเอง ไม่มีปุ่มในหน้าเว็บเลย)
+          header: "",
+          sortable: false,
+          align: "center",
+          dataIndex: "id",
+          id: "closeBgEditID",
+          width: 95,
+          renderer: function (value, metaData, record) {
+            if (record.get("sp_bg_edit") == 1 && Ext.isEmpty(record.get("c_comment_edit1"))) {
+              metaData.attr = "style='cursor:pointer;' ext:qtip='คำขอแก้ไขงบประมาณยังค้างอยู่ (ยังไม่มีการปิดเรื่อง) กดเพื่อปิดคำขอ'";
+              return '<span style="color:#1677ff;text-decoration:underline;white-space:nowrap;">🔓 ปิดคำขอ</span>';
+            }
+            return "";
+          },
         },
         {
           header: "อัพเดทสถานะ",

@@ -848,6 +848,21 @@ Ext.AppUx = function (app, menu) {
         name: "c_code",
       },
       {
+        name: "sp_tor_delete_flag",
+      },
+      {
+        name: "tor_delete_comment",
+      },
+      {
+        name: "tor_delete_user",
+      },
+      {
+        name: "tor_delete_cost",
+      },
+      {
+        name: "tor_delete_date",
+      },
+      {
         name: "bg_budget_dtl_project_id",
       },
       {
@@ -933,6 +948,12 @@ Ext.AppUx = function (app, menu) {
       },
       {
         name: "i_yyyy",
+      },
+      {
+        name: "i_type_year",
+      },
+      {
+        name: "mm_start",
       },
       {
         name: "c_year",
@@ -1045,6 +1066,94 @@ Ext.AppUx = function (app, menu) {
   });
   //    console.log(' >>> ' + Ext.getDate.getNowCarlen());
   //    console.log(' >>> ' + Ext.getDate.defaultDate());
+
+  // PR ที่ถูกถอยรายการกลับมาให้แก้ไข (sp_tor_delete_flag = 1): double click แล้วโชว์หมายเหตุก่อน
+  // ว่าต้องแก้ไขอะไรบ้าง กด "รับทราบและแก้ไขรายการ" เพื่อเคลียร์ flag แล้วเปิดฟอร์มแก้ไขต่อ
+  var spTorReverseNote = function () {
+    new Ext.Window({
+      id: "win-reverse-note",
+      title: "เหตุผลในการถูกถอยรายการ (ต้องแก้ไข)",
+      resizable: false,
+      modal: true,
+      width: 600,
+      layout: "form",
+      bodyStyle: "padding:8px;",
+      items: [
+        {
+          xtype: "displayfield",
+          fieldLabel: "รหัส PR",
+          value: "<b>" + (Ext.selectRow.get("c_code") || "(ยังไม่ออกเลข PR)") + "</b>",
+        },
+        {
+          xtype: "displayfield",
+          fieldLabel: "ผู้ถอยรายการ",
+          value:
+            "<b>" +
+            (Ext.selectRow.get("tor_delete_user") || "-") +
+            "</b>" +
+            (Ext.selectRow.get("tor_delete_cost") ? " (" + Ext.selectRow.get("tor_delete_cost") + ")" : ""),
+        },
+        {
+          xtype: "displayfield",
+          fieldLabel: "วันเวลาที่ถอย",
+          value: Ext.selectRow.get("tor_delete_date") || "-",
+        },
+        {
+          xtype: "textarea",
+          fieldLabel: "หมายเหตุ/สิ่งที่ต้องแก้ไข",
+          name: "tor_delete_comment",
+          id: "reverseNoteCommentID",
+          width: 400,
+          height: 120,
+          readOnly: true,
+          value: Ext.selectRow.get("tor_delete_comment"),
+        },
+      ],
+      buttons: [
+        {
+          text: "รับทราบและแก้ไขรายการ",
+          iconCls: "icon-table_delete",
+          handler: function () {
+            Ext.Ajax.request({
+              url: "tor/api/mnTorController.php",
+              method: "GET",
+              params: {
+                mode: "Recognize_Reason",
+                id: Ext.selectRow.get("id"),
+                sp_status_hdr_id: Ext.selectRow.get("tor_status_id"),
+                c_comment_delete: Ext.getCmp("reverseNoteCommentID").getValue(),
+                sp_emp_id: Ext.selectRow.get("sp_emp_id"),
+                i_enabled: 2,
+              },
+              success: function (result) {
+                var jd = Ext.util.JSON.decode(result.responseText);
+                if (jd.success) {
+                  Ext.getCmp("win-reverse-note").destroy();
+                  Ext.selectRow.set("sp_tor_delete_flag", 0);
+                  Ext.selectRow.set("tor_delete_comment", null);
+                  Ext.selectRow.commit();
+                  Ext.loadStore("edit", true);
+                  if (Ext.storeDtl) Ext.storeDtl.reload();
+                } else {
+                  Ext.MessageBox.alert("Failed", jd.msg);
+                }
+              },
+              failure: function (result) {
+                Ext.MessageBox.alert("Failed", result.responseText);
+              },
+            });
+          },
+        },
+        {
+          text: Ext.GLOBAL_BU_BACK_TH,
+          iconCls: "icon-clear",
+          handler: function () {
+            Ext.getCmp("win-reverse-note").destroy();
+          },
+        },
+      ],
+    }).show();
+  };
   //interlizing
   Ext.loadStore = function (status, show) {
     var statusx = status;
@@ -1101,6 +1210,11 @@ Ext.AppUx = function (app, menu) {
       winApp.show();
       Ext.getCmp("winChequeID").hideTabStripItem(1);
     } else if (statusx === "edit") {
+      // PR ถูกถอยรายการกลับมาให้แก้ไข -> โชว์หมายเหตุก่อน แล้วค่อยเปิดฟอร์ม
+      if (Ext.selectRow && Ext.selectRow.get && Ext.selectRow.get("sp_tor_delete_flag") == 1) {
+        spTorReverseNote();
+        return;
+      }
       Ext.HDR_ID = Ext.selectRow.data.id;
       Ext.tor_type_id = Ext.selectRow.data.tor_type_id; // default start เจาะจงน้อวกว่า 5 แสน
       Ext.i_is_more = Ext.selectRow.data.i_is_more;
@@ -1118,7 +1232,7 @@ Ext.AppUx = function (app, menu) {
       var winApp = AppPoStore(statusx);
       Ext.getCmp("winChequeID").items.items[0].getForm().loadRecord(Ext.selectRow);
       winApp.show();
-      syncBgYearType(Ext.selectRow.get("i_yyyy"));
+      syncBgYearType(Ext.selectRow.get("i_yyyy"), Ext.selectRow.get("i_type_year"), Ext.selectRow.get("mm_start"));
       // ส่งรายการแล้วจะอัพเดทไม่ได้
       if (Ext.selectRow.get("tor_status_id") > 0) {
         Ext.getCmp("updateBuID").hide();
@@ -1167,32 +1281,57 @@ Ext.AppUx = function (app, menu) {
     }
   };
 
-  function syncBgYearType(selectedYear) {
+  function buildMonthStore(selectedYearAd) {
+    var i_year = (selectedYearAd - 0) + 543;
+    Ext.store_month = new Ext.data.JsonStore({
+      fields: ["id", "c_name"],
+      data: [
+        { id: "10", c_name: "ต.ค. " + (i_year - 1) },
+        { id: "11", c_name: "พ.ย. " + (i_year - 1) },
+        { id: "12", c_name: "ธ.ค. " + (i_year - 1) },
+        { id: "01", c_name: "ม.ค. " + i_year },
+        { id: "02", c_name: "ก.พ. " + i_year },
+        { id: "03", c_name: "มี.ค. " + i_year },
+        { id: "04", c_name: "เม.ย. " + i_year },
+        { id: "05", c_name: "พ.ค. " + i_year },
+        { id: "06", c_name: "มิ.ย. " + i_year },
+        { id: "07", c_name: "ก.ค. " + i_year },
+        { id: "08", c_name: "ส.ค. " + i_year },
+        { id: "09", c_name: "ก.ย. " + i_year },
+      ],
+    });
+    return Ext.store_month;
+  }
+
+  function syncBgYearType(selectedYear, savedTypeYear, savedMonth) {
     var grp = Ext.getCmp("i_type_yearID");
     var mm = Ext.getCmp("mm_ID");
     if (!grp) {
       return;
     }
     var yr = selectedYear - 0;
-    if (yr != Ext.bgYear) {
+    // ใช้ค่าที่บันทึกไว้จริงของรายการ (i_type_year/mm_start) ถ้ามี แทนการคำนวณจากปีอย่างเดียว
+    // ป้องกันไม่ให้ค่าที่ user เลือกไว้ (เช่น "ก่อนปีงบประมาณ") หายไปตอนเปิดดู/แก้ไขรายการ
+    var hasSaved = savedTypeYear != null && savedTypeYear !== "";
+    var typeYear = hasSaved ? savedTypeYear - 0 : yr < Ext.bgYear ? 2 : 1;
+    var showGroup = yr != Ext.bgYear || typeYear == 2;
+
+    if (showGroup) {
       grp.show();
-      if (yr < Ext.bgYear) {
-        grp.setValue(2);
-        if (mm) {
-          mm.show();
-        }
-      } else {
-        grp.setValue(1);
-        if (mm) {
-          mm.hide();
-        }
-      }
     } else {
       grp.hide();
-      grp.setValue(1);
-      if (mm) {
-        mm.hide();
+    }
+    grp.setValue(typeYear);
+
+    if (typeYear == 2 && mm) {
+      var mmCombo = Ext.getCmp("mm_startID");
+      mmCombo.bindStore(buildMonthStore(yr));
+      if (savedMonth) {
+        mmCombo.setValue(savedMonth);
       }
+      mm.show();
+    } else if (mm) {
+      mm.hide();
     }
   }
 
@@ -1324,29 +1463,9 @@ Ext.AppUx = function (app, menu) {
           this.getStore().clearFilter();
         },
         select: function () {
-          var i_year = Ext.getCmp("i_yearID").getValue() + 543;
-          Ext.store_month = new Ext.data.JsonStore({
-            fields: ["id", "c_name"],
-            data: [
-              // { id: "00", c_name: "- ทั้งหมด -" },
-              { id: "10", c_name: "ต.ค. " + (i_year - 1) },
-              { id: "11", c_name: "พ.ย. " + (i_year - 1) },
-              { id: "12", c_name: "ธ.ค. " + (i_year - 1) },
-              { id: "01", c_name: "ม.ค. " + i_year },
-              { id: "02", c_name: "ก.พ. " + i_year },
-              { id: "03", c_name: "มี.ค. " + i_year },
-              { id: "04", c_name: "เม.ย. " + i_year },
-              { id: "05", c_name: "พ.ค. " + i_year },
-              { id: "06", c_name: "มิ.ย. " + i_year },
-              { id: "07", c_name: "ก.ค. " + i_year },
-              { id: "08", c_name: "ส.ค. " + i_year },
-              { id: "09", c_name: "ก.ย. " + i_year },
-            ],
-          });
-          Ext.getCmp("mm_startID").bindStore(Ext.store_month);
-          // Ext.getCmp("mm_end").bindStore(Ext.store_month);
+          Ext.getCmp("mm_startID").bindStore(buildMonthStore(Ext.getCmp("i_yearID").getValue()));
           Ext.getCmp("mm_startID").setValue(Ext.getCmp("mm_startID").getValue());
-          // Ext.getCmp("mm_end").setValue(Ext.getCmp("mm_end").getValue());
+          // เปลี่ยนปีงบประมาณเอง ถือเป็นการเลือกใหม่ ไม่ใช้ค่าที่เคยบันทึกไว้
           syncBgYearType(Ext.getCmp("i_yearID").getValue());
         },
       },
@@ -1675,6 +1794,56 @@ Ext.AppUx = function (app, menu) {
                           readOnly: true,
                           name: "c_code",
                         },
+                        {
+                          xtype: "hidden",
+                          name: "parent_id",
+                          id: "parent_idID",
+                        },
+                        {
+                          xtype: "checkbox",
+                          fieldLabel: "เป็น PR ลูกของ",
+                          id: "isChildPrCheckID",
+                          hidden: statusx != "add",
+                          boxLabel: "ผูกกับ PR แม่ (ใช้เลข PR เดียวกัน ไม่ออกเลขใหม่)",
+                          listeners: {
+                            check: function (cb, checked) {
+                              Ext.getCmp("parentPrComboID").setVisible(checked);
+                              if (!checked) {
+                                Ext.getCmp("parentPrComboID").clearValue();
+                                Ext.getCmp("parent_idID").setValue(null);
+                                Ext.getCmp("codeHdrID").setValue(null);
+                              }
+                            },
+                          },
+                        },
+                        new Ext.form.ComboBox({
+                          id: "parentPrComboID",
+                          fieldLabel: "ค้นหา PR แม่",
+                          hidden: true,
+                          anchor: "60%",
+                          store: new Ext.data.JsonStore({
+                            autoLoad: false,
+                            url: "tor/api/List_spTorDocRef.php",
+                            baseParams: { type: "ParentPr" },
+                            root: "data",
+                            idProperty: "id",
+                            fields: ["id", "c_code", "c_name", "f_total_amt"],
+                          }),
+                          valueField: "id",
+                          displayField: "c_code",
+                          mode: "remote",
+                          minChars: 2,
+                          queryParam: "c_code",
+                          hideTrigger: true,
+                          emptyText: "พิมพ์เลข PR แม่เพื่อค้นหา แล้วเลือกจากรายการ",
+                          tpl: '<tpl for="."><div class="x-combo-list-item">{c_code} - {c_name} ({f_total_amt})</div></tpl>',
+                          listeners: {
+                            select: function (combo, record) {
+                              Ext.getCmp("parent_idID").setValue(record.data.id);
+                              Ext.getCmp("codeHdrID").setValue(record.data.c_code);
+                            },
+                          },
+                        }),
                         {
                           fieldLabel: "เลขที่สารบัญรับ",
                           //  emptyText: "", //readOnly: true,
@@ -2844,6 +3013,92 @@ Ext.AppUx = function (app, menu) {
                   //haddler
                 },
                 {
+                  text: "ยกเลิกรายการ",
+                  id: "buCancelTorID",
+                  iconCls: "icon-table_delete",
+                  hidden: statusx == "add" ? true : false,
+                  handler: function () {
+                    new Ext.Window({
+                      id: "win-msg-cancel-pr",
+                      title: "ยืนยันการยกเลิกรายการ",
+                      resizable: false,
+                      modal: true,
+                      width: 500,
+                      layout: "form",
+                      items: [
+                        {
+                          xtype: "displayfield",
+                          fieldLabel: "รหัส PR",
+                          value: "<b style='font-size:16px;'>" + Ext.selectRow.data.c_code + "</b>",
+                        },
+                        {
+                          xtype: "displayfield",
+                          fieldLabel: "ชื่อรายการ",
+                          value: "<p style='font-size:13px;'>" + Ext.selectRow.data.c_name + "</p>",
+                        },
+                        {
+                          xtype: "displayfield",
+                          fieldLabel: "หมายเหตุ",
+                          value: "<b style='font-size:14px;color:red;'>เมื่อคุณกดยืนยัน รายการจะถูกยกเลิก และหายไปจากระบบ</b>",
+                        },
+                        {
+                          fieldLabel: "เหตุผล",
+                          xtype: "textarea",
+                          name: "reason",
+                          width: 350,
+                          id: "reason_cancel_prID",
+                        },
+                      ],
+                      buttons: [
+                        {
+                          text: "ยืนยันการยกเลิก",
+                          iconCls: "icon-table_delete",
+                          handler: function () {
+                            if (Ext.isEmpty(Ext.getCmp("reason_cancel_prID").getValue())) {
+                              Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกเหตุผล");
+                              return;
+                            }
+                            Ext.Ajax.request({
+                              url: "tor/api/mnTorController.php",
+                              params: {
+                                mode: "Cancel_Tor",
+                                id: Ext.selectRow.data.id,
+                                sp_status_hdr_id: Ext.selectRow.data.tor_status_id,
+                                c_comment_delete: Ext.getCmp("reason_cancel_prID").getValue(),
+                                sp_emp_id: Ext.selectRow.data.sp_emp_id,
+                                i_type_delete: 2,
+                              },
+                              method: "GET",
+                              success: function (result) {
+                                var jsonData = Ext.util.JSON.decode(result.responseText);
+                                if (jsonData.success) {
+                                  Ext.MessageBox.alert("Success", jsonData.msg, function () {
+                                    Ext.getCmp("win-msg-cancel-pr").destroy();
+                                    Ext.getCmp("tabpanel1").getStore().reload();
+                                    Ext.getCmp("winMain").destroy();
+                                  });
+                                } else {
+                                  Ext.MessageBox.alert("Failed", jsonData.msg);
+                                }
+                              },
+                              failure: function (result) {
+                                Ext.MessageBox.alert("Failed", result.responseText);
+                              },
+                            });
+                          },
+                        },
+                        {
+                          text: Ext.GLOBAL_BU_BACK_TH,
+                          handler: function () {
+                            Ext.getCmp("win-msg-cancel-pr").hide();
+                            Ext.getCmp("win-msg-cancel-pr").destroy();
+                          },
+                        },
+                      ],
+                    }).show();
+                  },
+                },
+                {
                   text: Ext.GLOBAL_BU_BACK_TH,
                   handler: function () {
                     Ext.getCmp("winMain").hide();
@@ -2882,7 +3137,7 @@ Ext.AppUx = function (app, menu) {
           border: false,
           listeners: {
             beforerender: function () {
-              // console.log(Ext.selectRow);
+              // console.log(Ext.selectRow); //พี่อ้อ
             },
           },
           items: [
@@ -3320,6 +3575,16 @@ Ext.AppUx = function (app, menu) {
           align: "left",
           dataIndex: "c_codeStatus",
           width: 140,
+          renderer: function (value, metaData, record, row, col, store, gridView) {
+            // PR ที่ถูกถอยรายการกลับมาให้แก้ไข -> รหัส PR ตัวแดง + (แก้ไข)
+            // เหตุผลว่าต้องแก้ไขอะไร ดูได้ตอน double click (Ext.loadStore -> spTorReverseNote())
+            if (record.get("sp_tor_delete_flag") == 1) {
+              metaData.attr = "style='cursor:pointer';";
+              var pr = record.get("c_code") || "(ยังไม่ออกเลข PR)";
+              return "<b style='color:#F43217'>" + pr + "</b> <span style='font-weight:bold;color:#F43217'>(แก้ไข)</span>";
+            }
+            return value;
+          },
         },
         /*  {
                         header: "ผ่านรายการ",

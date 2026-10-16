@@ -1422,7 +1422,8 @@ Ext.AppUx = function (app, menu) {
             i_alarm: Ext.menu_i_alarm,
             i_pa: Ext.menu_i_day,
             tor_status_id: Ext.menu_id,
-            type_menu: 2, //ชุดสอง ผู้รับผิดชอบ 
+            type_menu: 2, //ชุดสอง ผู้รับผิดชอบ
+            limit: 30, //ให้โหลดหน้าแรก 30 รายการเท่ากับ pageSize
         },
         root: "data",
         idProperty: "id",
@@ -4315,6 +4316,16 @@ Ext.AppUx = function (app, menu) {
                                     }
                                 }, //haddler
                                 {
+                                    text: "ถอยรายการ",
+                                    iconCls: "icon-arrow_undo",
+                                    handler: function () {
+                                        // ปิดฟอร์มแล้วเปิดหน้าต่างเลือกเมนูที่จะถอย (เช่น กลับไปจัดสรรงบประมาณ เพื่อแก้ประเภท PR)
+                                        Ext.getCmp("winMain").hide();
+                                        Ext.getCmp("winMain").destroy();
+                                        cancel_tor("reverse");
+                                    },
+                                },
+                                {
                                     text: Ext.GLOBAL_BU_BACK_TH,
                                     handler: function () {
                                         Ext.getCmp("winMain").hide();
@@ -5639,7 +5650,7 @@ Ext.AppUx = function (app, menu) {
                     //     id: "processreverseID", // reverse
                     //     width: 200,
                     //     renderer: function (value, metaData, record, row, col, store, gridView) {
-                    //         var BtnText = '&nbspย้อนรายการ'; 
+                    //         var BtnText = '&nbspย้อนรายการ';
                     //         var IconImg = '../images/icons/date_previous.png';
                     //         var style = 'font-size:12px;border:1px solid #ccc; width:100px; padding:3px 3px 3px 10px; background: #f0f0f0 url('+IconImg+') no-repeat 3px center; cursor: pointer;';
                     //         return '<button style="'+style+'" type="button">' + BtnText + '</button>';
@@ -5809,7 +5820,7 @@ Ext.AppUx = function (app, menu) {
                     tbar: MenuButton(),
                     columns: colmnn,
                     bbar: new Ext.PagingToolbar({
-                        pageSize: 20,
+                        pageSize: 30,
                         store: Ext.storeDtl,
                         displayInfo: true,
                         displayMsg: "Displaying topics {0} - {1} of {2}",

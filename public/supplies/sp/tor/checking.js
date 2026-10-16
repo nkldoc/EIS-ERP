@@ -5728,10 +5728,7 @@ function encodeLogData(data) {
                 createdAtClient: new Date().toISOString()
         });
 }
-
-
-
-
+ 
 Ext.auditBoong = function (i) {
         var link = Ext.genLink(3, 0);
         Ext.Ajax.request({
@@ -6282,7 +6279,20 @@ Ext.upMoneyId = function (id, req, f, bgid) {
                 },
         });
 };
-Ext.genCode = function (rec) {
+// checkbox "ออกเลขตรวจรับโดยไม่เช็คเงิน" ในหน้าทำรายการตรวจรับ
+Ext.isSkipBgCheck = function () {
+        var skipBgCheck = Ext.getCmp("i_skip_bg_checkID");
+        return !!(skipBgCheck && skipBgCheck.getValue());
+};
+// ออกเลขตรวจรับโดยไม่จองเงิน/ไม่หักใบกัน (ข้าม Ext.bookingOverall ทั้งหมด)
+Ext.genCodeSkipBg = function (rec) {
+        if (rec.c_code != null && rec.c_code != "") {
+                Ext.MessageBox.alert("Notification", "มีเลขCHK ไม่สามารถออกเลขซ้ำได้ ");
+                return;
+        }
+        Ext.genCode(rec, true);
+};
+Ext.genCode = function (rec, skipBgCheck) {
         Ext.Ajax.request({
                 url: "tor/api/mnCheckCode.php",
                 method: "POST",
@@ -6296,11 +6306,12 @@ Ext.genCode = function (rec) {
                         dc_cost_origin_id: Ext.getCmp("dc_cost2_idID").getValue(),
                         d_checking_date: Ext.util.Format.date(Ext.getCmp("d_checking_dateID").getValue(), "Y-m-d"),
                         i_budget_year: Ext.getCmp("i_budget_year").getValue(),
+                        i_skip_bg_check: skipBgCheck === true ? 1 : 0,
                 },
                 success: function (result, request) {
                         if (result.statusText) {
                                 Ext.storeDtl.reload();
-                                Ext.Msg.alert("แจ้งเตือน", "หักเงินและออกเลขเรียบร้อยแล้ว");
+                                Ext.Msg.alert("แจ้งเตือน", skipBgCheck === true ? "ออกเลขตรวจรับเรียบร้อยแล้ว (ไม่ได้เช็คเงินและใบกัน)" : "หักเงินและออกเลขเรียบร้อยแล้ว");
                                 Ext.getCmp("winPeriodHdrID").destroy();
                         }
                 },
@@ -11529,7 +11540,7 @@ Ext.AppUx = function (app, menu) {
                                                                 },
                                                                 {
                                                                         text: "แก้ไขข้อมูล ADMIN ด้วยเครื่องมือ",
-                                                                        hidden: Ext.session.dc_center_user != 1 ? true : false,
+                                                                        hidden: Ext.session.dc_center_user != 1 || !!(window.parent !== window && window.parent.Ext && window.parent.Ext.getCmp("supplies-admin-tools")),
                                                                         icon: "../images/icons/application_edit.png",
                                                                         scope: this,
                                                                         handler: function (e) {
@@ -13890,13 +13901,6 @@ Ext.AppUx = function (app, menu) {
                                                                                                                         }
                                                                                                                         return true; // ผ่านเงื่อนไข
                                                                                                                 }
-                                                                                                        }, {
-                                                                                                                fieldLabel: "วันที่รับของ",
-                                                                                                                xtype: "hidden",
-                                                                                                                name: "d_arrive_date",
-                                                                                                                id: "d_arrive_dateID",
-                                                                                                                readOnly: true,
-                                                                                                                submitFormat: "Y-m-d", // ส่งเป็น 2025-07-09
                                                                                                         },
                                                                                                         {
                                                                                                                 xtype: 'button',
@@ -13904,15 +13908,18 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 width: 80,
                                                                                                                 iconCls: "icon-building-edit", // (ถ้ามี) ใส่เพื่อให้มีไอคอนสวยงามขึ้น
                                                                                                                 handler: function () {
-                                                                                                                        // ตัวอย่าง Logic การดึงค่าจากช่อง Textfield ข้างๆ มาใช้งาน
-                                                                                                                        var codeValue = this.previousSibling().getValue();
+                                                                                                                        // อ่านค่าจากช่อง datefield "วันที่รับของเอกสารสมบูรณ์" โดยตรง
+                                                                                                                        // (เดิมใช้ this.previousSibling() ซึ่งชี้ไป hidden field ที่ไม่เคยมีค่า ทำให้บันทึกไม่ได้)
+                                                                                                                        var arriveDateField = Ext.getCmp('d_doc_arrive_validationID');
+                                                                                                                        var codeValue = arriveDateField ? arriveDateField.getValue() : '';
+                                                                                                                        var codeValueYmd = codeValue ? Ext.util.Format.gridDate(codeValue, "Y-m-d") : '';
                                                                                                                         if (Ext.arrive_dt) {
                                                                                                                                 Ext.Msg.alert('แจ้งเตือน', 'วันที่รับของ ห้ามเกินวันที่ตรวจรับ!');
                                                                                                                                 return;
                                                                                                                         }
 
-                                                                                                                        if (!codeValue) {
-                                                                                                                                Ext.Msg.alert('แจ้งเตือน', 'กรุณากรอกเลขที่ตรวจรับก่อนบันทึก');
+                                                                                                                        if (!codeValueYmd) {
+                                                                                                                                Ext.Msg.alert('แจ้งเตือน', 'กรุณาระบุวันที่รับของเอกสารสมบูรณ์ก่อนบันทึก');
                                                                                                                                 return;
                                                                                                                         }
                                                                                                                         if (Ext.glAcctionNo) {
@@ -13930,22 +13937,25 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                 method: 'POST',
                                                                                                                                                 params: {
                                                                                                                                                         mode: 'updateBillingDate',
-                                                                                                                                                        d_doc_arrive_dt: Ext.util.Format.gridDate(codeValue, "Y-m-d"),
+                                                                                                                                                        d_doc_arrive_dt: codeValueYmd,
                                                                                                                                                         sp_tor_id: Ext.selectRow.get('sp_tor_id'),
                                                                                                                                                         sp_tor_contract_id: Ext.selectRow.get('sp_tor_contract_id'),
                                                                                                                                                         sp_check_period_hdr_id: Ext.selectRow.get('sp_check_period_hdr_id'),
                                                                                                                                                         sp_tor_hdr_period_id: Ext.selectRow.get('sp_tor_hdr_period_id'),
                                                                                                                                                         sp_tor_hdr_period_ids: JSON.stringify([Ext.selectRow.get('sp_tor_hdr_period_id')]),
-                                                                                                                                                        d_doc_arrive_dts: JSON.stringify([Ext.util.Format.gridDate(codeValue, "Y-m-d")])
+                                                                                                                                                        d_doc_arrive_dts: JSON.stringify([codeValueYmd])
                                                                                                                                                 },
                                                                                                                                                 success: function (response) {
                                                                                                                                                         try {
                                                                                                                                                                 var result = Ext.decode(response.responseText);
                                                                                                                                                                 if (result.success === 'Success' || result.reval === 0) {
-                                                                                                                                                                        Ext.Msg.alert('สำเร็จ', result.msg || 'อัพเดทประเภทการจองเงินเรียบร้อยแล้ว', function () {
-                                                                                                                                                                                // update the local record so reopening the form keeps the value
-                                                                                                                                                                                if (rec && rec.set) {
-                                                                                                                                                                                        rec.set('i_pr_type1', codeValue);
+                                                                                                                                                                        Ext.Msg.alert('สำเร็จ', result.msg || 'บันทึกวันที่รับของเอกสารสมบูรณ์เรียบร้อยแล้ว', function () {
+                                                                                                                                                                                // อัปเดต record ที่เลือกไว้ เพื่อให้เปิดฟอร์มใหม่แล้วยังเห็นค่าล่าสุด
+                                                                                                                                                                                if (Ext.selectRow && Ext.selectRow.set && Ext.isDate(codeValue)) {
+                                                                                                                                                                                        var arriveBe = codeValue.format('d-m-') + (codeValue.getFullYear() + 543);
+                                                                                                                                                                                        Ext.selectRow.set('d_arrive_date', arriveBe);
+                                                                                                                                                                                        Ext.selectRow.set('d_doc_arrive_dt', arriveBe);
+                                                                                                                                                                                        Ext.selectRow.commit();
                                                                                                                                                                                 }
 
                                                                                                                                                                                 updateModifyDate('วันที่วางบิล');
@@ -14054,6 +14064,15 @@ Ext.AppUx = function (app, menu) {
                                                                                                 name: "i_chk_bgTxt",
                                                                                                 // value: "ปี",
                                                                                         },
+                                                                                        {
+                                                                                                // ติ๊กแล้ว "บันทึกรายการหลัก" จะออกเลขตรวจรับเลย โดยไม่จองเงิน/ไม่หักใบกัน และไม่เช็ควงเงิน
+                                                                                                xtype: "checkbox",
+                                                                                                id: "i_skip_bg_checkID",
+                                                                                                fieldLabel: "ออกเลขตรวจรับ",
+                                                                                                boxLabel: '<span style="color:red">ออกเลขตรวจรับโดยไม่เช็คเงิน</span>',
+                                                                                                checked: true, // ค่าเริ่มต้น: ไม่เช็คเงินและใบกัน (เอาติ๊กออกเพื่อกลับไปจองเงิน/หักใบกันแบบเดิม)
+                                                                                                submitValue: false,
+                                                                                        },
                                                                                         new Ext.form.ComboBox({
                                                                                                 mode: "local",
                                                                                                 // allowBlank: false,
@@ -14161,6 +14180,9 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                         },
                                                                                                                                 });
                                                                                                                         } else if (this.getValue() == Ext.getCmp("i_budget_year").getValue()) {
+                                                                                                                                // i_yyyy_overlapID == i_budget_year -> ไม่ต้องผูกกับใบกันเงินข้ามปี เคลียร์ c_bookingID ทิ้ง
+                                                                                                                                Ext.getCmp("c_bookingID").setValue(null);
+                                                                                                                                Ext.getCmp("c_bookingID").lastSelectionText = "";
                                                                                                                                 Ext.getCmp("c_bookingID").setReadOnly(true);
                                                                                                                                 Ext.getCmp("c_booking_radiogroup").hide(true);
                                                                                                                                 // Ext.getCmp("c_bookingID").setReadOnly(true);
@@ -16457,7 +16479,9 @@ Ext.AppUx = function (app, menu) {
                                                                         var totalVatFromGrid = 0;
                                                                         Ext.getCmp("gridSub4ID").getStore().each(function (rec) {
                                                                                 var v = 0;
-                                                                                if (rec._vatManual) {
+                                                                                if (!Ext.getCmp("i_vat_amtID").getValue()) {
+                                                                                        v = 0; // ไม่ติ๊ก "ภาษีมูลค่าเพิ่ม" = ไม่มี VAT
+                                                                                } else if (rec._vatManual) {
                                                                                         v = parseFloat((rec.get("f_vat_amt") || "0").toString().replace(/,/g, "")) || 0;
                                                                                 } else {
                                                                                         var net = parseFloat((rec.get("f_net_total") || "0").toString().replace(/,/g, "")) || 0;
@@ -16496,6 +16520,10 @@ Ext.AppUx = function (app, menu) {
                                                                                 d_date: Ext.util.Format.gridDate(v.data.d_doc_date, "Y-m-d"),
                                                                                 c_comment: v.data.c_comment,
                                                                                 f_vat_amt: (function () {
+                                                                                        // ไม่ติ๊ก "ภาษีมูลค่าเพิ่ม" = รายการนี้ไม่มี VAT ไม่ต้องคำนวณ 7% ให้รายการตั้งหนี้
+                                                                                        if (!Ext.getCmp("i_vat_amtID").getValue()) {
+                                                                                                return 0;
+                                                                                        }
                                                                                         if (v._vatManual) {
                                                                                                 return parseFloat((v.data.f_vat_amt + "").replace(/,/g, "")) || 0;
                                                                                         }
@@ -16543,7 +16571,7 @@ Ext.AppUx = function (app, menu) {
                                                                                 msg += "ออกเลขตรวจรับแล้ว ไม่สามารถทำรายการซ้ำได้";
                                                                         }
                                                                         var i_year = Ext.bg_budget_year.data.items[0].data.i_year_be;
-                                                                        if (Ext.selectRow.get("c_yyyy") != i_year && Ext.selectRow.data.i_chk_bg == 1) {
+                                                                        if (Ext.selectRow.get("c_yyyy") != i_year && Ext.selectRow.data.i_chk_bg == 1 && !Ext.isSkipBgCheck()) {
                                                                                 msg += "ใช้เงินปีงบประมาณ ไม่ตรงกับปีงบที่เปิด ";
                                                                         }
                                                                         if (Ext.getCmp("i_is_warrantyID").getValue().inputValue == 1) {
@@ -16568,10 +16596,10 @@ Ext.AppUx = function (app, menu) {
                                                                 if (Ext.not_equal == 1) {
                                                                         //  msg += "<span style='white-space: nowrap;'>- กรุณาตั้งหนี้ค่าใช้ค่าให้กับพอดีวงเงิน</span><br>";
                                                                 }
-                                                                if (Ext.sum_minus == 1) {
+                                                                if (Ext.sum_minus == 1 && !Ext.isSkipBgCheck()) {
                                                                         msg += "<span style='white-space: nowrap;'>- วงเงินแหล่งเงินไม่เพียงพอ</span><br>";
                                                                 }
-                                                                if (Ext.util.Format.date(Ext.getCmp("d_checking_dateID").getValue(), "Y-m-d") < Ext.util.Format.date(Ext.getCmp("d_arrive_dateID").getValue(), "Y-m-d")) {
+                                                                if (Ext.util.Format.date(Ext.getCmp("d_checking_dateID").getValue(), "Y-m-d") < Ext.util.Format.date(Ext.getCmp("d_doc_arrive_validationID").getValue(), "Y-m-d")) {
                                                                         msg += "วันที่ตรวจรับ น้อยกว่าวันที่รับของ ";
                                                                 }
                                                                 if (msg != "") {
@@ -16742,6 +16770,9 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                                                                                                                                         },
                                                                                                                                                                                                                                                                 });
                                                                                                                                                                                                                                                         });
+                                                                                                                                                                                                                                                } else if (Ext.isSkipBgCheck()) {
+                                                                                                                                                                                                                                                        // ออกเลขตรวจรับโดยไม่เช็คเงินและใบกัน: ข้ามการจองเงิน/หักใบกัน
+                                                                                                                                                                                                                                                        Ext.genCodeSkipBg(record[0].data);
                                                                                                                                                                                                                                                 } else {
                                                                                                                                                                                                                                                         Ext.bookingOverall(record, rec);
                                                                                                                                                                                                                                                 }

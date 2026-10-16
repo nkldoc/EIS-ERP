@@ -708,13 +708,6 @@ Ext.workScore = function () {
                         text: "บันทึกรายการ",
                         iconCls: "icon-save",
                         handler: function () {
-
-//console.log(JSON.parse(JSON.stringify(Ext.getCmp('leftfrmID').items.items))); 
-console.log(Ext.getCmp('leftfrmID').items.items.length);
-console.log(Ext.getCmp('leftfrmID').items.items);
-console.log(Ext.getCmp('rightfrmID').items.items);
-
-return false;
                             var form = Ext.getCmp("frmTab2").getForm();
                             if (Ext.selectRow.get("sp_cate_id") == 2 && Ext.menu_code == 'ST0006') {
                                 Ext.Msg.alert("แจ้งเตือน", "<span style='white-space: nowrap;'> ! PR ท่านได้เคยบันทึกแล้วถ้าต้องการแก้ไข/ติดต่อแอดมิน</span><br>", function (bu, action) {
@@ -1085,6 +1078,17 @@ Ext.AppUx = function (app, menu) {
             dataIndex: "f_total_price",
             width: 100,
         },
+        {
+            header: "ยกเลิก",
+            align: "center",
+            dataIndex: "sp_tor_dtl_id",
+            width: 65,
+            id: "deleteTorDtl",
+            renderer: function (value, metaData, record, row, col, store, gridView) {
+                metaData.attr = "style='cursor:pointer;';";
+                return '<button style="color:red;">ยกเลิก</button>';
+            },
+        },
 
         {width: 5, dataIndex: ""},
     ];
@@ -1401,7 +1405,7 @@ Ext.AppUx = function (app, menu) {
                                     Ext.getCmp("i_pr_type1ID").setValue(Ext.selectRow.json.i_pr_type1);
                                     Ext.getCmp("i_pr_type2ID").setValue(Ext.selectRow.json.i_pr_type2);
                                     Ext.getCmp("i_pr_type3ID").setValue(Ext.selectRow.json.i_pr_type3);
-                                    Ext.getCmp("f_type_amtID").setValue(Ext.selectRow.json.f_total_amt);
+                                    Ext.getCmp("f_type_amtID").setValue((parseFloat(String(Ext.selectRow.json.f_type_amt || 0).replace(/,/g, "")) > 0) ? Ext.selectRow.json.f_type_amt : Ext.selectRow.json.f_total_amt);
                                     Ext.getCmp("f_type_amtID2").setValue(Ext.selectRow.json.f_type2_amt);
                                     Ext.getCmp("f_type_amtID3").setValue(Ext.selectRow.json.f_type3_amt);
                                 },
@@ -2423,6 +2427,37 @@ Ext.AppUx = function (app, menu) {
 
 
 //                                                    Ext.getCmp('saveDtlID').setDisabed(true);
+                                                } else if (columnIndex === grid.getColumnModel().getIndexById("deleteTorDtl")) {
+                                                    var delSpTorDtlId = record.get("sp_tor_dtl_id");
+                                                    var delSpTorId = record.get("sp_tor_id");
+                                                    Ext.Msg.show({
+                                                        title: "ยืนยันการยกเลิกรายการ",
+                                                        msg: "ท่านต้องการที่จะยกเลิกรายการนี้ ?",
+                                                        width: 300,
+                                                        icon: Ext.MessageBox.QUESTION,
+                                                        buttons: Ext.MessageBox.YESNO,
+                                                        fn: function (btn) {
+                                                            if (btn === "yes") {
+                                                                Ext.Ajax.request({
+                                                                    url: "tor/api/mnTorController.php",
+                                                                    params: {
+                                                                        mode: "DELETE_TOR_DTL",
+                                                                        id: delSpTorDtlId,
+                                                                        sp_tor_id: delSpTorId,
+                                                                    },
+                                                                    method: "GET",
+                                                                    success: function (result, request) {
+                                                                        Ext.store2.setBaseParam("sp_tor_id", Ext.SP_TOR_ID);
+                                                                        Ext.store2.load();
+                                                                        Ext.example.msg("แจ้งเตือน", "ยกเลิกรายการเรียบร้อย", 3);
+                                                                    },
+                                                                    failure: function (result, request) {
+                                                                        Ext.MessageBox.alert("Failed", result.responseText);
+                                                                    },
+                                                                });
+                                                            }
+                                                        },
+                                                    });
                                                 }
                                             };
                                         },

@@ -146,6 +146,7 @@ if (!$ss_user_id) {
     <script type="text/javascript" src="CheckList/stores.js?_dc=<?= __VPRODUCT_; ?>"></script>
     <script type="text/javascript" src="CheckList/Function.js?_dc=<?= __VPRODUCT_; ?>"></script>
     <script type="text/javascript" src="CheckList/FormGridDtl.js?_dc=<?= __VPRODUCT_; ?>"></script>
+    <script src="tor/admin-relation-editor.js?v=<?= filemtime(__DIR__ . '/tor/admin-relation-editor.js'); ?>"></script>
     <script type="text/javascript" src="CheckList/FormGrid.js?_dc=<?= __VPRODUCT_; ?>"></script>
     </head>
 

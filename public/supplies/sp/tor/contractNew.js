@@ -1,4 +1,16 @@
 const Uiedit_contractNew = function (rec) {
+  // store วิธีการค้ำประกัน (บางหน้าเช่น ST0009 ไม่ได้โหลด contract.js ที่ประกาศตัวนี้ไว้)
+  if (!Ext.guarantee) {
+    Ext.guarantee = new Ext.data.JsonStore({
+      autoDestroy: false,
+      autoLoad: true,
+      url: "api/All_spAlert.php",
+      baseParams: { type: "sp_type_guarantee", i_is_type_tor: true },
+      root: "data",
+      idProperty: "id",
+      fields: ["id", "c_name"],
+    });
+  }
   Ext.SpHoliday = new Ext.data.JsonStore({
     autoLoad: true,
     storeId: "myStoreCost",
@@ -1694,6 +1706,8 @@ const Uiedit_contractNew = function (rec) {
         if (record.get("no") === 9999) return "";
         else if (record.get("no") === 9998) return " ";
         else if (record.get("no") === 9997) return "";
+        else if (![null, "", undefined].includes(record.get("sp_check_period")))
+          return '<span style="color:#1677ff;cursor:pointer;" ext:qtip="ออกเลขตรวจรับแล้ว แก้ไขไม่ได้ — คลิกเพื่อดูรายละเอียด">[ดูรายละเอียด]</span>';
         else
           return '[แก้ไข]';
 //          return '<button title="แก้ไขรายการ" style="padding:2px 4 px;color:#fff;background:#1677ff;border:1px solid #096dd9;border-radius:4px;cursor:pointer;">แก้ไข</button>';
@@ -3052,6 +3066,11 @@ const Uiedit_contractNew = function (rec) {
                         value: 24,
                       },
                       {
+                        xtype: "hidden",
+                        name: "c_arrive_code_per",
+                        id: "c_arrive_code_perID",
+                      },
+                      {
                         xtype: "buttongroup",
                         fieldLabel: "งวดตามสัญญา  ",
                         width: 500,
@@ -3418,6 +3437,22 @@ const Uiedit_contractNew = function (rec) {
                             boxLabel: "แก้ไข",
                           },
                         ], //radiogroup
+                        listeners: {
+                          // สลับป้ายปุ่มบันทึกตามโหมด: เพิ่ม -> "เพิ่มข้อมูลรายการ", แก้ไข -> "บันทึกการแก้ไข"
+                          change: function (rg, val) {
+                            var b = Ext.getCmp("button_add_per");
+                            if (!b) return;
+                            var v = rg.getValue();
+                            var mode = v && v.inputValue ? v.inputValue : 1;
+                            if (mode == 2) {
+                              b.setText("บันทึกการแก้ไข");
+                              b.setIconClass("icon-save-edit");
+                            } else {
+                              b.setText("เพิ่มข้อมูลรายการ");
+                              b.setIconClass("icon-add");
+                            }
+                          },
+                        },
                       },
                       {
                         xtype: "radiogroup",
@@ -3774,13 +3809,16 @@ const Uiedit_contractNew = function (rec) {
                             //   msg += "ยอดรวมของทุกงวดเกินวงเงินในสัญญาสัญญา";
                             // }
                             console.log(Ext.getCmp("sp_check_period").getValue());
-                            if (![null, "", undefined].includes(Ext.getCmp("sp_check_period").getValue()) && Ext.getCmp("i_type_editID").getValue().inputValue == 2) {
-                              msg += "- ตรวจรับแล้ว ไม่สามารถแก้ไขข้อมูลได้ " + "\n";
+                            var isEditMode = Ext.getCmp("i_type_editID").getValue().inputValue == 2;
+                            // สถานะ 3: ออกเลขตรวจรับแล้ว -> บล็อก (กันไว้อีกชั้น เผื่อหลุดเข้าโหมดแก้ไข)
+                            if (isEditMode && ![null, "", undefined].includes(Ext.getCmp("sp_check_period").getValue())) {
+                              Ext.Msg.alert("แจ้งเตือน", "งวดนี้ออกเลขตรวจรับแล้ว ไม่สามารถแก้ไขได้");
+                              return;
                             }
-
-                            var formSubmit = function () {
+                            var formSubmit = function (extraParams) {
                               form.submit({
                                 waitMsg: "Saving Data...",
+                                params: extraParams || {},
                                 success: function (form, action) {
                                   Ext.storeDtl.reload();
                                   Ext.storeedit.reload();
@@ -3812,7 +3850,18 @@ const Uiedit_contractNew = function (rec) {
                               return;
                             } else if (form.isValid()) {
                               Ext.getCmp("mode_id").setValue("UP_SP_TOR_HDR_DTL_PERIOD");
-                              formSubmit(form);
+                              if (isEditMode) {
+                                // โหมดแก้ไข -> ถามยืนยันเสมอ + ส่ง confirm_edit=1 ให้ backend เก็บ log
+                                Ext.Msg.confirm(
+                                  "ยืนยันการแก้ไข",
+                                  "ยืนยันการแก้ไขข้อมูลงวดงานนี้และบันทึกหรือไม่ ?",
+                                  function (btn) {
+                                    if (btn === "yes") formSubmit({ confirm_edit: 1 });
+                                  }
+                                );
+                              } else {
+                                formSubmit({ confirm_edit: 0 });
+                              }
                             } else {
                               Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกข้อมูลให้ครบถ้วน");
                             }
@@ -3876,6 +3925,10 @@ const Uiedit_contractNew = function (rec) {
                 if ([9999, 9998, 9997].includes(Ext.SelectStore.data.no)) {
                     Ext.getCmp("i_type_editID").setValue(1);
                     Ext.getCmp("i_type_edit2ID").hide();
+                    Ext.getCmp("button_add_per").setText("เพิ่มข้อมูลรายการ");
+                    Ext.getCmp("button_add_per").setIconClass("icon-add");
+                    Ext.getCmp("sp_check_period").setValue("");
+                    Ext.getCmp("c_arrive_code_perID").setValue("");
                 } else {
                     if (columnIndex === grid.getColumnModel().getIndexById("delete_contractNew")) {
                         if (record.data.sp_check_period != null) {
@@ -3884,11 +3937,37 @@ const Uiedit_contractNew = function (rec) {
                             delete_contractNew(Ext.SelectStore);
                         }
                     } else {
+                        // สถานะ 3: ออกเลขตรวจรับแล้ว (sp_check_period = c_code) -> แก้ไขไม่ได้ แสดงรายละเอียดให้ดูเฉย ๆ (ไว้แจ้ง admin)
+                        if (![null, "", undefined].includes(record.data.sp_check_period)) {
+                            var _r = record.data;
+                            Ext.Msg.show({
+                                title: "รายละเอียดงวดงาน (ออกเลขตรวจรับแล้ว — แก้ไขไม่ได้)",
+                                msg:
+                                    "<table style='font-size:12px;line-height:1.7'>" +
+                                    "<tr><td><b>เลขที่สัญญา</b>&nbsp;&nbsp;</td><td>: " + (_r.c_contract_code || _r.c_doc_ref_contract || "-") + "</td></tr>" +
+                                    "<tr><td><b>งวดที่</b></td><td>: " + _r.i_period + "</td></tr>" +
+                                    "<tr><td><b>วันที่เริ่มนับการส่งของในงวด</b></td><td>: " + shortThaiDate(_r.d_doc_date) + "</td></tr>" +
+                                    "<tr><td><b>วันที่กำหนดส่งในงวดงาน</b></td><td>: " + shortThaiDate(_r.d_period_date) + "</td></tr>" +
+                                    "<tr><td><b>จำนวนเงินงวด</b></td><td>: " + floatRenderer(_r.f_total_amt) + " บาท</td></tr>" +
+                                    "<tr><td><b>เลขรับของ</b></td><td>: " + (_r.c_arrive_code || "-") + "</td></tr>" +
+                                    "<tr><td><b>เลขตรวจรับ</b></td><td>: " + (_r.sp_check_period || "-") + "</td></tr>" +
+                                    "<tr><td><b>ID (แจ้ง admin)</b></td><td>: " + _r.id + "</td></tr>" +
+                                    "</table>" +
+                                    "<br><span style='color:#c00'>งวดนี้ออกเลขตรวจรับแล้ว หากต้องแก้ไข กรุณาส่งเรื่องพร้อม ID ด้านบนให้ admin แก้ไขหลังบ้าน</span>",
+                                buttons: Ext.Msg.OK,
+                                icon: Ext.Msg.INFO,
+                                minWidth: 460,
+                            });
+                            return;
+                        }
                         RecSet = record.data;
                         console.log(RecSet);
                         Ext.getCmp("i_type_edit2ID").show();
                         Ext.getCmp("i_type_editID").setValue(2);
+                        Ext.getCmp("button_add_per").setText("บันทึกการแก้ไข");
+                        Ext.getCmp("button_add_per").setIconClass("icon-save-edit");
                         Ext.getCmp("sp_check_period").setValue(RecSet.sp_check_period);
+                        Ext.getCmp("c_arrive_code_perID").setValue(RecSet.c_arrive_code);
                         Ext.getCmp("i_periodID").setValue(RecSet.i_period);
                         Ext.getCmp("i_pr_type2ID").setValue(RecSet.i_pr_type1);
                         Ext.getCmp("i_is_item").setValue(RecSet.i_is_item);
