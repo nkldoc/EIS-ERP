@@ -6,6 +6,29 @@ include("../../lib/date/i_date.class.php");
 $db = new DatabaseServer();
 $date = new i_date();
 
+// รายการ po_working_hdr_id ที่ใช้หาใบตรวจรับ (sp_check_period_hdr) ของใบขอเบิก a เรียงตามลำดับความสำคัญ (lvl)
+// 0 = ตัวใบเอง, 1-3 = ใบเดิมที่ถูกยกเลิก (parent_id, i_enable = 2) กรณีออกใบขอเบิกใหม่แทนใบเดิม ใบใหม่จะไม่ได้ผูกใบตรวจรับ
+// (parent_id = 0 คือไม่มีใบเดิม ต้องเช็ค i_enable = 2 กันไปจับใบตรวจรับที่ po_working_hdr_id = 0)
+// ใช้ UNION ALL ห้ามเปลี่ยนเป็น VALUES ที่มี subquery (เคยทดสอบแล้วได้ผลไม่คงที่แต่ละรอบ)
+function chkLinkSource()
+{
+	return "(
+            SELECT 0 AS lvl, a.po_working_hdr_id AS po_working_hdr_id
+            UNION ALL
+            SELECT 1, p1.po_working_hdr_id FROM NMU_EIS..po_working_hdr p1
+            WHERE p1.po_working_hdr_id = a.parent_id AND p1.i_enable = 2
+            UNION ALL
+            SELECT 2, p2.po_working_hdr_id FROM NMU_EIS..po_working_hdr p1
+            INNER JOIN NMU_EIS..po_working_hdr p2 ON p2.po_working_hdr_id = p1.parent_id AND p2.i_enable = 2
+            WHERE p1.po_working_hdr_id = a.parent_id AND p1.i_enable = 2
+            UNION ALL
+            SELECT 3, p3.po_working_hdr_id FROM NMU_EIS..po_working_hdr p1
+            INNER JOIN NMU_EIS..po_working_hdr p2 ON p2.po_working_hdr_id = p1.parent_id AND p2.i_enable = 2
+            INNER JOIN NMU_EIS..po_working_hdr p3 ON p3.po_working_hdr_id = p2.parent_id AND p3.i_enable = 2
+            WHERE p1.po_working_hdr_id = a.parent_id AND p1.i_enable = 2
+        ) lnk";
+}
+
 function List_QueryParam()
 {
 	global $db;
@@ -74,14 +97,17 @@ function List_QueryParam()
 			// strict_staff=1 (ใช้เมื่อเจาะจงดูรายละเอียดของพนักงานคนเดียวจาก Heatmap): จับคู่เฉพาะ sp_emp_id ที่ตรงกันจริงเท่านั้น
 			// ไม่รวมเอกสาร "ไม่ระบุ" (sp_emp_id เป็น NULL เพราะไม่มี sp_check_period_hdr จับคู่ได้) เข้ามาปนในรายการของพนักงานคนนั้น
 			// (ต่างจากตัวกรอง checkbox หลายคนของหน้าโดยรวม ที่ยังคงต้องการให้เอกสาร "ไม่ระบุ" ติดมาด้วยเสมอ จึงใช้ ISNULL(...,-1) IN (ids,-1) ตามเดิม)
+			// เจ้าหน้าที่จากใบตรวจรับ ถ้าไม่มีใบตรวจรับผูกใช้ผู้สร้างใบขอเบิกแทน (ตรงกับ List_Report_StatusReply.php)
+			$staffExpr = "ISNULL((SELECT d.sp_emp_id FROM sp_tor_contract stc
+                                 INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
+                                 WHERE stc.sp_tor_contract_id = chkp.sp_tor_contract_id),
+                                (SELECT TOP 1 e.sp_emp_id FROM NMU..dc_user u
+                                 INNER JOIN NMU_ERP..sp_emp e ON e.dc_emp_id = u.dc_emp_id
+                                 WHERE u.dc_user_id = a.dc_user_create_id))";
 			if ($strictStaff) {
-				$staffCond = " AND (SELECT d.sp_emp_id FROM sp_tor_contract stc
-                                 INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
-                                 WHERE stc.sp_tor_contract_id = chkp.sp_tor_contract_id) IN ($idsStr) ";
+				$staffCond = " AND $staffExpr IN ($idsStr) ";
 			} else {
-				$staffCond = " AND ISNULL((SELECT d.sp_emp_id FROM sp_tor_contract stc
-                                 INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
-                                 WHERE stc.sp_tor_contract_id = chkp.sp_tor_contract_id), -1) IN ($idsStr, -1) ";
+				$staffCond = " AND ISNULL($staffExpr, -1) IN ($idsStr, -1) ";
 			}
 		}
 	}
@@ -122,7 +148,8 @@ function List_QueryParam()
             ,a.po_working_hdr_id
             ,a.c_code_ref
             ,(select c_code from sp_tor_contract where sp_tor_contract_id = chkp.sp_tor_contract_id) as c_code_contract
-            ,(select c_full_name from dc_user where dc_user_id = chkp.dc_user_create_id ) as emp
+            -- ไม่มีใบตรวจรับผูก (เช่น ออกใบเบิกใหม่หลังยกเลิกใบเดิม) ใช้ผู้สร้างใบขอเบิกแทน
+            ,(select c_full_name from dc_user where dc_user_id = ISNULL(chkp.dc_user_create_id, a.dc_user_create_id) ) as emp
             ,(Select c_full_name from NMU_DATACENTER..dc_user where dc_user_id = aa.dc_user_create_id ) as po_emp_name
             ,(select c_full_name from nmu..dc_user where dc_user_id =  a.dc_user_create_id ) as emp_tt
             ,(Select inv_name from nmu..dc_creditor where dc_creditor_id = chkp.dc_creditor_id ) as dc_creditor
@@ -164,9 +191,9 @@ function List_QueryParam()
                 sch.sp_tor_contract_id,
                 sch.d_checking_date,
                 sch.d_arrive_date
-            FROM sp_check_period_hdr sch
-            WHERE sch.po_working_hdr_id = a.po_working_hdr_id
-            ORDER BY sch.sp_check_period_hdr_id DESC
+            FROM " . chkLinkSource() . "
+            INNER JOIN sp_check_period_hdr sch ON sch.po_working_hdr_id = lnk.po_working_hdr_id
+            ORDER BY lnk.lvl, sch.sp_check_period_hdr_id DESC
         ) chkp
         LEFT JOIN dbo.sp_withdraw sw ON sw.c_code_ref = a.c_code_ref
         LEFT JOIN dbo.vw_po_working_pdf pw ON pw.c_code_ref = sw.c_code_ref

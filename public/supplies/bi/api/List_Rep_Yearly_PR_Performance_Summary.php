@@ -13,67 +13,45 @@ $con = null;
 function List_QueryParam()
 {
 	global $db, $date, $root, $data, $con, $arr_status;
-	$sqlMain = "SET NOCOUNT ON
-	 			MERGE NMU_ERP.dbo.pr_year_summary AS T
-						USING (
-							SELECT
-								fiscal_year  AS year_th,
-								fiscal_month AS month_no,
-								COUNT(*)     AS total_pr
-							FROM (
-								SELECT
-									TRY_CONVERT(INT, SUBSTRING(c_code, 3, 4)) AS doc_year,
-									TRY_CONVERT(INT, SUBSTRING(c_code, 7, 2)) AS doc_month,
-									CASE 
-										WHEN TRY_CONVERT(INT, SUBSTRING(c_code, 7, 2)) >= 10
-											THEN TRY_CONVERT(INT, SUBSTRING(c_code, 3, 4)) + 1
-										ELSE TRY_CONVERT(INT, SUBSTRING(c_code, 3, 4))
-									END AS fiscal_year,
-									CASE 
-										WHEN TRY_CONVERT(INT, SUBSTRING(c_code, 7, 2)) >= 10
-											THEN TRY_CONVERT(INT, SUBSTRING(c_code, 7, 2)) - 9
-										ELSE TRY_CONVERT(INT, SUBSTRING(c_code, 7, 2)) + 3
-									END AS fiscal_month
-								FROM NMU_ERP..SP_Tor
-								WHERE c_code LIKE 'PR%'
-								AND i_enabled = 1 
-								AND i_type_bg = 1
-							) X
-							WHERE fiscal_year >= 2569
-							GROUP BY fiscal_year, fiscal_month
-						) AS S
-						ON  T.year_th  = S.year_th
-						AND T.month_no = S.month_no
-
-						WHEN MATCHED THEN
-							UPDATE SET T.total_pr = S.total_pr
-
-						WHEN NOT MATCHED THEN
-							INSERT (year_th, month_no, total_pr)
-							VALUES (S.year_th, S.month_no, S.total_pr);
-
-						WITH base AS (
-							SELECT
-								year_th,
-								month_no,
-								total_pr,
-								source_type
-							FROM NMU_ERP.dbo.pr_year_summary
-						)
+	// นับสดจาก NMU_ERP..sp_Tor ด้วยเงื่อนไข "เดียวกัน" กับหน้า drill-down (List_DetailBgV6, Performance_Summary=1)
+	//   - c_code LIKE 'PR%'  + i_enabled = 1 + i_type_bg = 1
+	//   - แยกปี/เดือน จากเลขในรหัสเอกสาร (c_code) ตำแหน่งที่ 3-6 = ปี พ.ศ. , 7-8 = เดือนปฏิทิน
+	// total_pr        = จำนวน PR รายเดือน (ตรงกับที่กดเข้าไปดูใน detail)
+	// cumulative_total = ยอดสะสมภายในปีงบ (running total)
+	$sqlMain = "SET NOCOUNT ON;
+					;WITH pr AS (
 						SELECT
-							year_th,
-							month_no,
-							total_pr,
-							CASE 
-								WHEN source_type = 1 THEN total_pr  -- ปีเก่า: เป็นยอดสะสมอยู่แล้ว
-								ELSE SUM(total_pr) OVER (
-										PARTITION BY year_th
-										ORDER BY month_no
-										ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-									)                             -- ปีใหม่: ให้ SQL คิดยอดสะสมให้
-							END AS cumulative_total
-						FROM base
-						ORDER BY year_th, month_no ;";
+							TRY_CONVERT(INT, SUBSTRING(c_code, 3, 4)) AS doc_year,
+							TRY_CONVERT(INT, SUBSTRING(c_code, 7, 2)) AS doc_month
+						FROM NMU_ERP..sp_Tor
+						WHERE c_code LIKE 'PR%'
+						  AND i_enabled = 1
+						  AND i_type_bg = 1
+					),
+					monthly AS (
+						SELECT
+							CASE WHEN doc_month >= 10 THEN doc_year + 1 ELSE doc_year END AS year_th,
+							CASE WHEN doc_month >= 10 THEN doc_month - 9 ELSE doc_month + 3 END AS month_no,
+							COUNT(*) AS total_pr
+						FROM pr
+						WHERE doc_year IS NOT NULL
+						  AND doc_month BETWEEN 1 AND 12
+						GROUP BY
+							CASE WHEN doc_month >= 10 THEN doc_year + 1 ELSE doc_year END,
+							CASE WHEN doc_month >= 10 THEN doc_month - 9 ELSE doc_month + 3 END
+					)
+					SELECT
+						year_th,
+						month_no,
+						total_pr,
+						SUM(total_pr) OVER (
+							PARTITION BY year_th
+							ORDER BY month_no
+							ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+						) AS cumulative_total
+					FROM monthly
+					WHERE year_th >= 2566
+					ORDER BY year_th, month_no;";
 	$stmt = $db->QueryParam($sqlMain, array());
 
 	if ($stmt) {

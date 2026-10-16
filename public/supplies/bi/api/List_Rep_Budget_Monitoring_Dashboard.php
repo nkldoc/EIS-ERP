@@ -162,7 +162,7 @@ SELECT
     , SUM(a.f_plan_cut_total) AS f_plan_cut_total
     , SUM(a.f_period_cut_total) AS f_period_cut_total
     , CASE 
-    WHEN a.dc_expense_budget_type_id IN (4,5) 
+    WHEN a.dc_expense_budget_type_id IN (5) 
         THEN SUM(a.f_period_begin) + SUM(a.f_period_transfer)
     ELSE 
 			SUM(a.f_plan_begin) + SUM(a.f_plan_transfer)
@@ -400,9 +400,7 @@ foreach (${$root} as &$item) {
     $budget_display = (float) $item["f_budget_display"];
     $budget_adjust = isset($adjust_map[$key]) ? $adjust_map[$key] : 0;
 
-    if ((int)$item["dc_expense_budget_type_id"] === 4) {
-        $item["f_budget_real"] = $budget_display + $budget_adjust;
-    } elseif ((int)$item["dc_expense_budget_type_id"] === 5) {
+    if ((int)$item["dc_expense_budget_type_id"] === 5) {
         $item["f_budget_real"] = $budget_real > 0 ? $budget_real : $budget_display;
     } else {
         $item["f_budget_real"] = $budget_display > 0 ? $budget_display : $budget_real;
