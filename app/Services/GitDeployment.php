@@ -28,7 +28,7 @@ final class GitDeployment
         $env = getenv();
         $env['GIT_TERMINAL_PROMPT'] = '0';
         $env['GCM_INTERACTIVE'] = 'Never';
-        $p = proc_open(self::command(array_merge([$this->git, '-C', $this->root], $args)), [0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']], $pipes, $this->root, $env, ['bypass_shell'=>true]);
+        $p = proc_open(self::command(array_merge([$this->git, '-c', 'safe.directory=' . str_replace('\\', '/', $this->root), '-C', $this->root], $args)), [0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']], $pipes, $this->root, $env, ['bypass_shell'=>true]);
         if (!is_resource($p)) throw new RuntimeException('เรียก Git ไม่สำเร็จ');
         fclose($pipes[0]);
         stream_set_blocking($pipes[1], false); stream_set_blocking($pipes[2], false);
