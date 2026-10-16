@@ -4,6 +4,8 @@
 $loginOutputLevel = ob_get_level();
 ob_start();
 header('Cache-Control: no-store');
+require_once __DIR__ . '/PortalEntryResponse.php';
+$isPortalEntry = PortalEntryResponse::requested($_GET, $_SERVER);
 
 require_once __DIR__ . '/../conf/session-storage.php';
 require_once __DIR__ . "/../conf/config.php";
@@ -73,7 +75,7 @@ while ($data = $db->Fetch($stmt)) {
     if (Presence::enabled()) {
         $portalCenterId = SuppliesLogin::ssoUserId($data);
         if ($portalCenterId <= 0) {
-            if (!empty($_GET['portal_entry'])) {
+            if ($isPortalEntry) {
                 http_response_code(401);
                 header('Content-Type: text/html; charset=utf-8');
                 header('Cache-Control: no-store');
@@ -94,7 +96,7 @@ while ($data = $db->Fetch($stmt)) {
         $re = ['reval'=>0, 'success'=>'Success', 'msg'=>'Login Success'];
         break;
     }
-    $instance = SuppliesLogin::begin($data, ['menu'=>'sp/dashBard.php'], !empty($_GET['portal_entry']));
+    $instance = SuppliesLogin::begin($data, ['menu'=>'sp/dashBard.php'], $isPortalEntry);
         SuppliesLogin::activate($data, $instance, ['menu'=>'sp/dashBard.php']);
      $_SESSION["last_activity"] = time();
      $_SESSION['created'] = time();
@@ -128,13 +130,8 @@ while ($data = $db->Fetch($stmt)) {
 }
 
 session_write_close();
-if (!empty($_GET['portal_entry']) && $re['reval'] === 0) {
-    while (ob_get_level() > $loginOutputLevel) {
-        ob_end_clean();
-    }
-    header('Content-Type: text/html; charset=utf-8');
-    header('Location: /supplies/', true, 303);
-    exit;
+if ($isPortalEntry && $re['reval'] === 0) {
+    PortalEntryResponse::redirect($loginOutputLevel);
 }
 echo json_encode($re);
 exit;
