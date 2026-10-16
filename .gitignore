@@ -34,3 +34,11 @@ nbproject/private/private.xml
 nbproject/project.properties
 nbproject/project.xml
 nbproject/private/private.properties
+
+# local debug / backup / test artifacts (added 2026-10-16)
+public/supplies/api/userMenu/userTree_debug.txt
+public/supplies/sp/tor/api/*.bak.php
+public/supplies/sp/tor/checking-bak.js
+public/supplies/sp/tor/checking01.js
+public/supplies/sp/tor/checking_1.js
+public/supplies/sp/tor/template/medsup_contract_import_test_real_*.xlsx
