@@ -1,6 +1,16 @@
 <?php
 
+// Keep dependency output from sending headers before the portal redirect.
+$loginOutputLevel = ob_get_level();
+ob_start();
+header('Cache-Control: no-store');
+
+require_once __DIR__ . '/../conf/session-storage.php';
 require_once __DIR__ . "/../conf/config.php";
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    http_response_code(503);
+    exit('Unable to start the session. Please contact the administrator.');
+}
 require_once __DIR__ . "/../lib/database/DatabaseServer.php";
 
 header("Content-Type: application/json; charset=utf-8");
@@ -118,7 +128,14 @@ while ($data = $db->Fetch($stmt)) {
 }
 
 session_write_close();
-if (!empty($_GET['portal_entry']) && $re['reval'] === 0) { header('Location: /supplies/', true, 303); exit; }
+if (!empty($_GET['portal_entry']) && $re['reval'] === 0) {
+    while (ob_get_level() > $loginOutputLevel) {
+        ob_end_clean();
+    }
+    header('Content-Type: text/html; charset=utf-8');
+    header('Location: /supplies/', true, 303);
+    exit;
+}
 echo json_encode($re);
 exit;
 
