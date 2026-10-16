@@ -31,6 +31,11 @@ if (!$userId) {
 $mode = $_REQUEST["mode"];
 $dc_cost_id = isset($_SESSION["dc_cost_id"]) ? intval($_SESSION["dc_cost_id"]) : 0;
 
+// รายชื่อ dc_user_id ที่ได้รับสิทธิ์ดูรายการทุกหน่วยงานในหน้าตรวจสอบภายใน
+// (เทียบเท่าเจ้าหน้าที่พัสดุส่วนกลาง dc_cost_id 0/3/38 โดยไม่ต้องเปลี่ยนสังกัดของผู้ใช้)
+$auditViewAllUserIds = [60132, 60131, 60130, 60964, 60965]; // nichaphat.khe, chayanit.kru, pattraporn.mee, phatthanan.art, suttinee.chu
+$isAuditViewAll = in_array(intval($_SESSION["user_id"] ?? 0), $auditViewAllUserIds, true);
+
 $table = "dbo.sp_tor";
 $keyName = "tor_id";
 $data = $util->mnUser($_REQUEST);
@@ -144,41 +149,41 @@ switch ($mode) {
                      AND bb.i_enable = 1    ) )  ";
                 }
             }
-            if ($_REQUEST["i_budget_year"] > 0) {
+            if (($_REQUEST["i_budget_year"] ?? 0) > 0) {
                 $wh .= " AND a.i_pr_year = " . $_REQUEST["i_budget_year"];
             }
-            if ($_REQUEST["dc_cost_id"] > 0) {
+            if (($_REQUEST["dc_cost_id"] ?? 0) > 0 && !$isAuditViewAll && !in_array($_SESSION['dc_cost_id'], [0, 38, 3])) {
                 $wh .= " AND a.dc_cost2_id = " . $_REQUEST["dc_cost_id"];
             }
-            if ($_REQUEST["dc_sub_cost_id"] > 0) {
+            if (($_REQUEST["dc_sub_cost_id"] ?? 0) > 0) {
                 $wh .= " AND a.dc_sub_cost_id = " . $_REQUEST["dc_sub_cost_id"];
             }
-            if ($_REQUEST["i_budget_year_overlap"] > 0) {
+            if (($_REQUEST["i_budget_year_overlap"] ?? 0) > 0) {
                 $wh .= " AND a.i_yyyy = " . $_REQUEST["i_budget_year_overlap"];
             }
-            if ($_REQUEST["dc_expense_budget_type_id"] > 0) {
+            if (($_REQUEST["dc_expense_budget_type_id"] ?? 0) > 0) {
                 $wh .= " AND a.dc_expense_budget_type_id = " . $_REQUEST["dc_expense_budget_type_id"];
             }
-            if ($_REQUEST["i_enabled"] > 0) {
+            if (($_REQUEST["i_enabled"] ?? 0) > 0) {
                 $wh .= " AND a.i_enabled = " . $_REQUEST["i_enabled"];
             }
-            if ($_REQUEST["sp_emp_id"] > 0) {
+            if (($_REQUEST["sp_emp_id"] ?? 0) > 0) {
                 $wh .= " AND a.sp_emp_id =  " . $_REQUEST["sp_emp_id"];
             }
-            if ($_REQUEST["tor_type_id"] > 0) {
+            if (($_REQUEST["tor_type_id"] ?? 0) > 0) {
                 $wh .= " AND a.tor_type_id =  " . $_REQUEST["tor_type_id"];
             }
-            if ($_REQUEST["i_type_contract"] > 0) {
+            if (($_REQUEST["i_type_contract"] ?? 0) > 0) {
                 $wh .= " AND  a.i_type_contract  = " . $_REQUEST["i_type_contract"];
             }
-            if ($_REQUEST["sp_tor_status_id"] > 0) {
+            if (($_REQUEST["sp_tor_status_id"] ?? 0) > 0) {
                 $wh .= " AND  a.tor_status_id  = " . $_REQUEST["sp_tor_status_id"];
             }
-            if ($_REQUEST["f_total_amtPr"] > 0) {
+            if (($_REQUEST["f_total_amtPr"] ?? 0) > 0) {
                 $wh .= " AND  a.f_total_amt  = " . str_replace(",", "", $_REQUEST["f_total_amtPr"]);
                 ;
             }
-            if ($_REQUEST["f_total_amtPo"] > 0) {
+            if (($_REQUEST["f_total_amtPo"] ?? 0) > 0) {
                 $wh .= " AND  b.f_total_amt  = " . str_replace(",", "", $_REQUEST["f_total_amtPo"]);
                 ;
             }
@@ -187,6 +192,8 @@ switch ($mode) {
             $wh .= "  and   a.d_egp_date  is null  and a.sp_emp_id is not null and a.dc_department_id is not null  and a.i_type_bg in (1,2,4)  "; //and a.tor_status_id = 21
         } else if (@$_REQUEST['i_show'] == 2) {
             $wh .= " ";
+        } else if ($isAuditViewAll) {
+            $wh .= " "; // allow-list: ดูรายการทุกหน่วยงาน
         } else if (!in_array($_SESSION['dc_cost_id'], [0, 38, 3])) {
             $wh .= " AND a.dc_cost2_id = " . $_SESSION['dc_cost_id'];
         } else if (@$_REQUEST['i_show'] == 0 && !in_array($_REQUEST['dc_cost_id'], [0, 38, 3])) {
@@ -425,6 +432,10 @@ switch ($mode) {
                 case 12:
                     $i_type_bg = "color:#FF1493";
                     $i_type_bgTxt = 'การจัดทำ PR ก่อนปีงบประมาณ';
+                    break;
+                case 14:
+                    $i_type_bg = "color:#8B008B";
+                    $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                     break;
                 default:
                     $i_type_bg = "color:#F43217";
@@ -1036,7 +1047,7 @@ switch ($mode) {
             if (@$_REQUEST["i_budget_yearEn"] > 0) {
                 $wh .= " AND a.i_pr_year = " . $_REQUEST["i_budget_yearEn"];
             }
-            if (@$_REQUEST["dc_cost_id"] > 0) {
+            if (@$_REQUEST["dc_cost_id"] > 0 && !$isAuditViewAll && !in_array($_SESSION['dc_cost_id'], [38, 3])) {
                 $wh .= " AND a.dc_cost2_id = " . $_REQUEST["dc_cost_id"];
             }
             if (@$_REQUEST["dc_sub_cost_id"] > 0) {
@@ -1076,6 +1087,8 @@ switch ($mode) {
             $wh .= "  and   a.d_egp_date  is null  and a.sp_emp_id is not null and a.dc_department_id is not null  and a.i_type_bg in (1,2,4)  "; //and a.tor_status_id = 21
         } else if (@$_REQUEST['i_show'] == 2) {
             $wh .= " ";
+        } else if ($isAuditViewAll) {
+            $wh .= " "; // allow-list: ดูรายการทุกหน่วยงาน
         } else if (!in_array($_SESSION['dc_cost_id'], [38, 3])) {
             $wh .= " AND a.dc_cost2_id = " . $_SESSION['dc_cost_id'];
         } else if (@$_REQUEST['i_show'] == 0 && !in_array(@$_SESSION['dc_cost_id'], [38, 3])) {
@@ -1323,6 +1336,10 @@ switch ($mode) {
                 case 12:
                     $i_type_bg = "color:#FF1493";
                     $i_type_bgTxt = 'การจัดทำ PR ก่อนปีงบประมาณ';
+                    break;
+                case 14:
+                    $i_type_bg = "color:#8B008B";
+                    $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                     break;
                 default:
                     $i_type_bg = "color:#F43217";

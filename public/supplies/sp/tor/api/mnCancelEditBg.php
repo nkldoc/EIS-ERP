@@ -85,21 +85,22 @@ function checkItemsToTranf($check_id, $data = array()) {
 switch ($mode) {
    case "return":
 
+    // ปิดเฉพาะรายการขอแก้ไขที่ค้างอยู่ (i_edit = 1) ไม่ทับแถวที่บันทึกแก้ไขแล้ว (i_edit = 2)
     $arrParam = array();
-    $arrParam[] = $_POST["sp_bg_edit"];
     $arrParam[] = $_POST["comment"];
     $arrParam[] = $_SESSION["user_id"];   // ดึงจาก session
-    $arrParam[] = $_SESSION["user_cost_id"];
+    $arrParam[] = $_SESSION["dc_cost_id"] ?? null;
     $arrParam[] = date("Y-m-d H:i:s");
     $arrParam[] = $_POST["id"];
 
     $sql = "UPDATE dbo.sp_tor_bg_log
-            SET i_edit = ?,
-                c_comment_edit1 = ?,
+            SET c_comment_edit1 = ?,
                 dc_user_update_id = ?,
                 dc_user_update_cost_id = ?,
                 d_update = ?
-            WHERE sp_tor_id = ?";
+            WHERE sp_tor_id = ?
+              AND i_edit = 1
+              AND ISNULL(c_comment_edit1, '') = ''";
 
     $stmt = $db->QueryParam($sql, $arrParam);
     break;

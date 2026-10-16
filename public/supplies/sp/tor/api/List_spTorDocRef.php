@@ -125,4 +125,27 @@ if ($_REQUEST["type"] == "DocRef") {
     $sqlCount   = "select count(*) as totalCount from ({$sqlTempTable}) a";
     $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
     echo json_encode(array("debug" => true, "totalCount" => $totalCount, $root => ${$root}));
+} else if ($_REQUEST["type"] == "ParentPr") {
+    // ค้นหา PR แม่ (สำหรับผูก "เป็น PR ลูกของ...") ด้วยเลข PR
+    // แสดงเฉพาะ PR ที่มีเลขแล้วและยังไม่เป็น PR ลูกของใคร กันการผูกซ้อนหลายชั้น
+    $c_code = trim($_REQUEST['c_code'] ?? '');
+
+    $arrParam = array();
+    $sqlMain = "select top 20 a.tor_id, a.c_code, a.c_name, a.f_total_amt
+                from dbo.sp_tor a
+                where a.c_code is not null
+                and a.parent_id is null
+                and a.c_code like ?
+                order by a.tor_id desc";
+    $arrParam[] = "%{$c_code}%";
+    $stmt = $db->QueryParam($sqlMain, $arrParam);
+    while ($row = $db->Fetch($stmt)) {
+        $data[] = array(
+            "id"          => intval($row["tor_id"]),
+            "c_code"      => $row["c_code"],
+            "c_name"      => $row["c_name"],
+            "f_total_amt" => number_format($row["f_total_amt"], 2),
+        );
+    }
+    echo json_encode(array("success" => true, $root => $data));
 }

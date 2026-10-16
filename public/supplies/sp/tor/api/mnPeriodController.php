@@ -120,7 +120,13 @@ switch ($mode) {
 
             FROM dbo.sp_tor_dtl_period a
             INNER JOIN dbo.sp_tor_hdr_period h on h.sp_tor_hdr_period_id = a.sp_tor_hdr_period_id
-            LEFT JOIN dbo.sp_tor_bidder_dtl d on d.sp_tor_id = a.sp_tor_id and d.dc_creditor_id=a.dc_creditor_id and d.i_enabled=  1
+            -- PR ที่มีหลายรายการเสนอราคาของผู้ขายรายเดียวกัน: เลือกแถวเดียว (ตรงรายการของงวดถ้ามี) ไม่ให้รายการของงวดแสดงซ้ำ
+            OUTER APPLY (
+                SELECT TOP 1 dd.sp_tor_dtl_id, dd.f_vat_amt, dd.f_total_add_vat_amt, dd.f_rate_vat
+                FROM dbo.sp_tor_bidder_dtl dd
+                WHERE dd.sp_tor_id = a.sp_tor_id and dd.dc_creditor_id = a.dc_creditor_id and dd.i_enabled = 1
+                ORDER BY CASE WHEN dd.sp_tor_dtl_id = a.sp_tor_dtl_id THEN 0 ELSE 1 END, dd.sp_tor_bidder_dtl_id
+            ) d
             LEFT JOIN dbo.vw_sp_pr_budget3 e on e.sp_tor_dtl_id=d.sp_tor_dtl_id
             LEFT JOIN dbo.sp_tor_dtl f on f.sp_tor_dtl_id=d.sp_tor_dtl_id
             WHERE a.sp_tor_hdr_period_id = ? and a.i_enabled = 1 and h.i_enabled = 1

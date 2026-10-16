@@ -895,13 +895,32 @@ if ($_REQUEST["type"] == "deliveries") {
                 , s.i_purchase 
                 , c.i_is_join_venture
                 , CASE
-                WHEN s.i_purchase = 1 THEN 'i_purchase 1' 
+                WHEN s.i_purchase = 1 THEN 'i_purchase 1'
                         ELSE 'i_purchase 2,3'
                 END AS i_purchaseText
+                , cw.i_is_warranty
+                , cw.i_is_warranty_book
+                , cw.book_no
+                , cw.book_seq
+                , CONVERT(VARCHAR, cw.d_book_date, 120) AS d_book_date
+                , cw.f_warranty_amt
+                , cw.cashiercheque_on
+                , cw.cashiercheque_seq
+                , isnull(CONVERT(VARCHAR, cw.d_cashiercheque_data, 120),'') AS d_cashiercheque_data
+                , cw.f_warranty_cashiercheque
+                , cw.c_remark_cashiercheque
+                , cw.book_warranty_no
+                , CONVERT(VARCHAR, cw.d_book_warranty_date, 120) AS d_book_warranty_date
+                , cw.dc_bank_id
+                , (SELECT c_code+' '+c_name FROM dc_bank aa WHERE aa.dc_bank_id = cw.dc_bank_id) AS dc_bank_idID_Name
+                , cw.f_book_warranty_amt
+                , CONVERT(VARCHAR, cw.d_book_warranty_end, 120) AS d_book_warranty_end
+                , cw.c_remark1
             "
         . " from ({$sqlTempTable}) a "
         . " inner join dbo.sp_tor s on s.tor_id = a.sp_tor_id"
         . " inner join dbo.sp_tor_contract c on c.sp_tor_id = a.sp_tor_id"
+        . " left join dbo.sp_tor_contract cw on cw.sp_tor_contract_id = a.sp_tor_contract_id"
         . " WHERE row > ? and row <= ?";
     //     echo $sqlMain . '/*';
     //    print_r($arrParam);
@@ -980,6 +999,27 @@ if ($_REQUEST["type"] == "deliveries") {
             "end_date" => $date->extDateBuddha($row["end_date"]),
             "c_comment" => $row["c_comment"],
             "c_remark" => $row["c_remark"],
+            //----- ข้อมูลหลักประกันสัญญา (contract guarantee) -----
+            "i_is_warranty" => $row["i_is_warranty"],
+            "i_is_warranty_book" => $row["i_is_warranty_book"],
+            "cashiercheque_on" => $row["cashiercheque_on"],
+            "c_books_cashiercheque" => $row["cashiercheque_on"],
+            "c_receipt_cashiercheque" => $row["cashiercheque_seq"],
+            "d_cashiercheque_date" => ((empty($row["d_cashiercheque_data"])) ? "" : $date->extDateBuddha($row["d_cashiercheque_data"])),
+            "f_cashiercheque_warranty_amt2" => $row["f_warranty_cashiercheque"],
+            "c_comment2" => $row["c_remark_cashiercheque"],
+            "c_books_receipt" => $row["book_no"],
+            "c_receipt_no" => $row["book_seq"],
+            "d_book_date" => ((empty($row["d_book_date"])) ? "" : $date->extDateBuddha($row["d_book_date"])),
+            "f_warranty_amt" => $row["f_warranty_amt"],
+            "c_doc_no" => $row["book_warranty_no"],
+            "d_doc_date1" => ((empty($row["d_book_warranty_date"])) ? "" : $date->extDateBuddha($row["d_book_warranty_date"])),
+            "dc_bank_id" => $row["dc_bank_id"],
+            "dc_bank_idID_Name" => $row["dc_bank_idID_Name"],
+            "f_warranty_amt1" => number_format($row["f_book_warranty_amt"], 2),
+            "d_expire_warranty" => ((empty($row["d_book_warranty_end"])) ? "" : $date->extDateBuddha($row["d_book_warranty_end"])),
+            "c_comment1" => $row["c_remark1"],
+            //-----------------------------------------------------
             "dc_creditor_id" => intval($row["dc_creditor_id"]),
             "dc_creditor_idTxt" => $row["dc_creditor_idTxt"],
             "c_discription" => $row["c_discription"],

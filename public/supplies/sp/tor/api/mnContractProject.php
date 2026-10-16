@@ -23,7 +23,40 @@ $ret_id = null;
 $ret_id2= null;
 $db->BeginTran();
 switch ($mode) {
-    case "REQUEST_EXT_CONTRACT": 
+    case "PLAN_BUDGET_TYPE":
+        // แหล่งเงินตามแผนงบประมาณ (NMU_EIS..bg_budget_hdr_plan / bg_budget_dtl_plan) ของรหัสงบประมาณ + ปีงบ (ค.ศ.)
+        // ใช้ตั้งค่าแหล่งเงินอัตโนมัติในฟอร์ม PR ย่อยโครงการต่อเนื่อง (project.js) - อ่านอย่างเดียว
+        $root = "data";
+        $sqlMain = "SELECT DISTINCT h.dc_expense_budget_type_id
+                      FROM " . DB_NMU_EIS . "bg_budget_dtl_plan d
+                      INNER JOIN " . DB_NMU_EIS . "bg_budget_hdr_plan h ON h.bg_budget_hdr_plan_id = d.bg_budget_hdr_plan_id
+                     WHERE h.i_enable = 1 AND d.bg_expense_id = ? AND h.i_year = ?";
+        $stmt = $db->QueryParam($sqlMain, array(intval($_REQUEST["bg_expense_id"] ?? 0), intval($_REQUEST["i_year"] ?? 0)));
+        ${$root} = array();
+        while ($stmt && $row = $db->Fetch($stmt)) {
+            ${$root}[] = array("dc_expense_budget_type_id" => intval($row["dc_expense_budget_type_id"]));
+        }
+        $db->RollBackTran();
+        echo json_encode(array("success" => true, "totalCount" => count(${$root}), $root => ${$root}));
+        exit;
+    case "UP_SUB_BUDGET_TYPE":
+        // หน้าต่างจองเงิน PO ย่อย (project.js) : แหล่งเงินที่เลือก (ตามแผน) ต่างจากที่บันทึกไว้
+        // บันทึกลง PR ย่อย (sp_tor) + สัญญาย่อย (sp_tor_contract) ก่อนจอง แบบเดียวกับโหมด EDIT
+        $bgTypeId = intval($_REQUEST['dc_expense_budget_type_id'] ?? 0);
+        $torProId = intval($_REQUEST['sp_tor_pro_id'] ?? 0);
+        $contractProId = intval($_REQUEST['sp_tor_contract_pro_id'] ?? 0);
+        if ($bgTypeId > 0 && $torProId > 0 && $contractProId > 0) {
+            $d_update = date("Y-m-d H:i:s");
+            $sql = "UPDATE dbo.sp_tor SET dc_expense_budget_type_id = ?, d_update = ?, dc_user_update_id = ?, dc_user_update_cost_id = ? WHERE tor_id = ?;
+                    UPDATE dbo.sp_tor_contract SET dc_expense_budget_type_id = ?, d_update = ?, dc_user_update_id = ?, dc_user_update_cost_id = ? WHERE sp_tor_contract_id = ?;";
+            $stmt = $db->QueryParam($sql, array($bgTypeId, $d_update, $_SESSION['user_id'], $_SESSION['dc_cost_id'], $torProId,
+                $bgTypeId, $d_update, $_SESSION['user_id'], $_SESSION['dc_cost_id'], $contractProId));
+        } else {
+            $stmt = false;
+            $sql = "UP_SUB_BUDGET_TYPE: missing parameter";
+        }
+        break;
+    case "REQUEST_EXT_CONTRACT":
         $data['sp_tor_id'] = $db->GetDataBySQL("SELECT sp_tor_id FROM dbo.sp_tor_contract where sp_tor_contract_id=?", array($data["sp_tor_contract_id"]));
         $sp_tor_id = $data['sp_tor_id'];
 //        print_r($data); exit();

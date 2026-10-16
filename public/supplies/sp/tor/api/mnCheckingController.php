@@ -214,26 +214,12 @@ switch ($mode) {
             exit();
         }
         $lookupSource = trim($_REQUEST['source'] ?? 'tor');
-        if (!in_array($lookupSource, array('tor', 'contract', 'ap', 'arrive'), true)) {
+        if (!in_array($lookupSource, array('tor', 'contract', 'ap'), true)) {
             $lookupSource = 'tor';
         }
         $lookupKeyword = trim($_REQUEST['keyword'] ?? '');
         $lookupLike = '%' . $lookupKeyword . '%';
-        if ($lookupSource === 'arrive') {
-            $lookupSql = "SELECT TOP 200 'arrive' AS source,
-                            COALESCE(c.sp_tor_id,cm.sp_tor_id) AS tor_id,
-                            COALESCE(c.sp_tor_contract_id,cm.sp_tor_contract_id) AS sp_tor_contract_id,
-                            h.sp_check_period_hdr_id,h.c_arrive_code AS c_code,
-                            COALESCE(c.c_name,cm.c_name,t.c_name) AS c_name,h.i_enabled
-                          FROM dbo.sp_check_period_hdr h
-                          LEFT JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
-                          LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=h.sp_mn_contract_hdr_id
-                          LEFT JOIN dbo.sp_tor_contract cm ON cm.sp_tor_contract_id=m.sp_contract_id
-                          LEFT JOIN dbo.sp_tor t ON t.tor_id=COALESCE(c.sp_tor_id,cm.sp_tor_id)
-                          WHERE h.c_arrive_code IS NOT NULL
-                            AND (?='' OR h.c_arrive_code LIKE ? OR COALESCE(c.c_name,cm.c_name,t.c_name) LIKE ?)
-                          ORDER BY h.sp_check_period_hdr_id DESC";
-        } else if ($lookupSource === 'ap') {
+        if ($lookupSource === 'ap') {
             $lookupSql = "SELECT TOP 200 'ap' AS source,
                             COALESCE(c.sp_tor_id,cm.sp_tor_id) AS tor_id,
                             COALESCE(c.sp_tor_contract_id,cm.sp_tor_contract_id) AS sp_tor_contract_id,
@@ -468,25 +454,7 @@ switch ($mode) {
 
         $contractId = intval($_REQUEST['sp_tor_contract_id'] ?? 0);
         if ($searchCode !== '') {
-            if ($searchType === 'arrive_code') {
-                $searchRows = $fetchRows(
-                        "SELECT TOP 1 h.sp_check_period_hdr_id,
-                           COALESCE(c.sp_tor_id,cm.sp_tor_id) AS sp_tor_id,
-                           COALESCE(c.sp_tor_contract_id,cm.sp_tor_contract_id) AS sp_tor_contract_id
-                         FROM dbo.sp_check_period_hdr h
-                         LEFT JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
-                         LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=h.sp_mn_contract_hdr_id
-                         LEFT JOIN dbo.sp_tor_contract cm ON cm.sp_tor_contract_id=m.sp_contract_id
-                         WHERE LTRIM(RTRIM(h.c_arrive_code))=?
-                         ORDER BY h.sp_check_period_hdr_id DESC",
-                        array($searchCode)
-                );
-                if (count($searchRows) > 0) {
-                    $checkPeriodHdrId = intval($searchRows[0]['sp_check_period_hdr_id']);
-                    $requestedTorId = intval($searchRows[0]['sp_tor_id']);
-                    $contractId = intval($searchRows[0]['sp_tor_contract_id']);
-                }
-            } else if ($searchType === 'ap_code') {
+            if ($searchType === 'ap_code') {
                 $searchRows = $fetchRows(
                         "SELECT TOP 1 h.sp_check_period_hdr_id,
                            COALESCE(c.sp_tor_id,cm.sp_tor_id) AS sp_tor_id,

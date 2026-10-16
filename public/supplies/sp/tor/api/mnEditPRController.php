@@ -3282,17 +3282,22 @@ switch ($mode) {
 
             $id = $_REQUEST['tor_id'];
             $bg_reserve_id = $_REQUEST["bg_reserve_id"];
-            $array = json_decode($i_pr_types);
-            $val = intval($array[0]);
 
 
             // อัพเดท sp_tor_contract (booking type)
+            // ปิดทุกใบจองเงินขั้น PR ที่ยัง active ของ PR นี้ (รวม orphan ที่ sp_tor ไม่ได้ชี้ถึงแล้ว)
+            // ยกเว้นใบที่เป็นของแหล่งที่ 2 / 3
             $sql1 = "
-                    UPDATE NMU_EIS..bg_reserve_money SET i_enable = 2 WHERE bg_reserve_money_id = ? AND pr_id = ? AND i_reserve = 1 AND i_sys = 1; 
-                    UPDATE sp_tor SET bg_reserve_money1_id = 0 WHERE tor_id = ?;
+                    UPDATE NMU_EIS..bg_reserve_money SET i_enable = 2
+                    WHERE pr_id = ? AND i_sys = 1 AND i_reserve = 1 AND i_enable = 1
+                      AND bg_reserve_money_id NOT IN (
+                          SELECT ISNULL(bg_reserve_money2_id,0) FROM sp_tor WHERE tor_id = ?
+                          UNION ALL SELECT ISNULL(bg_reserve_money3_id,0) FROM sp_tor WHERE tor_id = ?
+                      );
+                    UPDATE sp_tor SET bg_reserve_money1_id = 0, f_type_amt = 0, dc_expense_budget_type_id = NULL, i_pr_type1 = NULL WHERE tor_id = ?;
             ";
 
-            $arrValue1 = array($bg_reserve_id,  $id, $id);
+            $arrValue1 = array($id, $id, $id, $id);
             //           echo $sql1; print_r($arrValue1);
             $stmt1 = $db->QueryParam($sql1, $arrValue1);
         }
@@ -3334,17 +3339,21 @@ switch ($mode) {
 
             $id = $_REQUEST['tor_id'];
             $bg_reserve_id = $_REQUEST["bg_reserve_id"];
-            $array = json_decode($i_pr_types);
-            $val = intval($array[0]);
 
 
             // อัพเดท sp_tor_contract (booking type)
+            // ปิดทุกใบจองเงินขั้น PR ที่ยัง active ของ PR นี้ (รวม orphan) ยกเว้นใบของแหล่งที่ 1 / 3
             $sql1 = "
-                    UPDATE NMU_EIS..bg_reserve_money SET i_enable = 2 WHERE bg_reserve_money_id = ? AND pr_id = ? AND i_reserve = 1 AND i_sys = 1; 
-                    UPDATE sp_tor SET bg_reserve_money2_id = 0 WHERE tor_id = ?;
+                    UPDATE NMU_EIS..bg_reserve_money SET i_enable = 2
+                    WHERE pr_id = ? AND i_sys = 1 AND i_reserve = 1 AND i_enable = 1
+                      AND bg_reserve_money_id NOT IN (
+                          SELECT ISNULL(bg_reserve_money1_id,0) FROM sp_tor WHERE tor_id = ?
+                          UNION ALL SELECT ISNULL(bg_reserve_money3_id,0) FROM sp_tor WHERE tor_id = ?
+                      );
+                    UPDATE sp_tor SET bg_reserve_money2_id = 0, f_type2_amt = 0, dc_expense_budget_type2_id = NULL, i_pr_type2 = NULL WHERE tor_id = ?;
             ";
 
-            $arrValue1 = array($bg_reserve_id,  $id, $id);
+            $arrValue1 = array($id, $id, $id, $id);
             //           echo $sql1; print_r($arrValue1);
             $stmt1 = $db->QueryParam($sql1, $arrValue1);
         }
@@ -3386,17 +3395,21 @@ switch ($mode) {
 
             $id = $_REQUEST['tor_id'];
             $bg_reserve_id = $_REQUEST["bg_reserve_id"];
-            $array = json_decode($i_pr_types);
-            $val = intval($array[0]);
 
 
             // อัพเดท sp_tor_contract (booking type)
+            // ปิดทุกใบจองเงินขั้น PR ที่ยัง active ของ PR นี้ (รวม orphan) ยกเว้นใบของแหล่งที่ 1 / 2
             $sql1 = "
-                    UPDATE NMU_EIS..bg_reserve_money SET i_enable = 2 WHERE bg_reserve_money_id = ? AND pr_id = ? AND i_reserve = 1 AND i_sys = 1; 
-                    UPDATE sp_tor SET bg_reserve_money3_id = 0 WHERE tor_id = ?;
+                    UPDATE NMU_EIS..bg_reserve_money SET i_enable = 2
+                    WHERE pr_id = ? AND i_sys = 1 AND i_reserve = 1 AND i_enable = 1
+                      AND bg_reserve_money_id NOT IN (
+                          SELECT ISNULL(bg_reserve_money1_id,0) FROM sp_tor WHERE tor_id = ?
+                          UNION ALL SELECT ISNULL(bg_reserve_money2_id,0) FROM sp_tor WHERE tor_id = ?
+                      );
+                    UPDATE sp_tor SET bg_reserve_money3_id = 0, f_type3_amt = 0, dc_expense_budget_type3_id = NULL, i_pr_type3 = NULL WHERE tor_id = ?;
             ";
 
-            $arrValue1 = array($bg_reserve_id,  $id, $id);
+            $arrValue1 = array($id, $id, $id, $id);
             //           echo $sql1; print_r($arrValue1);
             $stmt1 = $db->QueryParam($sql1, $arrValue1);
         }
@@ -3490,8 +3503,6 @@ switch ($mode) {
 
             $id = $_REQUEST['tor_contract_id'];
             $bg_reserve_id = $_REQUEST["bg_reserve_id"];
-            $array = json_decode($i_pr_types);
-            $val = intval($array[0]);
 
 
             // อัพเดท sp_tor_contract (booking type)

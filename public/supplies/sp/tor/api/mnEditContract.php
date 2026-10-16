@@ -28,7 +28,9 @@ switch ($mode) {
         $arrValue = array();
 
         $i_is_book = $_REQUEST['i_is_book'] ?? NULL;
-        $i_is_book = $i_is_book == '- ไม่มีการค้ำประกัน -' ? NULL : $i_is_book;
+        // ค่า "ไม่มีการค้ำประกัน" (ข้อความ / 0 / ค่าว่าง) ให้เป็น NULL ทั้งหมด
+        $i_is_book = ($i_is_book == '- ไม่มีการค้ำประกัน -' || $i_is_book === '0' || $i_is_book === 0 || $i_is_book === '') ? NULL : $i_is_book;
+        $g = ($i_is_book === NULL) ? NULL : (string)$i_is_book; // '1'=เงินสด, '8'=แคชเชียร์เช็ค, '9'=หนังสือค้ำประกัน
 
         $COUNT_EDIT = $db->GetDataBySQL("select COUNT(sp_tor_id) as sp_tor_id  from sp_tor_contract_edit where i_enabled = 1  and sp_tor_id = {$_REQUEST['sp_tor_id']} group by sp_tor_id  ", array($_REQUEST["sp_tor_id"]));
         $stmt3 = $db->QueryParam("select
@@ -106,23 +108,28 @@ switch ($mode) {
         $arrValue = null;
 
         $arrParam["i_type_guarantee"] = $i_is_book;
-        $arrParam["book_seq"] = $_REQUEST["c_receipt_no"] ?? null;
-        $arrParam["d_book_date"] = !empty($_REQUEST['d_book_date']) ? $date->bc_to_ad($_REQUEST['d_book_date']) : null;
+
+        // เขียนเฉพาะข้อมูลของวิธีที่เลือก ที่เหลือ clear เป็น NULL เพื่อให้ป้ายวิธีการค้ำประกันบนหน้าจอตรงกับที่เลือก
+        // --- เงินสด (1) ---
         $val_warranty = str_replace(",", "", $_REQUEST["f_warranty_amt"] ?? '');
-        $arrParam["f_warranty_amt"] = ($val_warranty == '' || $val_warranty == 0) ? null : $val_warranty;
+        $arrParam["book_seq"] = ($g === '1') ? ($_REQUEST["c_receipt_no"] ?? null) : null;
+        $arrParam["d_book_date"] = ($g === '1' && !empty($_REQUEST['d_book_date'])) ? $date->bc_to_ad($_REQUEST['d_book_date']) : null;
+        $arrParam["f_warranty_amt"] = ($g === '1' && $val_warranty !== '' && $val_warranty != 0) ? $val_warranty : null;
 
-        $arrParam["book_warranty_no"] = $_REQUEST["c_doc_no"] ?? null;
-        $arrParam["d_book_warranty_date"] = !empty($_REQUEST['d_doc_date1']) ? $date->bc_to_ad($_REQUEST['d_doc_date1']) : null;
-        $arrParam["d_book_warranty_end"] = !empty($_REQUEST['d_expire_warranty']) ? $date->bc_to_ad($_REQUEST['d_expire_warranty']) : null;
+        // --- หนังสือค้ำประกัน (9) ---
         $val_book_warranty = str_replace(",", "", $_REQUEST["f_warranty_amt1"] ?? '');
-        $arrParam["f_book_warranty_amt"] = ($val_book_warranty == '' || $val_book_warranty == 0) ? null : $val_book_warranty;
-        $arrParam["dc_bank_id"] = $_REQUEST["dc_bank_id"] ?? null;
+        $arrParam["book_warranty_no"] = ($g === '9') ? ($_REQUEST["c_doc_no"] ?? null) : null;
+        $arrParam["d_book_warranty_date"] = ($g === '9' && !empty($_REQUEST['d_doc_date1'])) ? $date->bc_to_ad($_REQUEST['d_doc_date1']) : null;
+        $arrParam["d_book_warranty_end"] = ($g === '9' && !empty($_REQUEST['d_expire_warranty'])) ? $date->bc_to_ad($_REQUEST['d_expire_warranty']) : null;
+        $arrParam["f_book_warranty_amt"] = ($g === '9' && $val_book_warranty !== '' && $val_book_warranty != 0) ? $val_book_warranty : null;
+        $arrParam["dc_bank_id"] = ($g === '9') ? ($_REQUEST["dc_bank_id"] ?? null) : null;
 
-        // $arrParam['cashiercheque_on'] = $_REQUEST['c_receipt_cashiercheque'] ?? null;
-        $arrParam['cashiercheque_seq'] = $_REQUEST['c_receipt_cashiercheque'] ?? null;
-        $arrParam["d_cashiercheque_data"] = !empty($_REQUEST['d_cashiercheque_date']) ? $date->bc_to_ad($_REQUEST['d_cashiercheque_date']) : null;
+        // --- แคชเชียร์เช็ค (8) ---
         $val_warranty_cashiercheque = str_replace(",", "", $_REQUEST["f_cashiercheque_warranty_amt2"] ?? '');
-        $arrParam['f_warranty_cashiercheque'] = ($val_warranty_cashiercheque == '' || $val_warranty_cashiercheque == 0) ? null : $val_warranty_cashiercheque;
+        $arrParam['cashiercheque_on'] = ($g === '8') ? ($_REQUEST['c_receipt_cashiercheque'] ?? 1) : null;
+        $arrParam['cashiercheque_seq'] = ($g === '8') ? ($_REQUEST['c_receipt_cashiercheque'] ?? null) : null;
+        $arrParam["d_cashiercheque_data"] = ($g === '8' && !empty($_REQUEST['d_cashiercheque_date'])) ? $date->bc_to_ad($_REQUEST['d_cashiercheque_date']) : null;
+        $arrParam['f_warranty_cashiercheque'] = ($g === '8' && $val_warranty_cashiercheque !== '' && $val_warranty_cashiercheque != 0) ? $val_warranty_cashiercheque : null;
 
         $arrParam['d_doc_date'] = !empty($_REQUEST['d_doc_date']) ? $date->bc_to_ad($_REQUEST['d_doc_date']) : null;
         $arrParam['d_contract_receiving_date'] = !empty($_REQUEST['d_contract_receiving_date']) ? $date->bc_to_ad($_REQUEST['d_contract_receiving_date']) : null;
@@ -217,6 +224,15 @@ switch ($mode) {
         $data['i_joint_venture'] = $_REQUEST["i_is_join_venture_per"] ?? null;
         $data['i_is_product_last'] = $_REQUEST["i_product_type"] ?? null;
         if ($_REQUEST['i_type_edit'] == 2) {
+            // ---- อ่านค่าเดิมก่อนแก้ไข ไว้เขียน audit log ----
+            $__logOld = $db->GetDataBySQL(
+                "SELECT CONVERT(varchar,d_doc_date,23) AS d_doc_date
+                      , CONVERT(varchar,d_period_date,23) AS d_period_date
+                      , f_total_amt, i_day, i_alert, i_is_last, c_discription
+                   FROM dbo.sp_tor_hdr_period WHERE sp_tor_hdr_period_id = ?",
+                array($_REQUEST["sp_tor_hdr_period_id"])
+            );
+
             // if ($_REQUEST['copy_contract_dtl'] == 'save') {
             foreach ($data as $fldA => $value) {
                 $arrValue[] = ($value != "") ? $value : null;
@@ -255,10 +271,91 @@ switch ($mode) {
                 WHERE sp_tor_hdr_period_id = ?";
 
             $stmt2 = $db->QueryParam($sql2, $arrValue2);
-            $ss_id = $db->Fetch($stmt2);
-            $re_id = $ss_id["id"];
-            $dc_creditor_name = $ss_id["dc_creditor_name"];
-            $c_doc_ref_contract = $ss_id["c_doc_ref_contract"];
+            // $sql2 เป็น UPDATE ไม่มี result set จึงไม่ต้อง Fetch (เดิมเรียก Fetch แล้วอ่าน $ss_id["id"] ทำให้ PHP fatal / HTTP 500)
+            $re_id = $_REQUEST["sp_tor_hdr_period_id"];
+            $dc_creditor_name = $db->GetDataBySQL(
+                "SELECT c.c_name FROM dbo.sp_tor_hdr_period p
+                 INNER JOIN dbo.sp_tor_contract ct ON ct.sp_tor_contract_id = p.sp_tor_contract_id
+                 LEFT JOIN NMU.dbo.dc_creditor c ON c.dc_creditor_id = ct.dc_creditor_id
+                 WHERE p.sp_tor_hdr_period_id = ?",
+                array($re_id)
+            );
+            $c_doc_ref_contract = $db->GetDataBySQL(
+                "SELECT ct.c_code FROM dbo.sp_tor_hdr_period p
+                 INNER JOIN dbo.sp_tor_contract ct ON ct.sp_tor_contract_id = p.sp_tor_contract_id
+                 WHERE p.sp_tor_hdr_period_id = ?",
+                array($re_id)
+            );
+
+            // ---- sync ยอดเงินงวดไปตาราง sp_check_period_dtl (หน้าตรวจรับ SUM f_net_total_price จากตรงนี้) ----
+            //      ทำเฉพาะงวดที่ยังไม่ออกเลขตรวจรับ (sp_check_period_hdr.c_code IS NULL) เท่านั้น
+            $d_update_chk = date("Y-m-d H:i:s");
+            $db->QueryParam(
+                "UPDATE d
+                    SET d.f_net_unit_price = ?, d.f_net_total_price = ?,
+                        d.dc_user_update_id = ?, d.dc_user_update_cost_id = ?, d.d_update = ?
+                   FROM dbo.sp_check_period_dtl d
+                   INNER JOIN dbo.sp_check_period_hdr h ON h.sp_check_period_hdr_id = d.sp_check_period_hdr_id
+                  WHERE d.sp_tor_hdr_period_id = ? AND h.c_code IS NULL",
+                array($f_total_amt, $f_total_amt, $_SESSION["user_id"], $_SESSION["dc_cost_id"], $d_update_chk, $re_id)
+            );
+
+            // ---- เขียน audit log เฉพาะฟิลด์ที่มีการเปลี่ยนแปลง ----
+            $__logNew = array(
+                "d_doc_date"    => $data['d_doc_date'],
+                "d_period_date" => $data['d_period_date'],
+                "f_total_amt"   => $data['f_total_amt'],
+                "i_day"         => $data['i_day'],
+                "i_alert"       => $data['i_alert'],
+                "i_is_last"     => $data['i_is_last'],
+                "c_discription" => $data['c_discription'],
+            );
+            $__logLabel = array(
+                "d_doc_date"    => "วันที่เริ่มนับการส่งของในงวด",
+                "d_period_date" => "วันที่กำหนดส่งในงวดงาน",
+                "f_total_amt"   => "จำนวนเงินงวด",
+                "i_day"         => "จำนวนวันที่กำหนดส่ง",
+                "i_alert"       => "จำนวนวันแจ้งเตือน",
+                "i_is_last"     => "งวดสุดท้าย",
+                "c_discription" => "หมายเหตุ",
+            );
+            $__confirmed = (($_REQUEST['confirm_edit'] ?? '') == '1') ? 1 : 0;
+            $__logUser = $_SESSION["user_id"] ?? 0;
+            $__logDate = date("Y-m-d H:i:s");
+            $__logContractId = $_REQUEST['sp_tor_contract_id'] ?? null;
+            foreach ($__logNew as $__f => $__nv) {
+                $__ov = $__logOld[$__f] ?? null;
+                $__ovC = is_string($__ov) ? trim($__ov) : $__ov;
+                $__nvC = is_string($__nv) ? trim($__nv) : $__nv;
+                if (in_array($__f, array("d_doc_date", "d_period_date"))) {
+                    $__ovC = substr((string)$__ovC, 0, 10);
+                    $__nvC = substr((string)$__nvC, 0, 10);
+                } elseif ($__f == "f_total_amt") {
+                    $__ovC = number_format((float)$__ovC, 2, '.', '');
+                    $__nvC = number_format((float)$__nvC, 2, '.', '');
+                } else {
+                    $__ovC = (string)$__ovC;
+                    $__nvC = (string)$__nvC;
+                }
+                if ($__ovC === $__nvC) {
+                    continue;
+                }
+                // ใช้ sqlsrv_query ตรง ๆ + ปิด error ไว้ เพื่อไม่ให้การเขียน log ล้ม ไปทำให้การบันทึกงวดพัง
+                // (ถ้ายังไม่ได้สร้างตาราง sp_tor_hdr_period_edit_log การบันทึกงวดก็ยังทำงานปกติ แค่ไม่มี log)
+                @sqlsrv_query(
+                    $db->conn,
+                    "INSERT INTO dbo.sp_tor_hdr_period_edit_log
+                        (sp_tor_hdr_period_id, sp_tor_contract_id, c_contract_code, i_period,
+                         field_name, field_label, old_value, new_value, i_confirmed, c_source, dc_user_id, d_create)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    array(
+                        $re_id, $__logContractId, $c_doc_ref_contract, $i_period,
+                        $__f, $__logLabel[$__f], (string)$__ovC, (string)$__nvC,
+                        $__confirmed, 'ST0009', $__logUser, $__logDate
+                    )
+                );
+            }
+
             $i_period = $data["i_period"];
             $d_period_date = $data['d_period_date'];
             $f_total_amt = $data['f_total_amt'];

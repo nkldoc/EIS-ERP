@@ -222,6 +222,10 @@ if ($type == "ownnerPr") {
             case 7: $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
                 break;
@@ -491,6 +495,10 @@ if ($type == "ownnerPr") {
                 break;
             case 7: $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
+                break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                 break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -781,6 +789,10 @@ if ($type == "ownnerPr") {
                 break;
             case 7: $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
+                break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                 break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -1091,6 +1103,10 @@ if ($type == "ownnerPr") {
                 break;
             case 7: $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
+                break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                 break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -1420,6 +1436,10 @@ if ($type == "ownnerPr") {
                 break;
             case 7: $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'PR จองเงินทำถึงตรวจรับ';
+                break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                 break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
@@ -1752,6 +1772,10 @@ if ($type == "ownnerPr") {
             case 7: $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
                 break;
@@ -2070,6 +2094,10 @@ if ($type == "ownnerPr") {
             case 7: $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
                 break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
+                break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
                 break;
@@ -2320,6 +2348,10 @@ if ($type == "ownnerPr") {
                 break;
             case 7: $i_type_bg = "color:#52CD14";
                 $i_type_bgTxt = 'การจัดทำ PR จองเงินทำถึงตรวจรับ';
+                break;
+            case 14:
+                $i_type_bg = "color:#8B008B";
+                $i_type_bgTxt = 'PR ไม่จองเงิน (พิจารณาแยก)';
                 break;
             default :$i_type_bg = "color:#F43217";
                 $i_type_bgTxt = '';
