@@ -1,5 +1,8 @@
 <?php
 include("../conf/config.php");  
+require_once dirname(__DIR__) . '/conf/presence/Presence.php';
+Presence::revoke('SUPPLIES', (string)($_SESSION['user_id'] ?? ''), (string)($_SESSION['last_login'] ?? ''));
+SingleLogin::release('SUPPLIES', (string)($_SESSION['user_id'] ?? ''), (string)($_SESSION['login_instance'] ?? ''));
     $_SESSION = array();
     if (!headers_sent()) {
         setcookie(session_name(), "", [

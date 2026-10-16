@@ -1,6 +1,19 @@
 <?php
 
+// Keep dependency output from sending headers before the portal redirect.
+$loginOutputLevel = ob_get_level();
+ob_start();
+header('Cache-Control: no-store');
+require_once __DIR__ . '/PortalEntryResponse.php';
+$isPortalEntry = PortalEntryResponse::requested($_GET, $_SERVER);
+
+require_once __DIR__ . '/../conf/session-storage.php';
+require_once __DIR__ . '/../conf/presence/SuppliesLogin.php';
 require_once __DIR__ . "/../conf/config.php";
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    http_response_code(503);
+    exit('Unable to start the session. Please contact the administrator.');
+}
 require_once __DIR__ . "/../lib/database/DatabaseServer.php";
 
 header("Content-Type: application/json; charset=utf-8");
@@ -12,6 +25,10 @@ $requestUserId = filter_var($requestUserId, FILTER_VALIDATE_INT, [
 ]);
 
 if ($requestUserId === false || $requestUserId === null) {
+    if (isset($jsonInput['userf'], $jsonInput['passwordf'])) {
+        $_POST['userf'] = $jsonInput['userf']; $_POST['passwordf'] = $jsonInput['passwordf'];
+        require __DIR__ . '/login.php'; exit;
+    }
     http_response_code(400);
     echo json_encode([
         "reval" => 1,
@@ -22,7 +39,7 @@ if ($requestUserId === false || $requestUserId === null) {
 }
 
 $db        = new DatabaseServer();
-$sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
+$sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name, a.c_user_name
                 , isnull((select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
                 , isnull((select top 1 c_code from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
                 ,(select top 1 dc_area_id from dbo.dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
@@ -47,7 +64,7 @@ $sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
                 left join dbo.sp_emp c on c.dc_emp_id = b.dc_emp_id
                 left join dbo.sp_department d on d.dc_department_id = c.dc_department_id
                 left join dbo.sp_department_type e on e.dc_department_type_id = d.dc_department_type_id
-    WHERE a.dc_user_id = ?";
+    WHERE a.dc_user_id = ? AND a.i_enable=1 AND a.i_delete=2";
 $arrParam = [$requestUserId];
 $re = [
     "reval" => 1,
@@ -56,37 +73,32 @@ $re = [
 ];
 $stmt = $db->QueryParam($sqlMain, $arrParam);
 while ($data = $db->Fetch($stmt)) {
-    // Do not carry any authenticated fields from the previous user.
-    $_SESSION = array();
-    session_regenerate_id(true);
-    $_SESSION["DOMAIN"] = DOMAIN['en']; //id ผู้ใช้งาน 
-    $_SESSION["DOMAIN_NAME"] = DOMAIN['th']; //id ผู้ใช้งาน  
-    $_SESSION["menu"] = 'sp/dashBard.php'; //id ผู้ใช้งาน  
-    
-    $_SESSION["user_id"] = intval($data["dc_user_id"]); //id ผู้ใช้งาน
-     $_SESSION["user_name"] = $data["c_full_name"]; //ชื่อผู้ใช้งาน
-     $_SESSION["dc_emp_id"] = intval($data["dc_emp_id"]); //พนักงานผู้รับผิดชอบ
-    // c_sp_emp c_department_type c_department c_position sp_emp_id dc_department_id dc_department_type_id i_seq i_level
-     $_SESSION["sp_emp_id"] = intval($data["sp_emp_id"]) ?? null; //
-     $_SESSION["dc_department_id"] = intval($data["dc_department_id"]) ?? null; //
-     $_SESSION["dc_department_type_id"] = intval($data["dc_department_type_id"]) ?? null; //
-     $_SESSION["i_seq"] = intval($data["i_seq"]) ?? null; //
-     $_SESSION["i_level"] = intval($data["i_level"]) ?? null; //
-
-     $_SESSION["c_sp_emp"] = $data["c_sp_emp"] ?? null; //
-     $_SESSION["c_department_type"] = $data["c_department_type"] ?? null; //
-     $_SESSION["c_department"] = $data["c_department"] ?? null; //
-     $_SESSION["c_position"] = $data["c_position"] ?? null; //
-     $_SESSION["dc_center_user"] = intval($data["dc_center_user"]) ?? null; // 
-
-     /* dc_department_type_id department_type_name dc_department_id department_name */
-     $_SESSION["dc_cost_id"] = intval($data["dc_cost_id"]); //id หน่วยงาน
-     $_SESSION["cost_name"] = $data["cost_name"]; //หน่วยงาน
-     $_SESSION["cost_code"] = $data["cost_code"]; //รหัสหน่วยงาน
-     $_SESSION["dc_area_id"] = intval($data["dc_area_id"]); //id หน่วยธุรกิจ
-     $_SESSION["i_type_user"] = intval($data["i_type_user"]); //ประเภทผู้ใช้งาน
-     $_SESSION["dc_cost_acc_id"] = intval($data["dc_cost_acc_id"]); //id ศูนย์ต้นทุนทางบัญชีของหน่วยงานที่ log in
-     $_SESSION["last_login"] = date("Y-m-d H:i:s");
+    if (Presence::enabled()) {
+        $portalCenterId = SuppliesLogin::ssoUserId($data);
+        if ($portalCenterId <= 0) {
+            if ($isPortalEntry) {
+                http_response_code(401);
+                header('Content-Type: text/html; charset=utf-8');
+                header('Cache-Control: no-store');
+                echo '<!doctype html><html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>เข้าใช้งานระบบพัสดุ</title><body style="margin:0;background:#eef3fa;font:16px/1.7 Tahoma,sans-serif;color:#29435e;display:grid;place-items:center;min-height:100vh"><main style="max-width:440px;margin:24px;padding:32px;background:white;border-radius:16px;box-shadow:0 12px 40px #1935591a"><h1 style="font-size:22px">เข้าใช้งานระบบพัสดุ</h1><p>ไม่พบเซสชัน NMU_permission ที่มีสิทธิ์ตรงกับบัญชีนี้ กรุณาเข้าสู่ระบบแล้วเลือกใช้งานระบบพัสดุอีกครั้ง</p><a href="/NMU_permission/" style="display:inline-block;padding:10px 18px;background:#245ba2;color:white;border-radius:8px;text-decoration:none">เข้าสู่ระบบ NMU_permission</a></main></body></html>';
+            } else {
+                http_response_code(401); echo json_encode(['reval'=>1, 'success'=>false, 'msg'=>'กรุณาเข้าสู่ระบบผ่าน NMU_permission'], JSON_UNESCAPED_UNICODE);
+            }
+            exit;
+        }
+        $data['dc_center_user'] = $portalCenterId;
+    }
+    // Portal re-entry preserves the valid login and named operator.
+    if ((string)($_SESSION['user_id'] ?? '') === (string)$data['dc_user_id']
+        && !isset($_SESSION['impersonation_admin_center_id'])
+        && (int)($_SESSION['i_type_user'] ?? 0) === (int)$data['i_type_user']
+        && SuppliesLogin::validate()) {
+        $_SESSION['last_activity'] = time();
+        $re = ['reval'=>0, 'success'=>'Success', 'msg'=>'Login Success'];
+        break;
+    }
+    $instance = SuppliesLogin::begin($data, ['menu'=>'sp/dashBard.php'], $isPortalEntry);
+        SuppliesLogin::activate($data, $instance, ['menu'=>'sp/dashBard.php']);
      $_SESSION["last_activity"] = time();
      $_SESSION['created'] = time();
     //Java Session
@@ -119,6 +131,9 @@ while ($data = $db->Fetch($stmt)) {
 }
 
 session_write_close();
+if ($isPortalEntry && $re['reval'] === 0) {
+    PortalEntryResponse::redirect($loginOutputLevel);
+}
 echo json_encode($re);
 exit;
 

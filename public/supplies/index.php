@@ -1,5 +1,7 @@
 <?php
 include("conf/config.php");
+require_once __DIR__ . '/conf/WorkspacePolicy.php';
+if (isset($_SESSION['supplies_login_pending']) && $_SESSION['supplies_login_pending']['expires'] >= time()) { header('Location: access/confirm-login.php'); exit; }
 ob_start();     // Turn on output buffering
 system('ipconfig/all');  // Execute external program to display output
 $mycom = ob_get_contents(); // Capture the output into a variable
@@ -62,7 +64,9 @@ echo htmlspecialchars(
 );
 ?>";
                 Ext.NMU_PERMISSION = "<?php echo NMU_PERMISSION_HOST; ?>";
+                window.SUPPLIES_CAN_ADMIN_TOOLS = <?php echo (int)($_SESSION['dc_center_user'] ?? 0) === 1 ? 'true' : 'false'; ?>;
                 window.USER_HAS_PERMISSION = <?php echo $permission ? 'true' : 'false'; ?>;
+                window.SUPPLIES_EXTERNAL_UNIT = <?php echo SuppliesWorkspacePolicy::externalUnit($_SESSION) ? 'true' : 'false'; ?>;
 
 
             });
@@ -315,8 +319,14 @@ echo htmlspecialchars(
     </head>
     <script type="text/javascript" src="websocket.js?_dc=<?php echo rand(0, 100000); ?>"></script>
     <script type="text/javascript" src="js/Function.js?_dc=<?php echo rand(0, 100000); ?>"></script>
+    <link rel="stylesheet" href="css/docs-notifications.css?v=<?php echo (string)filemtime(__DIR__ . '/css/docs-notifications.css'); ?>" />
+    <script type="text/javascript" src="js/docs-notifications.js?v=<?php echo (string)filemtime(__DIR__ . '/js/docs-notifications.js'); ?>"></script>
+    <link rel="stylesheet" href="css/workspace-tabs.css?v=<?php echo (string)filemtime(__DIR__ . '/css/workspace-tabs.css'); ?>" />
+    <script type="text/javascript" src="js/workspace-tabs.js?v=<?php echo (string)filemtime(__DIR__ . '/js/workspace-tabs.js'); ?>"></script>
+    <script type="text/javascript" src="js/notebook.js?v=<?php echo (string)filemtime(__DIR__ . '/js/notebook.js'); ?>"></script>
     <script type="text/javascript" src="js/show_nat.js?_dc=<?php echo rand(0, 100000); ?>"></script>
     <body>
+        <?php require_once __DIR__ . '/conf/presence/Presence.php'; echo Presence::script('SUPPLIES'); ?>
     </body>
 
 </html>

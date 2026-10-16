@@ -1,5 +1,6 @@
 <?PHP
 
+ require_once __DIR__ . '/../conf/presence/SuppliesLogin.php';
  require_once("../conf/config.php");
  require_once("../lib/database/DatabaseServer.php");
 
@@ -8,7 +9,7 @@ if (isset($_POST["userf"]) && isset($_POST["passwordf"])) {
      // เพิ่ม ระดับ แผนกและสายงาน
      //dc_department_type_id department_type_name dc_department_id department_name
 
-     $sql = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
+     $sql = "select a.dc_user_id, a.c_password, a.dc_cost_id, b.dc_emp_id, a.c_full_name
                 , isnull((select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
                 , isnull((select top 1 c_code from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
                 ,(select top 1 dc_area_id from dbo.dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
@@ -40,38 +41,8 @@ if (isset($_POST["userf"]) && isset($_POST["passwordf"])) {
 
      $re = array("reval" => 1, "success" => "Error", "msg" => "Login False");
      while ($data = $db->Fetch($stmt)) { 
-        // Do not carry any authenticated fields from the previous user.
-        $_SESSION = array();
-        session_regenerate_id(true);
-        $_SESSION["DOMAIN_LOGIN"] = "SUPPLIES"; //id ผู้ใช้งาน
-        $_SESSION["DOMAIN"] = DOMAIN['en']; //id ผู้ใช้งาน 
-        $_SESSION["DOMAIN_NAME"] = DOMAIN['th']; //id ผู้ใช้งาน  
-        $_SESSION["menu"] = 'bi/dashBard.php'; //id ผู้ใช้งาน   
-        
-        $_SESSION["user_id"] = intval($data["dc_user_id"]); //id ผู้ใช้งาน
-         $_SESSION["user_name"] = $data["c_full_name"]; //ชื่อผู้ใช้งาน
-         $_SESSION["dc_emp_id"] = intval($data["dc_emp_id"]); //พนักงานผู้รับผิดชอบ
-        // c_sp_emp c_department_type c_department c_position sp_emp_id dc_department_id dc_department_type_id i_seq i_level
-         $_SESSION["sp_emp_id"] = intval($data["sp_emp_id"]) ?? null; //
-         $_SESSION["dc_department_id"] = intval($data["dc_department_id"]) ?? null; //
-         $_SESSION["dc_department_type_id"] = intval($data["dc_department_type_id"]) ?? null; //
-         $_SESSION["i_seq"] = intval($data["i_seq"]) ?? null; //
-         $_SESSION["i_level"] = intval($data["i_level"]) ?? null; //
-
-         $_SESSION["c_sp_emp"] = $data["c_sp_emp"] ?? null; //
-         $_SESSION["c_department_type"] = $data["c_department_type"] ?? null; //
-         $_SESSION["c_department"] = $data["c_department"] ?? null; //
-         $_SESSION["c_position"] = $data["c_position"] ?? null; //
-         $_SESSION["dc_center_user"] = intval($data["dc_center_user"]) ?? null; // 
-
-         /* dc_department_type_id department_type_name dc_department_id department_name */
-         $_SESSION["dc_cost_id"] = intval($data["dc_cost_id"]); //id หน่วยงาน
-         $_SESSION["cost_name"] = $data["cost_name"]; //หน่วยงาน
-         $_SESSION["cost_code"] = $data["cost_code"]; //รหัสหน่วยงาน
-         $_SESSION["dc_area_id"] = intval($data["dc_area_id"]); //id หน่วยธุรกิจ
-         $_SESSION["i_type_user"] = intval($data["i_type_user"]); //ประเภทผู้ใช้งาน
-         $_SESSION["dc_cost_acc_id"] = intval($data["dc_cost_acc_id"]); //id ศูนย์ต้นทุนทางบัญชีของหน่วยงานที่ log in
-         $_SESSION["last_login"] = date("Y-m-d H:i:s");
+        $instance = SuppliesLogin::begin($data, ['menu'=>'bi/dashBard.php']);
+        SuppliesLogin::activate($data, $instance, ['menu'=>'bi/dashBard.php']);
 //        //Java Session
 //        require_once("../java/Java.inc");
 //        $session = java_session(); 

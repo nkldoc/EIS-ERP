@@ -1,0 +1,69 @@
+#supplies-docs-bell { position:absolute; right:16px; top:8px; z-index:10; }
+.docs-notification-bell { cursor:pointer; border:1px solid #c2d4e8; border-radius:8px; background:#fff; color:#17436b; padding:8px 12px; min-height:36px; font:600 13px Tahoma,sans-serif; }
+.docs-notification-count { margin-left:6px; padding:2px 6px; background:#b42318; color:#fff; border-radius:12px; font-size:11px; }
+.docs-notification-panel { position:fixed; right:16px; width:360px; max-width:calc(100vw - 24px); max-height:calc(100vh - 24px); display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden; z-index:20000; background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 10px 32px #0003; font:13px/1.6 Tahoma,sans-serif; color:#24364b; }
+.docs-notification-panel[hidden],.docs-notification-count[hidden] { display:none; }
+.docs-notification-heading { flex-shrink:0; display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #e2e8f0; }
+.docs-notification-heading button { border:0; background:transparent; cursor:pointer; font-size:22px; color:#334155; }
+.docs-notification-items { min-height:0; overflow:hidden; flex:1 1 auto; }
+.docs-notification-item { display:block; padding:12px 14px; border-bottom:1px solid #e2e8f0; text-decoration:none; color:#24364b; }
+.docs-notification-item.unread { background:#eef6ff; border-left:3px solid #2563eb; }
+.docs-notification-item strong,.docs-notification-item span,.docs-notification-item small { display:block; overflow-wrap:anywhere; }
+.docs-notification-item small { color:#64748b; margin-top:4px; }
+.docs-notification-item:hover { background:#e3effc; }
+.docs-notification-all { flex-shrink:0; border-top:1px solid #e2e8f0; background:#fff; display:block; padding:12px; text-align:center; color:#174ea6; }
+.docs-notification-bell:focus-visible,.docs-notification-panel a:focus-visible { outline:2px solid #2563eb; outline-offset:2px; }
+@media(max-width:600px) { #supplies-docs-bell { right:8px; } .docs-notification-label { display:none; } .docs-notification-panel { right:12px; } }
+#supplies-docs-notifications { background:#fff!important; color:#24364b!important; opacity:1!important; filter:none!important; -webkit-text-fill-color:initial; }
+#supplies-docs-notifications .docs-notification-heading strong { color:#24364b!important; opacity:1!important; }
+#supplies-docs-notifications a.docs-notification-item,
+#supplies-docs-notifications a.docs-notification-item:link,
+#supplies-docs-notifications a.docs-notification-item:visited { background:#fff; color:#24364b!important; opacity:1!important; text-decoration:none!important; }
+#supplies-docs-notifications .docs-notification-item strong,
+#supplies-docs-notifications .docs-notification-item span { color:#24364b!important; opacity:1!important; -webkit-text-fill-color:#24364b; }
+#supplies-docs-notifications .docs-notification-item strong { font-weight:700; font-size:13px; }
+#supplies-docs-notifications .docs-notification-item small { color:#526580!important; opacity:1!important; -webkit-text-fill-color:#526580; }
+#supplies-docs-notifications a.docs-notification-item.unread { background:#eef6ff; }
+#supplies-docs-notifications a.docs-notification-item:hover { background:#e3effc; }
+#supplies-docs-notifications a.docs-notification-all,
+#supplies-docs-notifications a.docs-notification-all:visited { color:#174ea6!important; opacity:1!important; -webkit-text-fill-color:#174ea6; }
+
+/* Primary entry to the document and signing system. */
+#topToolBarID .eis-docs-launch-button { margin:3px 10px 3px 4px; border:1px solid #174b9b; border-radius:8px; background:linear-gradient(135deg,#2563b9,#163d7b); box-shadow:0 2px 5px #173d7b33; }
+#topToolBarID .eis-docs-launch-button td { background:none!important; }
+#topToolBarID .eis-docs-launch-button button { color:#fff!important; font:600 13px Tahoma,sans-serif; padding:7px 14px; height:auto; }
+#topToolBarID .eis-docs-launch-button:hover { background:linear-gradient(135deg,#3279d6,#1c4c98); box-shadow:0 3px 8px #173d7b44; }
+#topToolBarID .eis-docs-launch-button:focus-within { outline:2px solid #60a5fa; outline-offset:2px; }
+/* Purchase toolbar dropdown, scoped to preserve other Ext menus. */
+#topToolBarID .supplies-purchase-button { margin:3px 5px; border:1px solid #c5d5e8; border-radius:7px; background:#f8fbff; }
+#topToolBarID .supplies-purchase-button td { background:none!important; }
+#topToolBarID .supplies-purchase-button button { padding-top:6px; padding-bottom:6px; height:auto; color:#20446c; font-weight:600; }
+#topToolBarID .supplies-purchase-button:hover { background:#e8f1ff; border-color:#8aaddb; }
+.supplies-purchase-menu.x-menu { padding:6px; border:1px solid #d7e2ef; border-radius:12px; background:#fff; box-shadow:0 10px 28px rgba(25,53,89,.2); }
+.supplies-purchase-menu .x-menu-list { padding:3px; background:#fff; max-height:calc(100vh - 100px); overflow-y:auto; }
+.supplies-purchase-menu .x-menu-list-item { padding:0; margin:2px 0; border-radius:7px; font:13px/1.5 Tahoma,sans-serif; }
+.supplies-purchase-menu a.x-menu-item { position:relative; display:block; padding:8px 14px 8px 38px; color:#29435e; line-height:20px; border-radius:7px; }
+.supplies-purchase-menu .x-menu-item-icon { top:10px; left:11px; }
+.supplies-purchase-menu .x-menu-item-active { border:0; padding:0; background:#eaf2ff; }
+.supplies-purchase-menu .x-menu-item-active a.x-menu-item { color:#174ea6; background:#eaf2ff; }
+.supplies-purchase-menu a.x-menu-item:focus-visible { outline:2px solid #60a5fa; outline-offset:-2px; }
+.supplies-purchase-menu .x-menu-sep { margin:7px 10px; border-bottom-color:#e2e8f0; }
+/* Consistent 36px toolbar controls and aligned menu icon column. */
+#topToolBarID .supplies-purchase-button,
+#topToolBarID .supplies-account-button,
+#topToolBarID .eis-docs-launch-button { height:36px; box-sizing:border-box; margin:3px 6px; border-radius:8px; }
+#topToolBarID .supplies-account-button { border:1px solid #c5d5e8; background:#f8fbff; }
+#topToolBarID .supplies-account-button td { background:none!important; }
+#topToolBarID .supplies-account-button button,
+#topToolBarID .supplies-purchase-button button,
+#topToolBarID .eis-docs-launch-button button { height:30px; font:600 12px Tahoma,sans-serif; padding-top:0; padding-bottom:0; }
+#topToolBarID .x-btn-text-icon .x-btn-icon-small-left button { padding-left:23px; background-position:2px center; }
+#topToolBarID .supplies-account-button:hover { background:#e8f1ff; border-color:#8aaddb; }
+#supplies-docs-bell { margin:3px 6px!important; }
+.docs-notification-bell { display:inline-flex; align-items:center; gap:7px; height:36px; box-sizing:border-box; padding:0 12px; border-color:#c5d5e8; background:#f8fbff; font:600 12px Tahoma,sans-serif; border-radius:8px; }
+.docs-notification-bell:hover { background:#e8f1ff; border-color:#8aaddb; }
+.docs-bell-icon { display:inline-block; width:16px; height:16px; background:url('../images/icons/bell.png') center/16px no-repeat; flex-shrink:0; }
+.supplies-purchase-menu a.x-menu-item { padding:7px 14px 7px 38px; box-sizing:border-box; min-height:34px; border:0!important; margin:0!important; font:13px/20px Tahoma,sans-serif; }
+.supplies-purchase-menu .x-menu-item-icon { position:absolute!important; top:9px!important; left:11px!important; width:16px; height:16px; margin:0!important; }
+.supplies-purchase-menu .x-menu-item-text { line-height:20px; }
+.supplies-purchase-menu .x-menu-list-item { margin:1px 0; }

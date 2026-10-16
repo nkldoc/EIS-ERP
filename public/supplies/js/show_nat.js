@@ -915,62 +915,51 @@ Ext.onReady(function () {
     var loader = new Ext.tree.TreeLoader({
         dataUrl: "/supplies/api/userMenu/userTree.php",
         requestMethod: "get",
-        baseParams: {url: window.location.href, parent_id: localStorage.getItem("parentId")}
+        baseParams: {url: window.location.href, parent_id: localStorage.getItem("supplies_parentId")}
     });
     Ext.urlEIS =
             location.protocol + '//' +
             location.hostname +
             '/NMU_permission/entrance';
     var TreePanel1 = new Ext.tree.TreePanel({
-        // title: "USER MENU",upplies/websocket/msg'
+        header: false,
         border: false,
         iconCls: 'icon-folder-user',
         id: "TreePanel1ID",
+        cls: 'supplies-menu-tree',
+        tbar: [{
+            xtype: 'textfield',
+            id: 'supplies-menu-search',
+            emptyText: 'ค้นหาเมนู...',
+            width: 220,
+            enableKeyEvents: true,
+            listeners: {
+                keyup: {buffer: 200, fn: function (field) {
+                    var tree = Ext.getCmp('TreePanel1ID');
+                    var query = String(field.getValue() || '').toLowerCase().replace(/^\s+|\s+$/g, '');
+                    var visible = {};
+                    tree.root.cascade(function (node) {
+                        if (String(node.text || '').toLowerCase().indexOf(query) !== -1) {
+                            node.cascade(function (child) { visible[child.id] = true; });
+                            var parent = node;
+                            while (parent) { visible[parent.id] = true; parent = parent.parentNode; }
+                        }
+                    });
+                    tree.root.cascade(function (node) {
+                        if (!node.getUI) return;
+                        if (!query || visible[node.id]) {
+                            node.getUI().show();
+                            if (query && !node.leaf) node.expand(false, false);
+                        } else node.getUI().hide();
+                    });
+                }}
+            }
+        }],
         autoScroll: true,
         rootVisible: false, // show Root Node
         lines: false,
         singleExpand: false,
         useArrows: true,
-        tools: [{
-                id: 'refresh',
-                on: {
-                    click: function () {
-                        var tree = Ext.getCmp('TreePanel1ID');
-                        tree.body.mask('Loading', 'x-mask-loading');
-                        tree.root.reload();
-                        tree.root.collapse(true, false);
-                        setTimeout(function () { // mimic a server call
-                            tree.body.unmask();
-                            tree.root.expand(false, false);
-                        }, 1000);
-                    }
-                }
-            }, /*{
-             id: 'search', on: {
-             click: function () {
-             alert();
-             }
-             }
-             }, */{
-                id: 'down',
-                on: {
-                    click: function () {
-                        var tree = Ext.getCmp('TreePanel1ID');
-                        tree.root.expand(true, true);
-                    }
-                }
-            }, {
-                id: 'up',
-                on: {
-                    click: function () {
-                        var tree = Ext.getCmp('TreePanel1ID');
-                        tree.root.collapse(true, false);
-//                        console.log(this);
-                    }
-                }
-
-
-            }],
         shim: true,
         animCollapse: true,
         constrainHeader: true,
@@ -982,6 +971,10 @@ Ext.onReady(function () {
         loader: loader,
         root: root,
         listeners: {
+            resize: function (tree, width) {
+                var search = Ext.getCmp('supplies-menu-search');
+                if (search) search.setWidth(Math.max(100, width - 28));
+            },
             beforerender: function () {
                 new Ext.KeyMap(Ext.getBody(), [{
                         key: "f",
@@ -1058,10 +1051,8 @@ Ext.onReady(function () {
 
         return browserName + "  = " + fullVersion + ",Major version = " + majorVersion + ",navigator.appName = " + navigator.appName + ",navigator.userAgent = " + navigator.userAgent;
     };
-    localStorage.textMemories = localStorage.getItem("textMemories") || {};
     TreePanel1.on("click", function (n) {
-        var sn = this.selModel.selNode || {}; // selNode is null on initial selection
-        if (n.leaf && n.id != sn.id) {
+        if (n.leaf) {
             // ignore clicks on folders and currently selected node
 
 
@@ -1072,7 +1063,6 @@ Ext.onReady(function () {
             var uri = fullNameSplit[0];
             var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
             Ext.page = Ext.apply({uri: uri, method: method});
-            Ext.History.add(uri);
             if (n.leaf) {
 
                 let accessManu = {menuID: n.id, menuTxt: n.text, browser: getBrowsers()};
@@ -1087,7 +1077,7 @@ Ext.onReady(function () {
                         //Ext.get('userInfo').update(response.responseText);
                     }
                 });
-                Ext.getCmp("content-panel").update('<iframe src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
+                Ext.getCmp("content-panel").openPage(Ext.page.uri + '.php?' + Ext.page.method, Ext.util.Format.stripTags(n.text));
             }
         }
     });
@@ -1097,8 +1087,8 @@ Ext.onReady(function () {
     if (isNaN(widthWest)) {
         widthWest = 400;
         collapsed = true;
-        if (localStorage.getItem("parentId") === null) {
-            localStorage.setItem("parentId", 10646);
+        if (localStorage.getItem("supplies_parentId") === null) {
+            localStorage.setItem("supplies_parentId", 10646);
             location.reload();
         }
     }
@@ -1179,8 +1169,8 @@ Ext.onReady(function () {
     Ext.WestGlo = new Ext.Panel({
         id: "west",
         region: "west",
-        title: "&nbsp;",
-        layout: "accordion",
+        title: 'เมนูระบบ',
+        layout: "fit",
         collapsible: true,
         autoScroll: true,
         split: true,
@@ -1196,24 +1186,44 @@ Ext.onReady(function () {
                     dataType: "json",
                     data: {
                         type: "GET_PARENT_MENU",
-                        parent_id: localStorage.getItem("parentId"),
+                        parent_id: localStorage.getItem("supplies_parentId"),
                     },
                     success: function (obj) {
                         if (obj.success == true) {
-                            Ext.getCmp("txt-system").setIconClass("icon-report-start");
-                            Ext.getCmp("txt-system").setText("<span style='font-weight: bold; font-size: 12px; margin: 0px 1px;'>" + obj.c_name + "</span>");
-                            localStorage.setItem("parentId", obj.parent_id);
+                            var systems = obj.data || [];
+                            var savedId = localStorage.getItem('supplies_parentId');
+                            var selectedSystem = null, defaultSystem = null;
+                            $.each(systems, function (index, system) {
+                                if (String(system.id) === String(savedId)) selectedSystem = system;
+                                if (!defaultSystem && /สนับสนุน.*บริหาร|จัดซื้อจัดจ้าง/.test(system.c_name)) defaultSystem = system;
+                            });
+                            selectedSystem = selectedSystem || defaultSystem || systems[0] || {id: obj.parent_id, c_name: obj.c_name};
+                            var systemName = Ext.util.Format.htmlEncode(selectedSystem.c_name || 'ระบบสนับสนุนการบริหาร');
+                            var systemButton = Ext.getCmp('txt-system');
+                            systemButton.setIconClass('icon-report-start');
+                            systemButton.setText(systemName);
+                            localStorage.setItem('supplies_parentId', selectedSystem.id);
+                            loader.baseParams.parent_id = selectedSystem.id;
+                            if (systems.length <= 1) {
+                                systemButton.hide();
+                                Ext.getCmp('west').getTopToolbar().add({
+                                    xtype: 'tbtext',
+                                    cls: 'supplies-system-name',
+                                    text: systemName
+                                });
+                            }
                             $.each(obj.data || [], function (index, v) {
                                 Ext.getCmp("menu-system").add({
                                     text: v.c_name,
                                     iconCls: "icon-report",
                                     handler: function () {
-                                        localStorage.setItem("parentId", v.id);
+                                        localStorage.setItem("supplies_parentId", v.id);
                                         location.reload();
                                     },
                                 });
                             });
                             Ext.getCmp("menu-system").doLayout();
+                            Ext.getCmp('west').getTopToolbar().doLayout();
                             Ext.getCmp("west").add(TreePanel1);
                             Ext.getCmp("west").update();
                             Ext.getCmp("west").doLayout();
@@ -1283,7 +1293,6 @@ Ext.onReady(function () {
                 localStorage.setItem("collapsedNorth", "1");
             },
             afterrender: function () {
-
                 Ext.MessageBox.minWidth = 300;
                 Ext.userOnline = null;
                 Ext.receiveJson = function (obj) {
@@ -1607,18 +1616,11 @@ Ext.onReady(function () {
     };
 
     Ext.toogleTemp = new Ext.Button({
-        text: (north.collapsed) ? 'ย่อ' : 'ขยาย',
-        icon: "/supplies/images/icons/arrow_in.png",
-        style: 'margin-left:20px',
-        handler: function () {
-
-
-            console.log(Ext.WestGlo.collapsed);
-            console.log(north.collapsed);
-            this.setText((Ext.WestGlo.collapsed) ? 'ย่อ' : 'ขยาย');
-            north.toggleCollapse(north.collapsed);
-            Ext.WestGlo.toggleCollapse(Ext.WestGlo.collapsed);
-        },
+        text: 'สมุดโน้ต',
+        icon: './images/icons/book_edit.png',
+        cls: 'supplies-notebook-button',
+        tooltip: 'เปิดสมุดโน้ต (Text Memories)',
+        handler: function () { Ext.openSuppliesNotebook(); }
     });
     function safeShowNotifyList() {
         if (!window.NOTIFY_STORE.getCount()) {
@@ -1718,10 +1720,6 @@ Ext.onReady(function () {
     };
     // ฟังก์ชันเปิดหน้ารายการ
 
-    const btnNotify = new Ext.Button({
-        text: '🔔 แจ้งเตือน <span id="notify-badge" style="background:#d00;color:#fff;border-radius:10px;padding:2px 6px;margin-left:6px;">0</span>',
-        handler: safeShowNotifyList
-    });
 //    const onlineCountLabel = new Ext.Button({
 //    id:'onlineCountLabel',
 //    text: '🔔 แจ้งเตือน <span id="online-badge" style="background:#d00;color:#fff;border-radius:10px;padding:2px 6px;margin-left:6px;">0</span>',
@@ -1733,13 +1731,25 @@ Ext.onReady(function () {
 
     var center = {
         region: "center",
+        xtype: 'suppliesworkspace',
         id: "content-panel",
         tbar: new Ext.Panel({
             border: false,
             items: [new Ext.Toolbar({
                     border: false,
                     id: 'topToolBarID',
-                    items: [btnNotify, /*onlineCountLabel,*/ Ext.toogleTemp, {
+                    enableOverflow: true,
+                    items: [/*onlineCountLabel,*/ Ext.toogleTemp, {
+                            xtype: 'button',
+                            id: 'supplies-admin-tools',
+                            text: 'เครื่องมือ ADMIN',
+                            icon: './images/icons/application_edit.png',
+                            cls: 'supplies-admin-tools-button',
+                            tooltip: 'ค้นหาและแก้ไขข้อมูล TOR / สัญญา ได้จากทุกหน้า',
+                            hidden: window.SUPPLIES_CAN_ADMIN_TOOLS !== true,
+                            disabled: window.SUPPLIES_CAN_ADMIN_TOOLS !== true,
+                            handler: function () { Ext.openSuppliesAdminTools(); }
+                        }, {
                             xtype: 'displayfield',
                             width: 50,
                             id: 'disNumberID',
@@ -1762,23 +1772,19 @@ Ext.onReady(function () {
                             }
                         }, '->', {
                             xtype: 'button',
-                            text: 'ตรวจสอบข้อมูลและลงนาม/อนุมัติเอกสาร PDF',
-                            iconCls: 'icon-user-home',
+                            text: 'ระบบสนับสนุนเอกสารและลงนาม (EIS DOCS) ↗',
+                            cls: 'eis-docs-launch-button',
+                            icon: './images/icons/page_white_edit.png',
+                            tooltip: 'เปิดระบบสนับสนุนเอกสารและลงนาม (EIS DOCS)',
                             handler: function () {
-//						  Ext.getCmp('TreePanel1ID').root.reload();
-                                var fullURL = 'sp/appAuditDoc01?st=ST9001';
-//						  var fullURL = 'sp/dashBoard?st=ST0000';
-                                var fullNameSplit = fullURL.split("?");
-                                var uri = fullNameSplit[0];
-                                var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
-                                Ext.page = Ext.apply({uri: uri, method: method});
-                                Ext.History.add(uri);
-                                Ext.getCmp("content-panel").update('<iframe id="iframecontentID" src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
+                                var docsUrl = (location.hostname.toLowerCase() === 'eis.nmu.ac.th' ? 'https://doc-eis.nmu.ac.th' : '') + '/eis-docs/docMain/';
+                                window.open(docsUrl, '_blank', 'noopener');
                             }
                         },
                         {
                             xtype: 'button',
                             iconCls: 'icon-user-menu', icon: "/supplies/images/icons/text_list_bullets.png",
+                            cls: 'supplies-purchase-button',
                             text: 'ข้อมูลซื้อจ้าง',
                             // กันกรณี session เปลี่ยน runtime (ถ้าจำเป็น)
                             listeners: {
@@ -1798,8 +1804,14 @@ Ext.onReady(function () {
                                     m.getComponent('mnAdminSystemLogID').setVisible(isAdmin);
                                 }
                             },
-                            menu: [{
+                            menu: {
+                                cls: 'supplies-purchase-menu',
+                                defaults: {icon: './images/icons/application.png'},
+                                minWidth: 248,
+                                showSeparator: false,
+                                items: [{
                                     text: 'หน้าแรก',
+                                    icon: './images/icons/house.png',
                                     handler: function () {
 //								Ext.getCmp('TreePanel1ID').root.reload();
                                         var fullURL = 'bi/dashBoard?st=ST0000';
@@ -1807,11 +1819,11 @@ Ext.onReady(function () {
                                         var uri = fullNameSplit[0];
                                         var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
                                         Ext.page = Ext.apply({uri: uri, method: method});
-                                        Ext.History.add(uri);
                                         Ext.getCmp("content-panel").update('<iframe src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
                                     }
                                 }, {
                                     text: 'Ai ถามตอบ',
+                                    icon: './images/icons/comments.png',
                                     handler: function () {
                                         Ext.getCmp("content-panel").update('<iframe src="./ai/index.html" frameborder="0" width="100%" height="100%"></iframe>');
                                     }
@@ -2417,6 +2429,7 @@ Ext.onReady(function () {
                                 }, {
 
                                     text: 'ข้อมูล PR ซื้อจ้าง',
+                                    icon: './images/icons/page_white_text.png',
                                     handler: function (e) {
 //								Ext.getCmp('TreePanel1ID').root.reload();
                                         var fullURL = 'alert/st0001';
@@ -2424,11 +2437,11 @@ Ext.onReady(function () {
                                         var uri = fullNameSplit[0];
                                         var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
                                         Ext.page = Ext.apply({uri: uri, method: method});
-                                        Ext.History.add(uri);
                                         Ext.getCmp("content-panel").update('<iframe src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
                                     }
                                 }, {
                                     text: 'ข้อมูลสัญญาซื้อจ้าง',
+                                    icon: './images/icons/page_white_edit.png',
                                     handler: function (e) {
 //								Ext.getCmp('TreePanel1ID').root.reload();
                                         var fullURL = 'alert/period'; //alert/period.php
@@ -2436,7 +2449,6 @@ Ext.onReady(function () {
                                         var uri = fullNameSplit[0];
                                         var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
                                         Ext.page = Ext.apply({uri: uri, method: method});
-                                        Ext.History.add(uri);
                                         Ext.getCmp("content-panel").update('<iframe src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
                                     }
 
@@ -2450,7 +2462,6 @@ Ext.onReady(function () {
                                         var uri = fullNameSplit[0];
                                         var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
                                         Ext.page = Ext.apply({uri: uri, method: method});
-                                        Ext.History.add(uri);
                                         Ext.getCmp("content-panel").update('<iframe src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
                                     },
                                     scope: this
@@ -2476,7 +2487,6 @@ Ext.onReady(function () {
                                         var uri = fullNameSplit[0];
                                         var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
                                         Ext.page = Ext.apply({uri: uri, method: method});
-                                        Ext.History.add(uri);
                                         Ext.getCmp("content-panel").update('<iframe src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
                                     }
                                 }, {
@@ -2509,14 +2519,16 @@ Ext.onReady(function () {
                                         localStorage.clear();
                                     },
                                     scope: this,
-                                }],
+                                }]
+                            },
                             reorderable: true
                         },
                         {
                             xtype: 'button',
+                            cls: 'supplies-account-button',
                             text: 'ข้อมูลส่วนตัว',
                             icon: "/supplies/images/icons/user_key.png",
-                            menu: [
+                            menu: {cls: 'supplies-purchase-menu', minWidth: 248, items: [
                                 {
                                     text: 'กลับสู่ระบบ EIS',
                                     icon: "./images/icons/bullet_home.png",
@@ -2525,10 +2537,12 @@ Ext.onReady(function () {
                                     }
                                 }, {
                                     text: 'แก้ไขรหัสส่วนตัว',
+                                    icon: './images/icons/key.png',
                                     handler: function () {
                                         Ext.getCmp("content-panel").update('<iframe src="./sp/info.php" frameborder="0" width="100%" height="100%"></iframe>');
                                     }
                                 }, {
+                                    icon: './images/icons/cog.png',
                                     text: 'ตั้งค่าส่วนตัว'
 
                                 }, {
@@ -2537,7 +2551,7 @@ Ext.onReady(function () {
                                     handler: function () {
                                         window.location.href = Ext.urlEIS;
                                     }
-                                }]
+                                }]}
 //
 //
 //                        }, {
@@ -2545,7 +2559,18 @@ Ext.onReady(function () {
 //                            width: 50,
 //                            id: '2notif',
 //                            value: 5
-                        }
+                        }, '-', new Ext.BoxComponent({
+                            id: 'supplies-docs-bell',
+                            autoEl: {tag: 'div'},
+                            style: 'position:static; margin:0 8px; z-index:auto;',
+                            listeners: {
+                                afterrender: function (component) {
+                                    if (window.mountDocsNotifications) {
+                                        window.mountDocsNotifications(component.el.dom);
+                                    }
+                                }
+                            }
+                        })
 
                     ]
                 })]
@@ -2563,6 +2588,7 @@ Ext.onReady(function () {
         url: "./access/info.php",
         success: function (response) {
             // RENDER
+            var initialWorkspaceHash = window.location.hash;
             Ext.WebApp = new Ext.Viewport({
                 layout: "border",
                 items: [north, west, center]
@@ -2603,25 +2629,16 @@ Ext.onReady(function () {
                 }
             }
 
-            // Existing menus open pages by calling content-panel.update().
-            // Capture those calls centrally so every menu is remembered.
-            var originalContentUpdate = contentPanel.update;
-            contentPanel.update = function (html) {
-                var match = typeof html === "string" &&
-                    html.match(/<iframe\b[^>]*\bsrc=["']([^"']+)["']/i);
-                if (match) {
-                    rememberPage(match[1]);
-                }
-                return originalContentUpdate.apply(this, arguments);
-            };
-
+            contentPanel.on('tabchange', function (panel, tab) {
+                if (tab && tab.workspaceRoute) rememberPage(tab.workspaceRoute);
+            });
             function openHashPage() {
                 var route = window.location.hash ?
                     window.location.hash.substring(1).replace(/^\s+|\s+$/g, "") : "";
 
                 if (!route) {
                     try {
-                        route = localStorage.getItem(lastPageStorageKey) || "";
+                        route = window.SUPPLIES_EXTERNAL_UNIT ? "sp/CheckList.php" : (localStorage.getItem(lastPageStorageKey) || "");
                     } catch (ignore) { }
                 }
 
@@ -2636,6 +2653,9 @@ Ext.onReady(function () {
                 );
             }
 
+            if (initialWorkspaceHash) {
+                window.history.replaceState(null, document.title, window.location.pathname + window.location.search + initialWorkspaceHash);
+            }
             openHashPage();
             if (window.addEventListener) {
                 window.addEventListener("hashchange", openHashPage, false);
@@ -2706,64 +2726,21 @@ Ext.onReady(function () {
 //                localStorage.setItem("userid", jsonData.data.user_id);
 //            }
 //        });
-        //show dashboard
-        Ext.getCmp("content-panel").update('<iframe src="bi/dashBoard.php" frameborder="0" width="100%" height="100%"></iframe>');
+        // External units start with their PR list inside the shared workspace.
+        Ext.getCmp('content-panel').openPage(window.SUPPLIES_EXTERNAL_UNIT ? 'sp/CheckList.php' : 'bi/dashBoard.php');
         //display top
         if (localStorage.getItem('runWarranty') == '0') {
             Ext.get('header').hide();
         } else {
             Ext.get('header').show();
         }
-Ext.btnConnect();
-        Ext.textEditor = function () {
-            if (!Ext.isEmpty(Ext.getCmp('winMsgID'))) {
-                Ext.getCmp('winMsgID').show();
-            } else {
-                new Ext.Window({
-                    title: 'Text Memories',
-                    width: 400,
-                    id: 'winMsgID',
-                    height: 300,
-                    modal: false,
-                    plain: true,
-                    layout: "fit",
-                    maximizable: true,
-                    collapsible: true,
-                    closable: true,
-                    frame: true,
-                    items: [{
-                            xtype: 'textarea',
-                            fieldLabel: 'textareafield',
-                            name: 'textMemories',
-                            id: 'textMemoriesID',
-                            listeners: {
-                                blur: function () {
-                                    localStorage.setItem("textMemories", this.getValue());
-                                }, afterrender: function () {
-
-                                    if (localStorage.getItem("textMemories") !== '[object Object]') {
-                                        this.setValue(localStorage.getItem("textMemories"));
-                                    }
-
-                                }
-                            }
-                        }],
-                    listeners: {
-                        close: function (win) {
-                            localStorage.setItem("textMemories", Ext.getCmp('textMemoriesID').getValue());
-                        },
-                        beforeclose: function (win) { },
-                        afterrender: function (win) { }
-                    }
-                });
-                Ext.getCmp('winMsgID').show();
-            }
-        };
+        Ext.textEditor = Ext.openSuppliesNotebook;
         var showMenu = function () {
             let menu = new Ext.menu.Menu({
                 items: [{
                         iconCls: 'icon-user-home',
                         text: 'หน้าแรก',
+                                    icon: './images/icons/house.png',
                         handler: function () {
 //	         Ext.getCmp('TreePanel1ID').root.reload();
                             var fullURL = 'sp/dashBoard?st=ST0000';
@@ -2771,7 +2748,6 @@ Ext.btnConnect();
                             var uri = fullNameSplit[0];
                             var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
                             Ext.page = Ext.apply({uri: uri, method: method});
-                            Ext.History.add(uri);
                             Ext.getCmp("content-panel").update('<iframe src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
                         },
                     },
@@ -2838,7 +2814,6 @@ Ext.btnConnect();
                             var uri = fullNameSplit[0];
                             var method = (Ext.isEmpty(fullNameSplit[1])) ? '' : (fullNameSplit[1]);
                             Ext.page = Ext.apply({uri: uri, method: method});
-                            Ext.History.add(uri);
                             Ext.getCmp("content-panel").update('<iframe src="' + Ext.page.uri + '.php?' + Ext.page.method + '" frameborder="0" width="100%" height="100%"></iframe>');
                         },
                         scope: this
