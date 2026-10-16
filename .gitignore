@@ -1,9 +1,8 @@
 # Local application configuration
-/public/supplies/conf/config.php
-/public/procure/conf/config.php
+**/conf/config.php
 
 # Runtime data
-/storage/
+storage/
 *.log
 *.tmp
 *.cache
