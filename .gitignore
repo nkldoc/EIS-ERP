@@ -1,5 +1,8 @@
 # Local application configuration
 **/conf/config.php
+# Machine-specific presence settings (keep example files tracked)
+/public/procure/conf/presence/presence.config.php
+/public/supplies/conf/presence/presence.config.php
 
 # Runtime data
 storage/
