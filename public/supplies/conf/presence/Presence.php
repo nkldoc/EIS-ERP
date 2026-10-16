@@ -5,8 +5,8 @@ final class Presence
 {
     private static function config(): array
     {
-        $file = getenv('EIS_PRESENCE_CONFIG') ?: __DIR__ . '/presence.config.php';
-        return is_file($file) ? (array)require $file : [];
+        require_once __DIR__ . '/PresenceEnvironment.php';
+        return PresenceEnvironment::config(__DIR__ . '/presence.config.php');
     }
     private static function host(): string
     {
@@ -25,7 +25,7 @@ final class Presence
         if (($config['enabled'] ?? true) === false) return false;
         $host = self::host();
         if (in_array($host, ['dev-eis.nmu.ac.th', 'localhost', '127.0.0.1'], true)) return true;
-        return in_array($host, ['eis.nmu.ac.th', 'doc-eis.nmu.ac.th'], true)
+        return PresenceEnvironment::isProduction()
             && (bool)(getenv('EIS_DOCS_PRESENCE_DIR') ?: ($config['directory'] ?? ''));
     }
     public static function sessionKey(string $system, string $uid, string $login): string
