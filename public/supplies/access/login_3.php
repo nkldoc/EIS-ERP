@@ -8,7 +8,7 @@ if (isset($_POST["username"]) && isset($_POST["password"])) {
 
     $db = new DatabaseServer();
 
-    $sql = "select a.dc_user_id, a.c_password, a.dc_cost_id, b.dc_emp_id, a.c_full_name
+    $sql = "select top 1 a.dc_user_id, a.c_password, a.dc_cost_id, b.dc_emp_id, a.c_full_name
                 , IIF(c.sp_emp_id is null, 0, IIF( a.dc_user_id = 1 , 2, 1)) as i_set_type_emp
                 , 0 as i_type_emp
                 , isnull((select top 1 c_name from NMU_DATACENTER.dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
@@ -37,7 +37,8 @@ if (isset($_POST["username"]) && isset($_POST["password"])) {
                 left join dbo.sp_emp c on c.dc_emp_id = b.dc_emp_id
                 left join dbo.sp_department d on d.dc_department_id = c.dc_department_id
                 left join dbo.sp_department_type e on e.dc_department_type_id = d.dc_department_type_id
-            where a.i_enable = ? and a.i_delete = ? and a.c_user_name = ? and a.c_password = ?";
+            where a.i_enable = ? and a.i_delete = ? and a.c_user_name = ? and a.c_password = ?
+            order by a.d_update desc, a.dc_user_id desc";
     $stmt = $db->QueryParam($sql, array(STATUS_ENABLE, DELETE_FALSE, $_POST["username"], $_POST["password"]));
 
     $re = array("reval" => 1, "success" => "Error", "msg" => "Login False");

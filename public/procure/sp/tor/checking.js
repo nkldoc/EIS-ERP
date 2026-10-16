@@ -6173,15 +6173,17 @@ Ext.c_overlap_close = function (rec, event, edit) {
                 disableCaching: false,
                 success: function (result, request) {
                         var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
+                        console.log("c_overlap_close booking result", event, jsonData);
                         if (jsonData.success) {
                                 Ext.MessageBox.alert("Success", "เรียบร้อยแล้ว", function () {
+                                        console.log("UP_BG_CHECKING_OVERLAP send", { chk: rec.id, perioidHdr: Ext.perioidHdr && Ext.perioidHdr.get("id"), bg_reserve_overlap_id: jsonData.bg_reserve_overlap_id });
                                         Ext.Ajax.request({
                                                 url: "tor/api/mnPeriodController.php",
                                                 method: "POST",
                                                 params: {
                                                         mode: "UP_BG_CHECKING_OVERLAP",
                                                         id: Ext.perioidHdr.get("sp_tor_hdr_period_id"), //hdr_peirod_id
-                                                        sp_check_period_hdr_id: Ext.perioidHdr.get("id"), //checking_hdr_id
+                                                        sp_check_period_hdr_id: rec.id || Ext.perioidHdr.get("id"), //checking_hdr_id (ใช้ id ของ rec ที่ใช้จองจริง ให้ตรงกับ chk_id)
                                                         i_overlap: event == "c_overlap_close" ? 3 : 2,
                                                         bg_reserve_overlap_id: jsonData.bg_reserve_overlap_id,
                                                         i_yyyy_overlap: i_yyyy_overlap,
@@ -16690,6 +16692,31 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                                                 !rec.c_code) {
                                                                                                                                                                                 Ext.genCode(rec);
                                                                                                                                                                         }
+                                                                                                                                                                        return true;
+                                                                                                                                                                }
+                                                                                                                                                                // ผู้ใช้เลือกใบกันเหลื่อมปีในหน้าตรวจรับ แต่สัญญา/PR ยังไม่เป็นกันเหลื่อม (i_overlap=0)
+                                                                                                                                                                // ต้องจองใบกัน + เขียน bg_reserve_overlap_id/i_overlap/c_overlap/i_yyyy_overlap ลง sp_check_period_hdr
+                                                                                                                                                                // (เดิมตกไป getMoney ซึ่งจองเงินปีปัจจุบันและไม่เขียนใบกันลง hdr)
+                                                                                                                                                                // จองใบกันลง hdr แล้ว (เช่น ออกเลข AP ครั้งก่อนไม่สำเร็จ) ให้ออกเลขอย่างเดียว ห้ามจองซ้ำ/ตกไปจองเงินปีปัจจุบัน
+                                                                                                                                                                if (rec.bg_reserve_overlap_id > 0 && rec.i_overlapcheck == 2 && !rec.c_code &&
+                                                                                                                                                                        Ext.getCmp("submodeID").getValue() !== "modeEditAp" &&
+                                                                                                                                                                        Ext.getCmp("i_status_checkingID").getValue().inputValue == 1) {
+                                                                                                                                                                        Ext.genCode(rec);
+                                                                                                                                                                        return true;
+                                                                                                                                                                }
+                                                                                                                                                                var chosenBooking = Ext.getCmp("c_bookingID");
+                                                                                                                                                                var yearBudget = Ext.getCmp("i_budget_year") ? Ext.getCmp("i_budget_year").getValue() : null;
+                                                                                                                                                                var yearOverlap = Ext.getCmp("i_yyyy_overlapID") ? Ext.getCmp("i_yyyy_overlapID").getValue() : null;
+                                                                                                                                                                // lastSelectionText จะว่างถ้าค่าถูก setValue ไม่ได้เลือกจาก dropdown ให้ดึงจาก store แทน
+                                                                                                                                                                if (chosenBooking && chosenBooking.getValue() && !chosenBooking.lastSelectionText) {
+                                                                                                                                                                        var bkRec = Ext.booking_store.getById(chosenBooking.getValue());
+                                                                                                                                                                        if (bkRec) chosenBooking.lastSelectionText = bkRec.get("c_booking");
+                                                                                                                                                                }
+                                                                                                                                                                console.log("overlap-save check", { booking: chosenBooking && chosenBooking.getValue(), text: chosenBooking && chosenBooking.lastSelectionText, yearBudget: yearBudget, yearOverlap: yearOverlap, i_overlap: rec.i_overlap, bg_reserve_overlap_id: rec.bg_reserve_overlap_id });
+                                                                                                                                                                if (chosenBooking && chosenBooking.getValue() && chosenBooking.lastSelectionText && Number(yearBudget) > Number(yearOverlap) &&
+                                                                                                                                                                        Number(rec.i_overlap || 0) === 0 && !rec.bg_reserve_overlap_id && Ext.getCmp("submodeID").getValue() !== "modeEditAp" &&
+                                                                                                                                                                        Ext.getCmp("i_status_checkingID").getValue().inputValue == 1) {
+                                                                                                                                                                        Ext.c_overlap_close(rec, "c_overlap_book");
                                                                                                                                                                         return true;
                                                                                                                                                                 }
                                                                                                                                                                 Ext.selectRow.set("i_yyyy", parseInt(Ext.selectRow.get("i_yyyy")) - 1);

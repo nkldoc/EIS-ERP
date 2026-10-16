@@ -2755,8 +2755,23 @@ from dbo.sp_tranf_item a
         $arrParam[] = $data["warraty_age"] ?? null;
         $arrParam[] = !empty($data["i_warraty_end"]) ? $date->bc_to_ad($data['i_warraty_end']) : null;
         //-------------------------------------
+        // เลขที่ใบกันเหลื่อมปี: ฟอร์มส่ง c_booking = bg_budget_dtl_overlap_id ของใบกันที่เลือก (ดู booking_store)
+        // บันทึกเลขใบกันลง hdr ที่ต้นทาง ไม่ต้องพึ่ง flow จองใบกันฝั่ง JS (เดิมไม่เคยเขียน c_overlap ตอนบันทึกรายการหลัก)
+        $overlapCode = null;
+        $overlapBudgetId = $data["bg_budget_dtl_overlap_id"] ?? ($data["c_booking"] ?? null);
+        if (is_numeric($overlapBudgetId) && intval($overlapBudgetId) > 0
+                && intval($data["i_yyyy_overlap"] ?? 0) > 0
+                && intval($data["i_yyyy_overlap"]) < intval($data["i_budget_year"] ?? 0)) {
+            $fo = $db->GetDataBySQL(
+                    "SELECT TOP 1 c_code_ref FROM " . DB_NMU_EIS . "vw_bg_budget_overlap WHERE bg_budget_dtl_overlap_id = ?",
+                    array(intval($overlapBudgetId))
+            );
+            $overlapCode = is_array($fo) ? ($fo["c_code_ref"] ?? null) : $fo;
+            $overlapCode = ($overlapCode !== null && trim((string) $overlapCode) !== "") ? trim((string) $overlapCode) : null;
+        }
         $arrParam[] = $data["bg_budget_dtl_overlap_id"] ?? null;
         $arrParam[] = $data["i_yyyy_overlap"];
+        $arrParam[] = $overlapCode;
         $arrParam[] = $data["i_budget_year"];
         $arrParam[] = $data["i_type_transfer"];
         $arrParam[] = $data["i_doc_duo"] ?? null;
@@ -2809,6 +2824,7 @@ from dbo.sp_tranf_item a
                 . " , d_warranty_date = ?"
                 . " , bg_budget_dtl_overlap_id = ?"
                 . " , i_yyyy_overlap = ?"
+                . " , c_overlap = CASE WHEN bg_reserve_overlap_id IS NULL THEN ISNULL(?, c_overlap) ELSE c_overlap END"
                 . " , i_yyyy = ?"
                 . " , i_type_transfer = ?"
                 . " , i_doc_duo = ?"

@@ -1,5 +1,75 @@
 /* global Ext, user_right_add, user_right_edit, user_right_delete */
 
+// [เพิ่ม] ปิดคำขอแก้ไขงบประมาณที่ค้างอยู่ (sp_tor_bg_log, i_edit=1, c_comment_edit1 ว่าง) ผ่าน UI แทนการรัน SQL มือ
+// เดิมมีแค่ API (mnCancelEditBg.php mode=return) แต่ไม่มีปุ่มเรียกใช้เลยสักจุด ทำให้ PR ติดค้างสถานะ
+// "อยู่ระหว่างแก้ไขงบประมาณ" แม้จะแก้ไขเสร็จไปแล้วจริง (เปิด/ถอย/ผ่านรายการไม่ได้) ต้องรัน SQL ปลดล็อกเอง
+Ext.fnCloseBgEdit = function (record) {
+    var torId = record.get("id");
+    var win = new Ext.Window({
+        id: "win-close-bg-edit",
+        title: "ปิดคำขอแก้ไขงบประมาณ",
+        resizable: false,
+        modal: true,
+        width: 500,
+        layout: "form",
+        bodyStyle: "padding:8px;",
+        items: [
+            {
+                xtype: "displayfield",
+                fieldLabel: "รหัส PR",
+                value: "<b>" + Ext.util.Format.htmlEncode(record.get("c_code") || "") + "</b>",
+            },
+            {
+                xtype: "textarea",
+                fieldLabel: "ผลการแก้ไข / หมายเหตุปิดคำขอ",
+                name: "comment",
+                id: "closeBgEditCommentID",
+                width: 330,
+                height: 90,
+            },
+        ],
+        buttons: [
+            {
+                text: "ยืนยันปิดคำขอ",
+                iconCls: "icon-save",
+                handler: function () {
+                    var comment = Ext.getCmp("closeBgEditCommentID").getValue();
+                    if ([null, "", undefined].includes((comment || "").trim())) {
+                        Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกผลการแก้ไข / หมายเหตุปิดคำขอ");
+                        return;
+                    }
+                    win.getEl().mask("Please wait...", "x-mask-loading");
+                    Ext.Ajax.request({
+                        url: "tor/api/mnCancelEditBg.php",
+                        method: "POST",
+                        params: { mode: "return", id: torId, comment: comment },
+                        success: function (result) {
+                            var jsonData = Ext.util.JSON.decode(result.responseText);
+                            win.getEl().unmask();
+                            if (jsonData.success === "Success" || jsonData.reval === 0) {
+                                Ext.Msg.alert("สำเร็จ", "ปิดคำขอแก้ไขงบประมาณแล้ว", function () {
+                                    win.destroy();
+                                    if (Ext.storeDtl) {
+                                        Ext.storeDtl.reload();
+                                    }
+                                });
+                            } else {
+                                Ext.Msg.alert("ผิดพลาด", jsonData.msg || "ปิดคำขอไม่สำเร็จ");
+                            }
+                        },
+                        failure: function (result) {
+                            win.getEl().unmask();
+                            Ext.Msg.alert("ผิดพลาด", result.responseText);
+                        },
+                    });
+                },
+            },
+            { text: "ยกเลิก", handler: function () { win.destroy(); } },
+        ],
+    });
+    win.show();
+};
+
 Ext.workScore = function () {
   if (!Ext.isEmpty(Ext.getCmp("frmTab2"))) Ext.getCmp("frmTab2").destroy();
   Ext.i_pr_about = 1;
@@ -696,7 +766,12 @@ Ext.AppUx = function (app, menu) {
   function cellClick(grid, rowIndex, columnIndex, e) {
     var record = grid.getStore().getAt(rowIndex);
     Ext.selectRow = record;
-    if (columnIndex === grid.getColumnModel().getIndexById("processDueID")) {
+    if (columnIndex === grid.getColumnModel().getIndexById("closeBgEditID")) {
+      if (Ext.selectRow.get("sp_bg_edit") == 1 && Ext.isEmpty(Ext.selectRow.get("c_comment_edit1"))) {
+        Ext.fnCloseBgEdit(Ext.selectRow);
+      }
+      return;
+    } else if (columnIndex === grid.getColumnModel().getIndexById("processDueID")) {
       //ttf
       controller(Ext.selectRow, "processUpdate"); //on
     } else if (columnIndex === grid.getColumnModel().getIndexById("editEmpTorID")) {
@@ -5013,7 +5088,23 @@ Ext.AppUx = function (app, menu) {
           width: 200,renderer: function (value, metaData, record, row, col, store, gridView) {
               return value;
           }
-          
+
+        },
+        {
+          // [เพิ่ม] ปิดคำขอแก้ไขงบประมาณที่ค้างอยู่ (เดิมติดต้องรัน SQL ปลดล็อกเอง ไม่มีปุ่มในหน้าเว็บเลย)
+          header: "",
+          sortable: false,
+          align: "center",
+          dataIndex: "id",
+          id: "closeBgEditID",
+          width: 95,
+          renderer: function (value, metaData, record) {
+            if (record.get("sp_bg_edit") == 1 && Ext.isEmpty(record.get("c_comment_edit1"))) {
+              metaData.attr = "style='cursor:pointer;' ext:qtip='คำขอแก้ไขงบประมาณยังค้างอยู่ (ยังไม่มีการปิดเรื่อง) กดเพื่อปิดคำขอ'";
+              return '<span style="color:#1677ff;text-decoration:underline;white-space:nowrap;">🔓 ปิดคำขอ</span>';
+            }
+            return "";
+          },
         },
         {
           header: "อัพเดทสถานะ",

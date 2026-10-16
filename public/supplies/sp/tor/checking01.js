@@ -11529,7 +11529,7 @@ Ext.AppUx = function (app, menu) {
                                                                 },
                                                                 {
                                                                         text: "แก้ไขข้อมูล ADMIN ด้วยเครื่องมือ",
-                                                                        hidden: Ext.session.dc_center_user != 1 ? true : false,
+                                                                        hidden: Ext.session.dc_center_user != 1 || !!(window.parent !== window && window.parent.Ext && window.parent.Ext.getCmp("supplies-admin-tools")),
                                                                         icon: "../images/icons/application_edit.png",
                                                                         scope: this,
                                                                         handler: function (e) {

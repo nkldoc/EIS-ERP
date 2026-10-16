@@ -1,0 +1,70 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Workspace tabs verification</title>
+<link rel="stylesheet" href="../public/supplies/js/ext-3.4.0/resources/css/ext-all.css">
+<link rel="stylesheet" href="../public/supplies/css/workspace-tabs.css">
+<script src="../public/supplies/js/ext-3.4.0/adapter/ext/ext-base.js"></script>
+<script src="../public/supplies/js/ext-3.4.0/ext-all.js"></script>
+<script src="../public/supplies/js/workspace-tabs.js"></script>
+<script src="../public/supplies/js/notebook.js"></script>
+<body><pre id="result">RUNNING</pre><div id="workspace"></div>
+<script>
+Ext.onReady(function () {
+    var checks = [];
+    function check(value, name) { if (!value) throw new Error(name); checks.push(name); }
+    try {
+        var Workspace = Ext.ux.SuppliesWorkspace;
+        check(Workspace.normalizeRoute('sp/find?st=ST9000') === 'sp/find.php?st=ST9000', 'deep link keeps query');
+        check(!Workspace.normalizeRoute('https://example.com/') && !Workspace.normalizeRoute('../outside.php'), 'reject external routes');
+        var tree = new Ext.tree.TreePanel({id:'TreePanel1ID', root:new Ext.tree.TreeNode({id:'root', children:[]})});
+        tree.root.appendChild(new Ext.tree.TreeNode({id:'sp-menu?st=ST1', text:'เมนูทดสอบ', leaf:true}));
+        tree.render(document.body);
+        tree.root.expand();
+        var panel = new Workspace({renderTo:'workspace', width:900, height:540});
+        var home = panel.openPage('bi/dashBoard.php');
+        var first = panel.openPage('sp/find.php?st=ST9000', 'ค้นหา PR');
+        var frame = first.body.dom.querySelector('iframe');
+        frame.dataset.unsaved = 'kept';
+        var second = panel.openPage('alert/period.php', 'ข้อมูลสัญญาซื้อจ้าง');
+        check(panel.items.getCount() === 3, 'multiple pages stay open');
+        panel.openPage('./sp/find.php?st=ST9000');
+        check(panel.items.getCount() === 3 && panel.getActiveTab() === first, 'reopening activates existing tab');
+        check(first.body.dom.querySelector('iframe') === frame && frame.dataset.unsaved === 'kept', 'switching preserves iframe and state');
+        check(Ext.page.uri === 'sp/find' && Ext.page.method === 'st=ST9000', 'active page compatibility');
+        check(frame.id === 'iframecontentID' && !second.body.dom.querySelector('iframe').id, 'only active iframe has legacy ID');
+        panel.openPage('sp/find.php?st=OTHER');
+        check(panel.items.getCount() === 4, 'different query opens distinct page');
+        panel.update('<iframe src="./ai/index.html"></iframe>');
+        check(panel.getActiveTab().workspaceRoute === 'ai/index.html', 'legacy menu calls open tabs');
+        panel.remove(first, true);
+        check(first.isDestroyed && !document.body.contains(frame), 'closing destroys iframe');
+        check(!home.closable, 'home remains available');
+        var fromMenu = panel.openPage('sp/menu.php?st=ST1');
+        check(fromMenu.title === 'เมนูทดสอบ', 'tab uses tree menu title');
+        check(tree.getSelectionModel().getSelectedNode().id === 'sp-menu?st=ST1', 'active tab synchronizes menu selection');
+        var receipt = panel.openPage('sp/checking.php?st=ST0013');
+        var receiptFrame = receipt.body.dom.querySelector('iframe');
+        panel.openPage('sp/checking.php?st=ST0013', 'ตรวจรับพัสดุ/ครุภัณฑ์');
+        check(receipt.title === 'ตรวจรับพัสดุ/ครุภัณฑ์' && receipt.workspaceTitle === receipt.title, 'menu label replaces path title on existing tab');
+        check(receipt.body.dom.querySelector('iframe') === receiptFrame, 'correcting tab label preserves page');
+        window.SUPPLIES_EXTERNAL_UNIT = true;
+        var pr = panel.openPage('sp/CheckList.php');
+        var tabCount = panel.items.getCount();
+        panel.openPage('sp/app/tab.php?st=ST0001', 'ตรวจสอบรายการ');
+        check(panel.getActiveTab() === pr && panel.items.getCount() === tabCount, 'external PR menu reuses the default PR tab');
+        check(pr.workspaceRoute === 'sp/CheckList.php' && pr.title === 'ตรวจสอบรายการ', 'external menu shows only the PR content and menu title');
+        window.SUPPLIES_EXTERNAL_UNIT = false;
+        localStorage.setItem('textMemories', 'บันทึกเดิม');
+        Ext.openSuppliesNotebook();
+        var note = Ext.getCmp('textMemoriesID'), notebook = Ext.getCmp('winMsgID');
+        check(note.getValue() === 'บันทึกเดิม', 'notebook keeps legacy notes');
+        note.setValue('ข้อความใหม่');
+        note.el.dom.dispatchEvent(new Event('input', {bubbles:true}));
+        check(localStorage.getItem('textMemories') === 'ข้อความใหม่', 'typing autosaves notes');
+        notebook.hide();
+        Ext.openSuppliesNotebook();
+        check(Ext.getCmp('winMsgID') === notebook && note.getValue() === 'ข้อความใหม่', 'reopening keeps one notebook and its content');
+        document.getElementById('result').textContent = 'PASS: ' + checks.length + '\n' + checks.join('\n');
+    } catch (error) { document.getElementById('result').textContent = 'FAIL: ' + error.stack; }
+});
+</script>

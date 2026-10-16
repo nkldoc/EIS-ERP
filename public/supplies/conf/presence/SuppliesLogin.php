@@ -110,14 +110,27 @@ final class SuppliesLogin
     }
     public static function ssoAllowed(array $row): bool
     {
+        return self::ssoUserId($row) > 0;
+    }
+    public static function ssoUserId(array $row): int
+    {
         $cookie = (string)($_COOKIE['PHPSESSID'] ?? '');
         $portalDirectory = getenv('EIS_PERMISSION_SESSION_DIR') ?: 'C:/xampp/htdocs/NMU_permission/tmp/sessions';
-        if (!preg_match('/^[a-zA-Z0-9,-]{16,128}$/D', $cookie) || !is_file($portalDirectory . '/sess_' . $cookie)) return false;
+        if (!preg_match('/^[a-zA-Z0-9,-]{16,128}$/D', $cookie) || !is_file($portalDirectory . '/sess_' . $cookie)) return 0;
         $name = session_name(); $id = session_id(); $directory = session_save_path(); $cookies = ini_get('session.use_cookies');
         session_write_close();
         session_name('PHPSESSID'); session_id($cookie); session_save_path($portalDirectory);
         session_start(['use_cookies'=>false, 'read_and_close'=>true]); $portal = $_SESSION;
         session_name($name); session_id($id); session_save_path($directory); ini_set('session.use_cookies', $cookies); session_start();
-        return (int)($row['dc_center_user'] ?? 0) > 0 && (int)($portal['dc_user_id'] ?? 0) === (int)$row['dc_center_user'] && (int)($portal['i_permit_supplies'] ?? 0) === 1;
+        $portalId = (int)($portal['dc_user_id'] ?? 0);
+        if ($portalId <= 0 || (int)($portal['i_permit_supplies'] ?? 0) <= 0) return 0;
+        // Usernames can have multiple historical center records. Resolve the
+        // authenticated portal ID explicitly instead of choosing TOP 1 by name.
+        if (!empty($row['c_user_name'])) {
+            $db = new DatabaseServer();
+            $stmt = $db->QueryParam('SELECT dc_user_id FROM ' . DB_CENTER . 'dc_user WHERE dc_user_id = ? AND c_user_name = ? AND i_enable = 1 AND i_delete = 2', [$portalId, $row['c_user_name']]);
+            return $stmt && $db->Fetch($stmt) ? $portalId : 0;
+        }
+        return (int)($row['dc_center_user'] ?? 0) === $portalId ? $portalId : 0;
     }
 }

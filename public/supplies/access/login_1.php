@@ -26,7 +26,7 @@ if ($requestUserId === false || $requestUserId === null) {
 }
 
 $db        = new DatabaseServer();
-$sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
+$sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name, a.c_user_name
                 , isnull((select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
                 , isnull((select top 1 c_code from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
                 ,(select top 1 dc_area_id from dbo.dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
@@ -60,8 +60,20 @@ $re = [
 ];
 $stmt = $db->QueryParam($sqlMain, $arrParam);
 while ($data = $db->Fetch($stmt)) {
-    if (Presence::enabled() && !SuppliesLogin::ssoAllowed($data)) {
-        http_response_code(401); echo json_encode(['reval'=>1, 'success'=>false, 'msg'=>'กรุณาเข้าสู่ระบบผ่าน NMU_permission']); exit;
+    if (Presence::enabled()) {
+        $portalCenterId = SuppliesLogin::ssoUserId($data);
+        if ($portalCenterId <= 0) {
+            if (!empty($_GET['portal_entry'])) {
+                http_response_code(401);
+                header('Content-Type: text/html; charset=utf-8');
+                header('Cache-Control: no-store');
+                echo '<!doctype html><html lang="th"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>เข้าใช้งานระบบพัสดุ</title><body style="margin:0;background:#eef3fa;font:16px/1.7 Tahoma,sans-serif;color:#29435e;display:grid;place-items:center;min-height:100vh"><main style="max-width:440px;margin:24px;padding:32px;background:white;border-radius:16px;box-shadow:0 12px 40px #1935591a"><h1 style="font-size:22px">เข้าใช้งานระบบพัสดุ</h1><p>ไม่พบเซสชัน NMU_permission ที่มีสิทธิ์ตรงกับบัญชีนี้ กรุณาเข้าสู่ระบบแล้วเลือกใช้งานระบบพัสดุอีกครั้ง</p><a href="/NMU_permission/" style="display:inline-block;padding:10px 18px;background:#245ba2;color:white;border-radius:8px;text-decoration:none">เข้าสู่ระบบ NMU_permission</a></main></body></html>';
+            } else {
+                http_response_code(401); echo json_encode(['reval'=>1, 'success'=>false, 'msg'=>'กรุณาเข้าสู่ระบบผ่าน NMU_permission'], JSON_UNESCAPED_UNICODE);
+            }
+            exit;
+        }
+        $data['dc_center_user'] = $portalCenterId;
     }
     // Portal re-entry preserves the valid login and named operator.
     if ((string)($_SESSION['user_id'] ?? '') === (string)$data['dc_user_id']

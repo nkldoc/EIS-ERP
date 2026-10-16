@@ -63,10 +63,28 @@
   ];
 
   // ===== Staff Group (สายงาน) persistence =====
-  const GROUP_STORAGE_KEY = "reply_report_staff_groups_v1";
+  // ค่าเริ่มต้นดึงจากฐานข้อมูล (sp_emp.dc_department_id 2 = สายงาน 1, 3 = สายงาน 2, อื่นๆ) ผ่าน staff_group ใน API
+  // STAFF_GROUPS เก็บเฉพาะรายการที่ผู้ใช้ย้ายเองต่างจากฐานข้อมูล (override) ในเบราว์เซอร์นี้
+  // v2: ไม่ใช้ค่าที่เคยบันทึกใน v1 (สมัยที่ทุกคนเริ่มต้นเป็น "อื่นๆ") เพื่อให้ค่าจากฐานข้อมูลขึ้นทันที
+  const GROUP_STORAGE_KEY = "reply_report_staff_groups_v2";
   const GROUP_LABELS = { g1: "สายงาน 1", g2: "สายงาน 2", other: "อื่นๆ" };
   let STAFF_GROUPS = loadStaffGroups();
+  let STAFF_DB_GROUPS = {};
   let pendingGroups = {};
+
+  // สร้างกลุ่มตามฐานข้อมูลจากข้อมูลที่โหลดมา
+  function buildStaffDbGroups(rows) {
+    STAFF_DB_GROUPS = {};
+    (rows || []).forEach((it) => {
+      const sid = it.staff_id || 0;
+      if (sid !== 0 && it.staff_group) STAFF_DB_GROUPS[sid] = it.staff_group;
+    });
+  }
+
+  // กลุ่มที่ใช้จริงของทุกคน = ฐานข้อมูล ทับด้วยที่ผู้ใช้ย้ายเอง
+  function effectiveStaffGroups() {
+    return Object.assign({}, STAFF_DB_GROUPS, STAFF_GROUPS);
+  }
 
   function loadStaffGroups() {
     try {
@@ -86,7 +104,7 @@
   }
 
   function getStaffGroup(staffId) {
-    return STAFF_GROUPS[staffId] || "other";
+    return STAFF_GROUPS[staffId] || STAFF_DB_GROUPS[staffId] || "other";
   }
 
   // ===== Fiscal Year / Month helpers =====
@@ -102,6 +120,14 @@
   let selectedYearTh = currentFiscalYearEn() + 543;
   let selectedMonthIdx = currentMonthIdxInFiscal();
   let lastLoadedYearTh = null;
+  // ปีงบประมาณแรกที่ให้เลือกได้ในตัวกรองเดือน (ปีงบ 2569 = ต.ค. 2568) ต่อเนื่องถึงปีงบปัจจุบัน
+  // เดิมให้เลือกได้เฉพาะปีงบปัจจุบัน พอขึ้นปีงบใหม่ (ต.ค.) จึงเหลือแค่เดือนแรกที่ยังไม่มีข้อมูล และย้อนดูปีก่อนไม่ได้
+  const FIRST_FISCAL_EN = 2026;
+  function firstFiscalEn() {
+    return Math.min(FIRST_FISCAL_EN, currentFiscalYearEn());
+  }
+  // เปิดหน้าครั้งแรกแล้วปีงบปัจจุบันยังไม่มีข้อมูล -> สลับไปเดือนสุดท้ายของปีงบก่อนหน้าให้ครั้งเดียว
+  let initialFallbackDone = false;
 
   function initMainMonthSelect() {
     const $sel = $("#main_month_filter");
@@ -112,7 +138,7 @@
 
     // แสดงเฉพาะปีงบประมาณปัจจุบันเท่านั้น (ต.ค. ของปีงบปัจจุบัน ถึง เดือนปัจจุบัน)
     // ตามคำขอ: ตั้งแต่ ต.ค. 2568 จนถึงวันเดือนปีปัจจุบัน (ไม่ย้อนหลังปีงบประมาณเก่า)
-    const startFiscal = curFiscalEn;
+    const startFiscal = firstFiscalEn();
     const endFiscal = curFiscalEn;
 
     for (let fy = startFiscal; fy <= endFiscal; fy++) {
@@ -135,6 +161,8 @@
       selectedYearTh = yTh;
       selectedMonthIdx = mIdx;
 
+      // เลือกเดือน -> ช่วงวันที่ Grand Total = 1 ม.ค. ถึงสิ้นเดือนที่เลือก (ยึดแบบคลัง)
+      setDefaultGtDateRange();
       if (selectedYearTh !== lastLoadedYearTh) {
         loadData();
       } else {
@@ -271,7 +299,7 @@
     $("#btnOpenGroupModal")
       .off("click")
       .on("click", function () {
-        pendingGroups = Object.assign({}, STAFF_GROUPS);
+        pendingGroups = effectiveStaffGroups(); // เริ่มจากกลุ่มตามฐานข้อมูล + ที่เคยย้ายเอง
         $("#staffGroupSearch").val("");
         renderGroupModalTable();
         $("#groupModal").modal("show");
@@ -280,7 +308,11 @@
     $("#btnCloseGroupModal")
       .off("click")
       .on("click", function () {
-        STAFF_GROUPS = Object.assign({}, pendingGroups);
+        // เก็บเฉพาะคนที่ถูกย้ายต่างจากฐานข้อมูล
+        STAFF_GROUPS = {};
+        Object.keys(pendingGroups).forEach((id) => {
+          if (pendingGroups[id] !== (STAFF_DB_GROUPS[id] || "other")) STAFF_GROUPS[id] = pendingGroups[id];
+        });
         saveStaffGroups();
         $("#groupModal").modal("hide");
         renderStaffFilterUI(true);
@@ -394,12 +426,26 @@
         try {
           const obj = JSON.parse(responseText);
           if (obj.success && obj.data) {
+            if (!initialFallbackDone) {
+              initialFallbackDone = true;
+              if (obj.data.length === 0 && selectedYearTh - 543 > firstFiscalEn()) {
+                // ปีงบปัจจุบันยังไม่มีข้อมูล (เช่น ต้นปีงบ) -> แสดงเดือนสุดท้ายของปีงบก่อนหน้าแทน
+                selectedYearTh = selectedYearTh - 1;
+                selectedMonthIdx = 11;
+                $("#main_month_filter").selectpicker("val", `${selectedYearTh}_${selectedMonthIdx}`);
+                setDefaultGtDateRange(); // ช่วงวันที่ (ใช้กรองทุกกราฟ/ตาราง) ต้องเป็นของปีงบที่สลับไปด้วย
+                setTimeout(loadData, 0); // หลัง finally ซ่อน loader ของรอบนี้แล้ว รอบใหม่จะแสดง loader เอง
+                return;
+              }
+            }
             window.DATA_RAW = obj.data;
+            buildStaffDbGroups(obj.data); // กลุ่มสายงานตามฐานข้อมูล
             lastLoadedYearTh = selectedYearTh;
             renderStaffFilterUI(false);
           } else {
             console.error("API Error:", obj.message);
             window.DATA_RAW = [];
+            buildStaffDbGroups([]);
             renderStaffFilterUI(false);
           }
         } catch (e) {
@@ -2521,11 +2567,8 @@
     $("#gtDateEndTh").text(isoToThaiDMY($("#gtDateEnd").val()) ? `(EIS: ${isoToThaiDMY($("#gtDateEnd").val())})` : "");
   }
 
-  // ตั้งค่าเริ่มต้นของ #gtDateStart / #gtDateEnd แบบ dynamic ตามวันที่ปัจจุบันของเครื่อง (client date)
-  // ตั้งแต่วันที่ = วันที่ 1 ต.ค. ของปีงบประมาณปัจจุบัน (selectedYearTh), ถึงวันที่ = วันนี้
-  // (fiscal-year-to-date) เพื่อให้เป็นค่า default ที่ user เปิดมาเจอทันทีโดยไม่ต้องกดอะไรเลย
-  // ใช้บ่อยรายสัปดาห์ — ต่างจากกล่องกำหนดช่วงวันที่เอง (ใช้เดือนละครั้งตอนเทียบยอดกับทางคลัง)
-  // ที่ถูกซ่อนไว้เป็นค่าเริ่มต้นและเปิดผ่านปุ่ม #gtCustomRangeToggleBtn
+  // ค่าเริ่มต้นของ #gtDateStart / #gtDateEnd ตามเดือนที่เลือกใน dropdown (ดู setDefaultGtDateRange)
+  // กล่องกำหนดช่วงวันที่เองถูกซ่อนไว้เป็นค่าเริ่มต้นและเปิดผ่านปุ่ม #gtCustomRangeToggleBtn
   function toIsoDate(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -2533,15 +2576,17 @@
     return `${y}-${m}-${day}`;
   }
 
+  // ช่วงวันที่ตามเดือนที่เลือก (ยึดแบบคลัง) ถึงสิ้นเดือนที่เลือก (ไม่เกินวันนี้)
+  // ม.ค.-ก.ย. เริ่ม 1 ม.ค. เช่น ก.ย. 2569 = 01/01/2026 - 30/09/2026
+  // ต.ค.-ธ.ค. เริ่ม 1 ต.ค. (ต้นปีงบใหม่ ไม่นับข้อมูลปีงบก่อนมารวม) เช่น ต.ค. 2569 = 01/10/2026 - 31/10/2026
   function setDefaultGtDateRange() {
-    const { min, max } = fiscalYearBounds(selectedYearTh);
+    const yearEn = selectedYearTh - 543;
+    const calYear = selectedMonthIdx <= 2 ? yearEn - 1 : yearEn; // idx 0-2 = ต.ค.-ธ.ค. ของปีก่อนหน้า
+    const calMonth = selectedMonthIdx <= 2 ? selectedMonthIdx + 10 : selectedMonthIdx - 2; // 1-12
+    const monthEndIso = toIsoDate(new Date(calYear, calMonth, 0)); // วันสุดท้ายของเดือน
     const todayIso = toIsoDate(new Date());
-    const isCurrentFiscal = selectedYearTh === currentFiscalYearEn() + 543;
-    // ถ้ากำลังดูปีงบประมาณปัจจุบันและวันนี้ยังอยู่ในปีงบนั้น ใช้ "วันนี้" เป็นวันสิ้นสุด
-    // ถ้าไม่ใช่ (เช่นเลือกปีงบเก่า) ใช้วันสิ้นปีงบ (30 ก.ย.) แทน
-    const endIso = isCurrentFiscal && todayIso <= max ? todayIso : max;
-    $("#gtDateStart").val(min);
-    $("#gtDateEnd").val(endIso);
+    $("#gtDateStart").val(selectedMonthIdx <= 2 ? `${calYear}-10-01` : `${calYear}-01-01`);
+    $("#gtDateEnd").val(monthEndIso > todayIso ? todayIso : monthEndIso);
     updateGtDateThaiHints();
   }
 
@@ -2586,14 +2631,14 @@
     const targetYearTh = fiscalYearThOfIsoDate(startVal);
     if (targetYearTh === selectedYearTh) return false; // ตรงกันอยู่แล้ว ไม่ต้องสลับ
 
-    // dropdown ด้านบนรองรับเฉพาะปีงบประมาณปัจจุบันเท่านั้น — ถ้านอกช่วงนี้สลับให้ไม่ได้จริงๆ
+    // dropdown ด้านบนรองรับปีงบประมาณ firstFiscalEn() ถึงปีงบปัจจุบัน — ถ้านอกช่วงนี้สลับให้ไม่ได้จริงๆ
     const curFiscalEn = currentFiscalYearEn();
     const targetFiscalEn = targetYearTh - 543;
-    if (targetFiscalEn !== curFiscalEn) {
+    if (targetFiscalEn < firstFiscalEn() || targetFiscalEn > curFiscalEn) {
       $("#gtDateHint")
         .removeClass("text-success text-warning")
         .addClass("text-danger")
-        .text(`ปีงบประมาณ ${targetYearTh} อยู่นอกช่วงที่ตัวกรองเดือน/ปีงบประมาณด้านบนรองรับ (เฉพาะปีงบประมาณปัจจุบัน ${curFiscalEn + 543}) ตาราง/กราฟด้านล่างจึงยังคงแสดงปีงบประมาณ ${selectedYearTh} ต่อไป แม้ Grand Total ด้านบนจะคำนวณตามช่วงวันที่จริงก็ตาม`);
+        .text(`ปีงบประมาณ ${targetYearTh} อยู่นอกช่วงที่ตัวกรองเดือน/ปีงบประมาณด้านบนรองรับ (ปีงบประมาณ ${firstFiscalEn() + 543} - ${curFiscalEn + 543}) ตาราง/กราฟด้านล่างจึงยังคงแสดงปีงบประมาณ ${selectedYearTh} ต่อไป แม้ Grand Total ด้านบนจะคำนวณตามช่วงวันที่จริงก็ตาม`);
       return false;
     }
 
@@ -2757,7 +2802,7 @@
       });
 
     // ตั้งค่าเริ่มต้นของช่วงวันที่ Grand Total แบบ dynamic ตามวันที่ปัจจุบันของเครื่อง (ไม่ hardcode ปี/เดือน)
-    // ตั้งแต่วันที่ = วันที่ 1 ต.ค. ของปีงบประมาณปัจจุบัน, ถึงวันที่ = วันนี้ (fiscal-year-to-date)
+    // ตั้งแต่วันที่ = 1 ม.ค. ของปีปฏิทินของเดือนที่เลือก, ถึงวันที่ = สิ้นเดือนที่เลือก (ไม่เกินวันนี้)
     setDefaultGtDateRange();
 
     // คำนวณอัตโนมัติครั้งแรกด้วยค่าเริ่มต้นข้างต้น เพื่อให้ตรงกับ EIS ทันทีที่เปิดหน้า

@@ -152,8 +152,6 @@ Ext.onReady(function () {
     })();
     // ===== WebSocket integration + toolbar buttons (Ext.session.user_id) =====
     (function () {
-        var uid = (Ext.session && Ext.session.user_id) ? Ext.session.user_id : 0;
-        var pathNotif = '/notif/';
 // ที่เก็บรายการล่าสุดจาก websocket/api
         window.NOTIFY_ROWS = [];     // โครง: {id,title,desc,status,time,createdAt,link,...}
         window.NOTIFY_UNREAD = 0;
@@ -234,82 +232,6 @@ Ext.onReady(function () {
             window.updateNotifyBadge(window.NOTIFY_UNREAD);
         }
 
-        Ext.btnConnect = (function () {
-            if (window._notifySocket && window._notifySocket.readyState < WebSocket.CLOSING) {
-                Ext.Msg.alert('Info', 'Already connected');
-                return;
-            }
-            let protocol = (location.protocol === 'https:') ? 'wss://' : 'ws://';
-            let port = (location.protocol === 'https:') ? ':8443' : ':8080';
-            let ctx = pathNotif.replace(/[^\/]*$/, '');
-            let wsUrl = protocol + location.hostname + port + ctx + 'ws/notify/' + uid;
-
-            try {
-                window._notifySocket = new WebSocket(wsUrl);
-            } catch (e) {
-                Ext.Msg.alert('Error', 'Cannot create WebSocket: ' + e.message);
-                return;
-            }
-
-            var notifySocket = window._notifySocket;
-            var connectTimeout = setTimeout(function () { if (notifySocket.readyState === WebSocket.CONNECTING) notifySocket.close(); }, 10000);
-            window._notifySocket.onopen = function () {
-                clearTimeout(connectTimeout);
-                if (window._notifySocket !== notifySocket) return;
-                Ext.Toast.show({type: 'info', title: 'Connected', message: 'ระบบเชื่อมแจ้งเตือน ' + uid});
-            };
-
-            window._notifySocket.onmessage = function (e) {
-                if (window._notifySocket !== notifySocket) return;
-                try {
-                    var msg = Ext.decode(e.data);
-                    if (msg.event === 'bootstrap') {
-                        var n = (msg.data && msg.data.length) || 0;
-                        upsertNotifFromPayload(msg.data);
-                        Ext.Toast.show({type: 'info', title: 'Bootstrap', message: 'คุณมีแจ้งเตือน ' + n + ' รายการ ยังไม่อ่าน'});
-                    } else if (msg.event === 'notification') {
-
-                        var n = (msg.data && msg.data.length) || 0;
-                        upsertNotifFromPayload(msg.data);
-                        console.log(msg.event, msg.data);
-                        console.log('UNREAD =', window.NOTIFY_UNREAD);
-                        Ext.Toast.show({
-                            type: msg.type || 'info',
-                            title: msg.title || 'แจ้งเตือน',
-                            message: msg.message || '',
-                            link: msg.link || null,
-                            onClick: function () {
-                                // send markRead via WS
-                                if (window._notifySocket && window._notifySocket.readyState === WebSocket.OPEN && msg.id) {
-                                    window._notifySocket.send(Ext.encode({cmd: 'markRead', notify_id: msg.id}));
-                                }
-                            }
-                        });
-//
-                    } else if (msg.event === 'marked') {
-                        var n = (msg.data && msg.data.length) || 0;
-                        upsertNotifFromPayload(msg.data);
-                        Ext.Toast.show({type: 'info', title: 'Marked', message: 'Marked read id=' + msg.notify_id});
-                    }
-                } catch (err) {
-                    console.error(err);
-                }
-            };
-            window._notifySocket.onclose = function () {
-                clearTimeout(connectTimeout);
-                if (window._notifySocket !== notifySocket) return;
-                Ext.Toast.show({type: 'warning', title: 'WS', message: 'Connection closed'});
-            };
-            // window._notifySocket.onerror = function (err) {
-            //     console.error('WS error', err);
-            // };
-            window._notifySocket.onerror = function (err) {
-                if (window._notifySocket !== notifySocket) return;
-                // Log the current state: 0 (CONNECTING), 2 (CLOSING), 3 (CLOSED)
-                console.error('WS error. Socket State:', window._notifySocket.readyState, err);
-                Ext.Toast.show({ type: 'error', title: 'WS Error', message: 'Could not connect to server.' });
-            };
-
-        }); // () autorun
+        // Legacy /notif WebSocket retired; keep notification UI helpers available.
     })();
 });

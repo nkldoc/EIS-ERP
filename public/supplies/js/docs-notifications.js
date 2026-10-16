@@ -6,7 +6,7 @@
         if (!host || host.querySelector('.docs-notification-bell')) return;
         var bell = document.createElement('button');
         bell.type = 'button'; bell.className = 'docs-notification-bell';
-        bell.innerHTML = '🔔 <span class="docs-notification-label">เอกสารรอลงนาม</span><span class="docs-notification-count" hidden></span>';
+        bell.innerHTML = '<span class="docs-bell-icon" aria-hidden="true"></span> <span class="docs-notification-label">เอกสารรอลงนาม</span><span class="docs-notification-count" hidden></span>';
         bell.setAttribute('aria-expanded', 'false'); bell.setAttribute('aria-controls', 'supplies-docs-notifications');
         host.appendChild(bell);
         var panel = document.createElement('section'); panel.id = 'supplies-docs-notifications';
@@ -14,10 +14,16 @@
         panel.innerHTML = '<div class="docs-notification-heading"><strong>แจ้งเตือนเอกสาร</strong><button type="button" aria-label="ปิดแจ้งเตือน">×</button></div><div class="docs-notification-items" aria-live="polite"></div><a class="docs-notification-all" href="/eis-docs/docMain/" target="_blank" rel="noopener">เปิดระบบเอกสาร →</a>';
         document.body.appendChild(panel);
         panel.querySelector('.docs-notification-all').href = docsHome;
+        panel.querySelector('.docs-notification-all').textContent = 'ดูแจ้งเตือนทั้งหมดที่ EIS-DOCS →';
         var items = panel.querySelector('.docs-notification-items'), count = bell.querySelector('.docs-notification-count');
         var csrf = '', busy = false, stopped = false;
         function close() { panel.hidden = true; bell.setAttribute('aria-expanded', 'false'); }
-        function position() { var rect = bell.getBoundingClientRect(); panel.style.top = Math.min(rect.bottom + 8, window.innerHeight - 100) + 'px'; }
+        function position() {
+            var rect = bell.getBoundingClientRect();
+            var top = Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - 100));
+            panel.style.top = top + 'px';
+            panel.style.maxHeight = Math.max(0, window.innerHeight - top - 12) + 'px';
+        }
         function message(value) { items.textContent = value; }
         function render(data) {
             csrf = data.csrf; count.hidden = !data.unread_count;

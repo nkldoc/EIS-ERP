@@ -6,6 +6,29 @@ include("../../lib/date/i_date.class.php");
 $db = new DatabaseServer();
 $date = new i_date();
 
+// รายการ po_working_hdr_id ที่ใช้หาใบตรวจรับ (sp_check_period_hdr) ของใบขอเบิก a เรียงตามลำดับความสำคัญ (lvl)
+// 0 = ตัวใบเอง, 1-3 = ใบเดิมที่ถูกยกเลิก (parent_id, i_enable = 2) กรณีออกใบขอเบิกใหม่แทนใบเดิม ใบใหม่จะไม่ได้ผูกใบตรวจรับ
+// (parent_id = 0 คือไม่มีใบเดิม ต้องเช็ค i_enable = 2 กันไปจับใบตรวจรับที่ po_working_hdr_id = 0)
+// ใช้ UNION ALL ห้ามเปลี่ยนเป็น VALUES ที่มี subquery (เคยทดสอบแล้วได้ผลไม่คงที่แต่ละรอบ)
+function chkLinkSource()
+{
+    return "(
+            SELECT 0 AS lvl, a.po_working_hdr_id AS po_working_hdr_id
+            UNION ALL
+            SELECT 1, p1.po_working_hdr_id FROM NMU_EIS..po_working_hdr p1
+            WHERE p1.po_working_hdr_id = a.parent_id AND p1.i_enable = 2
+            UNION ALL
+            SELECT 2, p2.po_working_hdr_id FROM NMU_EIS..po_working_hdr p1
+            INNER JOIN NMU_EIS..po_working_hdr p2 ON p2.po_working_hdr_id = p1.parent_id AND p2.i_enable = 2
+            WHERE p1.po_working_hdr_id = a.parent_id AND p1.i_enable = 2
+            UNION ALL
+            SELECT 3, p3.po_working_hdr_id FROM NMU_EIS..po_working_hdr p1
+            INNER JOIN NMU_EIS..po_working_hdr p2 ON p2.po_working_hdr_id = p1.parent_id AND p2.i_enable = 2
+            INNER JOIN NMU_EIS..po_working_hdr p3 ON p3.po_working_hdr_id = p2.parent_id AND p3.i_enable = 2
+            WHERE p1.po_working_hdr_id = a.parent_id AND p1.i_enable = 2
+        ) lnk";
+}
+
 function List_QueryParam()
 {
     global $db;
@@ -27,6 +50,8 @@ function List_QueryParam()
             ,aa.po_working_item_id
             ,tor.sp_emp_id
             ,ISNULL((SELECT c_name FROM NMU_ERP..sp_emp WHERE sp_emp_id = tor.sp_emp_id), 'ไม่ระบุ') AS staff_name
+            -- สายงานของเจ้าหน้าที่ (sp_emp.dc_department_id) : 2 = จัดซื้อจัดจ้าง 1, 3 = จัดซื้อจัดจ้าง 2
+            ,(SELECT dc_department_id FROM NMU_ERP..sp_emp WHERE sp_emp_id = tor.sp_emp_id) AS staff_department_id
             ,pw.i_status as po_working_status
             ,(SELECT COUNT(*) FROM NMU_EIS..po_working_item x
                 WHERE x.po_working_hdr_id = a.po_working_hdr_id AND x.i_status = 3) AS protest_round_total
@@ -50,12 +75,19 @@ function List_QueryParam()
             GROUP BY aa.i_status, aa.po_working_hdr_id
         ) aa ON a.po_working_hdr_id = aa.po_working_hdr_id
         OUTER APPLY (
-            SELECT TOP 1 d.sp_emp_id
-            FROM sp_check_period_hdr sch
-            INNER JOIN sp_tor_contract stc ON sch.sp_tor_contract_id = stc.sp_tor_contract_id
-            INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
-            WHERE sch.po_working_hdr_id = a.po_working_hdr_id
-            ORDER BY sch.sp_check_period_hdr_id DESC
+            -- เจ้าหน้าที่จากใบตรวจรับ (ของใบเองหรือใบเดิมที่ถูกยกเลิก) ถ้าไม่มีใบตรวจรับเลยใช้ผู้สร้างใบขอเบิกแทน
+            SELECT ISNULL(
+                (SELECT TOP 1 d.sp_emp_id
+                FROM " . chkLinkSource() . "
+                INNER JOIN sp_check_period_hdr sch ON sch.po_working_hdr_id = lnk.po_working_hdr_id
+                INNER JOIN sp_tor_contract stc ON sch.sp_tor_contract_id = stc.sp_tor_contract_id
+                INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
+                ORDER BY lnk.lvl, sch.sp_check_period_hdr_id DESC),
+                (SELECT TOP 1 e.sp_emp_id
+                FROM NMU..dc_user u
+                INNER JOIN NMU_ERP..sp_emp e ON e.dc_emp_id = u.dc_emp_id
+                WHERE u.dc_user_id = a.dc_user_create_id)
+            ) AS sp_emp_id
         ) tor
         LEFT JOIN dbo.sp_withdraw sw ON sw.c_code_ref = a.c_code_ref
         LEFT JOIN dbo.vw_po_working_pdf pw ON pw.c_code_ref = sw.c_code_ref
@@ -97,6 +129,8 @@ function List_QueryParam()
                 'month_idx'   => $month_idx,
                 'staff_id'    => intval($row['sp_emp_id']),
                 'staff_name'  => $row['staff_name'],
+                // กลุ่มสายงานตามฐานข้อมูล ใช้เป็นค่าเริ่มต้นของ "จัดกลุ่มสายงานเจ้าหน้าที่" (ไม่มีสายงาน 1/2 = อื่นๆ)
+                'staff_group' => intval($row['staff_department_id'] ?? 0) === 2 ? 'g1' : (intval($row['staff_department_id'] ?? 0) === 3 ? 'g2' : 'other'),
                 'is_reply'    => $is_reply,
                 'is_pending_receive' => $is_pending_receive,
                 'po_working_hdr_id' => $row['po_working_hdr_id'],
@@ -149,15 +183,23 @@ function List_CompareProtestRounds()
     }
     $staffJoin = "
         OUTER APPLY (
-            SELECT TOP 1 d.sp_emp_id
-            FROM sp_check_period_hdr sch
-            INNER JOIN sp_tor_contract stc ON sch.sp_tor_contract_id = stc.sp_tor_contract_id
-            INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
-            WHERE sch.po_working_hdr_id = a.po_working_hdr_id
-            ORDER BY sch.sp_check_period_hdr_id DESC
+            -- เจ้าหน้าที่จากใบตรวจรับ (ของใบเองหรือใบเดิมที่ถูกยกเลิก) ถ้าไม่มีใบตรวจรับเลยใช้ผู้สร้างใบขอเบิกแทน
+            SELECT ISNULL(
+                (SELECT TOP 1 d.sp_emp_id
+                FROM " . chkLinkSource() . "
+                INNER JOIN sp_check_period_hdr sch ON sch.po_working_hdr_id = lnk.po_working_hdr_id
+                INNER JOIN sp_tor_contract stc ON sch.sp_tor_contract_id = stc.sp_tor_contract_id
+                INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
+                ORDER BY lnk.lvl, sch.sp_check_period_hdr_id DESC),
+                (SELECT TOP 1 e.sp_emp_id
+                FROM NMU..dc_user u
+                INNER JOIN NMU_ERP..sp_emp e ON e.dc_emp_id = u.dc_emp_id
+                WHERE u.dc_user_id = a.dc_user_create_id)
+            ) AS sp_emp_id
         ) tor
     ";
 
+    // Grand Total นับใบเบิกทุกประเภท (D, F, BR) ไม่กรอง c_code_ref LIKE 'D%' เพื่อให้เท่ากับรายงานคลัง List_RepProtest.php (EIS)
     $sql = "
         SELECT
             (SELECT COUNT(*)
@@ -168,7 +210,6 @@ function List_CompareProtestRounds()
              WHERE a.i_enable = 1
                 AND b.dc_cost_id = '38'
                 AND b.dc_cost_acc_id = 77
-                AND a.c_code_ref LIKE 'D%'
                 AND CONVERT(date, bb.d_doc_date) BETWEEN '$start_date' AND '$end_date'
                 $staffCond
             ) AS total_rounds
@@ -180,7 +221,6 @@ function List_CompareProtestRounds()
              WHERE a.i_enable = 1
                 AND b.dc_cost_id = '38'
                 AND b.dc_cost_acc_id = 77
-                AND a.c_code_ref LIKE 'D%'
                 AND CONVERT(date, bb.d_doc_date) BETWEEN '$start_date' AND '$end_date'
                 $staffCond
             ) AS total_docs
@@ -193,7 +233,6 @@ function List_CompareProtestRounds()
              WHERE a.i_enable = 1
                 AND b.dc_cost_id = '38'
                 AND b.dc_cost_acc_id = 77
-                AND a.c_code_ref LIKE 'D%'
                 AND CONVERT(date, a.d_create) BETWEEN '$start_date' AND '$end_date'
                 $staffCond
             ) AS total_sent
@@ -204,7 +243,6 @@ function List_CompareProtestRounds()
              WHERE a.i_enable = 1
                 AND b.dc_cost_id = '38'
                 AND b.dc_cost_acc_id = 77
-                AND a.c_code_ref LIKE 'D%'
                 AND CONVERT(date, a.d_create) BETWEEN '$start_date' AND '$end_date'
                 $staffCond
             ) AS total_sent_docs
@@ -391,17 +429,24 @@ function List_MonthlyDurationDetail()
         OUTER APPLY (
             SELECT TOP 1
                 sch.sp_check_period_hdr_id, sch.c_code, sch.dc_user_create_id, sch.dc_creditor_id, sch.sp_tor_contract_id
-            FROM sp_check_period_hdr sch
-            WHERE sch.po_working_hdr_id = a.po_working_hdr_id
-            ORDER BY sch.sp_check_period_hdr_id DESC
+            FROM " . chkLinkSource() . "
+            INNER JOIN sp_check_period_hdr sch ON sch.po_working_hdr_id = lnk.po_working_hdr_id
+            ORDER BY lnk.lvl, sch.sp_check_period_hdr_id DESC
         ) chkp
         OUTER APPLY (
-            SELECT TOP 1 d.sp_emp_id
-            FROM sp_check_period_hdr sch
-            INNER JOIN sp_tor_contract stc ON sch.sp_tor_contract_id = stc.sp_tor_contract_id
-            INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
-            WHERE sch.po_working_hdr_id = a.po_working_hdr_id
-            ORDER BY sch.sp_check_period_hdr_id DESC
+            -- เจ้าหน้าที่จากใบตรวจรับ (ของใบเองหรือใบเดิมที่ถูกยกเลิก) ถ้าไม่มีใบตรวจรับเลยใช้ผู้สร้างใบขอเบิกแทน
+            SELECT ISNULL(
+                (SELECT TOP 1 d.sp_emp_id
+                FROM " . chkLinkSource() . "
+                INNER JOIN sp_check_period_hdr sch ON sch.po_working_hdr_id = lnk.po_working_hdr_id
+                INNER JOIN sp_tor_contract stc ON sch.sp_tor_contract_id = stc.sp_tor_contract_id
+                INNER JOIN sp_tor d ON d.tor_id = stc.sp_tor_id
+                ORDER BY lnk.lvl, sch.sp_check_period_hdr_id DESC),
+                (SELECT TOP 1 e.sp_emp_id
+                FROM NMU..dc_user u
+                INNER JOIN NMU_ERP..sp_emp e ON e.dc_emp_id = u.dc_emp_id
+                WHERE u.dc_user_id = a.dc_user_create_id)
+            ) AS sp_emp_id
         ) tor
         LEFT JOIN NMU_EIS..po_working_item recv
             ON recv.po_working_hdr_id = a.po_working_hdr_id AND recv.i_sub_status = '2.00'

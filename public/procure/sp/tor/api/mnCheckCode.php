@@ -155,7 +155,8 @@ switch ($mode){
                 "SELECT c_sub FROM NMU_DATACENTER.dbo.dc_cost WHERE dc_cost_id = ?",
                 array($apCostId)
             );
-            $apCostSub = trim((string)($apCost['c_sub'] ?? ''));
+            // GetDataBySQL คืนค่าเดี่ยว (scalar) เมื่อ select คอลัมน์เดียว
+            $apCostSub = trim((string)(is_array($apCost) ? ($apCost['c_sub'] ?? '') : $apCost));
             $rejectApCode = function ($reason) use ($db, $apCostId, $apCostSub, $ret_id) {
                 $db->RollBackTran();
                 header('Content-Type: application/json; charset=utf-8');

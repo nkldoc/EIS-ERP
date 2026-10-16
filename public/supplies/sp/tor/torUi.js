@@ -1,5 +1,16 @@
 /* global Ext, user_right_add, user_right_edit, user_right_delete */
 /* global Ext */
+// แปลข้อความ error ภาษาอังกฤษที่ API งบประมาณ (api-nmu) ส่งกลับมา เป็นภาษาไทย - รู้จักเฉพาะข้อความที่
+// เจอบ่อยๆ เท่านั้น ข้อความอื่นที่ไม่รู้จักคืนค่าเดิมไว้ (ไม่ปิดบังข้อมูล เผื่อต้องเอาไปแจ้ง admin)
+Ext.fnTranslateBgMsg = function (msg) {
+    if (!msg) {
+        return msg;
+    }
+    if (/duplicate reserve/i.test(msg)) {
+        return "มีการจอง PR ไว้สำหรับงบประมาณนี้แล้ว";
+    }
+    return msg;
+};
 // แสดงรหัสแผนของ PR เป็นรายการทีละบรรทัด "ลำดับที่ N  รหัสแผน xx" แทนช่องข้อความยาวคั่นด้วย "," (ข้อมูลยังเก็บ
 // เป็นค่าคั่น "," ในฟิลด์ซ่อน plan_seqID/plan_codeID เหมือนเดิม) - seqStr/codeStr = ค่าคั่นด้วย ","
 Ext.fnPlanListHtml = function (seqStr, codeStr) {
@@ -419,7 +430,37 @@ function reverseToNewTor(rec) {
     }).show();
 }
 
+// เช็คเซสชันก่อนจองเงินทุกครั้ง (ก่อนเรียก genBooklinkDo จริง) - ถ้าเซสชันหมดอายุระหว่างใช้งาน
+// การจองที่ระบบงบ (API ภายนอก ไม่ใช้เซสชันของเรา) จะยังสำเร็จอยู่ แต่ขั้นตอนบันทึกเลขอ้างอิงกลับมา
+// ที่ระบบเรา (purchase1/purchase2 เรียก mnTorController.php ซึ่งต้องใช้เซสชัน) จะล้มเหลวเงียบๆ
+// ทำให้หน้าจอไม่รู้ว่าจองไปแล้ว กดจองซ้ำจะเจอ "Duplicate reserve" จากระบบงบ - เช็คก่อนเสมอ ถ้าเซสชัน
+// หมดอายุให้แจ้งเตือนชัดเจนและหยุดไว้ก่อนกดจองจริง
 function genBooklink(v, i) {
+    Ext.Ajax.request({
+        url: "tor/api/mnTorController.php",
+        params: {mode: "SESSION_PING"},
+        method: "POST",
+        success: function () {
+            genBooklinkDo(v, i);
+        },
+        failure: function (result) {
+            setDisabled_button(i, 1);
+            if (Ext.getCmp(Ext.poFormID)) {
+                Ext.getCmp(Ext.poFormID).getEl().unmask();
+            }
+            if (result.status === 401) {
+                Ext.Msg.alert(
+                    "เซสชันหมดอายุ",
+                    "เซสชันการใช้งานหมดอายุ กรุณากด Ctrl+F5 หรือออกจากระบบแล้วเข้าใหม่ ก่อนกดจองเงิน<br>"
+                    + "(ป้องกันกรณีจองเงินสำเร็จที่ระบบงบ แต่บันทึกเลขอ้างอิงกลับมาระบบเราไม่สำเร็จ ทำให้จองซ้ำได้)"
+                );
+            } else {
+                Ext.Msg.alert("แจ้งเตือน", "ตรวจสอบสถานะการเข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+            }
+        },
+    });
+}
+function genBooklinkDo(v, i) {
     var ii = i;
     var i_type = "dc_expense_budget_type" + i + "_id";
     var dc_expense_budget_type = Ext.selectRow.get(i_type);
@@ -613,7 +654,7 @@ function genBooklink(v, i) {
                                             });
                                         } else {
                                             setDisabled_button(i, 1);
-                                            Ext.MessageBox.alert("Failed", jsonData.msg); // alert massage error
+                                            Ext.MessageBox.alert("Failed", Ext.fnTranslateBgMsg(jsonData.msg)); // alert massage error
                                         }
                                     },
                                     failure: function (result, request) {

@@ -1,0 +1,14 @@
+2026-10-14T10:37:38+07:00 uid=NULL type=NULL replaced=NULL parent='10646' cookie=NO
+2026-10-14T10:37:44+07:00 uid=NULL type=NULL replaced=NULL parent='10646' cookie=NO
+2026-10-14T10:38:19+07:00 uid=61229 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:38:32+07:00 uid=61229 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:38:36+07:00 uid=61229 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:38:41+07:00 uid=61229 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:38:41+07:00 uid=61229 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:44:13+07:00 uid=61229 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:44:15+07:00 uid=61229 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:45:55+07:00 uid=61560 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:46:21+07:00 uid=60069 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:46:30+07:00 uid=60069 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:46:34+07:00 uid=60069 type=1 replaced=NULL parent='10646' cookie=yes
+2026-10-14T10:46:46+07:00 uid=60069 type=1 replaced=NULL parent='10646' cookie=yes
