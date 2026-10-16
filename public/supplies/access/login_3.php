@@ -1,5 +1,6 @@
 <?PHP
 
+require_once __DIR__ . '/../conf/presence/SuppliesLogin.php';
 require_once("../conf/config.php");
 require_once("../lib/database/DatabaseServer.php");
 

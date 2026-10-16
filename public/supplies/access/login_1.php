@@ -8,6 +8,7 @@ require_once __DIR__ . '/PortalEntryResponse.php';
 $isPortalEntry = PortalEntryResponse::requested($_GET, $_SERVER);
 
 require_once __DIR__ . '/../conf/session-storage.php';
+require_once __DIR__ . '/../conf/presence/SuppliesLogin.php';
 require_once __DIR__ . "/../conf/config.php";
 if (session_status() !== PHP_SESSION_ACTIVE) {
     http_response_code(503);

@@ -14,6 +14,7 @@ if($_SERVER["REQUEST_METHOD"] != "POST"){
     $_POST["userf"] = $data->userf;
     $_POST["passwordf"] = $data->passwordf;
 } 
+require_once __DIR__ . '/../conf/presence/SuppliesLogin.php';
 require_once("../conf/config.php");
 require_once("../lib/database/DatabaseServer.php");
 if (isset($_POST["userf"]) && isset($_POST["passwordf"])) {
