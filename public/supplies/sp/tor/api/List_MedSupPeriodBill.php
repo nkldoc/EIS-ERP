@@ -4,6 +4,12 @@ include("../../../conf/config.php");
 include("../../../lib/database/DatabaseServer.php");
 include("../../../lib/database/apiUtil.php");
 include("../../../lib/date/i_date.class.php");
+include(__DIR__ . "/medsupVatDraft.php");
+include_once(__DIR__ . "/medSupErpReserve.php");
+
+// รายการเปลี่ยนตามผู้ใช้ที่ล็อกอิน (ดู medsupOwnFilter) ห้ามให้เบราว์เซอร์/พร็อกซีเก็บผลไปใช้ซ้ำข้ามผู้ใช้
+header("Cache-Control: no-store, no-cache, must-revalidate");
+header("Pragma: no-cache");
 
 $db = new DatabaseServer();
 $date = new i_date();
@@ -21,6 +27,18 @@ $start = $_REQUEST["start"] ?? null;
 
 function get($a) {
     return $a ?? 0;
+}
+
+// user ใครuser มัน: admin (i_type_user = 2 หรือ user_id = 1) เห็นทุกรายการ ผู้ใช้อื่นเห็นเฉพาะรายการ
+// ที่ตัวเองเป็นคนสร้าง (dc_user_create_id) ไม่ปนกับของเจ้าหน้าที่คนอื่นแม้จะอยู่หน่วยงานเดียวกัน
+// ใช้กับทุกรายการหลักของเมนูเวชภัณฑ์ (PR / สัญญา / งวด / รับของ) - $alias = ตัวย่อตารางที่มี
+// คอลัมน์ dc_user_create_id ของแถวสัญญา/PR (sp_tor_period_bill)
+function medsupOwnFilter($alias) {
+    $uid = intval($_SESSION["user_id"] ?? 0);
+    if ($uid === 1 || intval($_SESSION["i_type_user"] ?? 0) === 2) {
+        return "";
+    }
+    return " and {$alias}.dc_user_create_id = {$uid}";
 }
 
 if (!get($start)) {
@@ -41,6 +59,7 @@ if ($type == "medsup_period_bill") {
     // แถว PR ตรงๆ (จะข้ามขั้นตอนเลือกจาก dropdown "เลือกจาก PR ที่มีอยู่" ในฟอร์ม "เพิ่ม
     // รายการใหม่" ไปโดยไม่ตั้งใจ) ต้องผ่าน dropdown นั้นเท่านั้นถึงจะดึง PR มาทำสัญญาต่อได้
     $wh = " and s.i_enabled = 1 and s.c_contract_code is not null";
+    $wh .= medsupOwnFilter("s"); // user ใครuser มัน (admin เห็นทั้งหมด)
     if ($act == "SEARCH") {
         $wh .= (!empty($_REQUEST['c_contract_code'])) ? " and s.c_contract_code like '%" . $_REQUEST['c_contract_code'] . "%'" : "";
     }
@@ -57,6 +76,7 @@ if ($type == "medsup_period_bill") {
                     , g.sp_tor_period_bill_hdr_id
                     , max(g.sp_tor_contract_id) as sp_tor_contract_id
                     , max(g.sp_tor_id) as sp_tor_id
+                    , max(g.pr_hdr_id) as pr_hdr_id
                     , max(g.sp_tor_hdr_period_id) as sp_tor_hdr_period_id
                     , max(g.c_contract_code) as c_contract_code
                     , max(g.i_period) as i_period
@@ -111,6 +131,8 @@ if ($type == "medsup_period_bill") {
             "sp_tor_period_bill_hdr_id" => intval($row["sp_tor_period_bill_hdr_id"]),
             "sp_tor_contract_id" => intval($row["sp_tor_contract_id"]),
             "sp_tor_id" => intval($row["sp_tor_id"]),
+            // PR ต้นทาง (sp_tor_period_bill_hdr_id ของแถว PR) ที่สัญญานี้เลือกมาทำต่อ - ใช้จองเงินขั้นสัญญา
+            "pr_hdr_id" => empty($row["pr_hdr_id"]) ? "" : intval($row["pr_hdr_id"]),
             "sp_tor_hdr_period_id" => intval($row["sp_tor_hdr_period_id"]),
             "c_contract_code" => $row["c_contract_code"],
             "i_period" => intval($row["i_period"]),
@@ -161,6 +183,19 @@ if ($type == "medsup_period_bill") {
         ${$root}[] = $temp;
     }
 
+    // สัญญาที่นำเข้าจากไฟล์และระบบ ERP เวชภัณฑ์จองเงินไว้แล้ว - เช็คสดจากระบบงบต่อแหล่งเงิน (ว่าง =
+    // ไม่มี) หน้าจอใช้แสดงสถานะ + ซ่อนปุ่มจองเงินไม่ให้จองซ้ำ (ทำหลังอ่านแถวหลักครบแล้ว)
+    foreach (${$root} as $i => $temp) {
+        foreach (array("", "2", "3") as $sfx) {
+            $erp = empty($temp["bg_reserve_money_id" . $sfx])
+                ? medSupErpReserve($db, $temp["sp_tor_period_bill_hdr_id"], $temp["dc_expense_budget_type_id" . $sfx])
+                : null;
+            ${$root}[$i]["erp_reserve_status" . $sfx] = $erp
+                ? $erp["text"] . (empty($erp["date"]) ? "" : " เมื่อ " . $date->extDateBuddha($erp["date"]))
+                : "";
+        }
+    }
+
     $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
     $totalCount = $db->GetDataBySQL($sqlCount, array());
     echo json_encode(array("totalCount" => $totalCount, $root => ${$root}));
@@ -174,6 +209,7 @@ if ($type == "medsup_period_bill") {
     // (เวชภัณฑ์)" ก่อนเสมอ ถึงจะมีงวด/เอกสารให้ "ส่งมอบงาน" จริง (เหมือนที่แก้ไปแล้วกับ
     // type=medsup_period_bill ของกริดหลักฝั่งบันทึกรายละเอียดในสัญญา)
     $wh = " and s.i_enabled = 1 and s.c_contract_code is not null";
+    $wh .= medsupOwnFilter("s"); // user ใครuser มัน (admin เห็นทั้งหมด)
     if ($act == "SEARCH") {
         $wh .= (!empty($_REQUEST['c_contract_code'])) ? " and s.c_contract_code like '%" . $_REQUEST['c_contract_code'] . "%'" : "";
     }
@@ -307,6 +343,12 @@ if ($type == "medsup_period_bill") {
                     , convert(varchar, d_ir_issue, 120) as d_ir_issue
                     , c_ap_code
                     , convert(varchar, d_ap_issue, 120) as d_ap_issue
+                    , c_erp_stock_code
+                    , draft_f_total_vat, draft_b_vat, draft_f_vat_percent
+                    , draft_b_wht, draft_f_wht_percent, draft_f_penalty
+                    , draft_b_guarantee, draft_f_guarantee_percent, draft_f_other
+                    , draft_f_vat_amt, draft_f_wht_amt
+                    , b_ir_confirm, b_ap_unlock
                 from NMU_ERP.dbo.sp_tor_period_bill_receive
                 where sp_tor_period_bill_id = ? and i_enabled = 1
                 order by sp_tor_period_bill_receive_id";
@@ -324,9 +366,31 @@ if ($type == "medsup_period_bill") {
             "d_ir_issue" => empty($row["d_ir_issue"]) ? "" : $date->extDateBuddha($row["d_ir_issue"]),
             "c_ap_code" => $row["c_ap_code"],
             "d_ap_issue" => empty($row["d_ap_issue"]) ? "" : $date->extDateBuddha($row["d_ap_issue"]),
+            "c_erp_stock_code" => $row["c_erp_stock_code"],
+            "draft_f_total_vat" => is_null($row["draft_f_total_vat"]) ? "" : number_format($row["draft_f_total_vat"], 2),
+            "draft_b_vat" => intval($row["draft_b_vat"]),
+            "draft_f_vat_percent" => $row["draft_f_vat_percent"],
+            "draft_b_wht" => intval($row["draft_b_wht"]),
+            "draft_f_wht_percent" => $row["draft_f_wht_percent"],
+            "draft_f_penalty" => is_null($row["draft_f_penalty"]) ? "" : number_format($row["draft_f_penalty"], 2),
+            "draft_b_guarantee" => intval($row["draft_b_guarantee"]),
+            "draft_f_guarantee_percent" => $row["draft_f_guarantee_percent"],
+            "draft_f_other" => is_null($row["draft_f_other"]) ? "" : number_format($row["draft_f_other"], 2),
+            // ไม่ใส่จุลภาคหลักพัน - ค่าถูกเติมลง NumberField ตรงๆ (parseFloat อ่าน "1,070.00" ได้แค่ 1)
+            "draft_f_vat_amt" => is_null($row["draft_f_vat_amt"]) ? "" : number_format($row["draft_f_vat_amt"], 2, ".", ""),
+            "draft_f_wht_amt" => is_null($row["draft_f_wht_amt"]) ? "" : number_format($row["draft_f_wht_amt"], 2, ".", ""),
+            // กด "ยืนยันยอด" ของเลข IR นี้แล้ว (ดู mode CONFIRM_IR)
+            "b_ir_confirm" => intval($row["b_ir_confirm"]),
+            // ผู้ดูแลระบบปลดล็อก IR ที่ออกเลขตรวจรับแล้วให้แก้ได้ (ดู mode UNLOCK_AP)
+            "b_ap_unlock" => intval($row["b_ap_unlock"]),
         );
     }
     echo json_encode(array($root => ${$root}));
+    exit();
+} else if ($type == "medsup_whoami") {
+    // ผู้ใช้ปัจจุบันเป็นผู้ดูแลระบบไหม - ใช้ซ่อน/แสดงเมนู "ปลดล็อกเลขตรวจรับ (Admin)" ที่ ST00095
+    // (เซิร์ฟเวอร์เช็คสิทธิ์ซ้ำเสมอใน mode UNLOCK_AP)
+    echo json_encode(array("is_admin" => medsupIsAdmin()));
     exit();
 } else if ($type == "medsup_ir_pending_ap") {
     // ================= รายการที่ออกเลข IR แล้ว (เมนู "ตรวจรับ (เวชภัณฑ์)") ================= //
@@ -335,6 +399,12 @@ if ($type == "medsup_period_bill") {
     // แล้วในหน้านี้ด้วย ไม่ให้หายไปจากคิว - เดิมกรอง c_ap_code is null ออกไปเลย) คอลัมน์
     // "เลข AP"/"วันที่ออกเลข AP" ในกริดจะโชว์ค่าจริงถ้าออกไปแล้ว หรือว่างถ้ายังไม่ออก
     $wh = " and r.c_ir_code is not null and r.i_enabled = 1";
+    // [ผู้ใช้ยืนยัน] เลข IR ขึ้นหน้านี้ได้ก็ต่อเมื่อกด "ยืนยันยอด" ที่ ST00095 แล้ว (ทุกแถวของ
+    // IR b_ir_confirm = 1 - แถวที่เพิ่ง merge เข้ามา/ถูกล้างสถานะหลังแก้ยอด ทำให้ IR หลุดไปจน
+    // กว่าจะยืนยันใหม่) ยกเว้น IR ที่ออกเลข AP ไปแล้ว ให้ขึ้นเสมอ (ไม่ให้หายจากประวัติ)
+    $wh .= " and (r.c_ap_code is not null or not exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_receive rc
+                where rc.c_ir_code = r.c_ir_code and rc.i_enabled = 1 and isnull(rc.b_ir_confirm, 0) = 0))";
+    $wh .= medsupOwnFilter("g"); // user ใครuser มัน (admin เห็นทั้งหมด)
     // ค้นหาโดยเลขที่สัญญา (ค่าเริ่มต้น) หรือฟิลด์อื่นตามที่เลือกใน "ค้นหาโดย" - เผื่อ
     // ความเข้ากันได้แบบเดิม (SEARCH + c_contract_code) ให้ยังใช้ได้เหมือนเดิมด้วย
     // หมายเหตุ: ST0013 มี "เลขที่ตรวจรับ"/"เลขที่ใบเบิก" ในตัวเลือกนี้ด้วย แต่เมนูนี้ไม่มี
@@ -342,6 +412,7 @@ if ($type == "medsup_period_bill") {
     $searchByColumns = array(
         'c_contract_code' => 'g.c_contract_code',
         'c_ir_code' => 'r.c_ir_code',
+        'c_ap_code' => 'r.c_ap_code', // เลขตรวจรับ (AP) เช่น 50-APMD-2569-000003
         'c_creditor_name' => 'g.c_creditor_name',
         'c_tax_number_imp' => 'g.c_tax_number_imp',
         'c_overlap' => null, // จัดการแยกด้านล่าง (ต้องเช็ค 3 คอลัมน์)
@@ -581,7 +652,13 @@ if ($type == "medsup_period_bill") {
             "f_total_vat" => is_null($row["f_total_vat"]) ? "" : number_format($row["f_total_vat"], 2),
             "b_vat" => intval($row["b_vat"]),
             "f_vat_percent" => $row["f_vat_percent"],
+            // ค่า VAT จริงที่บันทึกไว้ (อาจเป็นค่าที่ user แก้ไขเองทับค่าที่คำนวณได้จาก % ก็
+            // ได้ - ดึงมาเติมตรงๆ แทนที่จะคำนวณใหม่จาก % เสมอ เผื่อ user เคยแก้ไขเองไว้)
+            "f_vat_amt" => is_null($row["f_vat_amt"]) ? "" : number_format($row["f_vat_amt"], 2),
             "f_wht_percent" => $row["f_wht_percent"],
+            // ค่าภาษีหัก ณ ที่จ่ายจริงที่บันทึกไว้ (อาจเป็นค่าที่ user แก้ไขเองทับค่าที่
+            // คำนวณได้จาก % ก็ได้) - ดึงมาเติมตรงๆ เช่นเดียวกับ f_vat_amt
+            "f_wht_amt" => is_null($row["f_wht_amt"]) ? "" : number_format($row["f_wht_amt"], 2),
             "b_wht" => intval($row["b_wht"]),
             "f_penalty" => is_null($row["f_penalty"]) ? "0.00" : number_format($row["f_penalty"], 2),
             "b_guarantee" => intval($row["b_guarantee"]),
@@ -593,8 +670,40 @@ if ($type == "medsup_period_bill") {
             "i_budget_year_ref" => empty($row["i_budget_year_ref"]) ? "" : intval($row["i_budget_year_ref"]),
             "c_item_name" => $row["c_item_name"],
         );
+    } else {
+        // ยังไม่เคยบันทึกรายละเอียดตรวจรับจริงเลย - ใช้ "ร่าง" VAT ที่กรอกไว้ที่เมนู
+        // "ส่งมอบงาน (เวชภัณฑ์)" (ST00095 - ดู mode SAVE_VAT_DRAFT) ร่างเก็บแยกรายการ
+        // (ผู้ใช้ยืนยัน) ยอดของเลข IR = ผลรวมทุกรายการใน IR นี้ (medsupIrMoney) ฟอร์มฝั่ง
+        // JS รับ response รูปแบบเดียวกับตอนเจอ checking จริง - ไม่มีรายการไหนมีร่างเลย
+        // ไม่คืนแถว (JS คิดค่าเริ่มต้นจาก % เอง)
+        $m = medsupIrMoney($db, $_REQUEST['c_ir_code'] ?? null);
+        if ($m !== null && $m["has_draft"]) {
+            ${$root}[] = array(
+                "c_ir_code" => $_REQUEST['c_ir_code'] ?? null,
+                "f_total_vat" => number_format($m["f_total_vat"], 2, ".", ""),
+                "b_vat" => intval($m["b_vat"]),
+                "f_vat_percent" => $m["f_vat_percent"],
+                "b_wht" => intval($m["b_wht"]),
+                "f_wht_percent" => $m["f_wht_percent"],
+                "f_penalty" => number_format($m["f_penalty"], 2, ".", ""),
+                "b_guarantee" => intval($m["b_guarantee"]),
+                "f_guarantee_percent" => $m["f_guarantee_percent"],
+                "f_other" => number_format($m["f_other"], 2, ".", ""),
+                "f_vat_amt" => number_format($m["f_vat_amt"], 2, ".", ""),
+                "f_wht_amt" => number_format($m["f_wht_amt"], 2, ".", ""),
+            );
+        }
     }
-    echo json_encode(array($root => ${$root}));
+    // เตือนล่วงหน้าตั้งแต่เปิดฟอร์มตรวจรับ ถ้ายอดเงินของ IR ยังไม่ผ่านเงื่อนไขออกเลข AP
+    // (เงื่อนไขเดียวกับที่เช็คจริงตอนบันทึก - ดู medsupIrVatCheck) "" = ผ่าน
+    $irForCheck = $_REQUEST['c_ir_code'] ?? null;
+    if ($row) {
+        $vatWarning = medsupIrVatCheck($db, $irForCheck, $row["f_total_vat"] ?? 0, $row["f_vat_amt"] ?? 0, $row["f_wht_amt"] ?? 0);
+    } else {
+        $mChk = medsupIrMoney($db, $irForCheck);
+        $vatWarning = $mChk === null ? "" : medsupIrVatCheck($db, $irForCheck, $mChk["f_total_vat"], $mChk["f_vat_amt"], $mChk["f_wht_amt"]);
+    }
+    echo json_encode(array($root => ${$root}, "vat_warning" => $vatWarning));
     exit();
 } else if ($type == "medsup_pr_list") {
     // ================= รายการ PR ที่ยังไม่ผูกสัญญา (เมนู "การจัดทำ PR (หน่วยงาน)
@@ -603,6 +712,7 @@ if ($type == "medsup_period_bill") {
     // สัญญาจริง) พอเมนู "บันทึกรายละเอียดในสัญญา (เวชภัณฑ์)" เลือกไปทำสัญญาต่อแล้ว
     // c_contract_code จะถูกเติมทับ แถวนั้นก็จะหลุดออกจากรายการนี้ไปเอง
     $wh = " and s.i_enabled = 1 and s.c_contract_code is null";
+    $wh .= medsupOwnFilter("s"); // user ใครuser มัน (admin เห็นทั้งหมด)
     if ($act == "SEARCH") {
         $wh .= (!empty($_REQUEST['c_project_name'])) ? " and s.c_project_name like '%" . $_REQUEST['c_project_name'] . "%'" : "";
     }
@@ -618,6 +728,9 @@ if ($type == "medsup_period_bill") {
                     , s.dc_expense_budget_type_id3, s.c_fund_source3, s.f_fund_amt3, s.i_pr_type3
                     , s.i_purchase, s.i_product_type
                     , s.c_pr_doc_ref, convert(varchar, s.d_pr_doc_ref, 120) as d_pr_doc_ref
+                    , s.bg_reserve_money_id, convert(varchar, s.d_ap_reserve, 120) as d_ap_reserve
+                    , s.bg_reserve_money_id2, convert(varchar, s.d_ap_reserve2, 120) as d_ap_reserve2
+                    , s.bg_reserve_money_id3, convert(varchar, s.d_ap_reserve3, 120) as d_ap_reserve3
                     , convert(varchar, s.d_create, 120) as d_create
                     , (select top 1 c_full_name from dbo.dc_user where dc_user_id = s.dc_user_create_id) as c_create_name
                 from NMU_ERP.dbo.sp_tor_period_bill s
@@ -656,6 +769,13 @@ if ($type == "medsup_period_bill") {
             "i_product_type" => isset($row["i_product_type"]) ? intval($row["i_product_type"]) : null,
             "c_pr_doc_ref" => $row["c_pr_doc_ref"],
             "d_pr_doc_ref" => empty($row["d_pr_doc_ref"]) ? "" : $date->extDateBuddha($row["d_pr_doc_ref"]),
+            // สถานะจองเงินขั้น PR ต่อแหล่งเงิน (ว่าง = ยังไม่ได้จอง)
+            "bg_reserve_money_id" => is_null($row["bg_reserve_money_id"]) ? "" : $row["bg_reserve_money_id"],
+            "d_ap_reserve" => empty($row["d_ap_reserve"]) ? "" : $date->extDateBuddha($row["d_ap_reserve"]),
+            "bg_reserve_money_id2" => is_null($row["bg_reserve_money_id2"]) ? "" : $row["bg_reserve_money_id2"],
+            "d_ap_reserve2" => empty($row["d_ap_reserve2"]) ? "" : $date->extDateBuddha($row["d_ap_reserve2"]),
+            "bg_reserve_money_id3" => is_null($row["bg_reserve_money_id3"]) ? "" : $row["bg_reserve_money_id3"],
+            "d_ap_reserve3" => empty($row["d_ap_reserve3"]) ? "" : $date->extDateBuddha($row["d_ap_reserve3"]),
             "d_create" => $row["d_create"],
             "c_create_name" => $row["c_create_name"],
         );

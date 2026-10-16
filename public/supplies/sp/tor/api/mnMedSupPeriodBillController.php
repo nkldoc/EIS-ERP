@@ -12,44 +12,21 @@ $util = new apiUtil();
 // การแพทย์โดยเฉพาะ (dc_cost_id=82) ไม่ว่าใครจะเป็นคนล็อกอินเข้ามาบันทึกแทนก็ตาม
 define("MEDSUP_DC_COST_ID", 82);
 
-// เลขที่สัญญาอัตโนมัติ - ใช้เฉพาะตอนผู้ใช้ปล่อยช่อง "เลขที่สัญญา" ว่างไว้ (มีเลขที่ของ
-// ตัวเองอยู่แล้วก็กรอกเองได้ตามเดิม) รูปแบบ "{prefix}{เลขรัน 4 หลัก}/{ปีงบประมาณ พ.ศ.}"
-// prefix ตามประเภทหน่วยงาน (c_ap_dept_type) - รันเลขแยกชุดกันทั้งต่อประเภทและต่อปี
-// งบประมาณ (ภ./พ./ว. คนละชุดเลข และขึ้นปีงบใหม่ก็เริ่มนับ 0001 ใหม่ ตามที่ผู้ใช้ยืนยัน)
-// ปีงบประมาณไทยเริ่ม 1 ต.ค. - เดือน ต.ค.-ธ.ค. ถือเป็นปีงบถัดไปแล้ว
-function medsupGenContractCode($db, $deptType)
-{
-    $prefixMap = array(
-        "APPS" => "พวช.พ.",
-        "APMD" => "พวช.ภ.",
-        "APMS" => "พวช.ว.",
-    );
-    $prefix = $prefixMap[$deptType] ?? "พวช.";
-
-    $now = new DateTime();
-    $yearBE = intval($now->format("Y")) + 543;
-    $fiscalYear = (intval($now->format("n")) >= 10) ? $yearBE + 1 : $yearBE;
-    $suffix = "/{$fiscalYear}";
-
-    $stmt = $db->QueryParam(
-        "SELECT c_contract_code FROM NMU_ERP.dbo.sp_tor_period_bill
-          WHERE c_contract_code LIKE ? AND c_contract_code LIKE ?",
-        array($prefix . '%', '%' . $suffix)
-    );
-    $maxNum = 0;
-    while ($row = $db->Fetch($stmt)) {
-        $middle = substr($row["c_contract_code"], strlen($prefix), -strlen($suffix));
-        if (ctype_digit($middle)) {
-            $maxNum = max($maxNum, intval($middle));
-        }
-    }
-
-    return $prefix . str_pad($maxNum + 1, 4, '0', STR_PAD_LEFT) . $suffix;
-}
+// เลขที่สัญญาอัตโนมัติ (medsupGenContractCode) - ย้ายไปไฟล์กลางให้เมนูนำเข้าสัญญาจาก
+// Excel (ST00097) ใช้เลขรันชุดเดียวกัน
+include(__DIR__ . "/medsupContractCode.php");
 
 $mode = $_REQUEST["mode"] ?? null;
 $data = $util->mnUser($_REQUEST);
 $data["i_enabled"] = 1;
+
+// ช่อง "เลขที่สัญญา" (combo) ส่งค่ามาในชื่อ sp_tor_contract_id ซึ่งเป็นคอลัมน์ตัวเลข (bigint) แต่ถ้าเป็นสัญญาที่
+// พิมพ์เลขที่เอง/เปิดแก้ไขจากแถวที่บันทึกไว้ ค่าที่ส่งมาจะเป็น "ข้อความเลขที่สัญญา" (เช่น พวช.ว.0001/2569) แทน
+// เลข id - ทำให้ SQL error "Error converting data type nvarchar to bigint" ตอนบันทึก ต้องไม่ใช่ตัวเลขล้วนถึงทิ้ง
+// (ตอนแก้ไข UPDATE ด้านล่างจะคงค่า id เดิมของแถวไว้ให้ ไม่ทำให้สัญญาที่ผูกกับ ERP หลุด)
+if (isset($data["sp_tor_contract_id"]) && $data["sp_tor_contract_id"] !== "" && !ctype_digit(strval($data["sp_tor_contract_id"]))) {
+    $data["sp_tor_contract_id"] = null;
+}
 
 // ฟิลด์หัวเรื่อง (ชื่อโครงการ/ปีงบ/PO/ผู้ขาย/วันที่เริ่ม-สิ้นสุดสัญญา) กรอกเองได้แล้ว
 // (รองรับกรณีคีย์สัญญาใหม่ที่ยังไม่มีในระบบ) วันที่ต้องแปลง พ.ศ.->ค.ศ. ก่อนเก็บ
@@ -274,12 +251,19 @@ switch ($mode) {
             exit;
         }
         $lockCheck = $db->GetDataBySQL(
-            "SELECT c_contract_code FROM NMU_ERP.dbo.sp_tor_period_bill WHERE sp_tor_period_bill_id = ? AND i_enabled = 1",
+            "SELECT c_contract_code, isnull(bg_reserve_money_id, 0) + isnull(bg_reserve_money_id2, 0) + isnull(bg_reserve_money_id3, 0) AS reserved_sum
+               FROM NMU_ERP.dbo.sp_tor_period_bill WHERE sp_tor_period_bill_id = ? AND i_enabled = 1",
             array($editPeriodBillId)
         );
         if (!is_array($lockCheck)) {
             http_response_code(200);
             echo json_encode(["success" => false, "reval" => 1, "msg" => "ไม่พบรายการที่จะแก้ไข"]);
+            $db->RollBackTran();
+            exit;
+        }
+        if (intval($lockCheck["reserved_sum"] ?? 0) !== 0) {
+            http_response_code(200);
+            echo json_encode(["success" => false, "reval" => 1, "msg" => "PR นี้จองเงินแล้ว แก้ไขไม่ได้ กรุณายกเลิกการจองเงินก่อน แล้วจึงแก้ไข"]);
             $db->RollBackTran();
             exit;
         }
@@ -346,12 +330,17 @@ switch ($mode) {
             "select top 1 bg_reserve_money_id, c_ap_arrive_code, d_ap_reserve
                   , bg_reserve_money_id2, c_ap_arrive_code2, d_ap_reserve2
                   , bg_reserve_money_id3, c_ap_arrive_code3, d_ap_reserve3
-                  , c_ap_api_response
+                  , c_ap_api_response, pr_hdr_id, sp_tor_contract_id
+                  , pr_bg_reserve_money_id, pr_bg_reserve_money_id2, pr_bg_reserve_money_id3
               from NMU_ERP.dbo.sp_tor_period_bill
               where sp_tor_period_bill_hdr_id = ? and i_enabled = 1",
             array($_REQUEST["sp_tor_period_bill_hdr_id"])
         );
         $reserveRow = $db->Fetch($stmtReserve);
+        // ฟอร์มส่ง id สัญญามาเป็นข้อความ (ถูกทิ้งด้านบน) - คงค่า id เดิมของแถวไว้
+        if (empty($data["sp_tor_contract_id"]) && !empty($reserveRow["sp_tor_contract_id"])) {
+            $data["sp_tor_contract_id"] = $reserveRow["sp_tor_contract_id"];
+        }
 
         // ไม่ได้กรอกเลขที่สัญญาเอง - ออกเลขที่ให้อัตโนมัติตามประเภทหน่วยงานที่เลือก
         // (เกิดขึ้นได้ตอนกรอกรายละเอียดสัญญาต่อจากแถว PR เดิมที่ยังไม่เคยมีเลขที่สัญญา)
@@ -376,6 +365,13 @@ switch ($mode) {
             $data["c_ap_arrive_code3"] = $reserveRow["c_ap_arrive_code3"];
             $data["d_ap_reserve3"] = $reserveRow["d_ap_reserve3"];
             $data["c_ap_api_response"] = $reserveRow["c_ap_api_response"];
+            $data["pr_bg_reserve_money_id"] = $reserveRow["pr_bg_reserve_money_id"];
+            $data["pr_bg_reserve_money_id2"] = $reserveRow["pr_bg_reserve_money_id2"];
+            $data["pr_bg_reserve_money_id3"] = $reserveRow["pr_bg_reserve_money_id3"];
+            // PR ต้นทางของสัญญา (ใช้จองเงินขั้นสัญญา) - ถ้าฟอร์มไม่ได้ส่งมา คงค่าเดิมไว้
+            if (empty($data["pr_hdr_id"]) && !empty($reserveRow["pr_hdr_id"])) {
+                $data["pr_hdr_id"] = $reserveRow["pr_hdr_id"];
+            }
         }
 
         foreach ($_REQUEST["c_doc_ref"] as $k => $val) {
@@ -413,6 +409,18 @@ switch ($mode) {
         // soft delete (ตั้ง i_enabled = 0) แทนการลบถาวร - เผื่อกู้ข้อมูลกลับมาใช้ทีหลัง
         // (ใช้ mode เดียวกันทั้งหน้า "การจัดทำ PR" และ "บันทึกรายละเอียดในสัญญา" - ทุก
         // query LIST ที่อ่านตารางนี้กรอง i_enabled = 1 อยู่แล้ว แถวที่ลบจะหายจากกริดทันที)
+        // ห้ามลบรายการที่ยังจองเงินอยู่ (เงินจะค้างในระบบงบโดยไม่มีรายการอ้างอิง) - ต้องยกเลิกจองก่อน
+        $reservedCheck = intval($db->GetDataBySQL(
+            "select count(*) from NMU_ERP.dbo.sp_tor_period_bill
+              where sp_tor_period_bill_hdr_id = ? and i_enabled = 1
+                and (isnull(bg_reserve_money_id, 0) > 0 or isnull(bg_reserve_money_id2, 0) > 0 or isnull(bg_reserve_money_id3, 0) > 0)",
+            array($_REQUEST["sp_tor_period_bill_hdr_id"] ?? 0)
+        ));
+        if ($reservedCheck > 0) {
+            echo json_encode(array("reval" => 1, "success" => "Error", "msg" => "รายการนี้จองเงินอยู่ กรุณายกเลิกการจองเงินก่อนลบ"));
+            $db->RollBackTran();
+            exit;
+        }
         $sql = "UPDATE NMU_ERP.dbo.sp_tor_period_bill
                 SET i_enabled = 0, dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = GETDATE()
                 WHERE sp_tor_period_bill_hdr_id = ?";
@@ -426,21 +434,23 @@ switch ($mode) {
         // "DataDict api AP" ยิง POST เปลี่ยนแปลงยอดงบประมาณจริงของมหาวิทยาลัย
         $db->CommitTran();
         $db = null;
+        // level: "pr" = จองขั้น PR (i_reserve 1) จากเมนูการจัดทำ PR / "contract" (ค่าเริ่มต้น) =
+        // จองขั้นสัญญา (i_reserve 2) จากเมนู ST00092 ซึ่งต้องมี PR ที่จองไว้แล้วก่อน (ตาม ERP)
         echo json_encode(reserveMedSupFundSource(
             $_REQUEST["sp_tor_period_bill_hdr_id"] ?? null,
-            intval($_REQUEST["slot"] ?? 0)
+            intval($_REQUEST["slot"] ?? 0),
+            (($_REQUEST["level"] ?? "contract") === "pr") ? "pr" : "contract"
         ));
         exit;
 
     case "CANCEL_RESERVE_FUND_SOURCE":
-        // ยกเลิกการจองเงิน - AP-API ยังไม่มีข้อมูล spec ของ endpoint/payload ฝั่ง
-        // ยกเลิก (ไม่มีตัวอย่างใน spreadsheet) จึงยังไม่เชื่อมต่อจริง เพื่อกันการยิง
-        // คำขอที่เดาเอาเองไปกระทบงบประมาณจริงของมหาวิทยาลัย
-        $db->RollBackTran();
-        echo json_encode(array(
-            "reval" => 1,
-            "success" => "Error",
-            "msg" => "ยังไม่มีข้อมูล API สำหรับยกเลิกการจองเงิน กรุณาติดต่อผู้ดูแลระบบงบประมาณเพื่อขอรายละเอียด endpoint/รูปแบบข้อมูลก่อน",
+        // ยกเลิกการจองเงิน - ใช้ลิงก์เดิมของ ERP (torUi.js cancelBookingPr):
+        // IPAPIBG/?/bg/mn_BgReserveMoney/mode/PUT/bg_reserve_money_id/{id}/i_enable/2
+        $db->CommitTran();
+        $db = null;
+        echo json_encode(cancelMedSupFundSource(
+            $_REQUEST["sp_tor_period_bill_hdr_id"] ?? null,
+            intval($_REQUEST["slot"] ?? 0)
         ));
         exit;
 
@@ -460,10 +470,18 @@ if ($stmt) {
 echo json_encode($re);
 exit;
 
-// ================= จองเงินงบประมาณจริงต่อแหล่งเงิน (AP-API) ================= //
+// ================= จองเงินงบประมาณจริงต่อแหล่งเงิน (API งบของ ERP เดิม) ================= //
 // จองครั้งเดียวเต็มยอดของแหล่งเงินที่ระบุ (slot 1/2/3) - งวดต่างๆ ภายใต้สัญญานี้เบิกใช้
 // ภายในวงเงินที่จองไว้นี้ได้เรื่อยๆ โดยไม่ต้องจองซ้ำทุกงวด (ตามที่ผู้ใช้ยืนยัน)
-function reserveMedSupFundSource($hdrId, $slot) {
+//
+// ตามระบบ ERP (api-nmu mn_BgReserveMoney.php) การจองมี 2 ขั้น: ขั้น PR (i_reserve 1) ตัดจากงบตรงๆ
+// และขั้นสัญญา (i_reserve 2) ซึ่ง API หักจากยอดที่ PR (pr_id เดียวกัน) จองไว้ - จึงรองรับ 3 กรณี:
+//  1) level "pr"      : จองขั้น PR จากเมนูการจัดทำ PR (pr_id = hdr_id ของ PR)
+//  2) level "contract" + สัญญาผูก PR (pr_hdr_id) ที่จองแล้ว : จองขั้นสัญญาต่อจาก PR นั้น
+//  3) level "contract" + ไม่ได้ผูก PR : จองที่หน้าสัญญาได้เลยโดยไม่ต้องจอง PR ก่อน - ระบบจองขั้น PR
+//     ให้อัตโนมัติด้วย pr_id = hdr_id ของสัญญาเอง (เก็บเลขอ้างอิงที่ pr_bg_reserve_money_id[n]) แล้วจอง
+//     ขั้นสัญญาต่อทันที ถ้าขั้นสัญญาไม่สำเร็จจะยกเลิกขั้น PR ที่เพิ่งจองคืนให้เอง (ไม่ทิ้งเงินค้าง)
+function reserveMedSupFundSource($hdrId, $slot, $level = "contract") {
     $db2 = new DatabaseServer();
 
     if (empty($hdrId) || !in_array($slot, array(1, 2, 3), true)) {
@@ -471,23 +489,17 @@ function reserveMedSupFundSource($hdrId, $slot) {
     }
 
     $suffix = $slot === 1 ? "" : strval($slot);
-    $col = function ($base) use ($suffix) {
-        return $base . $suffix;
-    };
-
     $stmt2 = $db2->QueryParam(
-        "select top 1 sp_tor_period_bill_hdr_id, sp_tor_id, sp_tor_contract_id
-              , c_contract_code, c_contract_type
-              , convert(varchar, d_start_date, 120) as d_start_date
-              , convert(varchar, d_end_date, 120) as d_end_date
-              , i_budget_year, po_expense_id, c_expense_name
-              , dc_cost_id, c_tax_number_imp, dc_creditor_id, c_creditor_name
+        "select top 1 sp_tor_period_bill_hdr_id, sp_tor_contract_id
+              , c_contract_code, c_contract_type, c_pr_code
+              , i_budget_year, po_expense_id, c_expense_name, i_pr_type, i_pr_type2, i_pr_type3
+              , dc_cost_id, c_ap_dept_type, pr_hdr_id
               , dc_expense_budget_type_id as fs1_id, c_fund_source as fs1_name, f_fund_amt as fs1_amt
-                  , bg_reserve_money_id as fs1_reserved, c_overlap as fs1_overlap, i_budget_year_overlap as fs1_overlap_year
+                  , bg_reserve_money_id as fs1_reserved, pr_bg_reserve_money_id as fs1_pr_reserved, c_overlap as fs1_overlap
               , dc_expense_budget_type_id2 as fs2_id, c_fund_source2 as fs2_name, f_fund_amt2 as fs2_amt
-                  , bg_reserve_money_id2 as fs2_reserved, c_overlap2 as fs2_overlap, i_budget_year_overlap2 as fs2_overlap_year
+                  , bg_reserve_money_id2 as fs2_reserved, pr_bg_reserve_money_id2 as fs2_pr_reserved, c_overlap2 as fs2_overlap
               , dc_expense_budget_type_id3 as fs3_id, c_fund_source3 as fs3_name, f_fund_amt3 as fs3_amt
-                  , bg_reserve_money_id3 as fs3_reserved, c_overlap3 as fs3_overlap, i_budget_year_overlap3 as fs3_overlap_year
+                  , bg_reserve_money_id3 as fs3_reserved, pr_bg_reserve_money_id3 as fs3_pr_reserved, c_overlap3 as fs3_overlap
           from NMU_ERP.dbo.sp_tor_period_bill
           where sp_tor_period_bill_hdr_id = ? and i_enabled = 1",
         array($hdrId)
@@ -499,128 +511,464 @@ function reserveMedSupFundSource($hdrId, $slot) {
     }
 
     $fundId = $row["fs{$slot}_id"];
-    $fundName = $row["fs{$slot}_name"];
     $fundAmt = $row["fs{$slot}_amt"];
-    $alreadyReserved = $row["fs{$slot}_reserved"];
-    // ถ้าแหล่งเงินนี้เลือกไว้เป็น "กันเหลื่อม" (มีเลขที่ใบกันเหลื่อมบันทึกไว้) ให้ส่งเลข
-    // ที่ใบกัน/ปีงบประมาณของใบกันนั้นไปให้ AP-API แทนค่าว่าง (ปีต่อปี)
+    // ถ้าแหล่งเงินนี้เลือกไว้เป็น "กันเหลื่อม" (มีเลขที่ใบกันเหลื่อมบันทึกไว้) ให้ส่งเลขที่ใบกัน
     $fundOverlap = $row["fs{$slot}_overlap"];
-    $fundOverlapYear = $row["fs{$slot}_overlap_year"];
 
     if (empty($fundId) || empty($fundAmt)) {
         return array("reval" => 1, "success" => "Error", "msg" => "ยังไม่ได้เลือกแหล่งเงินที่ {$slot} หรือยังไม่ได้กรอกจำนวนเงิน");
     }
-    if (!empty($alreadyReserved)) {
+    if (!empty($row["fs{$slot}_reserved"])) {
         return array("reval" => 1, "success" => "Error", "msg" => "แหล่งเงินที่ {$slot} จองเงินไปแล้ว");
     }
+    // สัญญาที่นำเข้าจากไฟล์และระบบ ERP เวชภัณฑ์จองเงินไว้ในระบบงบแล้ว - ห้ามจองซ้ำจากเมนูนี้
+    include_once(__DIR__ . "/medSupErpReserve.php");
+    $erpReserve = medSupErpReserve($db2, $row["sp_tor_period_bill_hdr_id"], $fundId);
+    if ($erpReserve) {
+        return array("reval" => 1, "success" => "Error", "msg" => "แหล่งเงินที่ {$slot} " . $erpReserve["text"] . "<br>ไม่ต้องจองเงินซ้ำจากเมนูนี้");
+    }
 
-    // ถ้าสัญญานี้ไม่มี id จริงในระบบเรา (พิมพ์เลขที่สัญญาใหม่เอง ยังไม่เคยผูกกับ PR/สัญญา
-    // เดิม) ให้ใช้ id ของเราเอง (sp_tor_period_bill_hdr_id) แทนส่งไปให้ AP-API ก่อน
-    $prId = !empty($row["sp_tor_id"]) ? $row["sp_tor_id"] : $row["sp_tor_period_bill_hdr_id"];
-    $poId = !empty($row["sp_tor_contract_id"]) ? $row["sp_tor_contract_id"] : $row["sp_tor_period_bill_hdr_id"];
+    $ownHdrId = intval($row["sp_tor_period_bill_hdr_id"]);
+    $prRow = null;
+    $autoChain = false;
+    if ($level === "pr") {
+        $prId = medSupBgPrId($row["c_pr_code"] ?? null, $ownHdrId);
+    } else {
+        $prHdrId = intval($row["pr_hdr_id"] ?? 0);
+        if ($prHdrId > 0) {
+            // กรณี 2: ผูก PR แล้ว - PR ต้องจองแหล่งเงินเดียวกับสัญญานี้ไว้แล้ว
+            $stmtPr = $db2->QueryParam(
+                "select top 1 c_pr_code, c_ap_dept_type, dc_cost_id, i_budget_year, po_expense_id
+                      , dc_expense_budget_type_id as fs1_id, bg_reserve_money_id as fs1_reserved
+                      , dc_expense_budget_type_id2 as fs2_id, bg_reserve_money_id2 as fs2_reserved
+                      , dc_expense_budget_type_id3 as fs3_id, bg_reserve_money_id3 as fs3_reserved
+                  from NMU_ERP.dbo.sp_tor_period_bill
+                 where sp_tor_period_bill_hdr_id = ? and i_enabled = 1",
+                array($prHdrId)
+            );
+            $prRow = $db2->Fetch($stmtPr);
+            if (empty($prRow)) {
+                return array("reval" => 1, "success" => "Error", "msg" => "ไม่พบ PR ต้นทางของสัญญานี้ (อาจถูกลบไปแล้ว)");
+            }
+            $prReservedSlot = 0;
+            foreach (array(1, 2, 3) as $n) {
+                if (intval($prRow["fs{$n}_id"]) === intval($fundId) && intval($prRow["fs{$n}_reserved"]) > 0) {
+                    $prReservedSlot = $n;
+                    break;
+                }
+            }
+            if ($prReservedSlot === 0) {
+                return array("reval" => 1, "success" => "Error", "msg" => "PR ที่เลือกไว้ยังไม่ได้จองเงินแหล่งเงินนี้<br>กรุณาจองเงินที่ PR นั้นก่อน หรือเปิดสัญญาใหม่โดยไม่เลือก PR (ระบบจะจองให้ที่หน้านี้เลย)");
+            }
+            $prId = medSupBgPrId($prRow["c_pr_code"] ?? null, $prHdrId);
+        } else {
+            // กรณี 3: ไม่ผูก PR - รองรับผู้ใช้ที่ทำสัญญาแล้วจองเงินที่หน้าสัญญาเลยโดยไม่ออกเลข PR:
+            // จองขั้น PR (แค่รายการภายในระบบงบ ไม่สร้างแถว/เลข PR ในระบบเรา) + ขั้นสัญญาต่อเนื่อง
+            // เพราะ API บังคับว่าขั้นสัญญาต้องมีขั้น PR ของ pr_id เดียวกันอยู่ก่อน - ส่วนผู้ใช้ที่ทำ PR
+            // ก่อนก็ใช้กรณี 2 (เลือก PR ที่จองแล้ว) ได้ตามปกติ ปิดกรณีนี้ได้ด้วย $allowAutoChain = false
+            $allowAutoChain = true;
+            if (!$allowAutoChain) {
+                return array("reval" => 1, "success" => "Error", "msg" => "สัญญานี้ยังไม่ได้ผูกกับ PR ที่จองเงินแล้ว<br>กรุณาจองเงินที่เมนู \"การจัดทำ PR (หน่วยงาน) เวชภัณฑ์\" ก่อน แล้วเปิดสัญญาใหม่โดยเลือก PR นั้นในช่อง \"เลือกจาก PR ที่มีอยู่\"");
+            }
+            $autoChain = true;
+            $prId = medSupBgPrId(null, $ownHdrId);
+        }
+    }
+    $poId = !empty($row["sp_tor_contract_id"]) ? intval($row["sp_tor_contract_id"]) : $ownHdrId;
 
-    $userId = $_SESSION["user_id"] ?? null;
-    $userName = $db2->GetDataBySQL("select top 1 c_full_name from dbo.dc_user where dc_user_id = ?", array($userId));
-
-    $payload = array(
-        "username" => AP_EIS_API_USER,
-        "password" => AP_EIS_API_PASS,
-        "data" => array(
-            array(
-                "pr_id" => intval($prId),
-                "po_id" => intval($poId),
-                // ไม่ผูกกับงวดใดงวดหนึ่งแล้ว (จองระดับแหล่งเงิน/สัญญา) - ส่ง 0 เหมือน
-                // แนวทาง "0 = ทั้งหมด" ที่ dict ใช้กับ bg_expense_id
-                "period_id" => 0,
-                "chk_id" => 0,
-                "c_contract_code" => $row["c_contract_code"],
-                "d_start_date" => empty($row["d_start_date"]) ? null : date("Y-m-d", strtotime($row["d_start_date"])),
-                // ยังไม่มีฟิลด์ "วันที่สัญญามีผล" แยกในฟอร์ม - ใช้วันที่เริ่มสัญญาแทนไปก่อน
-                "d_contract_start_date" => empty($row["d_start_date"]) ? null : date("Y-m-d", strtotime($row["d_start_date"])),
-                "d_end_date" => empty($row["d_end_date"]) ? null : date("Y-m-d", strtotime($row["d_end_date"])),
-                "i_period" => 0,
-                "f_period_amt" => floatval(str_replace(",", "", $fundAmt)),
-                "bg_expense_id" => intval($row["po_expense_id"]),
-                "bg_expense_name" => $row["c_expense_name"],
-                "dc_expense_budget_type_id" => intval($fundId),
-                "dc_expense_budget_type_name" => $fundName,
-                // ประเภท "จัดซื้อจะขาย" ใช้เป็นวงเงินหมุนเวียนได้เรื่อยๆ ไม่ปิดยอด/ไม่คืน
-                // เงินคงเหลือ (จำกัดแค่ไม่เกินยอดแหล่งเงินที่ระบุ) ส่วนประเภทอื่นถือว่า
-                // จองครั้งนี้ครั้งเดียวครบยอดตามที่กรอกเลย
-                "i_is_last" => ($row["c_contract_type"] === "จัดซื้อจะขาย") ? 0 : 1,
-                "i_product_type" => 1,
-                "dc_cost_id" => intval($row["dc_cost_id"]),
-                "c_tax_number_imp" => $row["c_tax_number_imp"],
-                "dc_creditor_id" => intval($row["dc_creditor_id"]),
-                "dc_creditor_idTxt" => $row["c_creditor_name"],
-                "i_budget_year" => strval($row["i_budget_year"]),
-                "i_budget_year_overlap" => empty($fundOverlap) ? "" : strval($fundOverlapYear),
-                // จองที่ระดับแหล่งเงิน/สัญญา ยังไม่มีเอกสารรับของที่เจาะจง (จะเกิดทีหลัง
-                // ตอนบันทึกแต่ละงวด) จึงยังไม่มีเลขที่รับของ/วันที่รับของให้ส่ง
-                "c_arrive_code" => null,
-                "d_arrive_date" => null,
-                "c_doc_ref" => null,
-                "user_id" => intval($userId),
-                "user_name" => $userName,
-                "c_overlap" => empty($fundOverlap) ? "" : $fundOverlap,
-                "line_ids" => array(),
-            ),
-        ),
+    $apDeptCostMap = array("APPS" => 38, "APMD" => 50, "APMS" => 82);
+    $iPrType = intval($row["i_pr_type{$suffix}"] ?? 1);
+    if ($iPrType < 1) {
+        $iPrType = 1;
+    }
+    $src = $prRow ? $prRow : $row; // ขั้นสัญญาที่ผูก PR ใช้ค่าของ PR ต้นทาง (API จับคู่ยอดจากค่าเหล่านี้)
+    $yearRaw = intval($src["i_budget_year"]);
+    $baseParams = array(
+        "i_sys" => 1,
+        "pr_id" => intval($prId),
+        "po_id" => 0,
+        "chk_id" => 0,
+        // ระบบงบใช้ปีงบประมาณเป็น ค.ศ. (ปีงบ 2569 = 2026) แต่บางรายการเก็บเป็น พ.ศ. จึงแปลงให้เสมอ
+        "i_year" => $yearRaw > 2400 ? $yearRaw - 543 : $yearRaw,
+        "i_pr_type" => $iPrType, // 1 = แบบแผน / 2 = แบบงวด
+        "i_reserve" => 1,
+        // งบผูกกับหน่วยงานตาม "ประเภท" ของรายการ (APPS พัสดุ=38 / APMD เภสัช=50 / APMS เวชภัณฑ์=82)
+        // ห้ามใช้ dc_cost_id ที่เก็บในแถว (เมนูนี้เก็บ 82 คงที่) - งบค่ายา/เวชภัณฑ์ 133 แหล่งเงิน กทม.
+        // ปี 2026 อยู่ใต้หน่วยงาน 50 เท่านั้น
+        "dc_cost_id" => ($apDeptCostMap[$src["c_ap_dept_type"] ?? ""] ?? intval($src["dc_cost_id"])),
+        "dc_budget_type_id" => intval($fundId),
+        "bg_expense_id" => intval($src["po_expense_id"]),
+        // "จัดซื้อจะขาย" ใช้วงเงินหมุนเวียน ไม่ปิดยอด (i_last = 0) ประเภทอื่นจองครบยอดครั้งเดียว
+        "i_last" => ($row["c_contract_type"] === "จัดซื้อจะขาย") ? 0 : 1,
     );
+    if (!empty($fundOverlap)) {
+        $baseParams["c_code_overlap"] = $fundOverlap; // กันเหลื่อม: ส่งเลขที่ใบกันแบบเดียวกับ contractOverlap.js
+    }
+    $baseParams["f_amt"] = number_format(floatval(str_replace(",", "", $fundAmt)), 2, ".", "");
 
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, AP_EIS_API_URL);
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array("Content-Type: application/json"));
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    $responseBody = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlErr = curl_error($ch);
-    curl_close($ch);
+    $reserveCol = "bg_reserve_money_id" . $suffix;
+    $arriveCol = "c_ap_arrive_code" . $suffix;
+    $dateCol = "d_ap_reserve" . $suffix;
+    $prReserveCol = "pr_bg_reserve_money_id" . $suffix;
 
-    if ($curlErr) {
-        return array("reval" => 1, "success" => "Error", "msg" => "เชื่อมต่อ AP-API ไม่สำเร็จ: " . $curlErr);
+    // ขั้น PR (กรณี 1 และขั้นแรกของกรณี 3) ตัดจากงบตรงๆ จึงเช็กเงินคงเหลือก่อน (เหมือนเมนู PR เดิม
+    // torUi.js genBooklink) - ไม่พอให้แจ้งเตือนติดต่อฝ่ายการคลัง (ถ้าเช็กไม่ได้ ให้ API ตอบเอง)
+    if ($level === "pr" || $autoChain) {
+        $precheck = medSupBudgetPrecheck($baseParams, array(
+            "dept" => array(38 => "ฝ่ายพัสดุ", 50 => "ฝ่ายเภสัชกรรม", 82 => "งานเวชภัณฑ์ทางการแพทย์")[$baseParams["dc_cost_id"]] ?? "",
+            "fund" => $row["fs{$slot}_name"] ?? "",
+        ));
+        if ($precheck !== null) {
+            return $precheck;
+        }
     }
 
-    // เก็บ raw response ไว้เสมอเพื่อตรวจสอบ/debug (ไม่ทราบ schema ที่แน่ชัด) - ใส่ทุก
-    // แถวของ hdr นี้เพื่อให้ค่ายังอยู่ครบหลัง UPDATE (ลบ+insert ใหม่) ครั้งถัดไป
+    $links = array();
+
+    // ---- กรณี 1: จองขั้น PR อย่างเดียว ----
+    if ($level === "pr") {
+        $r1 = medSupBgReserveCall($db2, $hdrId, $slot, $baseParams, "pr");
+        $links[] = $r1["link"];
+        if (!$r1["ok"]) {
+            return array("reval" => 1, "success" => "Error", "msg" => $r1["msg"], "sent" => implode("  ➜  ", $links));
+        }
+        $db2->QueryParam(
+            "UPDATE NMU_ERP.dbo.sp_tor_period_bill SET {$reserveCol} = ?, {$arriveCol} = NULL, {$dateCol} = ? WHERE sp_tor_period_bill_hdr_id = ?",
+            array($r1["id"] ?: -1, date("Y-m-d H:i:s"), $hdrId)
+        );
+        return array(
+            "reval" => 0, "success" => "Success", "sent" => implode("  ➜  ", $links),
+            "msg" => $r1["id"] ? "จองเงินแหล่งที่ {$slot} สำเร็จ (รหัสอ้างอิง {$r1["id"]})"
+                : "ส่งข้อมูลจองเงินสำเร็จ แต่ไม่พบเลขอ้างอิงในผลตอบกลับ - กรุณาตรวจสอบกับระบบงบประมาณกลางอีกครั้ง",
+        );
+    }
+
+    // ---- กรณี 3: จองขั้น PR ให้อัตโนมัติก่อน ----
+    $autoPrId = null;
+    if ($autoChain) {
+        $r1 = medSupBgReserveCall($db2, $hdrId, $slot, $baseParams, "pr");
+        $links[] = $r1["link"];
+        if (!$r1["ok"]) {
+            return array("reval" => 1, "success" => "Error", "msg" => $r1["msg"], "sent" => implode("  ➜  ", $links));
+        }
+        if (empty($r1["id"])) {
+            return array("reval" => 1, "success" => "Error", "sent" => implode("  ➜  ", $links),
+                "msg" => "จองขั้น PR สำเร็จ แต่ API ไม่ส่งเลขอ้างอิงกลับมา ไม่สามารถจองขั้นสัญญาต่อได้ กรุณาติดต่อฝ่ายการคลัง");
+        }
+        $autoPrId = $r1["id"];
+        // เก็บเลขอ้างอิงขั้น PR ไว้ทันที (เผื่อขั้นต่อไปพัง จะได้ยกเลิกคืนได้ด้วยเลขนี้)
+        $db2->QueryParam(
+            "UPDATE NMU_ERP.dbo.sp_tor_period_bill SET {$prReserveCol} = ? WHERE sp_tor_period_bill_hdr_id = ?",
+            array($autoPrId, $hdrId)
+        );
+    }
+
+    // ---- ขั้นสัญญา (กรณี 2 และขั้นที่สองของกรณี 3) ----
+    $contractParams = $baseParams;
+    $contractParams["i_reserve"] = 2;
+    $contractParams["po_id"] = $poId;
+    // ขั้นสัญญาใช้ i_pr_type/i_last ของสัญญาเอง (ค่าอื่นเหมือนขั้น PR ทุกตัว - API จับคู่กับที่ PR จองไว้)
+    $r2 = medSupBgReserveCall($db2, $hdrId, $slot, $contractParams, "contract");
+    $links[] = $r2["link"];
+    if (!$r2["ok"]) {
+        $msg = $r2["msg"];
+        if ($autoPrId) {
+            // ขั้นสัญญาไม่สำเร็จ - คืนเงินขั้น PR ที่เพิ่งจองให้อัตโนมัติ ไม่ทิ้งยอดค้างในระบบงบ
+            $undo = medSupBgCancelCall($db2, $hdrId, $slot, $autoPrId);
+            $links[] = $undo["link"];
+            if ($undo["ok"]) {
+                $db2->QueryParam(
+                    "UPDATE NMU_ERP.dbo.sp_tor_period_bill SET {$prReserveCol} = NULL WHERE sp_tor_period_bill_hdr_id = ?",
+                    array($hdrId)
+                );
+                $msg .= "<br>(ระบบยกเลิกการจองขั้น PR ที่เพิ่งจองคืนให้แล้ว)";
+            } else {
+                $msg .= "<br><b>คำเตือน:</b> ยกเลิกการจองขั้น PR ที่เพิ่งจอง (รหัสอ้างอิง {$autoPrId}) คืนให้ไม่สำเร็จ กรุณากดยกเลิกการจองเงินอีกครั้ง หรือติดต่อฝ่ายการคลัง";
+            }
+        }
+        return array("reval" => 1, "success" => "Error", "msg" => $msg, "sent" => implode("  ➜  ", $links));
+    }
+
     $db2->QueryParam(
-        "UPDATE NMU_ERP.dbo.sp_tor_period_bill SET c_ap_api_response = ? WHERE sp_tor_period_bill_hdr_id = ?",
-        array(substr($responseBody, 0, 4000), $hdrId)
-    );
-
-    $decoded = json_decode($responseBody, true);
-    if ($httpCode < 200 || $httpCode >= 300) {
-        return array("reval" => 1, "success" => "Error", "msg" => "AP-API ตอบกลับผิดพลาด (HTTP {$httpCode}): " . substr($responseBody, 0, 500));
-    }
-    if (is_array($decoded) && (isset($decoded["error"]) || (isset($decoded["success"]) && !$decoded["success"]))) {
-        $errMsg = $decoded["error"] ?? ($decoded["message"] ?? $responseBody);
-        return array("reval" => 1, "success" => "Error", "msg" => "AP-API ปฏิเสธการจองเงิน: " . (is_string($errMsg) ? $errMsg : json_encode($errMsg)));
-    }
-
-    // ไม่ทราบ schema ที่แน่ชัดของค่าที่ตอบกลับ (ไม่มีตัวอย่าง response ในเอกสาร) - ลอง
-    // เดาชื่อฟิลด์ที่เป็นไปได้ ถ้าไม่เจอก็ยังถือว่าสำเร็จ (HTTP 2xx ไม่มี error) แต่ไม่มี
-    // เลขอ้างอิงให้ - ผู้ใช้ควรตรวจสอบกับระบบงบประมาณกลางอีกครั้ง
-    $bgReserveMoneyId = $decoded["bg_reserve_money_id"] ?? ($decoded["data"]["bg_reserve_money_id"] ?? null);
-    $arriveCode = $decoded["c_arrive_code"] ?? ($decoded["data"]["c_arrive_code"] ?? null);
-
-    $reserveCol = $col("bg_reserve_money_id");
-    $arriveCol = $col("c_ap_arrive_code");
-    $dateCol = $col("d_ap_reserve");
-    $db2->QueryParam(
-        "UPDATE NMU_ERP.dbo.sp_tor_period_bill
-            SET {$reserveCol} = ?, {$arriveCol} = ?, {$dateCol} = ?
-          WHERE sp_tor_period_bill_hdr_id = ?",
-        array($bgReserveMoneyId ?: -1, $arriveCode, date("Y-m-d H:i:s"), $hdrId)
+        "UPDATE NMU_ERP.dbo.sp_tor_period_bill SET {$reserveCol} = ?, {$arriveCol} = NULL, {$dateCol} = ? WHERE sp_tor_period_bill_hdr_id = ?",
+        array($r2["id"] ?: -1, date("Y-m-d H:i:s"), $hdrId)
     );
 
     return array(
         "reval" => 0,
         "success" => "Success",
-        "msg" => $bgReserveMoneyId
-            ? "จองเงินแหล่งที่ {$slot} สำเร็จ (รหัสอ้างอิง {$bgReserveMoneyId})"
+        "sent" => implode("  ➜  ", $links),
+        "msg" => $r2["id"]
+            ? "จองเงินแหล่งที่ {$slot} สำเร็จ (รหัสอ้างอิง {$r2["id"]})" . ($autoPrId ? "<br>(จองขั้น PR อัตโนมัติ รหัสอ้างอิง {$autoPrId})" : "")
             : "ส่งข้อมูลจองเงินสำเร็จ แต่ไม่พบเลขอ้างอิงในผลตอบกลับ - กรุณาตรวจสอบกับระบบงบประมาณกลางอีกครั้ง",
     );
+}
+
+// pr_id ที่ส่งให้ API งบ (คอลัมน์ตัวเลขล้วน) ต้องไม่ชนกับ tor_id ของ PR จริงใน ERP (ลำดับ 1,2,3...
+// ที่ API/รายงานงบใช้จับคู่ PR ตาม pr_id + i_sys - ถ้าส่งเลขลำดับแถวของเราตรงๆ จะไปตรงกับ PR เก่าของ
+// ERP แล้วรายงานแสดงชื่อ/เลข PR/วันที่ผิดตัว)
+//  - มีเลข PR ของเรา: ใช้ "ตัวเลข" ในเลข PR (PR25690900013-APMD -> 25690900013) - ยึดเลขรันเดียวกับ
+//    ที่ออกผ่าน SP_GEN_CODE ของ ERP ที่ไม่ซ้ำอยู่แล้ว (ตัวอักษรใน bigint ใส่ไม่ได้ จึงเอาแค่ตัวเลข)
+//  - ไม่มีเลข PR (สัญญาที่จองที่หน้าสัญญาเลย): 9900000000 + hdr_id ของสัญญา (ช่วงเลขที่ ERP ไม่ใช้)
+function medSupBgPrId($prCode, $hdrId) {
+    // สั้นและไม่ชน: 99000 + hdr_id (tor_id ของ PR จริงใน ERP ตอนนี้ไม่เกินหลักพัน ช่วงเลขนี้อยู่สูงกว่ามาก)
+    // hdr_id ของแถว PR กับสัญญาใช้ลำดับเดียวกัน จึงไม่ซ้ำกันเอง - PR ใช้ hdr_id ของ PR, สัญญาที่ผูก PR
+    // ใช้ hdr_id ของ PR ต้นทาง (ให้ API จับคู่ขั้นสัญญากับขั้น PR), สัญญาที่ไม่มี PR ใช้ hdr_id ของสัญญาเอง
+    // ($prCode ไม่ได้ใช้แล้ว เก็บพารามิเตอร์ไว้ให้ตัวเรียกเดิมไม่ต้องแก้)
+    return 99000 + intval($hdrId);
+}
+
+// เช็กเงินคงเหลือก่อนจองขั้น PR: แบบแผนดู f_total_plan แบบงวดดู f_total_dtl - คืน array error ถ้าไม่พอ
+// ไม่งั้นคืน null (รวมถึงกรณีเรียกเช็กไม่ได้ ไม่บล็อกการจอง ให้ API จองตอบเอง)
+function medSupBudgetPrecheck($params, $labels = array()) {
+    $budgetLink = rtrim(IPAPIBG, "/") . "/?/bg/BgBudgetAllSupplies"
+        . "/i_year/" . rawurlencode(strval($params["i_year"]))
+        . "/dc_budget_type_id/" . rawurlencode(strval($params["dc_budget_type_id"]))
+        . "/dc_cost_id/" . rawurlencode(strval($params["dc_cost_id"]))
+        . "/bg_expense_id/" . rawurlencode(strval($params["bg_expense_id"]));
+    $chB = curl_init();
+    curl_setopt($chB, CURLOPT_URL, $budgetLink);
+    curl_setopt($chB, CURLOPT_HTTPGET, 1);
+    curl_setopt($chB, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($chB, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($chB, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($chB, CURLOPT_TIMEOUT, 30);
+    medSupApplyBgRequestOptions($chB);
+    $budgetBody = medSupStripPhpNotices(curl_exec($chB));
+    curl_close($chB);
+    $budget = json_decode($budgetBody, true);
+    if (is_array($budget) && isset($budget["totalCount"])) {
+        $balanceKey = $params["i_pr_type"] == 1 ? "f_total_plan" : "f_total_dtl";
+        $balance = ($budget["totalCount"] > 0 && isset($budget["data"][0][$balanceKey]))
+            ? floatval(str_replace(",", "", $budget["data"][0][$balanceKey])) : 0;
+        if ($balance <= 0) {
+            // ไม่มีงบเลย (ไม่มีแถวงบ หรือยอดคงเหลือเป็น 0) - หน่วยงานนี้ยังไม่ถูกหยอดงบของแหล่งเงิน/ค่าใช้จ่ายนี้
+            return array(
+                "reval" => 1,
+                "success" => "Error",
+                "msg" => "ยังไม่มีงบประมาณ รอคลังหยอดเงิน"
+                    . ((!empty($labels["dept"]) || !empty($labels["fund"]))
+                        ? "<br>หน่วยงาน: " . ($labels["dept"] ?? "") . " / แหล่งเงิน: " . ($labels["fund"] ?? "") : ""),
+                "sent" => $budgetLink,
+            );
+        }
+        if ($balance < floatval($params["f_amt"])) {
+            return array(
+                "reval" => 1,
+                "success" => "Error",
+                // แสดงยอดที่ขอจองและเงินคงเหลือจริง เพื่อให้ผู้ใช้เห็นว่าเงินไม่พอจริงๆ
+                // เงินคงเหลือดึงจากระบบงบ (คลัง) ตัวเดียวกับรายงานทะเบียนคุมงบประมาณ ของ "หน่วยงาน + แหล่งเงิน +
+                // ค่าใช้จ่าย" ที่ใช้จองจริง - ระบุชื่อหน่วยงาน/แหล่งเงินกำกับด้วย ผู้ใช้จะได้รู้ว่ายอดนี้เป็นของกองไหน
+                // (งบแต่ละหน่วยงานแยกกัน เช่น เภสัชกับเวชภัณฑ์คนละก้อน)
+                "msg" => "เงินไม่พอ กรุณาติดต่อฝ่ายการคลัง"
+                    . ((!empty($labels["dept"]) || !empty($labels["fund"]))
+                        ? "<br>หน่วยงาน: " . ($labels["dept"] ?? "") . " / แหล่งเงิน: " . ($labels["fund"] ?? "") : "")
+                    . "<br>ยอดที่ขอจอง: " . number_format(floatval($params["f_amt"]), 2)
+                    . " บาท / เงินคงเหลือ: " . number_format($balance, 2) . " บาท",
+                "sent" => $budgetLink,
+            );
+        }
+    }
+    return null;
+}
+
+// ยิงลิงก์จองเงิน (mode/POST) หนึ่งครั้ง + บันทึกสิ่งที่ส่งและผลตอบกลับลง c_ap_api_response เสมอ
+// คืน array(ok, id, link, msg) - $stepLabel: "pr" หรือ "contract" ใช้แปลข้อความเงินไม่พอ
+function medSupBgReserveCall($db2, $hdrId, $slot, $params, $stepLabel) {
+    $link = rtrim(IPAPIBG, "/") . "/?/bg/mn_BgReserveMoney/mode/POST";
+    foreach ($params as $k => $v) {
+        $link .= "/" . $k . "/" . rawurlencode(strval($v));
+    }
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $link);
+    curl_setopt($ch, CURLOPT_HTTPGET, 1);
+    // เซิร์ฟเวอร์ PHP ไม่มี CA bundle ของ cert ที่ api-nmu ใช้ (SSL certificate problem: unable to get
+    // local issuer certificate) - ปิดการตรวจ cert เฉพาะการเรียกไปยัง IPAPIBG (ระบบงบภายในของ
+    // มหาวิทยาลัยเอง) เหมือน mnTorController.php/mnArrivalCode1.php ที่ทำอยู่แล้ว
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    medSupApplyBgRequestOptions($ch);
+    $responseBody = medSupStripPhpNotices(curl_exec($ch));
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    // เก็บสิ่งที่ส่ง + ผลตอบกลับดิบไว้เสมอ เพื่อตรวจสอบ/debug ย้อนหลัง - ใส่ทุกแถวของ hdr นี้
+    // เพื่อให้ค่ายังอยู่ครบหลัง UPDATE (ลบ+insert ใหม่) ครั้งถัดไป
+    $logText = "slot {$slot} {$stepLabel} " . date("Y-m-d H:i:s") . " | SENT: " . $link
+        . " | HTTP " . $httpCode . ($curlErr ? " | CURL: " . $curlErr : "")
+        . " | RESP: " . $responseBody;
+    $db2->QueryParam(
+        "UPDATE NMU_ERP.dbo.sp_tor_period_bill SET c_ap_api_response = ? WHERE sp_tor_period_bill_hdr_id = ?",
+        array(substr($logText, 0, 4000), $hdrId)
+    );
+
+    if ($curlErr) {
+        return array("ok" => false, "id" => null, "link" => $link, "msg" => "เชื่อมต่อ API จองเงินไม่สำเร็จ: " . $curlErr);
+    }
+    $decoded = json_decode($responseBody, true);
+    if ($httpCode < 200 || $httpCode >= 300) {
+        return array("ok" => false, "id" => null, "link" => $link, "msg" => "API จองเงินตอบกลับผิดพลาด (HTTP {$httpCode}): " . substr($responseBody, 0, 500));
+    }
+    // API เดิมตอบ {success: true/false, msg, bg_reserve_money_id} - ไม่ใช่ success = จองไม่สำเร็จ
+    if (!is_array($decoded) || empty($decoded["success"])) {
+        $errMsg = is_array($decoded) ? ($decoded["msg"] ?? $responseBody) : $responseBody;
+        if (is_string($errMsg) && stripos($errMsg, "Not enough money") !== false) {
+            return array("ok" => false, "id" => null, "link" => $link, "msg" => ($stepLabel === "pr"
+                ? "เงินไม่พอ กรุณาติดต่อฝ่ายการคลัง"
+                : "เงินไม่พอ ยอดสัญญาเกินยอดที่ PR จองไว้ (หรือถูกสัญญาอื่นของ PR เดียวกันใช้ไปแล้ว) กรุณาติดต่อฝ่ายการคลัง"));
+        }
+        return array("ok" => false, "id" => null, "link" => $link, "msg" => "API จองเงินปฏิเสธการจอง: " . (is_string($errMsg) ? $errMsg : json_encode($errMsg)));
+    }
+    $id = $decoded["bg_reserve_money_id"] ?? ($decoded["data"]["bg_reserve_money_id"] ?? null);
+    return array("ok" => true, "id" => $id, "link" => $link, "msg" => "");
+}
+
+// ยิงลิงก์ยกเลิกการจอง (mode/PUT ... i_enable/2) หนึ่งครั้ง - คืน array(ok, link, msg)
+function medSupBgCancelCall($db2, $hdrId, $slot, $reserveId) {
+    $link = rtrim(IPAPIBG, "/") . "/?/bg/mn_BgReserveMoney/mode/PUT/bg_reserve_money_id/" . intval($reserveId) . "/i_enable/2";
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $link);
+    curl_setopt($ch, CURLOPT_HTTPGET, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    medSupApplyBgRequestOptions($ch);
+    $responseBody = medSupStripPhpNotices(curl_exec($ch));
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    $logText = "CANCEL slot {$slot} " . date("Y-m-d H:i:s") . " | SENT: " . $link
+        . " | HTTP " . $httpCode . ($curlErr ? " | CURL: " . $curlErr : "")
+        . " | RESP: " . $responseBody;
+    $db2->QueryParam(
+        "UPDATE NMU_ERP.dbo.sp_tor_period_bill SET c_ap_api_response = ? WHERE sp_tor_period_bill_hdr_id = ?",
+        array(substr($logText, 0, 4000), $hdrId)
+    );
+
+    if ($curlErr) {
+        return array("ok" => false, "link" => $link, "msg" => "เชื่อมต่อ API ไม่สำเร็จ: " . $curlErr);
+    }
+    $decoded = json_decode($responseBody, true);
+    if ($httpCode < 200 || $httpCode >= 300 || !is_array($decoded) || empty($decoded["success"])) {
+        $errMsg = is_array($decoded) ? ($decoded["msg"] ?? $responseBody) : $responseBody;
+        return array("ok" => false, "link" => $link, "msg" => "ยกเลิกการจองเงินไม่สำเร็จ: " . (is_string($errMsg) ? $errMsg : json_encode($errMsg)));
+    }
+    return array("ok" => true, "link" => $link, "msg" => "");
+}
+
+// ================= ตัวช่วยเรียก API งบ (IPAPIBG) จากฝั่งเซิร์ฟเวอร์ ================= //
+// ลิงก์นี้ของเดิมถูกเรียกจากเบราว์เซอร์ (มี User-Agent/Referer/คุกกี้ของผู้ใช้ไปด้วยเสมอ) พอ
+// เรียกจาก PHP curl เปล่าๆ ฝั่ง api-nmu (lib/log_access.php ทำ strpos กับ header ที่ไม่มี) จึงตอบ
+// HTTP 500 - ใส่ header ให้เหมือนเบราว์เซอร์ และส่งคุกกี้ session ของผู้ใช้ต่อไปด้วย (ต้องปล่อย
+// session lock ก่อน ไม่งั้นถ้า api-nmu ใช้ session ตัวเดียวกันจะรอกันจน timeout)
+function medSupApplyBgRequestOptions($ch) {
+    $cookie = "";
+    foreach ($_COOKIE as $k => $v) {
+        $cookie .= ($cookie === "" ? "" : "; ") . $k . "=" . $v;
+    }
+    curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER["HTTP_USER_AGENT"] ?? "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    curl_setopt($ch, CURLOPT_REFERER, (OST_HOST . "://" . ($_SERVER["HTTP_HOST"] ?? "")) . "/supplies/");
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array("Accept: application/json, text/javascript, */*; q=0.01", "X-Requested-With: XMLHttpRequest"));
+    if ($cookie !== "") {
+        curl_setopt($ch, CURLOPT_COOKIE, $cookie);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
+    }
+}
+
+// ตัดข้อความ PHP Deprecated/Notice/Warning ที่ api-nmu พ่นออกมาปนใน response (ทำให้ log/ข้อความ
+// ยาวจนมองไม่เห็นเนื้อหาจริง และ json_decode ไม่ผ่าน) ก่อนนำไปตรวจ/บันทึก
+function medSupStripPhpNotices($body) {
+    if (!is_string($body)) {
+        return $body;
+    }
+    // api-nmu ตอบ JSON ที่ขึ้นต้นด้วย BOM (EF BB BF) ทำให้ json_decode ล้มเหลว - ผลคือจองสำเร็จจริง
+    // แต่ฝั่งเราอ่านผลไม่ออกแล้วแจ้งว่า "ปฏิเสธ" (บั๊กที่เจอจริง) ต้องตัด BOM ออกก่อนเสมอ
+    $body = preg_replace('/^\xEF\xBB\xBF/', '', ltrim($body));
+    return trim(preg_replace('/(PHP )?(Deprecated|Notice|Warning):[^\r\n]*(\r?\n|$)/', '', $body));
+}
+
+// ================= ยกเลิกการจองเงินต่อแหล่งเงิน (ลิงก์เดิมของ ERP) ================= //
+// ลำดับ: ยกเลิกขั้นสัญญา/ขั้นที่จองไว้ที่ bg_reserve_money_id[n] ก่อน แล้วค่อยยกเลิกขั้น PR ที่ระบบจอง
+// อัตโนมัติไว้ให้สัญญา (pr_bg_reserve_money_id[n] - เฉพาะสัญญาที่จองโดยไม่ได้ผูก PR)
+function cancelMedSupFundSource($hdrId, $slot) {
+    $db2 = new DatabaseServer();
+
+    if (empty($hdrId) || !in_array($slot, array(1, 2, 3), true)) {
+        return array("reval" => 1, "success" => "Error", "msg" => "ไม่พบรายการหรือแหล่งเงินที่ต้องการยกเลิกการจอง");
+    }
+    $suffix = $slot === 1 ? "" : strval($slot);
+
+    $stmt2 = $db2->QueryParam(
+        "select top 1 bg_reserve_money_id{$suffix} as reserved, pr_bg_reserve_money_id{$suffix} as own_pr
+           from NMU_ERP.dbo.sp_tor_period_bill
+          where sp_tor_period_bill_hdr_id = ? and i_enabled = 1",
+        array($hdrId)
+    );
+    $row = $db2->Fetch($stmt2);
+    $reserveId = empty($row) ? 0 : intval($row["reserved"]);
+    $ownPrId = empty($row) ? 0 : intval($row["own_pr"]);
+
+    if ($reserveId === 0 && $ownPrId === 0) {
+        return array("reval" => 1, "success" => "Error", "msg" => "แหล่งเงินที่ {$slot} ยังไม่ได้จองเงิน");
+    }
+    if ($reserveId < 0) {
+        // -1 = จองสำเร็จแต่ API ไม่ส่งเลขอ้างอิงกลับมา (ดู reserveMedSupFundSource) ไม่มีเลขให้ยกเลิก
+        return array("reval" => 1, "success" => "Error", "msg" => "ไม่มีเลขอ้างอิงการจอง ไม่สามารถยกเลิกอัตโนมัติได้ กรุณาติดต่อฝ่ายการคลัง");
+    }
+
+    // ห้ามยกเลิกการจองของ PR ถ้ายังมีสัญญาที่จองเงินจาก PR นี้อยู่ (ต้องยกเลิกสัญญาก่อน ไม่งั้น
+    // ยอดจองขั้นสัญญาจะค้างโดยไม่มี PR รองรับ)
+    $contractReserved = intval($db2->GetDataBySQL(
+        "select count(*) from NMU_ERP.dbo.sp_tor_period_bill
+          where pr_hdr_id = ? and i_enabled = 1
+            and (isnull(bg_reserve_money_id, 0) > 0 or isnull(bg_reserve_money_id2, 0) > 0 or isnull(bg_reserve_money_id3, 0) > 0)",
+        array($hdrId)
+    ));
+    if ($contractReserved > 0) {
+        return array("reval" => 1, "success" => "Error", "msg" => "มีสัญญาที่จองเงินจาก PR นี้อยู่ ({$contractReserved} รายการ) กรุณายกเลิกการจองเงินของสัญญาเหล่านั้นก่อน แล้วจึงยกเลิกการจองของ PR");
+    }
+
+    $links = array();
+    $cancelled = array();
+
+    if ($reserveId > 0) {
+        $c1 = medSupBgCancelCall($db2, $hdrId, $slot, $reserveId);
+        $links[] = $c1["link"];
+        if (!$c1["ok"]) {
+            return array("reval" => 1, "success" => "Error", "msg" => $c1["msg"], "sent" => implode("  ➜  ", $links));
+        }
+        $db2->QueryParam(
+            "UPDATE NMU_ERP.dbo.sp_tor_period_bill
+                SET bg_reserve_money_id{$suffix} = NULL, c_ap_arrive_code{$suffix} = NULL, d_ap_reserve{$suffix} = NULL
+              WHERE sp_tor_period_bill_hdr_id = ?",
+            array($hdrId)
+        );
+        $cancelled[] = "รหัสอ้างอิง {$reserveId}";
+    }
+
+    if ($ownPrId > 0) {
+        $c2 = medSupBgCancelCall($db2, $hdrId, $slot, $ownPrId);
+        $links[] = $c2["link"];
+        if (!$c2["ok"]) {
+            return array("reval" => 1, "success" => "Error", "sent" => implode("  ➜  ", $links),
+                "msg" => ($reserveId > 0 ? "ยกเลิกขั้นสัญญาแล้ว แต่" : "") . "ยกเลิกการจองขั้น PR (รหัสอ้างอิง {$ownPrId}) ไม่สำเร็จ: " . $c2["msg"] . "<br>กรุณากดยกเลิกการจองเงินอีกครั้ง หรือติดต่อฝ่ายการคลัง");
+        }
+        $db2->QueryParam(
+            "UPDATE NMU_ERP.dbo.sp_tor_period_bill SET pr_bg_reserve_money_id{$suffix} = NULL WHERE sp_tor_period_bill_hdr_id = ?",
+            array($hdrId)
+        );
+        $cancelled[] = "ขั้น PR รหัสอ้างอิง {$ownPrId}";
+    }
+
+    return array("reval" => 0, "success" => "Success", "sent" => implode("  ➜  ", $links),
+        "msg" => "ยกเลิกการจองเงินแหล่งที่ {$slot} แล้ว (" . implode(", ", $cancelled) . ") คืนเงินกลับงบประมาณเรียบร้อย");
 }

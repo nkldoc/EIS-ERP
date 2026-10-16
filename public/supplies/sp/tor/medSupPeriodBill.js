@@ -103,6 +103,7 @@ Ext.storeMedSupPrLookup = new Ext.data.JsonStore({
         "dc_expense_budget_type_id", "c_fund_source", "f_fund_amt",
         "dc_expense_budget_type_id2", "c_fund_source2", "f_fund_amt2",
         "dc_expense_budget_type_id3", "c_fund_source3", "f_fund_amt3",
+        "bg_reserve_money_id", "bg_reserve_money_id2", "bg_reserve_money_id3",
     ],
 });
 
@@ -118,6 +119,37 @@ Ext.storeApDeptTypePeriodBill = new Ext.data.JsonStore({
         {id: "APMS", c_name: "APMS - เวชภัณฑ์"},
     ],
 });
+
+// ผู้ใช้ของ พัสดุ(38)/เภสัช(50)/เวชภัณฑ์(82) ล็อกประเภทตามหน่วยงานตัวเอง เหลือรายการเดียวและ
+// ไม่มี dropdown - admin/หน่วยงานอื่นเห็นครบทั้ง 3 รายการและเลือกเองได้ (แมพเดียวกับ
+// Ext.MEDSUP_AP_DEPT_COST ใน regTorMedSup.js)
+Ext.userApDeptPeriodBill = (function () {
+    // admin (user_id = 1) ไม่ถูกล็อกเสมอ
+    if (parseInt(Ext.session && Ext.session.user_id) === 1) { return null; }
+    var map = {38: "APPS", 50: "APMD", 82: "APMS"};
+    return map[parseInt(Ext.session && Ext.session.dc_cost_id)] || null;
+})();
+if (Ext.userApDeptPeriodBill) {
+    Ext.storeApDeptTypePeriodBill.filter("id", Ext.userApDeptPeriodBill);
+}
+
+// ค่าใช้จ่ายเริ่มต้นของเภสัช/เวชภัณฑ์ = bg_expense_id 133 (030300090001 : ค่ายาและเวชภัณฑ์
+// อวัยวะเทียม) ล็อกไม่ให้เลือกเอง
+Ext.expenseLockedPeriodBill = Ext.userApDeptPeriodBill === "APMD" || Ext.userApDeptPeriodBill === "APMS";
+Ext.DEFAULT_EXPENSE_ID_PERIOD_BILL = "133";
+// เติมค่าเริ่มต้นลงช่องค่าใช้จ่าย/ชื่อโครงการ (ชื่อโครงการเติมเฉพาะตอนยังว่าง) - ต้องรอทั้ง
+// store และ combo พร้อม จึงถูกเรียกทั้งตอน store โหลดเสร็จและตอน combo render
+Ext.fnApplyDefaultExpensePeriodBill = function () {
+    var combo = Ext.getCmp("po_expense_idID");
+    var rec = Ext.storePoExpensePeriodBill.getById(Ext.DEFAULT_EXPENSE_ID_PERIOD_BILL);
+    if (!combo || !combo.rendered || !rec || combo.getValue()) { return; }
+    combo.setValue(rec.get("id"));
+    Ext.getCmp("c_expense_nameID").setValue(rec.get("c_name"));
+    var nameFld = Ext.getCmp("c_nameID");
+    if (nameFld && !nameFld.getValue()) {
+        nameFld.setValue(Ext.fnProjectNameFromExpense(rec.get("c_name")));
+    }
+};
 
 Ext.storeContractLookup = new Ext.data.JsonStore({
     autoDestroy: false,
@@ -282,6 +314,9 @@ Ext.storePoExpensePeriodBill = new Ext.data.JsonStore({
     idProperty: "id",
     fields: ["id", "c_name"],
 });
+if (Ext.expenseLockedPeriodBill) {
+    Ext.storePoExpensePeriodBill.on("load", Ext.fnApplyDefaultExpensePeriodBill);
+}
 
 Ext.storeCreditorLookupPeriodBill = new Ext.data.JsonStore({
     autoDestroy: false,
@@ -362,19 +397,23 @@ Ext.fnAddMedSupItems = function (li) {
                 id: "c_doc_refID[" + line + "]",
                 name: "c_doc_ref[" + line + "]",
                 width: 220,
-                fieldLabel: "เลขที่ใบส่งของ/ใบแจ้งหนี้",
+                fieldLabel: "เลขงวด",
+                // default เป็นเลขงวดตามลำดับที่เพิ่ม (01, 02, 03, ...) ทุกครั้งที่เพิ่มงวดใหม่
+                // - ใบสั่งซื้อมีได้แค่งวดเดียวอยู่แล้ว (Ext.fnGetPeriodLimit) จึงได้ "01" เสมอ
+                // โดยไม่ต้องแยกเงื่อนไขตามประเภทสัญญา ยังแก้ไขเป็นค่าอื่นเองได้ตามปกติ
+                value: (line < 10 ? "0" : "") + line,
                 validator: function (val) {
                     return Ext.isEmpty(val) ? "กรุณากรอกข้อมูลให้ถูกต้อง" : true;
                 }
             },
             {
-                fieldLabel: "วันที่เอกสาร",
+                fieldLabel: "วันที่ครบกำหนดส่งของ",
                 id: "d_doc_dateSubID[" + line + "]",
                 name: "d_doc_dateSub[" + line + "]",
                 xtype: "datefield",
                 width: 220,
                 validator: function (val) {
-                    return Ext.isEmpty(val) ? "กรุณาระบุวันที่เอกสาร" : true;
+                    return Ext.isEmpty(val) ? "กรุณาระบุวันที่ครบกำหนดส่งของ" : true;
                 }
             },
             {
@@ -672,7 +711,7 @@ function fundSourceFieldSet(n, required, hoistOverlapControls) {
                 combo.setRawValue(fundRec ? fundRec.get("c_name") : "");
                 Ext.getCmp(nameHiddenId).setValue(fundRec ? fundRec.get("c_name") : "");
                 Ext.getCmp(amtId).setValue(Ext.floatRenderer(parseFloat(String(record.get("f_total")).replace(/,/g, "")) || 0));
-                if (n === 1) {
+                if (n === 1 && !Ext.expenseLockedPeriodBill) {
                     var expenseIdx = Ext.storePoExpensePeriodBill.findExact("id", record.get("bg_expense_id"));
                     var expenseRec = expenseIdx > -1 ? Ext.storePoExpensePeriodBill.getAt(expenseIdx) : null;
                     var expenseCombo = Ext.getCmp("po_expense_idID");
@@ -832,6 +871,18 @@ Ext.fnRestoreFundSourceReserveStatus = function (n) {
         if (reserveTypeGroupCmp) { reserveTypeGroupCmp.disable(); }
         if (overlapComboCmp) { overlapComboCmp.disable(); }
         if (overlapYearComboCmp) { overlapYearComboCmp.disable(); }
+    } else if (Ext.selectRow && Ext.selectRow.get("erp_reserve_status" + suffix)
+            && String(comboFld.getValue()) === String(Ext.selectRow.get("dc_expense_budget_type_id" + suffix))) {
+        // สัญญาที่นำเข้าจากไฟล์และระบบ ERP เวชภัณฑ์จองเงินไว้ในระบบงบแล้ว - ไม่ให้จองซ้ำจากเมนูนี้
+        // และไม่มีปุ่มยกเลิก (รายการจองเป็นของ ERP ต้องยกเลิกจากฝั่ง ERP) ล็อกแหล่งเงินเหมือนจองแล้ว
+        statusCmp.setValue(Ext.selectRow.get("erp_reserve_status" + suffix));
+        reserveBtn.hide();
+        cancelBtn.hide();
+        comboFld.disable();
+        amtFld.setReadOnly(true);
+        if (reserveTypeGroupCmp) { reserveTypeGroupCmp.disable(); }
+        if (overlapComboCmp) { overlapComboCmp.disable(); }
+        if (overlapYearComboCmp) { overlapYearComboCmp.disable(); }
     } else {
         statusCmp.setValue("ยังไม่ได้จองเงิน");
         reserveBtn.show();
@@ -888,9 +939,19 @@ Ext.fnReserveFundSource = function (n) {
         Ext.Msg.alert("แจ้งเตือน", "กรุณาบันทึกรายการนี้ก่อน แล้วเปิดแก้ไขใหม่อีกครั้งเพื่อจองเงิน");
         return;
     }
+    // ข้อความยืนยัน: แสดงแหล่งเงิน/ค่าใช้จ่าย/จำนวนเงินจริงของสล็อตนี้ให้ตรวจก่อนกด
+    var sfx = n === 1 ? "" : String(n);
+    var fundCmb = Ext.getCmp("dc_expense_budget_type_id" + sfx + "ID");
+    var amtCmp = Ext.getCmp("f_fund_amt" + sfx + "ID");
+    var expCmb = Ext.getCmp("po_expense_idID");
+    var amtNum = parseFloat(String(amtCmp ? amtCmp.getValue() : 0).replace(/,/g, "")) || 0;
     Ext.Msg.confirm(
         "ยืนยันการจองเงิน",
-        "ต้องการจองเงินงบประมาณเต็มยอดของแหล่งเงินที่ " + n + " ใช่หรือไม่?<br><b style='color:red;'>การกระทำนี้จะตัด/จองงบประมาณจริงของมหาวิทยาลัย ไม่สามารถยกเลิกเองได้ในขณะนี้</b>",
+        "<b>แหล่งเงินที่ " + n + ":</b> " + Ext.util.Format.htmlEncode(fundCmb ? fundCmb.getRawValue() : "") + "<br>"
+        + "<b>ค่าใช้จ่าย:</b> " + Ext.util.Format.htmlEncode(expCmb ? expCmb.getRawValue() : "") + "<br>"
+        + "<b>จำนวนเงินที่จอง: " + Ext.floatRenderer(amtNum) + " บาท</b><br><br>"
+        + "<span style='color:red;font-weight:bold;'>ระบบจะตัดงบประมาณจริงทันที หากจองผิดสามารถกดปุ่ม \"ยกเลิกการจองเงิน\" หรือติดต่อฝ่ายการคลัง</span><br><br>"
+        + "ต้องการจองเงินใช่หรือไม่?",
         function (btn) {
             if (btn !== "yes") {
                 return;
@@ -903,7 +964,10 @@ Ext.fnReserveFundSource = function (n) {
                 success: function (result) {
                     Ext.getCmp("win-medsupID").getEl().unmask();
                     var jd = Ext.util.JSON.decode(result.responseText);
-                    Ext.Msg.alert(jd.reval === 0 ? "สำเร็จ" : "ผิดพลาด", jd.msg, function () {
+                    // ลิงก์จองเงินที่ backend ยิงจริง (สำเร็จหรือไม่ก็ตาม) - เปิด console เพื่อตรวจว่า
+                    // ส่งอะไรไปจองบ้าง (บันทึกไว้ที่คอลัมน์ c_ap_api_response ด้วย)
+                    console.log("RESERVE_FUND_SOURCE sent:", jd.sent, jd);
+                    Ext.Msg.alert(jd.reval === 0 ? "สำเร็จ" : "ผิดพลาด", jd.msg + (jd.sent ? "<br><br><b>ลิงก์ API ที่ส่ง (แยกทีละลิงก์ - อย่าเปิดในเบราว์เซอร์ เพราะเป็นการสั่งจอง/ยกเลิกจริง):</b><br><span style='font-size:11px;word-break:break-all;'>" + Ext.util.Format.htmlEncode(jd.sent).split("  ➜  ").join("<br><br>") + "</span>" : ""), function () {
                         if (jd.reval === 0) {
                             Ext.getCmp("tabpanel1").getStore().reload();
                             Ext.getCmp("win-medsupID").destroy();
@@ -919,24 +983,41 @@ Ext.fnReserveFundSource = function (n) {
     );
 };
 
-// ยกเลิกการจองเงิน - ยังไม่เชื่อมต่อ API จริง (ไม่มี spec ของฝั่งยกเลิกในเอกสาร - จาก
-// flowchart พบว่า step นี้ถูกปิดใช้งานอยู่ฝั่งระบบงบประมาณกลางเอง) backend จะตอบกลับ
-// ข้อความแจ้งเตือนแทนการยิงคำขอที่เดาเอาเอง
+// ยกเลิกการจองเงินของแหล่งเงินที่ n - backend ยิงลิงก์ยกเลิกเดิมของ ERP (mode/PUT ... i_enable/2)
+// คืนเงินกลับงบประมาณ แล้วเคลียร์สถานะจองให้จองใหม่ได้
 Ext.fnCancelReserveFundSource = function (n) {
     var hdrIdFld = Ext.getCmp("sp_tor_period_bill_hdr_idID");
     var hdrId = hdrIdFld ? hdrIdFld.getValue() : null;
-    Ext.Ajax.request({
-        url: Ext.url_process,
-        method: "POST",
-        params: {mode: "CANCEL_RESERVE_FUND_SOURCE", sp_tor_period_bill_hdr_id: hdrId, slot: n},
-        success: function (result) {
-            var jd = Ext.util.JSON.decode(result.responseText);
-            Ext.Msg.alert(jd.reval === 0 ? "สำเร็จ" : "ผิดพลาด", jd.msg);
-        },
-        failure: function () {
-            Ext.Msg.alert("ผิดพลาด", "เชื่อมต่อไม่สำเร็จ");
+    Ext.Msg.confirm(
+        "ยืนยันการยกเลิกการจองเงิน",
+        "ต้องการยกเลิกการจองเงินแหล่งเงินที่ " + n + " และคืนเงินกลับงบประมาณใช่หรือไม่?",
+        function (btn) {
+            if (btn !== "yes") {
+                return;
+            }
+            Ext.getCmp("win-medsupID").getEl().mask("กำลังยกเลิกการจอง...", "x-mask-loading");
+            Ext.Ajax.request({
+                url: Ext.url_process,
+                method: "POST",
+                params: {mode: "CANCEL_RESERVE_FUND_SOURCE", sp_tor_period_bill_hdr_id: hdrId, slot: n},
+                success: function (result) {
+                    Ext.getCmp("win-medsupID").getEl().unmask();
+                    var jd = Ext.util.JSON.decode(result.responseText);
+                    console.log("CANCEL_RESERVE_FUND_SOURCE sent:", jd.sent, jd);
+                    Ext.Msg.alert(jd.reval === 0 ? "สำเร็จ" : "ผิดพลาด", jd.msg + (jd.sent ? "<br><br><b>ลิงก์ API ที่ส่ง (แยกทีละลิงก์ - อย่าเปิดในเบราว์เซอร์ เพราะเป็นการสั่งจอง/ยกเลิกจริง):</b><br><span style='font-size:11px;word-break:break-all;'>" + Ext.util.Format.htmlEncode(jd.sent).split("  ➜  ").join("<br><br>") + "</span>" : ""), function () {
+                        if (jd.reval === 0) {
+                            Ext.getCmp("tabpanel1").getStore().reload();
+                            Ext.getCmp("win-medsupID").destroy();
+                        }
+                    });
+                },
+                failure: function () {
+                    Ext.getCmp("win-medsupID").getEl().unmask();
+                    Ext.Msg.alert("ผิดพลาด", "เชื่อมต่อไม่สำเร็จ");
+                }
+            });
         }
-    });
+    );
 };
 
 function winMedSupPeriodBill(rec) {
@@ -1089,6 +1170,13 @@ function winMedSupPeriodBill(rec) {
                     id: "sp_tor_idID",
                 },
                 {
+                    // PR ต้นทาง (hdr_id ของแถว PR ที่เลือกจากช่องด้านล่าง) - ใช้เป็น pr_id ตอนจอง
+                    // เงินขั้นสัญญา (ต้องมี PR ที่จองเงินไว้แล้วก่อน ตามระบบ ERP เดิม)
+                    xtype: "hidden",
+                    name: "pr_hdr_id",
+                    id: "pr_hdr_idID",
+                },
+                {
                     // เลือกได้เฉพาะตอน "เพิ่มรายการใหม่" เท่านั้น (ตอนแก้ไขสัญญาที่มีอยู่
                     // แล้วมี hdr_id ของตัวเองอยู่แล้ว ไม่เกี่ยวกับ PR ที่ยังไม่ผูกสัญญา)
                     xtype: "combo",
@@ -1107,7 +1195,7 @@ function winMedSupPeriodBill(rec) {
                     store: Ext.storeMedSupPrLookup,
                     valueField: "sp_tor_period_bill_id",
                     displayField: "c_pr_code",
-                    tpl: '<tpl for="."><div class="x-combo-list-item">{c_pr_code} - {c_project_name}</div></tpl>',
+                    tpl: '<tpl for="."><div class="x-combo-list-item">{c_pr_code} - {c_project_name}<tpl if="bg_reserve_money_id || bg_reserve_money_id2 || bg_reserve_money_id3"> <span style="color:green;">[จองเงินแล้ว]</span></tpl><tpl if="!(bg_reserve_money_id || bg_reserve_money_id2 || bg_reserve_money_id3)"> <span style="color:red;">[ยังไม่จองเงิน]</span></tpl></div></tpl>',
                     triggerAction: "all",
                     forceSelection: true,
                     typeAhead: false,
@@ -1121,10 +1209,19 @@ function winMedSupPeriodBill(rec) {
                             // เดิม (สัญญาที่บันทึกจะได้ hdr_id ใหม่ของตัวเองเสมอ ดู mode ADD
                             // ใน mnMedSupPeriodBillController.php) PR เดิมจึงยังอยู่ครบ
                             // จัดการแยกจากหน้า "การจัดทำ PR (หน่วยงาน) เวชภัณฑ์" ได้อิสระ
-                            Ext.getCmp("c_ap_dept_typeID").setValue(record.get("c_ap_dept_type") || "APMS");
-                            Ext.getCmp("po_expense_idID").setValue(record.get("po_expense_id"));
-                            Ext.getCmp("po_expense_idID").setRawValue(record.get("c_expense_name"));
-                            Ext.getCmp("c_expense_nameID").setValue(record.get("c_expense_name"));
+                            // ผูกสัญญากับ PR ต้นทาง (เพื่อจองเงินขั้นสัญญา) + เตือนถ้า PR ยังไม่จองเงิน
+                            Ext.getCmp("pr_hdr_idID").setValue(record.get("sp_tor_period_bill_hdr_id"));
+                            if (!(record.get("bg_reserve_money_id") || record.get("bg_reserve_money_id2") || record.get("bg_reserve_money_id3"))) {
+                                Ext.Msg.alert("แจ้งเตือน", "PR นี้ยังไม่ได้จองเงิน<br>บันทึกสัญญาได้ แต่จะกดจองเงินที่หน้านี้ไม่ได้ ต้องไปจองเงินของ PR ที่เมนู \"การจัดทำ PR (หน่วยงาน) เวชภัณฑ์\" ก่อน<br>หรือถ้าต้องการจองที่หน้าสัญญานี้เลย ให้เปิดสัญญาใหม่โดยไม่เลือก PR (ระบบจะจองขั้น PR ให้อัตโนมัติ)");
+                            }
+                            if (!Ext.userApDeptPeriodBill) {
+                                Ext.getCmp("c_ap_dept_typeID").setValue(record.get("c_ap_dept_type") || "APMS");
+                            }
+                            if (!Ext.expenseLockedPeriodBill) {
+                                Ext.getCmp("po_expense_idID").setValue(record.get("po_expense_id"));
+                                Ext.getCmp("po_expense_idID").setRawValue(record.get("c_expense_name"));
+                                Ext.getCmp("c_expense_nameID").setValue(record.get("c_expense_name"));
+                            }
                             Ext.getCmp("c_nameID").setValue(record.get("c_project_name"));
                             Ext.getCmp("i_budget_yearID").setValue(record.get("i_budget_year"));
                             Ext.getCmp("dc_expense_budget_type_idID").setValue(record.get("dc_expense_budget_type_id"));
@@ -1169,7 +1266,9 @@ function winMedSupPeriodBill(rec) {
                     forceSelection: true,
                     typeAhead: false,
                     editable: false,
-                    value: "APMS",
+                    value: Ext.userApDeptPeriodBill || "APMS",
+                    readOnly: !!Ext.userApDeptPeriodBill,
+                    hideTrigger: !!Ext.userApDeptPeriodBill,
                 },
                 fundPanel1.reserveTypeGroup,
                 fundPanel1.overlapYearCombo,
@@ -1191,7 +1290,14 @@ function winMedSupPeriodBill(rec) {
                     caseSensitive: false,
                     doQuery: Ext.fnAnyMatchDoQuery,
                     emptyText: "กรุณาเลือกชื่อค่าใช้จ่าย...",
+                    // เภสัช/เวชภัณฑ์ ล็อกเป็น "030300090001 : ค่ายาและเวชภัณฑ์ อวัยวะเทียม" (ไม่มี
+                    // dropdown) - พัสดุ/admin เลือกเองได้เหมือนเดิม
+                    readOnly: Ext.expenseLockedPeriodBill,
+                    hideTrigger: Ext.expenseLockedPeriodBill,
                     listeners: {
+                        render: function () {
+                            if (Ext.expenseLockedPeriodBill) { Ext.fnApplyDefaultExpensePeriodBill(); }
+                        },
                         select: function (combo, record) {
                             Ext.getCmp("c_expense_nameID").setValue(record.get("c_name"));
                             Ext.getCmp("c_nameID").setValue(Ext.fnProjectNameFromExpense(record.get("c_name")));
@@ -1383,13 +1489,14 @@ function winMedSupPeriodBill(rec) {
                         Ext.getCmp("contractComboID").setRawValue(Ext.selectRow.get("c_contract_code"));
                         Ext.getCmp("c_contract_codeID").setValue(Ext.selectRow.get("c_contract_code"));
                         Ext.getCmp("sp_tor_idID").setValue(Ext.selectRow.get("sp_tor_id"));
+                        Ext.getCmp("pr_hdr_idID").setValue(Ext.selectRow.get("pr_hdr_id"));
 
                         // ฟิลด์อ้างอิงของสัญญา (ชื่อโครงการ/ปีงบ/PO/ผู้ขาย/วันที่เริ่ม-สิ้นสุด)
                         // อ่านจากค่าที่เคยบันทึกไว้ในแถวนี้โดยตรง (กรอกเองได้แล้ว จึงต้องใช้
                         // ค่าที่บันทึกจริง ไม่ใช่ค่าปัจจุบันของสัญญาในระบบ)
                         Ext.getCmp("c_nameID").setValue(Ext.selectRow.get("c_project_name"));
                         Ext.getCmp("c_contract_typeID").setValue(Ext.selectRow.get("c_contract_type"));
-                        Ext.getCmp("c_ap_dept_typeID").setValue(Ext.selectRow.get("c_ap_dept_type") || "APMS");
+                        Ext.getCmp("c_ap_dept_typeID").setValue(Ext.userApDeptPeriodBill || Ext.selectRow.get("c_ap_dept_type") || "APMS");
                         Ext.getCmp("c_expense_nameID").setValue(Ext.selectRow.get("c_expense_name"));
                         Ext.getCmp("po_expense_idID").setValue(Ext.selectRow.get("po_expense_id"));
                         Ext.getCmp("po_expense_idID").setRawValue(Ext.selectRow.get("c_expense_name"));
@@ -1476,7 +1583,7 @@ Ext.AppUx = function (app, menu) {
         idProperty: "id",
         totalProperty: "totalCount",
         fields: [
-            "no", "id", "sp_tor_period_bill_hdr_id", "sp_tor_contract_id", "sp_tor_id", "sp_tor_hdr_period_id",
+            "no", "id", "sp_tor_period_bill_hdr_id", "sp_tor_contract_id", "sp_tor_id", "pr_hdr_id", "sp_tor_hdr_period_id",
             "c_contract_code", "i_period", "c_project_name", "c_contract_type", "c_ap_dept_type",
             "dc_expense_budget_type_id", "c_fund_source", "f_fund_amt", "c_overlap", "i_budget_year_overlap",
             "dc_expense_budget_type_id2", "c_fund_source2", "f_fund_amt2", "c_overlap2", "i_budget_year_overlap2",
@@ -1488,6 +1595,7 @@ Ext.AppUx = function (app, menu) {
             "bg_reserve_money_id", "d_ap_reserve",
             "bg_reserve_money_id2", "d_ap_reserve2",
             "bg_reserve_money_id3", "d_ap_reserve3",
+            "erp_reserve_status", "erp_reserve_status2", "erp_reserve_status3",
         ],
     });
 

@@ -13,7 +13,8 @@ include(__DIR__ . "/medsupContractCode.php");
 //   LIST / LIST_ROWS = ประวัติการนำเข้าแต่ละครั้ง / สัญญาที่นำเข้าในครั้งนั้น
 // ไฟล์: 1 แถว = 1 งวด แถวที่ "ลำดับสัญญา" เดียวกันคือสัญญาเดียวกัน (หลายงวด) ข้อมูลหัวสัญญา
 // ของแถวถัดๆ ไปเว้นว่างได้ (ใช้ของแถวแรก) ถ้ากรอกต้องตรงกับแถวแรก
-// รองรับเฉพาะงบ "ปีต่อปี" - งบกันเหลื่อม (ต้องเลือกใบกันเหลื่อม) และการจองเงินทำต่อที่ ST00092
+// งบกันเหลื่อม: กรอกเลขใบกันเหลื่อมที่คอลัมน์ c_overlap (ของแหล่งเงินที่ 1) ว่าง = ปีต่อปี - การจองเงินทำต่อที่ ST00092
+// pr_id / po_id / chk_id = เลขอ้างอิงจากไฟล์ที่ export มา เก็บไว้อ้างอิงเท่านั้น (c_ref_*)
 
 define("MEDSUP_DC_COST_ID", 82);
 
@@ -31,6 +32,88 @@ function imp_json($arr)
 function imp_str($v)
 {
     return trim(str_replace("\xC2\xA0", " ", (string) ($v ?? "")));
+}
+
+// ความยาว/ตัดข้อความแบบนับตัวอักษร UTF-8 (ไม่พึ่ง extension mbstring)
+function imp_len($s)
+{
+    return preg_match_all('/./us', (string) $s);
+}
+
+function imp_cut($s, $max)
+{
+    return preg_match('/^.{0,' . intval($max) . '}/us', (string) $s, $m) ? $m[0] : "";
+}
+
+// สถานะจองเงินในระบบงบของรายการที่ ERP เวชภัณฑ์จองไว้แล้ว - ค้นจาก pr_id / po_id / chk_id ในไฟล์นำเข้า
+// (เลขของฝั่ง ERP เวชภัณฑ์ รายการจองของระบบนั้นอยู่ใต้ i_sys = 2 ใน bg_reserve_money - ดูจากข้อมูลจริง:
+// หน่วยงาน 82/50 อยู่ใต้ i_sys นี้ทั้งหมด และตรงกับรายการที่ ERP ยิงเข้า /procure/ir)
+// อ่านอย่างเดียว ใช้แสดงให้เห็นตอนตรวจสอบ/ดูรายการที่นำเข้า - ไม่ได้เปลี่ยนสถานะ/ปุ่มจองเงินของ ST00092
+// i_reserve: 1 = ขั้น PR, 2 = ขั้นสัญญา (มี po_id), 3 = ขั้นตรวจรับ (มี chk_id)
+define("MEDSUP_ERP_I_SYS", 2);
+
+function imp_reserve_status($db, $prId, $poId, $chkId)
+{
+    static $cache = array();
+    $prId = imp_str($prId);
+    $poId = imp_str($poId);
+    $chkId = imp_str($chkId);
+    if ($prId === "") {
+        return "";
+    }
+    if (!ctype_digit($prId) || strlen($prId) > 18) {
+        return "pr_id ไม่ใช่ตัวเลข ค้นในระบบงบไม่ได้";
+    }
+    if (!isset($cache[$prId])) {
+        $rows = array();
+        $stmt = $db->QueryParam(
+            "select i_reserve, po_id, chk_id, f_amt from " . DB_NMU_EIS . "bg_reserve_money
+              where i_sys = ? and i_enable = 1 and pr_id = ?",
+            array(MEDSUP_ERP_I_SYS, $prId)
+        );
+        while ($stmt && ($r = $db->Fetch($stmt))) {
+            $rows[] = array("st" => intval($r["i_reserve"]), "po" => strval(intval($r["po_id"])), "chk" => strval(intval($r["chk_id"])), "amt" => floatval($r["f_amt"]));
+        }
+        $cache[$prId] = $rows;
+    }
+    $rows = $cache[$prId];
+    if (empty($rows)) {
+        return "ไม่พบการจองในระบบงบ";
+    }
+    $poKey = ctype_digit($poId) ? strval(intval($poId)) : null;
+    $chkKey = ctype_digit($chkId) ? strval(intval($chkId)) : null;
+    $pr = 0;
+    $con = 0;
+    $conN = 0;
+    $conOther = 0;
+    $chk = 0;
+    $chkN = 0;
+    foreach ($rows as $r) {
+        if ($r["st"] === 1) {
+            $pr += $r["amt"];
+        } elseif ($r["st"] === 2) {
+            if ($poKey === null || $r["po"] === $poKey) {
+                $con += $r["amt"];
+                $conN++;
+            } else {
+                $conOther++;
+            }
+        } elseif ($r["st"] === 3 && $chkKey !== null && $r["chk"] === $chkKey && ($poKey === null || $r["po"] === $poKey)) {
+            $chk += $r["amt"];
+            $chkN++;
+        }
+    }
+    if ($conN > 0) {
+        $txt = "จองขั้นสัญญาแล้ว " . number_format($con, 2);
+    } elseif ($pr > 0) {
+        $txt = "จองขั้น PR แล้ว " . number_format($pr, 2) . " (ยังไม่จองขั้นสัญญา" . ($conOther > 0 ? " - po_id ไม่ตรงกับที่จองไว้" : "") . ")";
+    } else {
+        $txt = "พบรายการในระบบงบ แต่ไม่ใช่ขั้น PR/สัญญาของ po_id นี้";
+    }
+    if ($chkN > 0) {
+        $txt .= " / ตรวจรับแล้ว " . number_format($chk, 2);
+    }
+    return $txt;
 }
 
 function imp_num($v)
@@ -87,15 +170,6 @@ function imp_flag($v, $default)
 // คำนวณจาก % กรอก = ใช้ยอดนั้นตรงๆ (แก้เองทับเหมือนในหน้าจอ)
 function imp_vat($in, $total, &$errs)
 {
-    $bVat = imp_flag($in["vat_flag"] ?? "", 1);
-    $bWht = imp_flag($in["wht_flag"] ?? "", 1);
-    $bGuar = imp_flag($in["guar_flag"] ?? "", 0);
-    if ($bVat === null || $bWht === null || $bGuar === null) {
-        $errs[] = "ช่อง มี/ไม่มี ต้องเป็น Y หรือ N";
-    }
-    $bVat = $bVat ?? 1;
-    $bWht = $bWht ?? 1;
-    $bGuar = $bGuar ?? 0;
     $nums = array();
     foreach (array("vat_amt", "vat_pct", "wht_amt", "wht_pct", "penalty", "guar_pct", "other") as $k) {
         $raw = imp_str($in[$k] ?? "");
@@ -103,6 +177,27 @@ function imp_vat($in, $total, &$errs)
         if ($raw !== "" && ($nums[$k] === null || $nums[$k] < 0)) {
             $errs[] = "ช่อง VAT \"{$k}\" ต้องเป็นตัวเลขไม่ติดลบ";
             $nums[$k] = null;
+        }
+    }
+    // [ผู้ใช้ขอ] ตัดคอลัมน์ "(มี/ไม่มี)" ออกจากไฟล์ - ดูจากช่อง (บาท)/(%) แทน:
+    //   VAT / หัก ณ ที่จ่าย : มีเป็นค่าเริ่มต้น - กรอก 0 ที่ช่อง (บาท) หรือ (%) = ไม่มี
+    //   ค่าประกันผลงาน      : มีเมื่อกรอก (%) มากกว่า 0
+    // ไฟล์รุ่นเก่าที่ยังมีคอลัมน์ (มี/ไม่มี) ถ้ากรอกมาก็ยังใช้ค่านั้น (N = ไม่มี)
+    $zero = function ($k) use ($nums) {
+        return $nums[$k] !== null && abs($nums[$k]) < 0.000001;
+    };
+    $bVat = ($zero("vat_amt") || $zero("vat_pct")) ? 0 : 1;
+    $bWht = ($zero("wht_amt") || $zero("wht_pct")) ? 0 : 1;
+    $bGuar = ($nums["guar_pct"] !== null && $nums["guar_pct"] > 0) ? 1 : 0;
+    foreach (array("vat_flag" => "bVat", "wht_flag" => "bWht", "guar_flag" => "bGuar") as $col => $var) {
+        if (imp_str($in[$col] ?? "") === "") {
+            continue;
+        }
+        $f = imp_flag($in[$col], null);
+        if ($f === null) {
+            $errs[] = "ช่อง มี/ไม่มี ต้องเป็น Y หรือ N";
+        } elseif ($f === 0) {
+            $$var = 0;
         }
     }
     $vatPct = $nums["vat_pct"] ?? 7;
@@ -165,8 +260,13 @@ function imp_validate($db, $inputRows)
 
     $deptOk = array("APPS", "APMD", "APMS");
     $typeOk = array("จัดซื้อจะขาย", "ใบสั่งซื้อ", "สัญญา");
+    // c_overlap = เลขใบกันเหลื่อมของแหล่งเงินที่ 1 (ระดับสัญญา - คอลัมน์ c_overlap เดียวกับที่ ST00092 บันทึก
+    // ตอนเลือกใบกันเหลื่อม การจองเงินส่งเลขนี้ให้ API งบ) ว่าง = งบปีต่อปี
     $headerKeys = array("dept", "expense_code", "project", "contract_code", "contract_type",
-        "fund1", "amt1", "fund2", "amt2", "fund3", "amt3", "year", "start", "end", "tax", "vendor");
+        "fund1", "amt1", "fund2", "amt2", "fund3", "amt3", "year", "start", "end", "tax", "vendor", "c_overlap");
+    // pr_id / po_id / chk_id = เลขอ้างอิงจากไฟล์ที่ export มา (เก็บไว้อ้างอิงเท่านั้น ไม่ใช้กับการจองเงิน)
+    // pr_id, po_id เก็บต่องวด (ค่าแรกที่กรอกในแถวของงวดนั้น) chk_id เก็บต่องวด + ต่อรายการรับของของแถวนั้น
+    $refKeys = array("pr_id", "po_id", "chk_id");
 
     $groups = array();     // seq => ข้อมูลหัวสัญญาจากแถวแรก + งวด
     $rowsOut = array();
@@ -232,6 +332,7 @@ function imp_validate($db, $inputRows)
                 "d_doc_dateSub" => $due ?: null, "c_detail" => $pRaw["detail"],
                 "c_fund_source_dtl" => $periodFund, "f_fund_amt_dtl" => $periodAmt,
                 "raw" => $pRaw, "receives" => array(), "rowIdx" => array(),
+                "ref" => array("pr_id" => "", "po_id" => "", "chk_id" => ""),
             );
         } else {
             $pFirst = $groups[$seq]["periods"][$groups[$seq]["pmap"][$pKey]];
@@ -244,6 +345,19 @@ function imp_validate($db, $inputRows)
             }
         }
         $pIdx = $groups[$seq]["pmap"][$pKey];
+        foreach ($refKeys as $rk) {
+            $rv = imp_str($in[$rk] ?? "");
+            if (imp_len($rv) > 50) {
+                $errs[] = "{$rk} ยาวเกิน 50 ตัวอักษร";
+                $rv = "";
+            }
+            if ($rv !== "" && $groups[$seq]["periods"][$pIdx]["ref"][$rk] === "") {
+                $groups[$seq]["periods"][$pIdx]["ref"][$rk] = $rv;
+            }
+        }
+        if (imp_len(imp_str($in["c_overlap"] ?? "")) > 100) {
+            $errs[] = "c_overlap (เลขใบกันเหลื่อม) ยาวเกิน 100 ตัวอักษร";
+        }
         $p = $groups[$seq]["periods"][$pIdx];
 
         // รายการรับของ (dtl ของหน้าส่งมอบงาน) - ไม่บังคับ กรอกช่องใดช่องหนึ่ง = มีรายการรับของ
@@ -253,6 +367,7 @@ function imp_validate($db, $inputRows)
             "d_receive_date" => imp_date($in["rc_date"] ?? ""),
             "c_detail" => imp_str($in["rc_detail"] ?? ""),
             "f_amt" => imp_num($in["rc_amt"] ?? ""),
+            "c_ref_chk_id" => imp_cut(imp_str($in["chk_id"] ?? ""), 50),
         );
         $hasRc = $rc["c_receive_code"] !== "" || $rc["c_erp_stock_code"] !== "" || imp_str($in["rc_date"] ?? "") !== ""
             || $rc["c_detail"] !== "" || imp_str($in["rc_amt"] ?? "") !== "";
@@ -290,6 +405,9 @@ function imp_validate($db, $inputRows)
             "calc_before" => $money ? $money["before"] : null, "calc_vat" => $money ? $money["vat"] : null,
             "calc_wht" => $money ? $money["wht"] : null, "calc_guar" => $money ? $money["guar"] : null,
             "calc_pay" => $money ? $money["pay"] : null,
+            // สถานะจองเงินในระบบงบ (ของฝั่ง ERP เวชภัณฑ์) จาก pr_id/po_id ของงวด + chk_id ของแถวนี้
+            "rsv_status" => imp_reserve_status($db, $groups[$seq]["periods"][$pIdx]["ref"]["pr_id"],
+                $groups[$seq]["periods"][$pIdx]["ref"]["po_id"], $in["chk_id"] ?? ""),
             "errs" => $errs, "warns" => $warns,
         );
     }
@@ -320,6 +438,7 @@ function imp_validate($db, $inputRows)
             $cErrs[] = "ประเภทของสัญญาต้องเป็น จัดซื้อจะขาย / ใบสั่งซื้อ / สัญญา";
         }
 
+        $c["c_overlap"] = $h["c_overlap"];
         $c["c_contract_code"] = $h["contract_code"];
         if ($h["contract_code"] !== "") {
             if (isset($fileCodes[$h["contract_code"]])) {
@@ -442,6 +561,27 @@ function imp_validate($db, $inputRows)
             }
         }
 
+        // เลขใบกันเหลื่อม (c_overlap ของแหล่งเงินที่ 1): ต้องเป็นใบกันของหน่วยงานเวชภัณฑ์ที่มีจริงในระบบงบ
+        // (view เดียวกับ dropdown ใบกันเหลื่อมของ ST00092) และแหล่งเงินที่ 1 ต้องตรงกับแหล่งเงินของใบกัน
+        // (ST00092 ล็อกแหล่งเงินตามใบกันเหมือนกัน) - ปีของใบกันเก็บลง i_budget_year_overlap ให้อัตโนมัติ
+        // (ST00092 ใช้ปีนี้โหลดรายการใบกันตอนเปิดสัญญา)
+        $c["i_budget_year_overlap"] = null;
+        if ($c["c_overlap"] !== "") {
+            $ov = $db->GetDataBySQL(
+                "select top 1 i_year, dc_expense_budget_type_id from " . DB_NMU_EIS . "vw_bg_budget_overlap
+                  where c_code_ref = ? and dc_cost_id = ? order by i_year desc",
+                array($c["c_overlap"], MEDSUP_DC_COST_ID)
+            );
+            if (!$ov) {
+                $cErrs[] = "ไม่พบใบกันเหลื่อมเลขที่ {$c["c_overlap"]} ของหน่วยงานเวชภัณฑ์ในระบบงบประมาณ";
+            } else {
+                $c["i_budget_year_overlap"] = intval($ov["i_year"]);
+                if (!empty($c["dc_expense_budget_type_id"]) && intval($ov["dc_expense_budget_type_id"]) !== intval($c["dc_expense_budget_type_id"])) {
+                    $cErrs[] = "แหล่งเงินที่ 1 ไม่ตรงกับแหล่งเงินของใบกันเหลื่อม {$c["c_overlap"]}";
+                }
+            }
+        }
+
         $c["periods"] = $g["periods"];
         $contracts[] = $c;
 
@@ -539,6 +679,13 @@ switch ($mode) {
             $ok = false;
         }
 
+        // คอลัมน์เก็บเลขอ้างอิง pr_id/po_id/chk_id เพิ่มโดย scriptBaseUpdate/sp_tor_period_bill_import_ref.sql
+        // (ยังไม่ได้รันสคริปต์ = นำเข้าได้ตามปกติ แค่ไม่เก็บเลขอ้างอิง 3 ตัวนี้)
+        $hasRefBill = intval($db->GetDataBySQL(
+            "select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill', 'c_ref_pr_id') is null then 0 else 1 end", array())) === 1;
+        $hasRefReceive = intval($db->GetDataBySQL(
+            "select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_ref_chk_id') is null then 0 else 1 end", array())) === 1;
+
         $codes = array();
         $now = date("Y-m-d H:i:s");
         foreach ($v["contracts"] as $c) {
@@ -594,7 +741,15 @@ switch ($mode) {
                     "dc_user_update_id" => $_SESSION["user_id"] ?? null,
                     "dc_user_update_cost_id" => $_SESSION["dc_cost_id"] ?? null,
                     "d_update" => $now,
+                    // เลขใบกันเหลื่อมของแหล่งเงินที่ 1 (ว่าง = ปีต่อปี)
+                    "c_overlap" => ($c["c_overlap"] ?? "") !== "" ? $c["c_overlap"] : null,
+                    "i_budget_year_overlap" => $c["i_budget_year_overlap"] ?? null,
                 );
+                if ($hasRefBill) {
+                    foreach (array("pr_id", "po_id", "chk_id") as $rk) {
+                        $data["c_ref_" . $rk] = ($p["ref"][$rk] ?? "") !== "" ? $p["ref"][$rk] : null;
+                    }
+                }
                 $fields = implode(", ", array_keys($data));
                 $marks = implode(", ", array_fill(0, count($data), "?"));
                 $stmtP = $db->QueryParam(
@@ -616,18 +771,22 @@ switch ($mode) {
                     // draft_* ชุดเดียวกับปุ่ม "แก้ไข VAT" > บันทึกร่าง ที่หน้าส่งมอบงาน
                     // draft_f_total_vat = จำนวนเงินรับของ (ถอด VAT) ให้ medsupRowMoney ใช้ยอดที่บันทึกไว้
                     $vt = $rc["vat"];
+                    $rcParams = array($periodBillId, $rc["c_receive_code"], $rc["d_receive_date"] ?: null, $rc["c_detail"], $rc["f_amt"], $rc["c_erp_stock_code"],
+                        $_SESSION["user_id"] ?? null, $_SESSION["dc_cost_id"] ?? null,
+                        $rc["f_amt"], $vt["b_vat"], $vt["vat_pct"], $vt["vat"],
+                        $vt["b_wht"], $vt["wht_pct"], $vt["wht"],
+                        $vt["penalty"], $vt["b_guar"], $vt["guar_pct"], $vt["other"]);
+                    if ($hasRefReceive) {
+                        $rcParams[] = ($rc["c_ref_chk_id"] ?? "") !== "" ? $rc["c_ref_chk_id"] : null;
+                    }
                     if (!$db->QueryParam(
                         "SET NOCOUNT ON; INSERT INTO NMU_ERP.dbo.sp_tor_period_bill_receive
                             (sp_tor_period_bill_id, c_receive_code, d_receive_date, c_detail, f_amt, c_erp_stock_code, i_enabled, dc_user_create_id, dc_user_create_cost_id, d_create
                             , draft_f_total_vat, draft_b_vat, draft_f_vat_percent, draft_f_vat_amt
                             , draft_b_wht, draft_f_wht_percent, draft_f_wht_amt
-                            , draft_f_penalty, draft_b_guarantee, draft_f_guarantee_percent, draft_f_other)
-                         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-                        array($periodBillId, $rc["c_receive_code"], $rc["d_receive_date"] ?: null, $rc["c_detail"], $rc["f_amt"], $rc["c_erp_stock_code"],
-                            $_SESSION["user_id"] ?? null, $_SESSION["dc_cost_id"] ?? null,
-                            $rc["f_amt"], $vt["b_vat"], $vt["vat_pct"], $vt["vat"],
-                            $vt["b_wht"], $vt["wht_pct"], $vt["wht"],
-                            $vt["penalty"], $vt["b_guar"], $vt["guar_pct"], $vt["other"])
+                            , draft_f_penalty, draft_b_guarantee, draft_f_guarantee_percent, draft_f_other" . ($hasRefReceive ? ", c_ref_chk_id" : "") . ")
+                         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" . ($hasRefReceive ? ", ?" : "") . ");",
+                        $rcParams
                     )) {
                         $ok = false;
                         break 2;
@@ -678,10 +837,17 @@ switch ($mode) {
     case "LIST_ROWS":
         $data = array();
         // 1 แถว = 1 รายการรับของ (งวดที่ไม่มีรายการรับของ = 1 แถว ช่องรับของว่าง)
+        // เลขอ้างอิง pr_id/po_id/chk_id (คอลัมน์จาก scriptBaseUpdate/sp_tor_period_bill_import_ref.sql - ยังไม่มีก็แสดงว่าง)
+        $refSel = intval($db->GetDataBySQL(
+            "select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill', 'c_ref_pr_id') is null
+                           or COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_ref_chk_id') is null then 0 else 1 end", array())) === 1
+            ? ", b.c_ref_pr_id, b.c_ref_po_id, isnull(r.c_ref_chk_id, b.c_ref_chk_id) as c_ref_chk_id"
+            : ", cast(null as varchar(50)) as c_ref_pr_id, cast(null as varchar(50)) as c_ref_po_id, cast(null as varchar(50)) as c_ref_chk_id";
         $stmt = $db->QueryParam(
             "select b.sp_tor_period_bill_hdr_id, b.c_contract_code, b.c_ap_dept_type, b.c_project_name, b.c_contract_type, b.c_creditor_name, b.i_budget_year
                 , b.i_period, b.c_doc_ref, convert(varchar, b.d_doc_dateSub, 120) as d_doc_dateSub, b.c_detail, b.c_fund_source_dtl, b.f_fund_amt_dtl
                 , r.c_receive_code, r.c_erp_stock_code, convert(varchar, r.d_receive_date, 120) as d_receive_date, r.c_detail as rc_detail, r.f_amt as rc_amt
+                , b.c_overlap {$refSel}
              from NMU_ERP.dbo.sp_tor_period_bill b
              left join NMU_ERP.dbo.sp_tor_period_bill_receive r on r.sp_tor_period_bill_id = b.sp_tor_period_bill_id and r.i_enabled = 1
              where b.sp_tor_period_bill_import_id = ? and b.i_enabled = 1
@@ -708,6 +874,12 @@ switch ($mode) {
                 "d_receive_date" => empty($r["d_receive_date"]) ? "" : $date->extDateBuddha($r["d_receive_date"]),
                 "rc_detail" => $r["rc_detail"],
                 "rc_amt" => is_null($r["rc_amt"]) ? "" : number_format(floatval($r["rc_amt"]), 2),
+                "pr_id" => $r["c_ref_pr_id"],
+                "po_id" => $r["c_ref_po_id"],
+                "chk_id" => $r["c_ref_chk_id"],
+                "c_overlap" => $r["c_overlap"],
+                // สถานะจองเงินในระบบงบ ณ ตอนที่เปิดดู (ค้นสดจากเลขอ้างอิงที่เก็บไว้)
+                "rsv_status" => imp_reserve_status($db, $r["c_ref_pr_id"], $r["c_ref_po_id"], $r["c_ref_chk_id"]),
             );
         }
         imp_json(array("data" => $data, "totalCount" => count($data)));

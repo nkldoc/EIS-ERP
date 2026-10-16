@@ -27,6 +27,7 @@ Ext.storeMedSupPrList = new Ext.data.JsonStore({
         "dc_expense_budget_type_id2", "c_fund_source2", "f_fund_amt2", "i_pr_type2",
         "dc_expense_budget_type_id3", "c_fund_source3", "f_fund_amt3", "i_pr_type3",
         "i_purchase", "i_product_type", "c_pr_doc_ref", "d_pr_doc_ref",
+        "bg_reserve_money_id", "d_ap_reserve", "bg_reserve_money_id2", "d_ap_reserve2", "bg_reserve_money_id3", "d_ap_reserve3",
         "d_create", "c_create_name",
     ],
 });
@@ -84,10 +85,22 @@ Ext.storeMedSupApDeptType = new Ext.data.JsonStore({
     autoDestroy: false,
     autoLoad: false,
     data: [
-        {id: "APPS", c_name: "APPS - พัสดุ"},
-        {id: "APMD", c_name: "APMD - เภสัช"},
-        {id: "APMS", c_name: "APMS - เวชภัณฑ์"},
+        {id: "APPS", c_name: "APPS - พัสดุ", dc_cost_id: 38},
+        {id: "APMD", c_name: "APMD - เภสัช", dc_cost_id: 50},
+        {id: "APMS", c_name: "APMS - เวชภัณฑ์", dc_cost_id: 82},
     ],
+});
+// แมพ "ประเภท" กับหน่วยงานจริงใน dc_cost (38 ฝ่ายพัสดุ / 50 ฝ่ายเภสัชกรรม / 82 งานเวชภัณฑ์ฯ)
+// แทนข้อความคงที่ - ชื่อดึงจาก dc_cost เมื่อโหลดเสร็จ
+Ext.MEDSUP_AP_DEPT_COST = {APPS: 38, APMD: 50, APMS: 82};
+Ext.storeMedSupCost.on("load", function (st) {
+    Ext.storeMedSupApDeptType.each(function (r) {
+        var idx = st.find("id", String(r.get("dc_cost_id")));
+        if (idx >= 0) {
+            r.set("c_name", r.get("id") + " - " + st.getAt(idx).get("c_name"));
+        }
+    });
+    Ext.storeMedSupApDeptType.commitChanges();
 });
 
 function yearThMedSupPr() {
@@ -147,11 +160,24 @@ function winAddMedSupPr(rec) {
     // เลือกได้ทุกหน่วยงาน (ไม่ล็อกเหมือนเมนูเวชภัณฑ์อื่นๆ) เพราะเจ้าหน้าที่จากหน่วยงาน
     // อื่นก็อาจเข้ามาบันทึก PR แทนได้ - default ไว้ที่เวชภัณฑ์การแพทย์ (82) เพราะเมนูนี้
     // ใช้งานหลักโดยฝ่ายเวชภัณฑ์
+    // หน่วยงานของผู้ใช้ที่ล็อกอินถ้าเป็นหนึ่งใน พัสดุ(38)/เภสัช(50)/เวชภัณฑ์(82) -> รหัสประเภท
+    var userApDept = (function () {
+        // admin (user_id = 1 ตามที่ระบบอื่นใช้) ไม่ถูกล็อกเสมอ ไม่ว่าจะสังกัดหน่วยงานไหน
+        if (parseInt(Ext.session && Ext.session.user_id) === 1) { return null; }
+        var uc = parseInt(Ext.session && Ext.session.dc_cost_id);
+        for (var k in Ext.MEDSUP_AP_DEPT_COST) {
+            if (Ext.MEDSUP_AP_DEPT_COST[k] === uc) { return k; }
+        }
+        return null;
+    })();
     var dc_cost_idFld = new Ext.form.ComboBox({
         fieldLabel: "หน่วยงานเจ้าของเรื่อง", width: 300,
         store: Ext.storeMedSupCost, mode: "local", valueField: "id", displayField: "c_name",
         triggerAction: "all", forceSelection: true, typeAhead: false,
-        emptyText: "กรุณาเลือกหน่วยงาน...", value: MEDSUP_DC_COST_ID,
+        emptyText: "กรุณาเลือกหน่วยงาน...",
+        value: userApDept ? Ext.MEDSUP_AP_DEPT_COST[userApDept] : MEDSUP_DC_COST_ID,
+        // ผู้ใช้ พัสดุ/เภสัช/เวชภัณฑ์ ล็อกเป็นหน่วยงานตัวเอง (ไม่มี dropdown) - admin เลือกเองได้
+        readOnly: !!userApDept, hideTrigger: !!userApDept,
     });
 
     // ขอดำเนินการ (1=จัดซื้อ/2=จัดจ้าง/3=จัดเช่า) - ค่า/ชื่อตรงกับเมนู PR ทั่วไป
@@ -178,13 +204,50 @@ function winAddMedSupPr(rec) {
         store: Ext.storeMedSupPoExpense, mode: "local", valueField: "id", displayField: "c_name",
         triggerAction: "all", forceSelection: true, typeAhead: false,
         emptyText: "กรุณาเลือกค่าใช้จ่าย...",
+        // เภสัช/เวชภัณฑ์ ล็อกค่าใช้จ่ายเป็นค่าเริ่มต้นด้านล่าง (ไม่มี dropdown) - พัสดุ/admin เลือกเองได้
+        readOnly: userApDept === "APMD" || userApDept === "APMS",
+        hideTrigger: userApDept === "APMD" || userApDept === "APMS",
     });
+
+    // ค่าเริ่มต้น "030300090001 : ค่ายาและเวชภัณฑ์ อวัยวะเทียม" (bg_expense_id 133) สำหรับ
+    // เภสัช/เวชภัณฑ์ - เฉพาะโหมดสร้างใหม่ (โหมดแก้ไขใช้ค่าเดิมของ PR) ต้องรอ store โหลดเสร็จ
+    // ก่อน ไม่งั้น combo จะโชว์เป็นเลข id ดิบ
+    if (!isEdit && (userApDept === "APMD" || (userApDept || "APMS") === "APMS")) {
+        var setDefaultExpense = function () {
+            var r = Ext.storeMedSupPoExpense.getById("133");
+            if (r && !po_expense_idFld.getValue()) {
+                po_expense_idFld.setValue(r.get("id"));
+            }
+        };
+        if (Ext.storeMedSupPoExpense.getCount() > 0) {
+            setDefaultExpense();
+        } else {
+            Ext.storeMedSupPoExpense.on("load", setDefaultExpense, null, {single: true});
+        }
+    }
 
     var c_ap_dept_typeFld = new Ext.form.ComboBox({
         fieldLabel: "ประเภท", width: 200,
         store: Ext.storeMedSupApDeptType, mode: "local", valueField: "id", displayField: "c_name",
         triggerAction: "all", forceSelection: true, typeAhead: false, editable: false,
-        value: "APMS",
+        // ผู้ใช้ของ พัสดุ/เภสัช/เวชภัณฑ์ ล็อกประเภทตามหน่วยงานตัวเอง (ไม่มี dropdown ให้เลือก)
+        // ผู้ใช้หน่วยงานอื่น (เช่น admin) ยังเลือกเองได้ โดยเริ่มที่ APMS เหมือนเดิม
+        value: userApDept || "APMS",
+        readOnly: !!userApDept, hideTrigger: !!userApDept,
+        // ผู้ใช้ที่ถูกล็อกจะเหลือรายการเดียวคือของหน่วยงานตัวเอง (admin/หน่วยงานอื่นเห็นครบ 3 รายการ)
+        listeners: {
+            beforerender: function () {
+                if (userApDept) {
+                    Ext.storeMedSupApDeptType.clearFilter();
+                    Ext.storeMedSupApDeptType.filter("id", userApDept);
+                } else {
+                    Ext.storeMedSupApDeptType.clearFilter();
+                }
+            },
+            select: function (cb, rec) {
+                dc_cost_idFld.setValue(rec.get("dc_cost_id"));
+            },
+        },
     });
 
     // แหล่งเงินที่ 1 (แสดงตลอด) - แบบแผน/แบบงวด ต่อแหล่ง (ผูกกับ i_pr_type/2/3 ที่มีอยู่
@@ -369,6 +432,79 @@ function winAddMedSupPr(rec) {
         });
     }
 
+    // ===== จองเงินขั้น PR (ตามระบบ ERP เดิม: i_reserve 1 ตัดจากงบตรงๆ) - ใช้ได้เฉพาะ PR ที่
+    // บันทึกแล้ว (โหมดแก้ไข) ต่อแหล่งเงินที่ 1/2/3 - จองตามค่าที่บันทึกไว้ใน DB ของ PR นั้น
+    // ถ้าจองแล้วแก้ไข/ลบ PR ไม่ได้จนกว่าจะยกเลิกการจอง (backend บังคับ) และต้องจอง PR ก่อน
+    // ถึงจะจองเงินขั้นสัญญาที่เมนู ST00092 ได้ ผลลัพธ์แสดงลิงก์ API ที่ส่งไปด้วยเพื่อตรวจสอบ
+    function showReserveResult(jd) {
+        console.log("PR reserve result:", jd.sent, jd);
+        Ext.Msg.alert(jd.reval === 0 ? "สำเร็จ" : "ผิดพลาด", jd.msg + (jd.sent ? "<br><br><b>ลิงก์ API ที่ส่ง (แยกทีละลิงก์ - อย่าเปิดในเบราว์เซอร์ เพราะเป็นการสั่งจอง/ยกเลิกจริง):</b><br><span style='font-size:11px;word-break:break-all;'>" + Ext.util.Format.htmlEncode(jd.sent).split("  ➜  ").join("<br><br>") + "</span>" : ""), function () {
+            if (jd.reval === 0) {
+                Ext.storeMedSupPrList.reload();
+                win.destroy();
+            }
+        });
+    }
+    function callReserve(mode, n) {
+        win.getEl().mask("กรุณารอสักครู่...", "x-mask-loading");
+        Ext.Ajax.request({
+            url: "tor/api/mnMedSupPeriodBillController.php",
+            method: "POST",
+            params: {mode: mode, level: "pr", sp_tor_period_bill_hdr_id: rec.get("sp_tor_period_bill_hdr_id"), slot: n},
+            success: function (response) {
+                win.getEl().unmask();
+                showReserveResult(Ext.decode(response.responseText));
+            },
+            failure: function () {
+                win.getEl().unmask();
+                Ext.Msg.alert("ผิดพลาด", "เชื่อมต่อไม่สำเร็จ");
+            },
+        });
+    }
+    function buildReserveRow(n) {
+        var sfx = n === 1 ? "" : String(n);
+        var fundId = isEdit ? rec.get("dc_expense_budget_type_id" + sfx) : 0;
+        var reserveId = isEdit ? rec.get("bg_reserve_money_id" + sfx) : "";
+        return {
+            xtype: "compositefield", fieldLabel: "จองเงินแหล่งที่ " + n, anchor: "98%",
+            hidden: !(isEdit && fundId > 0),
+            items: [
+                {
+                    xtype: "displayfield", width: 430,
+                    value: reserveId
+                        ? "<span style='color:green;font-weight:bold;'>จองเงินแล้ว (รหัสอ้างอิง " + reserveId + ")</span> เมื่อ " + (rec.get("d_ap_reserve" + sfx) || "")
+                        : "<span style='color:red;'>ยังไม่ได้จองเงิน</span>",
+                },
+                new Ext.Toolbar.Button({
+                    text: "จองเงิน", iconCls: "icon-add", hidden: !!reserveId,
+                    handler: function () {
+                        var amt = parseFloat(String(rec.get("f_fund_amt" + sfx) || "0").replace(/,/g, "")) || 0;
+                        Ext.Msg.confirm(
+                            "ยืนยันการจองเงิน",
+                            "<b>แหล่งเงินที่ " + n + ":</b> " + Ext.util.Format.htmlEncode(rec.get("c_fund_source" + sfx) || "") + "<br>"
+                            + "<b>ค่าใช้จ่าย:</b> " + Ext.util.Format.htmlEncode(rec.get("c_expense_name") || "") + "<br>"
+                            + "<b>จำนวนเงินที่จอง: " + Ext.floatRenderer(amt) + " บาท</b> (ตามที่บันทึกไว้)<br><br>"
+                            + "<span style='color:red;font-weight:bold;'>ระบบจะตัดงบประมาณจริงทันที หากจองผิดสามารถกดปุ่ม \"ยกเลิกการจองเงิน\" หรือติดต่อฝ่ายการคลัง</span><br><br>"
+                            + "ต้องการจองเงินใช่หรือไม่?",
+                            function (btn) { if (btn === "yes") { callReserve("RESERVE_FUND_SOURCE", n); } }
+                        );
+                    },
+                }),
+                new Ext.Toolbar.Button({
+                    text: "ยกเลิกการจองเงิน", iconCls: "icon-drop", hidden: !reserveId,
+                    handler: function () {
+                        Ext.Msg.confirm(
+                            "ยืนยันการยกเลิกการจองเงิน",
+                            "ต้องการยกเลิกการจองเงินแหล่งเงินที่ " + n + " และคืนเงินกลับงบประมาณใช่หรือไม่?",
+                            function (btn) { if (btn === "yes") { callReserve("CANCEL_RESERVE_FUND_SOURCE", n); } }
+                        );
+                    },
+                }),
+            ],
+        };
+    }
+    var anyReserved = isEdit && ["", "2", "3"].some(function (s) { return !!rec.get("bg_reserve_money_id" + s); });
+
     var win = new Ext.Window({
         title: isEdit ? "แก้ไข PR" : "ข้อมูลรายละเอียด PR",
         buttonAlign: "left",
@@ -418,6 +554,10 @@ function winAddMedSupPr(rec) {
                 items: [dc_expense_budget_type_id3Fld, i_pr_type3Fld, f_fund_amt3Fld, removeFund3Btn],
             },
             f_totalDisplayFld,
+            // สถานะ/ปุ่มจองเงินขั้น PR ต่อแหล่งเงิน (โหมดแก้ไขเท่านั้น - ต้องบันทึก PR ก่อน)
+            buildReserveRow(1),
+            buildReserveRow(2),
+            buildReserveRow(3),
             {
                 xtype: "displayfield", hideLabel: true,
                 value: "<span style='font-size:12px;color:#000;font-weight:bold;'>รหัสเอกสารอ้างอิง <span style='color:red'>*</span> ชื่อเรื่อง/หน่วยงาน/จำนวนเงิน ระบบจะแจ้งหากซ้ำ</span>",
@@ -430,7 +570,8 @@ function winAddMedSupPr(rec) {
             modesubFld,
         ],
         buttons: [
-            {text: "บันทึกรายการ", iconCls: "icon-save", handler: saveNewPr},
+            // PR ที่จองเงินแล้วแก้ไขไม่ได้ (backend ปฏิเสธ) - ปิดปุ่มให้เห็นชัดว่าต้องยกเลิกจองก่อน
+            {text: anyReserved ? "บันทึกรายการ (จองเงินแล้ว แก้ไขไม่ได้)" : "บันทึกรายการ", iconCls: "icon-save", disabled: anyReserved, handler: saveNewPr},
             {text: Ext.GLOBAL_BU_BACK_TH, iconCls: "icon-clear", handler: function () { win.destroy(); }},
         ],
     });
@@ -521,6 +662,21 @@ Ext.AppUx = function (app, menu) {
                 },
                 {header: "แหล่งเงินที่ 1", dataIndex: "c_fund_source", width: 150},
                 {header: "จำนวนเงิน", dataIndex: "f_fund_amt", width: 100, align: "right"},
+                {
+                    // จองเงินขั้น PR (i_reserve 1) ต่อแหล่งเงิน - ต้องจองก่อนถึงจะจองเงินขั้นสัญญาที่
+                    // เมนู "บันทึกรายละเอียดในสัญญา (เวชภัณฑ์)" ได้ (ตามระบบ ERP เดิม)
+                    header: "สถานะจองเงิน", width: 110, align: "center", dataIndex: "bg_reserve_money_id",
+                    renderer: function (v, meta, r) {
+                        var n = 0;
+                        var total = 0;
+                        ["", "2", "3"].forEach(function (s) {
+                            if (r.get("dc_expense_budget_type_id" + s) > 0) { total++; }
+                            if (r.get("bg_reserve_money_id" + s)) { n++; }
+                        });
+                        if (n === 0) { return "<span style='color:red;'>ยังไม่จอง</span>"; }
+                        return "<span style='color:green;'>จองแล้ว " + n + "/" + total + "</span>";
+                    },
+                },
                 {header: "รหัสเอกสารอ้างอิง", dataIndex: "c_pr_doc_ref", width: 130},
                 {header: "วันที่สร้าง", dataIndex: "d_create", width: 130},
                 {header: "ผู้สร้างรายการ", dataIndex: "c_create_name", width: 150},
@@ -559,7 +715,12 @@ Ext.AppUx = function (app, menu) {
                                     url: "tor/api/mnMedSupPeriodBillController.php",
                                     method: "POST",
                                     params: {mode: "DELETE", sp_tor_period_bill_hdr_id: record.get("sp_tor_period_bill_hdr_id")},
-                                    success: function () {
+                                    success: function (response) {
+                                        // ถ้าจองเงินอยู่ backend จะปฏิเสธการลบ (reval 1) ต้องยกเลิกจองก่อน
+                                        var res = Ext.decode(response.responseText);
+                                        if (res.reval === 1) {
+                                            Ext.Msg.alert("แจ้งเตือน", res.msg || "ลบไม่สำเร็จ");
+                                        }
                                         Ext.storeMedSupPrList.reload();
                                     },
                                     failure: function () {

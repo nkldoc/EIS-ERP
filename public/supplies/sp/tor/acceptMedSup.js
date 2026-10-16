@@ -3,14 +3,63 @@
 // เมนู "ตรวจรับ (เวชภัณฑ์)" (ST00096) - คิวรอออกเลข AP ต่อจากเมนู "ส่งมอบงาน (เวชภัณฑ์)"
 // (ST00095) ที่ออกเลข IR ไว้แล้ว อ่าน/เขียนตาราง sp_tor_period_bill_receive ตัวเดียวกัน
 // 1 แถวในกริดหลัก = 1 เลข IR (รวมยอด/จำนวนรายการย่อยทุกแถวที่แชร์เลข IR เดียวกัน) แสดง
-// เฉพาะที่ยังไม่ออกเลข AP เท่านั้น - ออกเลข AP แล้วหลุดคิวนี้ไปเอง แก้ไข/ลบรายการย่อยดิบ
-// ทำที่เมนู "ส่งมอบงาน (เวชภัณฑ์)" เท่านั้น เมนูนี้ทำได้แค่ดูรายละเอียด + ออกเลข AP
+// ทั้งที่ยังไม่ออกเลข AP และออกไปแล้ว (ผู้ใช้ต้องการเห็นรายการที่ออกเลข AP ไปแล้วค้างอยู่
+// ในหน้านี้ด้วย ไม่ให้หายไปจากคิว - ดู type=medsup_ir_pending_ap ใน List_MedSupPeriodBill.php)
+// แก้ไข/ลบรายการย่อยดิบทำที่เมนู "ส่งมอบงาน (เวชภัณฑ์)" เท่านั้น เมนูนี้ทำได้แค่ดู
+// รายละเอียด + ออกเลข AP
 
 // Ext.floatRenderer (ตัว global ของระบบ) คืนค่า "" (ว่าง) เมื่อ value เป็น 0 (falsy) -
 // ครอบอีกชั้นให้ขึ้น "0.00" แทนปล่อยว่างตอนแสดงยอดเงิน
 function moneyStrAccept(v) {
     return Ext.floatRenderer(v) || "0.00";
 }
+
+// Ext.floatRenderer ตัดทศนิยมตำแหน่งที่ 3 เป็นต้นไปทิ้งเฉยๆ (ตัดปัด ไม่ใช่ปัดเศษ) ทำให้
+// ค่าที่หารไม่ลงตัว เช่น 100/1.07=93.4579... แสดงผลผิดเป็น 93.45 ทั้งที่ปัดแบบ 5/4 ที่ถูก
+// ต้องคือ 93.46 - ปัดเศษให้ถูกต้อง (round half up) เป็น 2 ตำแหน่งก่อนเสมอ ก่อนส่งเข้า
+// moneyStrAccept ทุกครั้งที่เป็นยอดเงินที่คำนวณได้
+// ห้ามใช้ Math.round(v * 100) / 100 (แม้บวก Number.EPSILON แล้ว) - floating point ทำให้ปัด
+// ลงผิดที่ .xx5 จริง เช่น 64.50 x 7% = 4.515 -> ได้ 4.51 (ที่ถูกคือ 4.52) ตัดเศษ float ทิ้ง
+// ด้วย toPrecision(12) ก่อน แล้วเลื่อนทศนิยมผ่านสตริง "e2"/"e-2" - สูตรเดียวกับ round2 ใน
+// deliverWorkMedSup.js และ round() ของ PHP ฝั่ง SAVE_CHECKING
+function round2Accept(v) {
+    var n = Number(Number(v).toPrecision(12));
+    if (!isFinite(n) || Math.abs(n) < 0.000001) {
+        return 0;
+    }
+    var sign = n < 0 ? -1 : 1;
+    return sign * Number(Math.round(Number(Math.abs(n) + "e2")) + "e-2");
+}
+
+// คัดลอกข้อความไปคลิปบอร์ด - ใช้ Clipboard API สมัยใหม่ก่อน ถ้าใช้ไม่ได้ (เช่นเปิดผ่าน
+// http ไม่ใช่ https/localhost) fallback เป็นวิธี textarea + execCommand แบบเดิม
+Ext.fnCopyToClipboard = function (text) {
+    if (!text) {
+        return;
+    }
+    function fallbackCopy() {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+            document.execCommand("copy");
+        } catch (e) {
+            // เงียบไว้ - ไม่มีอะไรทำต่อได้ถ้าเบราว์เซอร์ไม่รองรับจริงๆ
+        }
+        document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+            Ext.example && Ext.example.msg ? Ext.example.msg("คัดลอกแล้ว", text) : null;
+        }, fallbackCopy);
+    } else {
+        fallbackCopy();
+    }
+};
 
 Ext.storeAcceptMedSupList = new Ext.data.JsonStore({
     autoDestroy: false,
@@ -171,50 +220,116 @@ function winCheckingDetailTab(rec) {
     var FORM_WIDTH = 1000;
     var AMT_WIDTH = 100;
 
-    var f_total_vatFld = new Ext.form.NumberField({fieldLabel: "จำนวนเงินรวม VAT", width: 200, value: periodTotal});
+    // "รายละเอียดเงิน" ทั้งหมดแก้ไขที่หน้านี้ไม่ได้ (ผู้ใช้ยืนยัน) - ค่าเริ่มต้นดึงจาก "ร่าง
+    // VAT" ที่กรอกไว้ที่หน้าส่งมอบงาน (ST00095 ปุ่ม "แก้ไข VAT") มาตรงๆ ผ่าน
+    // medsup_checking_by_ir (ดูตอนโหลดท้ายฟังก์ชัน) จะแก้ยอดต้องกลับไปแก้ที่หน้าส่งมอบงาน
+    // ช่องทั้งหมดยังเป็น NumberField/Checkbox เดิม (saveChecking อ่านค่าส่งไปบันทึกเหมือนเดิม)
+    // แค่ล็อกไม่ให้พิมพ์/ติ๊ก
+    var RO_STYLE = "background:#f0f0f0;";
+    var f_total_vatFld = new Ext.form.NumberField({fieldLabel: "จำนวนเงินรวม VAT", width: 200, value: 0, readOnly: true, style: RO_STYLE});
     var f_before_vatFld = new Ext.form.DisplayField({fieldLabel: "จำนวนเงินก่อน VAT", width: 200, value: "0.00"});
-    var b_vatChk = new Ext.form.Checkbox({boxLabel: "", width: 22, checked: true});
-    var f_vat_amtFld = new Ext.form.DisplayField({width: AMT_WIDTH, value: "0.00", style: "font-weight:bold;color:#c00;"});
-    var f_vat_percentFld = new Ext.form.NumberField({width: 45, value: 7});
+    var b_vatChk = new Ext.form.Checkbox({boxLabel: "", width: 22, checked: true, disabled: true});
+    var f_vat_amtFld = new Ext.form.NumberField({width: AMT_WIDTH, value: "0.00", readOnly: true, style: RO_STYLE + "font-weight:bold;color:#c00;"});
+    var f_vat_percentFld = new Ext.form.NumberField({width: 45, value: 7, readOnly: true, style: RO_STYLE});
     var f_request_amtFld = new Ext.form.DisplayField({fieldLabel: "จำนวนเงินขอเบิก", width: 200, value: "0.00"});
-    var b_whtChk = new Ext.form.Checkbox({boxLabel: "", width: 22, checked: true});
-    var f_wht_amtFld = new Ext.form.DisplayField({width: AMT_WIDTH, value: "0.00", style: "font-weight:bold;color:#c00;"});
-    var f_wht_percentFld = new Ext.form.NumberField({width: 45, value: 1});
-    var f_penaltyFld = new Ext.form.NumberField({fieldLabel: "ค่าปรับ", width: 200, value: 0});
-    var b_guaranteeChk = new Ext.form.Checkbox({boxLabel: "", width: 22, checked: false});
+    var b_whtChk = new Ext.form.Checkbox({boxLabel: "", width: 22, checked: true, disabled: true});
+    var f_wht_amtFld = new Ext.form.NumberField({width: AMT_WIDTH, value: "0.00", readOnly: true, style: RO_STYLE + "font-weight:bold;color:#c00;"});
+    var f_wht_percentFld = new Ext.form.NumberField({width: 45, value: 1, readOnly: true, style: RO_STYLE});
+    var f_penaltyFld = new Ext.form.NumberField({fieldLabel: "ค่าปรับ", width: 200, value: 0, readOnly: true, style: RO_STYLE});
+    var b_guaranteeChk = new Ext.form.Checkbox({boxLabel: "", width: 22, checked: false, disabled: true});
     var f_guarantee_amtFld = new Ext.form.DisplayField({width: AMT_WIDTH, value: "0.00", style: "font-weight:bold;color:#c00;"});
-    var f_guarantee_percentFld = new Ext.form.NumberField({width: 45, value: 0});
-    var f_otherFld = new Ext.form.NumberField({fieldLabel: "อื่นๆ", width: 200, value: 0});
+    var f_guarantee_percentFld = new Ext.form.NumberField({width: 45, value: 0, readOnly: true, style: RO_STYLE});
+    var f_otherFld = new Ext.form.NumberField({fieldLabel: "อื่นๆ", width: 200, value: 0, readOnly: true, style: RO_STYLE});
+    // แจ้งที่มาของยอดเงิน (เปลี่ยนข้อความตามผลโหลดท้ายฟังก์ชัน)
+    var moneySourceFld = new Ext.form.DisplayField({
+        hideLabel: true, width: 380,
+        value: "ยอดเงินดึงจากหน้าส่งมอบงาน (ST00095) - แก้ไขได้ที่ปุ่ม \"แก้ไข VAT\" หน้าส่งมอบงาน",
+        style: "color:#08c;"
+    });
     var f_pay_amtFld = new Ext.form.DisplayField({fieldLabel: "จำนวนเงินที่จ่าย", width: 200, value: "0.00", style: "font-weight:bold;font-size:14px;color:#060;"});
 
     // คำนวณยอดใหม่ทุกครั้งที่แก้ตัวเลข/ติ๊ก checkbox - ใช้แสดงผลให้ผู้ใช้เห็นก่อนบันทึก
     // เท่านั้น ยอดจริงที่เก็บลง DB คำนวณซ้ำอีกทีฝั่งเซิร์ฟเวอร์เสมอ (ดู mode SAVE_CHECKING)
-    function recalc() {
-        var total = parseFloat(String(f_total_vatFld.getValue()).replace(/,/g, "")) || 0;
-        var vatPercent = b_vatChk.getValue() ? (parseFloat(f_vat_percentFld.getValue()) || 0) : 0;
-        var beforeVat = vatPercent > 0 ? total / (1 + vatPercent / 100) : total;
-        var vatAmt = total - beforeVat;
-        var whtPercent = b_whtChk.getValue() ? (parseFloat(f_wht_percentFld.getValue()) || 0) : 0;
-        var whtAmt = b_whtChk.getValue() ? beforeVat * whtPercent / 100 : 0;
+    // ตัวเลขที่กรอกในช่อง "จำนวนเงินรวม VAT" คือยอดรวม (grand total) ที่รวม VAT ไว้แล้วจริงๆ
+    // - หักลบย้อนกลับหา "ยอดก่อน VAT" ด้วยการหาร (เช่น กรอก 107 VAT 7% ต้องได้ยอดก่อน VAT
+    // = 107/1.07 = 100.00 พอดี, VAT = 107-100 = 7.00 พอดี) ภาษีหัก ณ ที่จ่าย/ค่าประกัน
+    // ผลงาน คิดจาก "ยอดก่อน VAT" ที่หักลบมาแล้วนี้ (ไม่ใช่จากยอดรวม) ตามธรรมเนียมการหัก
+    // ภาษี ณ ที่จ่ายทั่วไป - สูตรเดียวกับหน้า "ตรวจรับ" ต้นแบบ ST0013 "จำนวนเงินที่จ่าย"
+    // หักจาก "ยอดก่อน VAT" ไม่ใช่ยอดรวม (VAT จ่ายแยกต่างหาก ไม่รวมอยู่ในยอดที่จ่ายจริงให้
+    // ผู้ขาย ตามที่ผู้ใช้ยืนยัน) = ยอดก่อน VAT - หัก ณ ที่จ่าย - ค่าปรับ - ค่าประกันผลงาน -
+    // อื่นๆ
+    //
+    // ยอด VAT (f_vat_amtFld) และยอดหัก ณ ที่จ่าย (f_wht_amtFld) แก้ไขเองได้ทั้งคู่ - ยอด
+    // ที่เหลือทั้งหมดจึงต้องคำนวณต่อจาก "ค่าปัจจุบันในฟิลด์" เสมอ (ไม่ว่าจะมาจากสูตร
+    // อัตโนมัติหรือ user แก้เอง) แยกเป็น 3 ชั้น: recalcVatFromPercent() คำนวณ VAT ใหม่จาก
+    // % (เรียกเมื่อยอดรวม/%VAT เปลี่ยน) -> recalcWhtFromPercent() คำนวณ ณ ที่จ่ายใหม่จาก %
+    // โดยอิง "ยอดก่อน VAT" ปัจจุบัน (เรียกเมื่อยอด VAT เปลี่ยนด้วย เผื่อยอดก่อน VAT เปลี่ยน
+    // ตาม หรือ %หัก ณ ที่จ่ายเปลี่ยนเอง) -> applyFinal() คำนวณยอดที่เหลือทั้งหมดจากค่า
+    // ปัจจุบันในทุกฟิลด์ (setValue ไม่ยิง event "change" เองใน ExtJS 3 จึงต้องเรียก
+    // ฟังก์ชันต่อกันตรงๆ ไม่พึ่ง event chain)
+    function applyFinal() {
+        var total = round2Accept(parseFloat(String(f_total_vatFld.getValue()).replace(/,/g, "")) || 0);
+        var vatAmt = round2Accept(parseFloat(String(f_vat_amtFld.getValue()).replace(/,/g, "")) || 0);
+        var beforeVat = round2Accept(total - vatAmt);
+        var whtAmt = round2Accept(parseFloat(String(f_wht_amtFld.getValue()).replace(/,/g, "")) || 0);
         var guaranteePercent = b_guaranteeChk.getValue() ? (parseFloat(f_guarantee_percentFld.getValue()) || 0) : 0;
-        var guaranteeAmt = b_guaranteeChk.getValue() ? beforeVat * guaranteePercent / 100 : 0;
+        var guaranteeAmt = b_guaranteeChk.getValue() ? round2Accept(beforeVat * guaranteePercent / 100) : 0;
         var penalty = parseFloat(String(f_penaltyFld.getValue()).replace(/,/g, "")) || 0;
         var other = parseFloat(String(f_otherFld.getValue()).replace(/,/g, "")) || 0;
-        var payAmt = total - whtAmt - penalty - guaranteeAmt - other;
+        // [ผู้ใช้ยืนยัน] จ่าย = ยอดรวม VAT - หัก ณ ที่จ่าย - ค่าปรับ - ค่าประกันผลงาน - อื่นๆ
+        // (ถอด VAT: 107 -> 107 - 1 = 106) สูตรเดียวกับหน้าส่งมอบงานและ SAVE_CHECKING
+        var payAmt = round2Accept(total - whtAmt - penalty - guaranteeAmt - other);
 
         f_before_vatFld.setValue(moneyStrAccept(beforeVat));
-        f_vat_amtFld.setValue(moneyStrAccept(vatAmt));
         f_request_amtFld.setValue(moneyStrAccept(total));
-        f_wht_amtFld.setValue(moneyStrAccept(whtAmt));
         f_guarantee_amtFld.setValue(moneyStrAccept(guaranteeAmt));
         f_pay_amtFld.setValue(moneyStrAccept(payAmt));
     }
-    [f_total_vatFld, f_vat_percentFld, f_wht_percentFld, f_penaltyFld, f_guarantee_percentFld, f_otherFld].forEach(function (fld) {
-        fld.on("change", recalc);
+    function recalcWhtFromPercent() {
+        var total = round2Accept(parseFloat(String(f_total_vatFld.getValue()).replace(/,/g, "")) || 0);
+        var vatAmt = round2Accept(parseFloat(String(f_vat_amtFld.getValue()).replace(/,/g, "")) || 0);
+        var beforeVat = round2Accept(total - vatAmt);
+        var whtPercent = b_whtChk.getValue() ? (parseFloat(f_wht_percentFld.getValue()) || 0) : 0;
+        var whtAmt = b_whtChk.getValue() ? round2Accept(beforeVat * whtPercent / 100) : 0;
+        f_wht_amtFld.setValue(moneyStrAccept(whtAmt));
+        applyFinal();
+    }
+    function recalcVatFromPercent() {
+        var total = round2Accept(parseFloat(String(f_total_vatFld.getValue()).replace(/,/g, "")) || 0);
+        var vatPercent = b_vatChk.getValue() ? (parseFloat(f_vat_percentFld.getValue()) || 0) : 0;
+        var beforeVat = vatPercent > 0 ? total / (1 + vatPercent / 100) : total;
+        var vatAmt = round2Accept(total - beforeVat);
+        f_vat_amtFld.setValue(moneyStrAccept(vatAmt));
+        recalcWhtFromPercent();
+    }
+    [f_total_vatFld, f_vat_percentFld].forEach(function (fld) {
+        fld.on("change", recalcVatFromPercent);
     });
-    [b_vatChk, b_whtChk, b_guaranteeChk].forEach(function (chk) {
-        chk.on("check", recalc);
+    b_vatChk.on("check", recalcVatFromPercent);
+    f_vat_amtFld.on("change", recalcWhtFromPercent);
+    f_wht_percentFld.on("change", recalcWhtFromPercent);
+    b_whtChk.on("check", recalcWhtFromPercent);
+    f_wht_amtFld.on("change", applyFinal);
+    [f_penaltyFld, f_guarantee_percentFld, f_otherFld].forEach(function (fld) {
+        fld.on("change", applyFinal);
     });
+    b_guaranteeChk.on("check", applyFinal);
+
+    // ยังไม่เคยกรอกร่าง VAT ที่หน้าส่งมอบงานเลย - คิดค่าเริ่มต้นแบบเดียวกับ popup ร่างที่
+    // ST00095: ยอดก่อน VAT = ยอดรวมรายการรับของของ IR นี้ (periodTotal), VAT/หัก ณ ที่จ่าย
+    // = % ของยอดก่อน VAT, ยอดรวม VAT = ก่อน VAT + VAT (คิดไปข้างหน้า ไม่หารย้อนกลับ)
+    // [ผู้ใช้ยืนยัน] "ถอด VAT" - ยอดรายการรับของ (periodTotal) = ยอดรวม VAT แล้ว: ก่อน VAT =
+    // ยอดรวม/(1+%VAT), หัก ณ ที่จ่าย = % ของยอดก่อน VAT (สูตรเดียวกับ ST00095/medsupRowMoney)
+    function defaultFromItems(msg) {
+        f_total_vatFld.setValue(round2Accept(periodTotal));
+        recalcVatFromPercent();
+        moneySourceFld.setValue(msg || "ยังไม่ได้กรอกร่าง VAT ที่หน้าส่งมอบงาน (ST00095) - ใช้ค่าเริ่มต้น VAT 7% / หัก ณ ที่จ่าย 1%");
+    }
+    // ค่าเงินจาก API ถูก number_format มา (มีจุลภาค เช่น "1,070.00") - NumberField ใช้
+    // parseFloat ซึ่งอ่านได้แค่ 1 ต้องตัดจุลภาคออกก่อนเสมอ
+    function numStr(v) {
+        return String(v == null ? "" : v).replace(/,/g, "");
+    }
 
     var d_doc_completeFld = new Ext.form.DateField({fieldLabel: "วันที่รับของเอกสารสมบูรณ์", width: 200});
     var d_checkingFld = new Ext.form.DateField({fieldLabel: "วันที่บันทึกการตรวจรับ", width: 200, allowBlank: false});
@@ -353,8 +468,14 @@ function winCheckingDetailTab(rec) {
                 f_total_vat: f_total_vatFld.getValue(),
                 b_vat: b_vatChk.getValue() ? 1 : 0,
                 f_vat_percent: f_vat_percentFld.getValue(),
+                // ค่า VAT ที่โชว์อยู่ตอนนี้ (อาจเป็นค่าที่คำนวณจาก % หรือ user แก้ไขเองทับ
+                // ก็ได้) - ส่งไปให้ฝั่ง PHP ใช้ตรงๆ แทนการคำนวณจาก % ซ้ำอีกที
+                f_vat_amt: f_vat_amtFld.getValue(),
                 b_wht: b_whtChk.getValue() ? 1 : 0,
                 f_wht_percent: f_wht_percentFld.getValue(),
+                // ค่าภาษีหัก ณ ที่จ่ายที่โชว์อยู่ตอนนี้ (อาจเป็นค่าที่คำนวณจาก % หรือ user
+                // แก้ไขเองทับก็ได้) - ส่งไปให้ฝั่ง PHP ใช้ตรงๆ แทนการคำนวณจาก % ซ้ำอีกที
+                f_wht_amt: f_wht_amtFld.getValue(),
                 f_penalty: f_penaltyFld.getValue(),
                 b_guarantee: b_guaranteeChk.getValue() ? 1 : 0,
                 f_guarantee_percent: f_guarantee_percentFld.getValue(),
@@ -367,11 +488,20 @@ function winCheckingDetailTab(rec) {
                 if (res.reval === 0) {
                     // ปุ่ม "บันทึก" นี้บันทึกรายละเอียดตรวจรับ + ออกเลข AP ให้เลข IR นี้
                     // ในขั้นตอนเดียวกันเลย (ฝั่งเซิร์ฟเวอร์ทำต่อให้อัตโนมัติหลังบันทึก
-                    // สำเร็จ - ดู mode SAVE_CHECKING)
-                    Ext.Msg.alert("สำเร็จ", "บันทึกรายละเอียดตรวจรับและออกเลข AP เรียบร้อยแล้ว", function () {
-                        Ext.storeAcceptMedSupList.reload();
-                        center.remove(tab);
-                    });
+                    // สำเร็จ - ดู mode SAVE_CHECKING) เดิมพอบันทึกเสร็จจะปิดแท็บทิ้งทันที
+                    // ทำให้ไม่เห็นเลข AP ที่เพิ่งออก - ตอนนี้เอาเลขที่เซิร์ฟเวอร์ส่งกลับมา
+                    // (res.c_ap_code) ไปอัปเดตค้างไว้ที่ป้ายด้านบนฟอร์ม แล้ว "ไม่" ปิดแท็บ
+                    // ให้อัตโนมัติอีกต่อไป ผู้ใช้กด "ปิดแท็บนี้" เองตอนก๊อปเลขเสร็จแล้ว
+                    var apFld = Ext.getCmp("apCodeDisplayID-" + rec.get("c_ir_code"));
+                    if (apFld && res.c_ap_code) {
+                        apFld.setValue("<b>" + res.c_ap_code + "</b>");
+                    }
+                    Ext.storeAcceptMedSupList.reload();
+                    Ext.Msg.alert(
+                        "สำเร็จ",
+                        "บันทึกรายละเอียดตรวจรับและออกเลข AP เรียบร้อยแล้ว"
+                            + (res.c_ap_code ? "<br>เลข AP: <b>" + res.c_ap_code + "</b>" : "")
+                    );
                 } else {
                     Ext.Msg.alert("แจ้งเตือน", res.msg || "บันทึกไม่สำเร็จ");
                 }
@@ -420,6 +550,11 @@ function winCheckingDetailTab(rec) {
         labelWidth: 170,
         defaults: {labelWidth: 170, labelSeparator: ":"},
         items: [
+            {
+                xtype: "displayfield", id: "apCodeDisplayID-" + rec.get("c_ir_code"),
+                fieldLabel: "เลขตรวจรับ AP", width: 260,
+                value: rec.get("c_ap_code") ? "<b>" + rec.get("c_ap_code") + "</b>" : "(ยังไม่ออกเลข)",
+            },
             {xtype: "displayfield", fieldLabel: "เลขข้างอิงเอกสารในการรับของ", width: 200, value: rec.get("c_ir_code")},
             {
                 xtype: "panel",
@@ -459,6 +594,7 @@ function winCheckingDetailTab(rec) {
                                 autoHeight: true,
                                 defaults: {labelWidth: 150, labelSeparator: ":"},
                                 items: [
+                                    moneySourceFld,
                                     f_total_vatFld,
                                     f_before_vatFld,
                                     {
@@ -520,51 +656,129 @@ function winCheckingDetailTab(rec) {
     center.setActiveTab(tab);
     tab.doLayout();
 
+    function hasVal(v) {
+        return v !== "" && v !== null && typeof v !== "undefined";
+    }
+    // ช่อง "รายละเอียดเงิน" - จากร่างที่หน้าส่งมอบงาน หรือจากที่บันทึกตรวจรับไว้แล้ว
+    function fillMoney(d) {
+        f_total_vatFld.setValue(numStr(d.f_total_vat));
+        b_vatChk.setValue(!!d.b_vat);
+        if (hasVal(d.f_vat_percent)) {
+            f_vat_percentFld.setValue(d.f_vat_percent);
+        }
+        b_whtChk.setValue(!!d.b_wht);
+        if (hasVal(d.f_wht_percent)) {
+            f_wht_percentFld.setValue(d.f_wht_percent);
+        }
+        f_penaltyFld.setValue(numStr(d.f_penalty || 0));
+        b_guaranteeChk.setValue(!!d.b_guarantee);
+        if (hasVal(d.f_guarantee_percent)) {
+            f_guarantee_percentFld.setValue(d.f_guarantee_percent);
+        }
+        f_otherFld.setValue(numStr(d.f_other || 0));
+        // d_checking มีเฉพาะแถวจาก sp_tor_period_bill_checking จริง (บันทึกตรวจรับแล้ว)
+        // ไม่มี = ค่าร่างจากหน้าส่งมอบงาน
+        if (typeof d.d_checking !== "undefined") {
+            moneySourceFld.setValue("ยอดเงินตามที่บันทึกตรวจรับไว้แล้ว - แก้ไขได้ที่ปุ่ม \"แก้ไข VAT\" หน้าส่งมอบงาน (ST00095)");
+        }
+        // มียอด VAT/หัก ณ ที่จ่ายที่บันทึกไว้ตรงๆ (ร่างใหม่ หรือบันทึกตรวจรับแล้ว) ใช้ยอดนั้น
+        // ได้ก็ต่อเมื่อยังตรงกับรายการรับของตอนนี้ (ถอด VAT: ยอดรวม VAT ที่บันทึกไว้ = ยอดรวม
+        // รายการของ IR นี้ periodTotal) - รายการถูกแก้/เพิ่มหลังบันทึกไปแล้ว ยอดเก่าใช้ไม่ได้
+        // ถอด VAT ใหม่จาก % ที่บันทึกไว้แทน ร่างเก่าที่มีแค่ % ก็คิดจาก % เช่นกัน
+        var savedTotal = round2Accept(parseFloat(numStr(d.f_total_vat)) || 0);
+        var matchesItems = Math.abs(savedTotal - round2Accept(periodTotal)) < 0.005;
+        if (hasVal(d.f_vat_amt) && matchesItems) {
+            f_vat_amtFld.setValue(numStr(d.f_vat_amt));
+            if (hasVal(d.f_wht_amt)) {
+                f_wht_amtFld.setValue(numStr(d.f_wht_amt));
+                applyFinal();
+            } else {
+                recalcWhtFromPercent();
+            }
+        } else if (hasVal(d.f_vat_amt)) {
+            defaultFromItems("รายการรับของถูกแก้ไขหลังบันทึกยอดเงิน - คำนวณใหม่ตาม % จากยอดรายการปัจจุบัน"
+                + " (กดแก้ไข VAT > บันทึกร่าง ที่หน้าส่งมอบงานเพื่อบันทึกยอดใหม่)");
+        } else {
+            defaultFromItems("ยอดเงินคำนวณตาม % จากร่างที่หน้าส่งมอบงาน (ST00095)");
+        }
+    }
+    // ช่องอื่นของฟอร์มตรวจรับ - มีเฉพาะตอนเคยบันทึกตรวจรับไว้แล้ว (ร่างไม่มีฟิลด์พวกนี้)
+    function fillOthers(d) {
+        if (hasVal(d.d_doc_complete)) {
+            d_doc_completeFld.setValue(d.d_doc_complete);
+        }
+        if (hasVal(d.d_checking)) {
+            d_checkingFld.setValue(d.d_checking);
+        }
+        if (hasVal(d.c_egp_no)) {
+            c_egp_noFld.setValue(d.c_egp_no);
+        }
+        if (hasVal(d.c_disburse_detail)) {
+            c_disburse_detailFld.setValue(d.c_disburse_detail);
+        }
+        if (d.c_overlap_no) {
+            c_overlap_noFld.setValue(d.c_overlap_no);
+        }
+        if (d.i_budget_year_ref) {
+            i_budget_year_refFld.setValue(d.i_budget_year_ref);
+        }
+        if (d.c_item_name) {
+            c_item_nameFld.setValue(d.c_item_name);
+        }
+        if (hasVal(d.i_budget_year_use)) {
+            i_budget_year_useFld.setValue(d.i_budget_year_use);
+        }
+        if (d.dc_cost_responsible_id) {
+            dc_cost_responsible_idFld.setValue(d.dc_cost_responsible_id);
+        }
+        if (d.dc_cost_owner_id) {
+            dc_cost_owner_idFld.setValue(d.dc_cost_owner_id);
+        }
+    }
+
     // ถ้าเคยกรอกไว้แล้ว (แก้ไขซ้ำ) ดึงค่าเดิมมาเติมให้
     Ext.Ajax.request({
         url: "tor/api/List_MedSupPeriodBill.php",
         method: "GET",
         params: {type: "medsup_checking_by_ir", c_ir_code: rec.get("c_ir_code")},
         success: function (response) {
-            var res = Ext.decode(response.responseText);
-            var d = res.data && res.data[0];
-            if (!d) {
-                recalc();
+            // เจอจริง: หน้าจอค้างที่ค่าตั้งต้น (ยอด 0 ทั้งหมด) ทั้งที่มีร่างแล้ว = callback นี้
+            // พังกลางทาง (JSON จาก PHP อ่านไม่ได้ หรือ setValue ช่องอื่นก่อนถึงช่องเงิน error)
+            // - เติม "ช่องเงิน" ก่อนเสมอ ช่องอื่นเติมเฉพาะที่ API ส่งมาจริง (ร่างไม่มี
+            // d_doc_complete/d_checking/c_egp_no ฯลฯ) และดัก error ขึ้นแจ้งเตือนให้เห็นสาเหตุ
+            var d;
+            try {
+                var res = Ext.decode(response.responseText);
+                d = res && res.data && res.data[0];
+            } catch (e) {
+                defaultFromItems();
+                Ext.Msg.alert("แจ้งเตือน", "โหลดยอดเงินจากหน้าส่งมอบงานไม่สำเร็จ (ข้อมูลจากเซิร์ฟเวอร์ผิดรูปแบบ)<br>"
+                    + Ext.util.Format.htmlEncode(String(response.responseText).substring(0, 300)));
                 return;
             }
-            d_doc_completeFld.setValue(d.d_doc_complete);
-            d_checkingFld.setValue(d.d_checking);
-            c_egp_noFld.setValue(d.c_egp_no);
-            c_disburse_detailFld.setValue(d.c_disburse_detail);
-            if (d.c_overlap_no) {
-                c_overlap_noFld.setValue(d.c_overlap_no);
+            if (!d) {
+                defaultFromItems();
+            } else {
+                try {
+                    fillMoney(d);
+                } catch (e) {
+                    Ext.Msg.alert("แจ้งเตือน", "เติมยอดเงินไม่สำเร็จ: " + Ext.util.Format.htmlEncode(e.message));
+                }
+                try {
+                    fillOthers(d);
+                } catch (e) {
+                    Ext.Msg.alert("แจ้งเตือน", "เติมข้อมูลตรวจรับเดิมไม่สำเร็จ: " + Ext.util.Format.htmlEncode(e.message));
+                }
             }
-            if (d.i_budget_year_ref) {
-                i_budget_year_refFld.setValue(d.i_budget_year_ref);
+            // ยอดเงินของ IR ยังไม่ผ่านเงื่อนไขออกเลข AP (รายการย่อยยังไม่ยืนยัน VAT / ยอดไม่ตรง
+            // ผลรวมรายการย่อย) - เตือนสีแดงในกล่องรายละเอียดเงินตั้งแต่เปิด (ตอนกดบันทึก
+            // เซิร์ฟเวอร์เช็คซ้ำและขึ้นแจ้งเตือนเต็มให้อีกที) ออกเลข AP ไปแล้วไม่ต้องเตือน
+            if (res.vat_warning && !rec.get("c_ap_code")) {
+                moneySourceFld.setValue("<span style=\"color:#c00;font-weight:bold;\">" + res.vat_warning + "</span>");
             }
-            if (d.c_item_name) {
-                c_item_nameFld.setValue(d.c_item_name);
-            }
-            i_budget_year_useFld.setValue(d.i_budget_year_use);
-            f_total_vatFld.setValue(d.f_total_vat);
-            b_vatChk.setValue(!!d.b_vat);
-            f_vat_percentFld.setValue(d.f_vat_percent);
-            b_whtChk.setValue(!!d.b_wht);
-            f_wht_percentFld.setValue(d.f_wht_percent);
-            f_penaltyFld.setValue(d.f_penalty);
-            b_guaranteeChk.setValue(!!d.b_guarantee);
-            f_guarantee_percentFld.setValue(d.f_guarantee_percent);
-            f_otherFld.setValue(d.f_other);
-            if (d.dc_cost_responsible_id) {
-                dc_cost_responsible_idFld.setValue(d.dc_cost_responsible_id);
-            }
-            if (d.dc_cost_owner_id) {
-                dc_cost_owner_idFld.setValue(d.dc_cost_owner_id);
-            }
-            recalc();
         },
         failure: function () {
-            recalc();
+            defaultFromItems();
         }
     });
 }
@@ -664,6 +878,7 @@ Ext.AppUx = function (app, menu) {
             data: [
                 ["c_contract_code", "เลขสัญญา"],
                 ["c_ir_code", "เลขที่รับของ (IR)"],
+                ["c_ap_code", "เลขตรวจรับ (AP)"],
                 ["c_overlap", "เลขที่ใบกัน"],
                 ["c_creditor_name", "ผู้ขาย/ผู้รับจ้าง"],
                 ["c_tax_number_imp", "เลขประจำตัวผู้เสียภาษีผู้ขาย/ผู้รับจ้าง"],
@@ -888,6 +1103,32 @@ Ext.AppUx = function (app, menu) {
                             if (columnIndex === grid.getColumnModel().getIndexById("checkingReadyID")) {
                                 winCheckingDetailTab(grid.getStore().getAt(rowIndex));
                             }
+                        });
+                        // คลิกขวาที่แถว - ก๊อปเลขรับของ (IR) / เลข AP ของแถวนั้นไปคลิปบอร์ด
+                        // (ตามที่ขอ ไม่ต้องเปิดรายละเอียดก่อนถึงจะก๊อปได้)
+                        this.on("rowcontextmenu", function (grid, rowIndex, e) {
+                            e.stopEvent();
+                            var record = grid.getStore().getAt(rowIndex);
+                            grid.getSelectionModel().selectRow(rowIndex);
+                            var irCode = record.get("c_ir_code");
+                            var apCode = record.get("c_ap_code");
+                            var menu = new Ext.menu.Menu({
+                                items: [
+                                    {
+                                        text: "คัดลอกเลขรับของ (IR): " + (irCode || "-"),
+                                        iconCls: "icon-copy",
+                                        disabled: !irCode,
+                                        handler: function () { Ext.fnCopyToClipboard(irCode); }
+                                    },
+                                    {
+                                        text: "คัดลอกเลข AP: " + (apCode || "ยังไม่ออกเลข"),
+                                        iconCls: "icon-copy",
+                                        disabled: !apCode,
+                                        handler: function () { Ext.fnCopyToClipboard(apCode); }
+                                    },
+                                ]
+                            });
+                            menu.showAt(e.getXY());
                         });
                     },
                 },

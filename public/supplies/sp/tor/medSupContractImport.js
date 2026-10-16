@@ -17,11 +17,11 @@ Ext.MEDSUP_IMPORT_COLUMNS = [
     {key: "seq", label: "ลำดับสัญญา*"},
     {key: "dept", label: "ประเภท*"},
     {key: "expense_code", label: "รหัสค่าใช้จ่าย*", pad: 12},
-    {key: "project", label: "ชื่อโครงการ"},
+    {key: "project", label: "ชื่อโครงการ(ชื่อตามเล่มงบ)", alias: ["ชื่อโครงการ"]},
     {key: "contract_code", label: "เลขที่สัญญา"},
     {key: "contract_type", label: "ประเภทของสัญญา*"},
     {key: "fund1", label: "แหล่งเงินที่ 1*"},
-    {key: "amt1", label: "จำนวนเงินแหล่งที่ 1*"},
+    {key: "amt1", label: "จำนวนเงินแหล่งที่ 1(วงเงินทำสัญญา)*", alias: ["จำนวนเงินแหล่งที่ 1*"]},
     {key: "fund2", label: "แหล่งเงินที่ 2"},
     {key: "amt2", label: "จำนวนเงินแหล่งที่ 2"},
     {key: "fund3", label: "แหล่งเงินที่ 3"},
@@ -34,28 +34,33 @@ Ext.MEDSUP_IMPORT_COLUMNS = [
     {key: "period", label: "งวดที่*"},
     {key: "doc_ref", label: "เลขงวด"},
     {key: "due", label: "วันที่ครบกำหนดส่งของ", date: true},
-    {key: "detail", label: "รายละเอียด"},
+    {key: "detail", label: "ชื่อเรื่อง(EGP)", alias: ["รายละเอียด"]},
     {key: "period_fund", label: "แหล่งเงินของงวดนี้*"},
-    {key: "period_amt", label: "จำนวนเงินจากแหล่งเงินนี้*"},
+    {key: "period_amt", label: "จำนวนเงินจากแหล่งเงินนี้(ใบสั่งซื้อ)*", alias: ["จำนวนเงินจากแหล่งเงินนี้*"]},
     // รายการรับของ (dtl ของหน้าส่งมอบงาน ST00095) - ไม่บังคับ 1 แถว = 1 รายการรับของ แถวที่
     // ลำดับสัญญา + งวดที่ เดียวกันคืองวดเดียวกัน (1 งวดมีหลายรายการรับของได้)
     {key: "rc_code", label: "ใบแจ้งหนี้/รับของ"},
     {key: "rc_erp", label: "เลขรับเข้าคลังของ ERP"},
     {key: "rc_date", label: "วันรับของ", date: true},
     {key: "rc_detail", label: "รายละเอียดรับของ"},
-    {key: "rc_amt", label: "จำนวนเงินรับของ"},
+    {key: "rc_amt", label: "จำนวนเงินรับของ(บิลส่งของ)", alias: ["จำนวนเงินรับของ"]},
     // VAT ของรายการรับของ (ตามหน้า "แก้ไข VAT" ที่หน้าส่งมอบงาน) - ไม่บังคับ ว่าง = ค่าเริ่มต้น
     // (VAT 7% / หัก ณ ที่จ่าย 1% / ไม่มีค่าประกันผลงาน) "จำนวนเงินรวม VAT" = จำนวนเงินรับของ
-    {key: "vat_flag", label: "ภาษีมูลค่าเพิ่ม (มี/ไม่มี)"},
+    // [ผู้ใช้ขอ] ตัดคอลัมน์ "(มี/ไม่มี)" ออก - ไม่มี VAT / ไม่หัก ณ ที่จ่าย = กรอก 0 ที่ช่อง (บาท) หรือ (%)
+    // ค่าประกันผลงาน = มีเมื่อกรอก (%) มากกว่า 0
     {key: "vat_amt", label: "ภาษีมูลค่าเพิ่ม (บาท)"},
     {key: "vat_pct", label: "ภาษีมูลค่าเพิ่ม (%)"},
-    {key: "wht_flag", label: "ภาษีหัก ณ ที่จ่าย (มี/ไม่มี)"},
     {key: "wht_amt", label: "ภาษีหัก ณ ที่จ่าย (บาท)"},
     {key: "wht_pct", label: "ภาษีหัก ณ ที่จ่าย (%)"},
     {key: "penalty", label: "ค่าปรับ"},
-    {key: "guar_flag", label: "ค่าประกันผลงาน (มี/ไม่มี)"},
     {key: "guar_pct", label: "ค่าประกันผลงาน (%)"},
-    {key: "other", label: "อื่นๆ"},
+    {key: "other", label: "อื่นๆ(ส่วนลด)", alias: ["อื่นๆ"]},
+    // [ผู้ใช้ขอ] ต่อท้ายสุดของไฟล์ - pr_id/po_id/chk_id = เลขอ้างอิงจากไฟล์ที่ export มา (เก็บไว้อ้างอิงเท่านั้น)
+    // c_overlap = เลขใบกันเหลื่อมของแหล่งเงินที่ 1 (ระดับสัญญา - กรอกที่แถวแรกของสัญญา ว่าง = ปีต่อปี)
+    {key: "pr_id", label: "pr_id"},
+    {key: "po_id", label: "po_id"},
+    {key: "chk_id", label: "chk_id"},
+    {key: "c_overlap", label: "c_overlap"},
 ];
 
 // ชื่อคอลัมน์เทียบแบบไม่สนช่องว่าง/เครื่องหมาย * (ผู้ใช้อาจลบ * หรือเว้นวรรคต่างกัน)
@@ -145,6 +150,24 @@ Ext.fnImportHtmlTable = function (cols, rows, rowCls) {
     h.push("</tbody></table>");
     return h.join("");
 };
+// สถานะจองเงินในระบบงบ (ข้อความจาก imp_reserve_status ฝั่ง PHP): จองแล้ว = เขียว / อื่นๆ = ส้ม
+// ไม่พบการจอง = ตัวแดง + บอกเลข pr_id/po_id ของแถวนั้นว่ายังไม่ได้จองเงินมา [ผู้ใช้ขอ]
+Ext.fnImportRsvNotFound = function (v) {
+    return /^ไม่พบการจอง/.test(v || "");
+};
+Ext.fnImportRsvNotFoundText = function (r) {
+    return "เลข pr_id " + (r.pr_id || "-") + " และเลข po_id " + (r.po_id || "-") + " นี้ยังไม่ได้จองเงินมา";
+};
+Ext.fnImportRsvStatus = function (v, r) {
+    if (!v) {
+        return "";
+    }
+    if (Ext.fnImportRsvNotFound(v)) {
+        return "<span style=\"color:#c00;font-weight:bold;\">" + Ext.util.Format.htmlEncode(v + " - " + Ext.fnImportRsvNotFoundText(r || {})) + "</span>";
+    }
+    var color = /^จองขั้นสัญญาแล้ว/.test(v) ? "#080" : "#c60";
+    return "<span style=\"color:" + color + ";\">" + Ext.util.Format.htmlEncode(v) + "</span>";
+};
 Ext.fnImportMoney = function (v) {
     var n = parseFloat(String(v == null ? "" : v).replace(/,/g, ""));
     return v === "" || v == null || isNaN(n) ? Ext.util.Format.htmlEncode(v == null ? "" : v) : Ext.util.Format.number(n, "0,000.00");
@@ -182,14 +205,19 @@ function winMedSupImportRows(rec) {
         {header: "งวดที่", key: "i_period", align: "center"},
         {header: "เลขงวด", key: "c_doc_ref"},
         {header: "วันที่ครบกำหนดส่งของ", key: "d_doc_dateSub", align: "center"},
-        {header: "รายละเอียด", key: "c_detail"},
+        {header: "ชื่อเรื่อง(EGP)", key: "c_detail"},
         {header: "แหล่งเงินของงวดนี้", key: "c_fund_source_dtl"},
-        {header: "จำนวนเงิน", key: "f_fund_amt_dtl", align: "right"},
+        {header: "จำนวนเงิน(ใบสั่งซื้อ)", key: "f_fund_amt_dtl", align: "right"},
         {header: "ใบแจ้งหนี้/รับของ", key: "c_receive_code"},
         {header: "เลขรับเข้าคลังของ ERP", key: "c_erp_stock_code"},
         {header: "วันรับของ", key: "d_receive_date", align: "center"},
         {header: "รายละเอียดรับของ", key: "rc_detail"},
-        {header: "จำนวนเงินรับของ", key: "rc_amt", align: "right"},
+        {header: "จำนวนเงินรับของ(บิลส่งของ)", key: "rc_amt", align: "right"},
+        {header: "pr_id", key: "pr_id"},
+        {header: "po_id", key: "po_id"},
+        {header: "chk_id", key: "chk_id"},
+        {header: "c_overlap", key: "c_overlap"},
+        {header: "สถานะจองเงิน (ระบบงบ)", key: "rsv_status", render: Ext.fnImportRsvStatus},
     ];
     var tablePanel = new Ext.Panel({border: false, autoScroll: true, html: "<div class=\"medsup-imp-empty\">กำลังโหลด..</div>"});
     var curRows = [];   // แถวที่แสดงอยู่ (ลำดับเดียวกับ <tr> ในตาราง)
@@ -400,6 +428,7 @@ function medSupImportCancel(rec, hdrIds, onDone, codes) {
 // หน้าต่างนำเข้าใหม่: ชื่อรายการ + ไฟล์ -> ตรวจสอบ (แสดงรายละเอียด) -> บันทึก
 function winMedSupImportNew() {
     var parsedRows = null;   // แถวจากไฟล์ (ส่งให้ PHP) ของรอบตรวจสอบล่าสุด
+    var previewRows = [];    // แถวที่แสดงในตารางก่อนบันทึก (ค่าจากไฟล์ + ผลตรวจ + _chk = ติ๊กเลือกไว้)
     var fileName = "";
 
     var nameFld = new Ext.form.TextField({
@@ -429,6 +458,13 @@ function winMedSupImportNew() {
         }},
     ];
     var previewCols = [
+        // [ผู้ใช้ขอ] ติ๊กอัตโนมัติที่รายการ "ไม่พบการจองในระบบงบ" - ใช้เลือกแถวที่จะดาวน์โหลด Excel ส่งคืนผู้ใช้
+        {
+            header: "เลือก", key: "_chk", align: "center",
+            render: function (v, r) {
+                return "<input type=\"checkbox\" class=\"medsup-imp-chk\" data-i=\"" + r._i + "\"" + (v ? " checked" : "") + ">";
+            }
+        },
         {header: "แถว", key: "row_no", align: "center"},
         {
             header: "สถานะ", key: "status", align: "center",
@@ -448,6 +484,8 @@ function winMedSupImportNew() {
                 return v ? "<span style=\"color:" + (r.status === "ERROR" ? "#c00" : "#c60") + ";\">" + enc(v) + "</span>" : "";
             }
         },
+        // สถานะจองเงินในระบบงบของฝั่ง ERP เวชภัณฑ์ (ค้นจาก pr_id/po_id/chk_id ในไฟล์ - แสดงให้ดูเท่านั้น)
+        {header: "สถานะจองเงิน (ระบบงบ)", key: "rsv_status", render: Ext.fnImportRsvStatus},
     ].concat(Ext.MEDSUP_IMPORT_COLUMNS.map(function (c) {
         var col = {header: c.label, key: c.key};
         if (moneyKeys[c.key]) {
@@ -463,13 +501,59 @@ function winMedSupImportNew() {
         html: "<div class=\"medsup-imp-empty\">เลือกไฟล์แล้วกด \"ตรวจสอบข้อมูล\"..</div>",
     });
     var saveBtn = new Ext.Button({text: "บันทึกเข้าระบบ", iconCls: "icon-save", disabled: true});
+    // [ผู้ใช้ขอ] ดาวน์โหลดแถวที่ติ๊กไว้ (ค่าเริ่มต้น = รายการที่ไม่พบการจองในระบบงบ) เป็น Excel ส่งคืนผู้ใช้
+    var exportBtn = new Ext.Button({
+        text: "ดาวน์โหลด Excel รายการที่เลือก", icon: "../images/icons/page_excel.png", disabled: true, handler: exportChecked,
+    });
+
+    function checkedRows() {
+        return previewRows.filter(function (r) { return r._chk; });
+    }
+    function updateExportBtn() {
+        var n = checkedRows().length;
+        exportBtn.setText("ดาวน์โหลด Excel รายการที่เลือก" + (n ? " (" + n + " แถว)" : ""));
+        exportBtn.setDisabled(!n);
+    }
+    // ไฟล์ส่งคืน: คอลัมน์/ชื่อ/ลำดับเดียวกับแม่แบบ (แก้แล้วนำเข้าใหม่ได้เลย) + 2 คอลัมน์ท้าย = สถานะจองเงิน/หมายเหตุ
+    function exportChecked() {
+        var rows = checkedRows();
+        if (!rows.length) {
+            Ext.Msg.alert("แจ้งเตือน", "กรุณาติ๊กเลือกรายการที่ต้องการดาวน์โหลด");
+            return;
+        }
+        Ext.fnLoadSheetJs(function () {
+            var aoa = [Ext.MEDSUP_IMPORT_COLUMNS.map(function (c) { return c.label; }).concat(["สถานะจองเงิน (ระบบงบ)", "หมายเหตุ"])];
+            rows.forEach(function (r) {
+                var line = Ext.MEDSUP_IMPORT_COLUMNS.map(function (c) {
+                    var v = r[c.key] == null ? "" : r[c.key];
+                    var n = parseFloat(String(v).replace(/,/g, ""));
+                    return moneyKeys[c.key] && v !== "" && !isNaN(n) ? n : String(v);
+                });
+                var notes = [];
+                if (Ext.fnImportRsvNotFound(r.rsv_status)) {
+                    notes.push(Ext.fnImportRsvNotFoundText(r));
+                }
+                if (r.message) {
+                    notes.push(r.message);
+                }
+                aoa.push(line.concat([r.rsv_status || "", notes.join(" / ")]));
+            });
+            var ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws["!cols"] = aoa[0].map(function (h, i) { return {wch: i >= Ext.MEDSUP_IMPORT_COLUMNS.length ? 45 : 18}; });
+            var wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "ข้อมูล");
+            XLSX.writeFile(wb, "รายการส่งคืน_" + String(fileName || "import").replace(/\.[^.]*$/, "") + ".xlsx");
+        });
+    }
 
     // ไฟล์ถูกเปลี่ยน = ผลตรวจเดิมใช้ไม่ได้ ต้องตรวจสอบใหม่ก่อนบันทึก
     function resetPreview() {
         parsedRows = null;
+        previewRows = [];
         previewPanel.update("<div class=\"medsup-imp-empty\">เลือกไฟล์แล้วกด \"ตรวจสอบข้อมูล\"..</div>");
         summaryFld.setValue("");
         saveBtn.disable();
+        updateExportBtn();
     }
 
     function readFile() {
@@ -503,6 +587,12 @@ function winMedSupImportNew() {
                 var missing = [];
                 Ext.MEDSUP_IMPORT_COLUMNS.forEach(function (c) {
                     var idx = header.indexOf(Ext.fnImportNormLabel(c.label));
+                    // ชื่อคอลัมน์เดิมก่อนเปลี่ยนชื่อ (ไฟล์ที่ทำจากแม่แบบรุ่นเก่ายังนำเข้าได้)
+                    (c.alias || []).forEach(function (a) {
+                        if (idx < 0) {
+                            idx = header.indexOf(Ext.fnImportNormLabel(a));
+                        }
+                    });
                     colIdx[c.key] = idx;
                     if (idx < 0 && /\*$/.test(c.label)) {
                         missing.push(c.label);
@@ -555,16 +645,25 @@ function winMedSupImportNew() {
                 }
                 parsedRows = rows;
                 // ผลตรวจ (res.data) เรียงตามแถวที่ส่งไปเสมอ (1:1) - จับคู่กับค่าที่อ่านจากไฟล์
-                previewPanel.update(Ext.fnImportHtmlTable(previewCols, rows.map(function (raw, i) {
+                previewRows = rows.map(function (raw, i) {
                     var r = res.data[i] || {};
                     return Ext.apply({
-                        row_no: raw._row, status: r.status || "", message: r.message || "",
+                        _i: i, row_no: raw._row, status: r.status || "", message: r.message || "", rsv_status: r.rsv_status || "",
                         calc_before: r.calc_before, calc_vat: r.calc_vat, calc_wht: r.calc_wht,
                         calc_guar: r.calc_guar, calc_pay: r.calc_pay,
                     }, raw);
-                }), function (r) {
-                    return r.status === "ERROR" ? "err" : (r.status === "WARN" ? "warn" : "");
+                });
+                // ติ๊กอัตโนมัติ: ทุกแถวของสัญญา (ลำดับสัญญาเดียวกัน) ที่มีแถวไม่พบการจองในระบบงบ - ไฟล์ส่งคืนจะได้ครบทั้งสัญญา
+                var noRsv = previewRows.filter(function (r) { return Ext.fnImportRsvNotFound(r.rsv_status); });
+                var noRsvSeq = {};
+                noRsv.forEach(function (r) { noRsvSeq[String(r.seq)] = true; });
+                previewRows.forEach(function (r) {
+                    r._chk = Ext.fnImportRsvNotFound(r.rsv_status) || (String(r.seq) !== "" && noRsvSeq[String(r.seq)] === true);
+                });
+                previewPanel.update(Ext.fnImportHtmlTable(previewCols, previewRows, function (r) {
+                    return r.status === "ERROR" ? "err" : (r.status === "WARN" || Ext.fnImportRsvNotFound(r.rsv_status) ? "warn" : "");
                 }));
+                updateExportBtn();
                 var ok = res.error_rows === 0;
                 summaryFld.setValue(
                     "สัญญา " + res.contract_count + " รายการ / " + res.row_count + " งวด / รับของ "
@@ -574,6 +673,20 @@ function winMedSupImportNew() {
                         : "<span style=\"color:#c00;\">ผิดพลาด " + res.error_rows + " แถว (ตัวแดง) - แก้ไฟล์แล้วตรวจสอบใหม่</span>")
                 );
                 saveBtn.setDisabled(!ok);
+                if (noRsv.length) {
+                    var noRsvMsg = "ไม่พบการจองในระบบงบ " + noRsv.length + " รายการ (ติ๊กเลือกให้แล้ว)";
+                    summaryFld.setValue(summaryFld.getValue() + "<br><span style=\"color:#c00;\">" + noRsvMsg
+                        + " - กด \"ดาวน์โหลด Excel รายการที่เลือก\" เพื่อส่งคืนผู้ใช้</span>");
+                    Ext.Msg.show({
+                        title: "แจ้งเตือน", icon: Ext.Msg.WARNING, buttons: Ext.Msg.OK, minWidth: 460,
+                        msg: "<span style=\"color:#c00;font-weight:bold;\">" + noRsvMsg + "</span><br><br>"
+                            + noRsv.slice(0, 15).map(function (r) {
+                                return "<span style=\"color:#c00;\">แถว " + r.row_no + ": " + enc(Ext.fnImportRsvNotFoundText(r)) + "</span>";
+                            }).join("<br>")
+                            + (noRsv.length > 15 ? "<br>... และอีก " + (noRsv.length - 15) + " รายการ" : "")
+                            + "<br><br>กดปุ่ม \"ดาวน์โหลด Excel รายการที่เลือก\" เพื่อโหลดไฟล์ส่งคืนผู้ใช้",
+                    });
+                }
             },
             failure: function () {
                 mask.hide();
@@ -628,7 +741,7 @@ function winMedSupImportNew() {
         width: 1250, height: 620, modal: true, maximizable: true, layout: "border", closeAction: "destroy",
         items: [
             {
-                region: "north", xtype: "form", height: 130, border: false, bodyStyle: "padding:10px;", labelWidth: 90,
+                region: "north", xtype: "form", height: 150, border: false, bodyStyle: "padding:10px;", labelWidth: 90,
                 items: [
                     nameFld,
                     {
@@ -647,11 +760,18 @@ function winMedSupImportNew() {
             },
             previewPanel,
         ],
-        buttons: [saveBtn, {text: "ปิด", iconCls: "icon-clear", handler: function () { win.destroy(); }}],
+        buttons: [exportBtn, saveBtn, {text: "ปิด", iconCls: "icon-clear", handler: function () { win.destroy(); }}],
     });
     win.show();
     // เลือกไฟล์ใหม่ = ล้างผลตรวจเดิม (ต้องกดตรวจสอบใหม่ก่อนบันทึก)
     fileFld.getEl().on("change", resetPreview);
+    // ติ๊ก/เอาติ๊กออกในตารางก่อนบันทึก (ตารางถูกสร้างใหม่ทุกครั้งที่ตรวจสอบ จึงดักที่ตัวพาเนล)
+    previewPanel.body.on("click", function (e, t) {
+        if (t && t.className === "medsup-imp-chk" && previewRows[t.getAttribute("data-i")]) {
+            previewRows[t.getAttribute("data-i")]._chk = t.checked;
+            updateExportBtn();
+        }
+    });
 }
 
 Ext.AppUx = function (app, menu) {
