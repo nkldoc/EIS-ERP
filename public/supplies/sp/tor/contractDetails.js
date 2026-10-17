@@ -285,6 +285,7 @@
         var torId = Number(options.sp_tor_id || record.get('sp_tor_id') || 0);
         if (!id && !torId) return Ext.Msg.alert('ดูรายละเอียดทั้งหมด', 'กรุณาเลือก PR หรือสัญญา');
         var requestParams = id ? {sp_tor_contract_id: id} : {sp_tor_id: torId};
+        if (Number(options.sp_check_period_hdr_id) > 0) requestParams.sp_check_period_hdr_id = Number(options.sp_check_period_hdr_id);
         var tabs = new Ext.TabPanel({activeTab: options.initialTab || 0, border: false, deferredRender: false, items: [
             {title: 'PR / แหล่งเงิน / รายการ', autoScroll: true, bodyStyle: 'padding:12px', html: 'กำลังโหลดข้อมูล...'},
             {title: 'ผู้เสนอราคา / ผู้ชนะ', autoScroll: true, bodyStyle: 'padding:12px'},

@@ -9,6 +9,9 @@ if (empty($_SESSION['user_id'])) {
 }
 $contractId = intval($_GET['sp_tor_contract_id'] ?? 0);
 $requestedTorId = intval($_GET['sp_tor_id'] ?? 0);
+$selectedCheckId = intval($_GET['sp_check_period_hdr_id'] ?? 0);
+$checkFilter = $selectedCheckId > 0 ? ' AND h.sp_check_period_hdr_id=?' : '';
+$checkParams = $selectedCheckId > 0 ? array($selectedCheckId) : array();
 if ($contractId <= 0 && $requestedTorId <= 0) {
     http_response_code(400);
     echo json_encode(array('success' => false, 'msg' => 'ไม่พบ PR หรือสัญญาที่เลือก'));
@@ -145,7 +148,21 @@ $checks = $fetch('SELECT h.*, COALESCE(h.c_arrive_code,m.c_arrive_code) AS ir_co
     LEFT JOIN ' . DB_NMU . 'dc_bank_acc_creditor ba ON ba.dc_bank_acc_creditor_id=h.dc_bank_acc_creditor_id
     LEFT JOIN ' . DB_NMU . 'dc_bank bank ON bank.dc_bank_id=ba.dc_bank_id
     WHERE (h.sp_tor_contract_id IN (' . $contractList . ') OR m.sp_contract_id IN (' . $contractList . ')) AND h.i_enabled=1
-    ORDER BY cn.sp_tor_contract_id,p.i_period,h.sp_check_period_hdr_id', array());
+    ' . $checkFilter . ' ORDER BY cn.sp_tor_contract_id,p.i_period,h.sp_check_period_hdr_id', $checkParams);
+if ($selectedCheckId > 0) {
+    if (!$checks) {
+        http_response_code(404);
+        echo json_encode(array('success' => false, 'msg' => 'ไม่พบใบตรวจรับที่เลือกในสัญญานี้'));
+        exit;
+    }
+    $selectedPeriodId = intval($checks[0]['sp_tor_hdr_period_id']);
+    $periods = array_values(array_filter($periods, function ($row) use ($selectedPeriodId) {
+        return intval($row['sp_tor_hdr_period_id']) === $selectedPeriodId;
+    }));
+    $periodItems = array_values(array_filter($periodItems, function ($row) use ($selectedPeriodId) {
+        return intval($row['sp_tor_hdr_period_id']) === $selectedPeriodId;
+    }));
+}
 // Match the fund usage labels on the original inspection form.
 $fundUsage = array(1 => 'ใช้เงินกันเหลื่อมยังไม่ก่อหนี้ - ยังไม่จองใบกัน',
     2 => 'ใช้เงินกันเหลื่อมยังไม่ก่อหนี้ - จองใบกันแล้ว', 3 => 'ใช้เงินกันเหลื่อมก่อหนี้แล้ว');
@@ -169,7 +186,7 @@ $checkItems = $fetch('SELECT d.*, budget.c_name AS budget_name, expense.c_code A
     LEFT JOIN ' . DB_NMU . 'bg_expense expense ON expense.bg_expense_id=d.po_expense_id
     LEFT JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id=d.sp_tor_hdr_period_id
     WHERE (h.sp_tor_contract_id IN (' . $contractList . ') OR m.sp_contract_id IN (' . $contractList . ')) AND h.i_enabled=1
-    ORDER BY d.sp_check_period_hdr_id,d.sp_check_period_dtl_id', array());
+    ' . $checkFilter . ' ORDER BY d.sp_check_period_hdr_id,d.sp_check_period_dtl_id', $checkParams);
 $debtItems = $fetch('SELECT i.sp_tranf_item_id, t.sp_check_period_hdr_id, i.c_name,
     i.i_workin_process, i.i_is_under, acc.c_code AS account_code, acc.c_name AS account_name,
     (SELECT TOP 1 c_name FROM dbo.am_mode_acc WHERE am_mode_id=i.am_mode_id) AS asset_category,
@@ -183,7 +200,7 @@ $debtItems = $fetch('SELECT i.sp_tranf_item_id, t.sp_check_period_hdr_id, i.c_na
     LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=h.sp_mn_contract_hdr_id
     LEFT JOIN ' . DB_CENTER . 'dc_acc acc ON acc.dc_acc_id=i.dc_acc_id
     WHERE (h.sp_tor_contract_id IN (' . $contractList . ') OR m.sp_contract_id IN (' . $contractList . ')) AND h.i_enabled=1 AND i.i_enabled=1
-    ORDER BY t.sp_check_period_hdr_id,t.sp_tranf_hdr_id,i.sp_tranf_item_id', array());
+    ' . $checkFilter . ' ORDER BY t.sp_check_period_hdr_id,t.sp_tranf_hdr_id,i.sp_tranf_item_id', $checkParams);
 echo json_encode(array('success' => true, 'pr' => $pr, 'funds' => $funds, 'items' => $items,
     'bidders' => $bidders, 'contracts' => $contracts, 'periods' => $periods,
     'periodItems' => $periodItems, 'checks' => $checks, 'checkItems' => $checkItems,

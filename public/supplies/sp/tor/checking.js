@@ -10207,7 +10207,10 @@ function showCustomEditForm(rec) {
 
 var cellClick = function (grid, rowIndex, columnIndex, e) {
         if (columnIndex === grid.getColumnModel().getIndexById('contract_detailsID')) {
-                Ext.showContractDetails(grid.getStore().getAt(rowIndex), {initialTab: 3});
+                var overviewRow = grid.getStore().getAt(rowIndex);
+                var checkId = Number(overviewRow.get('sp_check_period_hdr_id') || 0);
+                if (!checkId) return Ext.Msg.alert('ดูรายละเอียด', 'ไม่พบใบตรวจรับของแถวที่เลือก');
+                Ext.showContractDetails(overviewRow, {initialTab: 3, sp_check_period_hdr_id: checkId});
                 return;
         }
         Ext.selectRow = this.selModel.selection.record;
