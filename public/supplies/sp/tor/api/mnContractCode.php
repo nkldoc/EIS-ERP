@@ -12,6 +12,174 @@ $date = new i_date();
 $util = new apiUtil();
 
 $mode = $_REQUEST["mode"];
+$contractToday = (new DateTime('now', new DateTimeZone('Asia/Bangkok')))->format('Y-m-d');
+// Unlocking the field alone must not switch normal numbering to a dotted number.
+if ($mode === 'SAVE_BACKDATE' && isset($_REQUEST['contract_date'])
+        && $_REQUEST['contract_date'] >= $contractToday) {
+    $mode = 'GENCODECST';
+    $_REQUEST['mode'] = $mode;
+}
+if ($mode === 'PREVIEW_BACKDATE' || $mode === 'SAVE_BACKDATE') {
+    header('Content-Type: application/json; charset=utf-8');
+    if (empty($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(array('success' => false, 'msg' => 'กรุณาเข้าสู่ระบบ'));
+        exit;
+    }
+    $docId = isset($_REQUEST['dc_doc_id']) ? intval($_REQUEST['dc_doc_id']) : 0;
+    $year = isset($_REQUEST['c_yyyy']) ? intval($_REQUEST['c_yyyy']) : 0;
+    $day = isset($_REQUEST['contract_date']) ? $_REQUEST['contract_date'] : '';
+    $saving = $mode === 'SAVE_BACKDATE';
+    $contractId = intval($_REQUEST['sp_tor_contract_id'] ?? 0);
+    if ($saving) {
+        $db->BeginTran();
+        // Serialize numbering, including simultaneous requests for the same contract.
+        $lock = sqlsrv_query($db->conn, "SET NOCOUNT ON; DECLARE @r int;
+            EXEC @r = sys.sp_getapplock @Resource = 'sp_doc_gen_backdate',
+                @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 10000;
+            SET NOCOUNT OFF;
+            SELECT @r AS lock_result;");
+        $locked = $lock ? $db->Fetch($lock) : false;
+        if (!$locked || $locked['lock_result'] < 0) {
+            $db->RollBackTran();
+            echo json_encode(array('success' => false, 'msg' => 'ระบบกำลังออกเลขสัญญา กรุณาลองใหม่'));
+            exit;
+        }
+        $stmt = sqlsrv_query($db->conn, 'SELECT c.c_code, t.i_purchase, t.i_type_contract, t.i_yyyy
+            FROM dbo.sp_tor_contract c WITH (UPDLOCK, HOLDLOCK)
+            INNER JOIN dbo.sp_tor t ON t.tor_id = c.sp_tor_id
+            WHERE c.sp_tor_contract_id = ? AND c.sp_tor_id = ?',
+            array($contractId, intval($_REQUEST['id'] ?? 0)));
+        $contract = $stmt ? $db->Fetch($stmt) : false;
+        if (!$contract || trim((string)$contract['c_code']) !== '') {
+            $db->RollBackTran();
+            echo json_encode(array('success' => false, 'msg' => 'ไม่พบสัญญาหรือสัญญานี้มีเลขแล้ว กรุณาโหลดข้อมูลใหม่'));
+            exit;
+        }
+        $docId = intval($contract['i_purchase']) + (intval($contract['i_type_contract']) === 2 ? 0 : 3);
+        $year = intval($contract['i_yyyy']);
+        if ($year < 2400) $year += 543;
+    }
+    $parsed = DateTime::createFromFormat('!Y-m-d', $day);
+    $result = array('success' => false, 'msg' => 'กรุณาตรวจสอบประเภทสัญญา ปี และวันที่เริ่มสัญญา');
+    if ($docId >= 1 && $docId <= 6 && $year >= 2400 && $year <= 3000
+            && $parsed && $parsed->format('Y-m-d') === $day) {
+        if (!$saving && $day >= $contractToday) {
+            // Match SP_GEN_CODE_CONTRACT without inserting or reserving a number.
+            $stmt = $db->QueryParam('SELECT TOP 1 i_year_be FROM dbo.sp_contract_year WHERE i_enabled = 1', array());
+            $activeYear = $stmt ? $db->Fetch($stmt) : false;
+            $stmt = $db->QueryParam('SELECT emp_code FROM dbo.sp_emp WHERE sp_emp_id = ?',
+                array(intval($_REQUEST['sp_emp_id'] ?? 0)));
+            $employee = $stmt ? $db->Fetch($stmt) : false;
+            $stmt = $db->QueryParam('SELECT d.c_code, d.i_digit,
+                (SELECT ISNULL(MAX(g.i_value), 0) + 1 FROM dbo.sp_doc_gen g
+                 WHERE g.dc_doc_id = d.dc_doc_id AND g.c_yyyy = ?) AS next_value
+                FROM dbo.sp_doc d WHERE d.dc_doc_id = ?',
+                array($activeYear ? $activeYear['i_year_be'] : 0, $docId));
+            $doc = $stmt ? $db->Fetch($stmt) : false;
+            $preview = array('success' => false, 'msg' => 'ไม่พบการตั้งค่าเลขสัญญา ปีที่ใช้งาน หรือรหัสสายงาน');
+            if ($activeYear && $employee && $doc && intval($doc['i_digit']) > 0) {
+                $preview = array('success' => true, 'normal' => true, 'issue_date' => $day,
+                    'code' => $doc['c_code'] . $employee['emp_code']
+                        . substr(str_repeat('0', 20) . $doc['next_value'], -intval($doc['i_digit']))
+                        . '/' . $activeYear['i_year_be'], 'numbering_type' => 'ปกติ');
+            }
+            echo json_encode($preview);
+            exit;
+        }
+        $stmt = $db->QueryParam(
+            'SELECT TOP 1 i_value, c_gen FROM dbo.sp_doc_gen
+             WHERE dc_doc_id = ? AND c_yyyy = ? AND d_create >= ? AND d_create < ?
+             ORDER BY i_value DESC, d_create DESC, c_gen DESC',
+            array($docId, $year, $day, $parsed->modify('+1 day')->format('Y-m-d'))
+        );
+        $last = $stmt ? $db->Fetch($stmt) : false;
+        // No number on the selected day: use the nearest preceding contract.
+        if ($stmt && !$last) {
+            $stmt = $db->QueryParam(
+                'SELECT TOP 1 i_value, c_gen FROM dbo.sp_doc_gen
+                 WHERE dc_doc_id = ? AND c_yyyy = ? AND d_create < ?
+                 ORDER BY d_create DESC, i_value DESC, c_gen DESC',
+                array($docId, $year, $day)
+            );
+            $last = $stmt ? $db->Fetch($stmt) : false;
+        }
+        if (!$stmt) {
+            $result['msg'] = 'ไม่สามารถค้นหาเลขสัญญาได้';
+        } elseif (!$last) {
+            $result['msg'] = 'ไม่พบเลขสัญญาในวันที่เลือกหรือก่อนหน้าในประเภทและปีที่ระบุ';
+        } elseif (preg_match('~^(.+?\d+)(?:\.(\d+))?/([0-9]{4})$~u', trim($last['c_gen']), $parts)) {
+            $base = $parts[1];
+            $suffix = 0;
+            $stmt = $db->QueryParam(
+                'SELECT c_gen FROM dbo.sp_doc_gen WHERE dc_doc_id = ? AND c_yyyy = ? AND i_value = ?',
+                array($docId, $year, $last['i_value'])
+            );
+            if ($stmt) {
+                while ($row = $db->Fetch($stmt)) {
+                    if (preg_match('~^' . preg_quote($base, '~') . '\.(\d+)/' . $parts[3] . '$~u', trim($row['c_gen']), $match)) {
+                        $suffix = max($suffix, intval($match[1]));
+                    }
+                }
+                $result = array('success' => true, 'last_code' => $last['c_gen'],
+                    'code' => $base . '.' . ($suffix + 1) . '/' . $parts[3],
+                    'issue_date' => $day, 'numbering_type' => 'ย้อนหลัง');
+                if ($saving) {
+                    $duplicate = sqlsrv_query($db->conn,
+                        'SELECT c_gen FROM dbo.sp_doc_gen WITH (UPDLOCK, HOLDLOCK) WHERE c_gen = ?',
+                        array($result['code']));
+                    $exists = $duplicate ? $db->Fetch($duplicate) : true;
+                    $insert = false;
+                    $update = false;
+                    if ($duplicate && !$exists) {
+                        $purchaseNames = array(1 => 'ซื้อ', 2 => 'จ้าง', 3 => 'เช่า');
+                        $contractNames = array(1 => 'สัญญา', 2 => 'ใบสั่ง', 3 => 'จะซื้อจะขาย');
+                        $detail = 'วันที่ออกเลข: ' . substr($day, 8, 2) . '-' . substr($day, 5, 2)
+                            . '-' . (intval(substr($day, 0, 4)) + 543) . "\r\n"
+                            . 'เลขสัญญา: ' . $result['code'] . "\r\n"
+                            . 'ประเภท: ย้อนหลัง (' . $contractNames[intval($contract['i_type_contract'])]
+                            . $purchaseNames[intval($contract['i_purchase'])] . ')';
+                        $insert = sqlsrv_query($db->conn,
+                            'INSERT INTO dbo.sp_doc_gen
+                             (dc_doc_id, ref_id, c_yyyy, i_value, dc_user_create_id,
+                              dc_user_create_cost_id, d_create, c_gen, c_date, d_gen_date, c_detail)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, GETDATE(), ?)',
+                            array($docId, intval($_REQUEST['id']), $year, $last['i_value'],
+                                $_SESSION['user_id'], $_SESSION['dc_cost_id'], $day, $result['code'], $detail));
+                        if ($insert) {
+                            $update = sqlsrv_query($db->conn,
+                                "UPDATE dbo.sp_tor_contract SET c_code = ?, d_doc_date = ?,
+                                 dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = GETDATE()
+                                 WHERE sp_tor_contract_id = ? AND ISNULL(c_code, '') = ''",
+                                array($result['code'], $day, $_SESSION['user_id'], $_SESSION['dc_cost_id'], $contractId));
+                        }
+                    }
+                    if (!$insert || !$update || sqlsrv_rows_affected($update) !== 1) {
+                        $result = array('success' => false, 'msg' => 'ไม่สามารถบันทึกเลขสัญญาได้ กรุณาโหลดตัวอย่างใหม่แล้วลองอีกครั้ง');
+                    } else {
+                        $result['msg'] = 'ออกเลขสัญญาเรียบร้อยแล้ว: ' . $result['code'];
+                    }
+                }
+            } else {
+                $result['msg'] = 'ไม่สามารถค้นหาเลขย่อยสัญญาได้';
+            }
+        } else {
+            $result['msg'] = 'รูปแบบเลขสัญญาล่าสุดไม่รองรับการเติมเลขหลังจุด';
+        }
+    }
+    if ($saving) {
+        if ($result['success']) {
+            if (!$db->CommitTran()) {
+                $db->RollBackTran();
+                $result = array('success' => false, 'msg' => 'ไม่สามารถบันทึกเลขสัญญาได้');
+            }
+        } else {
+            $db->RollBackTran();
+        }
+    }
+    echo json_encode($result);
+    exit;
+}
 $table = "dbo.sp_tor_contract";
 $keyName = "sp_tor_contract_id";
 $data = $util->mnUser($_REQUEST);

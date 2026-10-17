@@ -4184,6 +4184,10 @@ Ext.AppUx = function (app, menu) {
         }
     }
     function cellClick(grid, rowIndex, columnIndex, e) {
+        if (columnIndex === grid.getColumnModel().getIndexById("contract_detailsID")) {
+            Ext.showContractDetails(grid.getStore().getAt(rowIndex));
+            return;
+        }
         Ext.selectRow = this.selModel.selection.record;
         Ext.isPerioid = Ext.selectRow.get("i_last_period");
         Ext.TOR_ID = Ext.selectRow.data.sp_tor_id;
@@ -7715,6 +7719,15 @@ Ext.AppUx = function (app, menu) {
                         },
                     },
                     {
+                        header: "ดูรายละเอียดทั้งหมด",
+                        id: "contract_detailsID",
+                        width: 115,
+                        align: "center",
+                        renderer: function () {
+                            return '<span style="cursor:pointer;color:#15428b"><img src="../images/icons/book_magnify.png" alt=""> ดูรายละเอียด</span>';
+                        }
+                    },
+                    {
                         header: "แก้ไขสัญญา",
                         sortable: false,
                         align: "center",
@@ -8513,6 +8526,23 @@ Ext.AppUx = function (app, menu) {
                                             Ext.loadStore("edit", true); // app,data.load
                                         },
                                         scope: this,
+                                    },
+                                    {
+                                        text: "ดูรายละเอียดทั้งหมด (PR / สัญญา / ตรวจรับ)",
+                                        icon: "../images/icons/book_magnify.png",
+                                        handler: function () {
+                                            Ext.showContractDetails(Ext.selectRow);
+                                        }
+                                    },
+                                    {
+                                        text: "คัดลอกเลข PR",
+                                        icon: "../images/icons/page_copy.png",
+                                        handler: function () {
+                                            var row = Ext.selectRow;
+                                            var pr = row.get("pr_code") || row.get("tor_code") || (row.json && row.json.pr_code);
+                                            if (pr) copyToClipboard(pr);
+                                            else Ext.Msg.alert("คัดลอกเลข PR", "ไม่พบเลข PR ของสัญญานี้");
+                                        }
                                     },
                                     {
                                         text: 'คัดลอก "' + Ext.selectRow.data.dc_creditor_idTxt + '"',

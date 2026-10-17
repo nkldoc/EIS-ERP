@@ -1086,7 +1086,7 @@ Ext.contractDateLock = {
   lockDate: new Date(2026, 9, 1), // 1 ต.ค. 2569
   from: new Date(2026, 9, 5, 0, 0, 0), // 5 ต.ค. 2569
   until: new Date(2026, 9, 15, 23, 59, 59), // 15 ต.ค. 2569
-  editableWhenUnlocked: false, // true = ปลดล็อคแล้วให้ผู้ใช้เลือกวันที่เองได้
+  editableWhenUnlocked: true, // true = ปลดล็อคแล้วให้ผู้ใช้เลือกวันที่เองได้
   locked: false,
   isActive: function () {
     var now = new Date();
@@ -1144,17 +1144,78 @@ Ext.contractDateLock = {
 };
 //------------------------------------------------------------------------------
 
+IsBackdatedContract = function () {
+  var value = Ext.getCmp("d_contract_dateID").getValue();
+  return Ext.isDate(value) && value.format("Y-m-d") < new Date().format("Y-m-d");
+};
+
+PreviewBackdateContract = function (button) {
+  var field = Ext.getCmp("d_contract_dateID"),
+    contractDate = field.getValue(),
+    purchase = Number(Ext.getCmp("i_purchaseID").getValue().inputValue),
+    contractType = Number(Ext.getCmp("i_type_contractID").getValue().inputValue),
+    year = Number(Ext.selectRow.get("i_yyyy"));
+  if (!field.isValid() || !Ext.isDate(contractDate) || !year) {
+    Ext.Msg.alert("แจ้งเตือน", "กรุณาระบุวันที่เริ่มสัญญาและปีงบประมาณให้ถูกต้อง");
+    return;
+  }
+  button.disable();
+  Ext.Ajax.request({
+    url: "tor/api/mnContractCode.php",
+    method: "POST",
+    params: {
+      mode: "PREVIEW_BACKDATE",
+      dc_doc_id: purchase + (contractType == 2 ? 0 : 3),
+      c_yyyy: year < 2400 ? year + 543 : year,
+      contract_date: contractDate.format("Y-m-d"),
+      sp_emp_id: Ext.selectRow.data.sp_emp_id,
+    },
+    callback: function (options, success, response) {
+      if (!button.destroyed) button.enable();
+      var result;
+      try { result = Ext.decode(response.responseText); } catch (e) {}
+      if (!success || !result || !result.success) {
+        Ext.Msg.alert("แจ้งเตือน", result && result.msg ? result.msg : "ไม่สามารถค้นหาตัวอย่างเลขสัญญาได้");
+        return;
+      }
+      var parts = result.issue_date.split("-"),
+        displayDate = parts[2] + "-" + parts[1] + "-" + (Number(parts[0]) + 543),
+        purchases = {1: "ซื้อ", 2: "จ้าง", 3: "เช่า"},
+        contracts = {1: "สัญญา", 2: "ใบสั่ง", 3: "จะซื้อจะขาย"};
+      Ext.Msg.alert("ตัวอย่างเลขสัญญา",
+        "วันที่ออกเลข: " + displayDate
+        + "<br>เลขสัญญา: <b>" + Ext.util.Format.htmlEncode(result.code) + "</b>"
+        + "<br>ประเภท: " + Ext.util.Format.htmlEncode(result.numbering_type)
+        + " (" + contracts[contractType] + purchases[purchase] + ")"
+        + "<br><br>ตัวอย่างนี้ยังไม่ได้จองเลข เลขจริงอาจเปลี่ยนเมื่อมีการออกเลขเพิ่ม");
+    },
+  });
+};
+
 GenCode_CTS = function () {
+  var dateField = Ext.getCmp("d_contract_dateID"),
+    selectedDate = dateField.getValue(),
+    saveButton = Ext.getCmp("btn_save_Contract");
+  if (!dateField.isValid() || !Ext.isDate(selectedDate)) {
+    Ext.Msg.alert("แจ้งเตือน", "กรุณาระบุวันที่เริ่มสัญญาให้ถูกต้อง");
+    return;
+  }
+  if (!Ext.SelectStore || !Ext.SelectStore.data.sp_tor_contract_id) {
+    Ext.Msg.alert("แจ้งเตือน", "กรุณาบันทึกรายละเอียดสัญญาก่อนออกเลขสัญญา");
+    return;
+  }
   var date_Ymd = Ext.util.Format.date(Ext.getCmp("d_contract_dateID").getValue(), "Ymd");
   var date_Ym = Ext.selectRow.get("i_yyyy") / 1 + 543; //date_Ymd.substr(0, 4) / 1 + 543;
   var date_dd = date_Ymd.substr(4);
   var msg = "";
   if (msg == "") {
+    saveButton.disable();
     Ext.Ajax.request({
       url: "tor/api/mnContractCode.php",
       method: "POST",
       params: {
-        mode: "GENCODECST",
+        mode: IsBackdatedContract() ? "SAVE_BACKDATE" : "GENCODECST",
+        contract_date: Ext.getCmp("d_contract_dateID").getValue().format("Y-m-d"),
         id: Ext.HDR_ID,
         sp_tor_contract_id: Ext.SelectStore.data.sp_tor_contract_id,
         i_type_0: Ext.selectRow.data.i_purchase,
@@ -1170,20 +1231,35 @@ GenCode_CTS = function () {
         //                contract_type_0: Ext.selectRow.data.i_is_period == 0 ? 1 : 2,
       },
       success: function (result, request) {
+        var response;
+        try { response = Ext.decode(result.responseText); } catch (e) {}
+        if (!response || !response.success) {
+          saveButton.enable();
+          Ext.Msg.alert("แจ้งเตือน", response && response.msg ? response.msg : "ไม่สามารถออกเลขสัญญาได้");
+          return;
+        }
         // Ext.getCmp("win-frm-dtlID").destroy();
         Ext.store2.setBaseParam("tor_id", Ext.HDR_ID);
         Ext.store2.load({
           callback: function (recordx, operation, success) {
             if (success) {
-              Ext.Msg.alert("แจ้งเตือน", "บันทึกเรียบร้อย");
+              Ext.Msg.alert("แจ้งเตือน", response.code ? "ออกเลขสัญญาเรียบร้อยแล้ว: " + Ext.util.Format.htmlEncode(response.code) : "บันทึกเรียบร้อย");
               Ext.getCmp("win-frm-contractID").destroy();
               // if (type == "SAVE_DTL") {
               //   var inputEl = Ext.getCmp("gridSub5ID").getView().scroller.dom;
               //   inputEl.scrollTop = inputEl.scrollHeight;
               // }
             }
+            else {
+              saveButton.enable();
+              Ext.Msg.alert("แจ้งเตือน", "บันทึกเลขแล้ว แต่โหลดข้อมูลไม่สำเร็จ กรุณาปิดหน้าต่างแล้วโหลดข้อมูลใหม่");
+            }
           },
         });
+      },
+      failure: function () {
+        saveButton.enable();
+        Ext.Msg.alert("แจ้งเตือน", "ไม่สามารถออกเลขสัญญาได้ กรุณาโหลดข้อมูลใหม่เพื่อตรวจสอบก่อนลองอีกครั้ง");
       },
     });
   } else {
@@ -3848,6 +3924,26 @@ function d_period_dateID_change() {
                                   },
                               },
                               {
+                                  xtype: "button",
+                                  id: "buBackdateContractID",
+                                  text: "ปลดล็อกออกเลขสัญญาย้อนหลัง",
+                                  style: "margin-left:205px;margin-bottom:5px;",
+                                  handler: function () {
+                                      Ext.contractDateLock.release();
+                                      var field = Ext.getCmp("d_contract_dateID");
+                                      field.setReadOnly(false);
+                                      field.focus();
+                                      this.setText("ปลดล็อกแล้ว: แก้ไขวันที่เริ่มสัญญาได้");
+                                      this.disable();
+                                  },
+                              },
+                              {
+                                  xtype: "button",
+                                  text: "ตัวอย่างเลขสัญญา",
+                                  style: "margin-left:205px;margin-bottom:5px;",
+                                  handler: PreviewBackdateContract,
+                              },
+                              {
                                   // 0 = ล็อค (server บังคับ 1 ต.ค. 2569), 1 = ปลดล็อค/ไม่อยู่ในช่วงล็อค
                                   xtype: "hidden",
                                   id: "i_contract_date_unlockID",
@@ -4669,7 +4765,8 @@ function d_period_dateID_change() {
                                             msg +=  "- กรุณาเลือกหมวดค่าใช้จ่ายก่อนบันทึก" + "\n"
                                         }
                                         // if (Ext.getCmp('sp_contract_year').getValue() ==''){
-                                        if ([null,0,""].includes(Ext.selectRow.get("sp_contract_year")  )){
+                                        if ([null,0,""].includes(Ext.selectRow.get("sp_contract_year"))
+                                            && !(Ext.getCmp("i_edit_typeID").getValue().inputValue == 3 && IsBackdatedContract())){
                                           msg +=  "- ปีงบประมาณถูกปรับเป็นไม่ใช้งานอยู่" + "\n"
                                         }
                                         if (msg != "" ){
