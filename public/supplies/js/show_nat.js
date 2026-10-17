@@ -912,11 +912,41 @@ Ext.onReady(function () {
         });
     };
     var root = new Ext.tree.AsyncTreeNode();
+    var frequentMenuUser = Ext.session.user_id;
+    function frequentMenuKey() {
+        return 'supplies.frequentMenus.' + frequentMenuUser + '.' + localStorage.getItem('supplies_parentId');
+    }
+    function readFrequentMenus() {
+        try { return JSON.parse(localStorage.getItem(frequentMenuKey()) || '{}') || {}; }
+        catch (e) { return {}; }
+    }
+    function renderFrequentMenus() {
+        var counts = readFrequentMenus(), menus = [], folder = root.findChild('id', 'supplies-frequent-menus');
+        root.cascade(function (node) {
+            if (node.leaf && !node.attributes.frequentOriginalId && counts[node.id] && Number(counts[node.id].count) > 0) menus.push(node);
+        });
+        menus.sort(function (a, b) {
+            return Number(counts[b.id].count) - Number(counts[a.id].count) || Number(counts[b.id].last) - Number(counts[a.id].last);
+        });
+        if (!folder) {
+            folder = new Ext.tree.TreeNode({id: 'supplies-frequent-menus', text: 'เมนูที่ใช้บ่อยที่สุด', leaf: false, expanded: true});
+            root.insertBefore(folder, root.firstChild);
+        }
+        folder.removeAll(true);
+        for (var i = 0; i < Math.min(4, menus.length); i++) {
+            var menu = menus[i];
+            folder.appendChild(new Ext.tree.TreeNode({id: 'supplies-frequent-' + i, text: menu.text, leaf: true,
+                icon: menu.attributes.icon, iconCls: menu.attributes.iconCls, cls: menu.attributes.cls, frequentOriginalId: menu.id,
+                qtip: 'เปิดใช้งาน ' + Number(counts[menu.id].count) + ' ครั้ง'}));
+        }
+        folder.expand(false, false);
+    }
     var loader = new Ext.tree.TreeLoader({
         dataUrl: "/supplies/api/userMenu/userTree.php",
         requestMethod: "get",
         baseParams: {url: window.location.href, parent_id: localStorage.getItem("supplies_parentId")}
     });
+    loader.on('load', function () { renderFrequentMenus(); });
     Ext.urlEIS =
             location.protocol + '//' +
             location.hostname +
@@ -928,12 +958,43 @@ Ext.onReady(function () {
         id: "TreePanel1ID",
         cls: 'supplies-menu-tree',
         tbar: [{
-            xtype: 'textfield',
+            xtype: 'combo',
             id: 'supplies-menu-search',
             emptyText: 'ค้นหาเมนู...',
             width: 220,
+            mode: 'local',
+            store: new Ext.data.ArrayStore({fields: ['menuId', 'menuText']}),
+            displayField: 'menuText',
+            valueField: 'menuText',
+            triggerAction: 'all',
+            hideTrigger: true,
+            minChars: 1,
+            queryDelay: 150,
+            typeAhead: false,
+            forceSelection: false,
+            listWidth: 350,
+            maxHeight: 280,
+            tpl: '<tpl for="."><div class="x-combo-list-item">{menuText:htmlEncode}</div></tpl>',
             enableKeyEvents: true,
             listeners: {
+                beforequery: function (event) {
+                    var field=event.combo, query=String(event.query||'').toLowerCase().replace(/^\s+|\s+$/g,''), matches=[];
+                    root.cascade(function (node) {
+                        if(node.leaf&&!node.attributes.frequentOriginalId){
+                            var text=Ext.util.Format.stripTags(node.text||'');
+                            if(query&&text.toLowerCase().indexOf(query)!==-1)matches.push([node.id,text]);
+                        }
+                    });
+                    field.store.loadData(matches);
+                    event.forceAll=true;
+                    delete field.lastQuery;
+                    if(!matches.length){field.collapse();event.cancel=true;}
+                },
+                select: function (field, record) {
+                    var node=TreePanel1.getNodeById(record.get('menuId'));
+                    field.collapse();
+                    if(node)TreePanel1.fireEvent('click',node);
+                },
                 keyup: {buffer: 200, fn: function (field) {
                     var tree = Ext.getCmp('TreePanel1ID');
                     var query = String(field.getValue() || '').toLowerCase().replace(/^\s+|\s+$/g, '');
@@ -1053,11 +1114,15 @@ Ext.onReady(function () {
     };
     TreePanel1.on("click", function (n) {
         if (n.leaf) {
+            var originalMenuId = n.attributes.frequentOriginalId || n.id;
+            var menuCounts = readFrequentMenus();
+            menuCounts[originalMenuId] = {count: Number((menuCounts[originalMenuId] || {}).count || 0) + 1, last: new Date().getTime()};
+            try { localStorage.setItem(frequentMenuKey(), JSON.stringify(menuCounts)); } catch (storageError) {}
             // ignore clicks on folders and currently selected node
 
 
 
-            var url = n.id.replace(new RegExp("-", "g"), "/");
+            var url = originalMenuId.replace(new RegExp("-", "g"), "/");
             var fullURL = url;
             var fullNameSplit = fullURL.split("?");
             var uri = fullNameSplit[0];
@@ -1065,7 +1130,7 @@ Ext.onReady(function () {
             Ext.page = Ext.apply({uri: uri, method: method});
             if (n.leaf) {
 
-                let accessManu = {menuID: n.id, menuTxt: n.text, browser: getBrowsers()};
+                let accessManu = {menuID: originalMenuId, menuTxt: n.text, browser: getBrowsers()};
                 let accessinfo = Ext.apply({sysUserId: Ext.session.user_id}, accessManu);
                 Ext.session = Ext.apply({adminMunu: false});
 //                Ext.getCmp('north').fnNotifBe('menuname', n.text);
@@ -1078,6 +1143,7 @@ Ext.onReady(function () {
                     }
                 });
                 Ext.getCmp("content-panel").openPage(Ext.page.uri + '.php?' + Ext.page.method, Ext.util.Format.stripTags(n.text));
+                renderFrequentMenus();
             }
         }
     });

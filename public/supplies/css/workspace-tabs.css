@@ -93,3 +93,13 @@
 .supplies-notebook-window .x-window-bbar .x-btn button { height:28px; color:#31577f; padding-right:10px; }
 .supplies-notebook-window .x-window-bbar .x-btn:hover { background:#e2ecfa; }
 #topToolBarID.x-toolbar { height:auto!important; min-height:44px; box-sizing:border-box; padding:3px 5px; }
+.supplies-menu-tree .x-tree-node-el.supplies-contract-folder { background:#f1ecff; border:1px solid #ddd2fa; }
+.supplies-menu-tree .x-tree-node-el.supplies-contract-folder a span { color:#6d28d9; font-weight:bold; }
+.supplies-menu-tree .x-tree-node-el.supplies-checking-menu { background:#e8f8f1; box-shadow:inset 3px 0 #059669; }
+.supplies-menu-tree .x-tree-node-el.supplies-checking-menu a span { color:#047857; font-weight:bold; }
+.supplies-menu-tree .supplies-checking-menu.x-tree-node-over,
+.supplies-menu-tree .supplies-checking-menu.x-tree-selected { background:#c9f0df; box-shadow:inset 4px 0 #047857; }
+.supplies-menu-tree .supplies-contract-icon,
+.supplies-menu-tree .supplies-checking-icon { width:22px; height:24px; background-size:22px 22px!important; background-position:center!important; background-repeat:no-repeat!important; }
+.supplies-menu-tree .supplies-contract-icon { background-image:url('../images/icons/ui-contract-folder.svg')!important; }
+.supplies-menu-tree .supplies-checking-icon { background-image:url('../images/icons/ui-checking.svg')!important; }

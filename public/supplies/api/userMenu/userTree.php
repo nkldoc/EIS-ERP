@@ -83,5 +83,15 @@ function arrForJSON($arr, $index)
 			}
 		}
 	}
+	foreach ($arrReturn as &$menuNode) {
+		if (trim($menuNode['text']) === 'บริหารสัญญา') {
+			$menuNode['cls'] = 'supplies-contract-folder';
+			$menuNode['iconCls'] = 'supplies-contract-icon';
+		} elseif (strpos($menuNode['id'], 'sp-checking') === 0 || trim($menuNode['text']) === 'ตรวจรับพัสดุ/ครุภัณฑ์') {
+			$menuNode['cls'] = 'supplies-checking-menu';
+			$menuNode['iconCls'] = 'supplies-checking-icon';
+		}
+	}
+	unset($menuNode);
 	return $arrReturn;
 }
