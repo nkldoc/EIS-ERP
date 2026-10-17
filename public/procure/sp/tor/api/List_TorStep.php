@@ -1281,22 +1281,36 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
     $i_post1 = $_REQUEST['i_post1'] ?? null;
     if ($act == "SEARCH") {
-//        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
-        $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
-        $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
-        if ($_SESSION['i_level'] != 1) {
-            $wh .= ($_REQUEST['sp_emp_id'] != 0) ? " and a.sp_emp_id = " . $_REQUEST['sp_emp_id'] : " and a.dc_department_id =" . $_SESSION['dc_department_id'];
+        $searchCode = trim((string) ($_REQUEST['c_code'] ?? ''));
+        $searchName = trim((string) ($_REQUEST['c_name'] ?? ''));
+        $searchEmployee = max(0, (int) ($_REQUEST['sp_emp_id'] ?? 0));
+        $searchTorType = max(0, (int) ($_REQUEST['tor_type_id'] ?? 0));
+        if ($searchCode !== '') {
+            $wh .= " and a.c_code like N'%" . str_replace("'", "''", $searchCode) . "%'";
         }
-        $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
-        if ($i_post1 == 1) {
-            $wh .= " and a.sp_emp_id =" . $_REQUEST['sp_emp_id'];
+        if ($searchName !== '') {
+            $wh .= " and a.c_name like N'%" . str_replace("'", "''", $searchName) . "%'";
         }
-        if ($i_post != 0) {
-            if ($i_post == 1) {
-                $wh .= " and tor_status_id is not null";
-            } else {
-                $wh .= " and tor_status_id is null";
-            }
+        if ($searchTorType > 0) {
+            $wh .= " and a.tor_type_id = " . $searchTorType;
+        }
+        $searchDate = (string) ($_REQUEST['d_tor_date'] ?? '');
+        if (preg_match('/^\\d{4}-\\d{2}-\\d{2}$/D', $searchDate)) {
+            $wh .= " and CONVERT(date, a.d_tor_date) = '" . $searchDate . "'";
+        }
+        if ($searchEmployee > 0) {
+            $wh .= " and a.sp_emp_id = " . $searchEmployee;
+        } elseif ((int) ($_SESSION['i_level'] ?? 0) !== 1) {
+            $wh .= " and a.dc_department_id = " . (int) ($_SESSION['dc_department_id'] ?? 0);
+        }
+        $wh .= " and a.i_enabled = 1";
+        if ((int) $i_post1 === 1) {
+            $wh .= " and a.sp_emp_id = " . (int) ($_SESSION['sp_emp_id'] ?? 0);
+        }
+        if ((int) $i_post === 1) {
+            $wh .= " and tor_status_id is not null";
+        } elseif ((int) $i_post === 2) {
+            $wh .= " and tor_status_id is null";
         }
     } else {
         $wh .= ($tor_type_show == true) ? " and tor_status_id is null" : "";

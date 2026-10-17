@@ -4,6 +4,7 @@ include("../../../conf/config.php");
 include("../../../lib/database/DatabaseServer.php");
 include("../../../lib/database/apiUtil.php");
 include("../../../lib/date/i_date.class.php");
+require_once __DIR__ . "/PrReservationTypes.php";
 
 // config ปิด session แล้ว สามารถใช้ค่าที่อ่านมาได้
 $userId = $_SESSION['user_id'] ?? null;
@@ -650,7 +651,11 @@ switch ($mode) {
         break;
     //----------------------------------------------------------------
     case "UPDATEFORMSTSATUS":
-        $tor = $db->GetDataBySQL("select tor_status_id,sp_emp_id,c_bidding from dbo.sp_tor where tor_id = ?", array($data["id"])); //a.tor_status_id not in (24,25,26)
+        $tor = $db->GetDataBySQL("select tor_status_id,sp_emp_id,c_bidding,i_type_contract from dbo.sp_tor where tor_id = ?", array($data["id"])); //a.tor_status_id not in (24,25,26)
+        // A hidden/unavailable contract selector must not clear the saved type.
+        if (!isset($data['i_type_contract']) || $data['i_type_contract'] === '') {
+            $data['i_type_contract'] = $tor['i_type_contract'] ?? 0;
+        }
         $emp_id = $data["sp_emp_id"] ?? null;
         if ($emp_id == '') {
             $emp_id = $tor['sp_emp_id'];
@@ -846,9 +851,25 @@ switch ($mode) {
             $arrParam[] = $data["id"];
             $stmt = $db->QueryParam($sql, $arrParam);
         }
+        try {
+            $stmt3 = savePrReservationTypes($db, $data['id'], $data);
+        } catch (InvalidArgumentException $e) {
+            $db->RollBackTran();
+            echo json_encode(['reval' => 1, 'success' => false, 'msg' => $e->getMessage()]);
+            exit;
+        }
         break;
     //----------------------------------------------------------------
     case "UPDATEFORMSTSATUSST0001.1":
+        // Only plan (1) and period (2) are valid reservation types.
+        foreach (['i_pr_type1', 'i_pr_type2', 'i_pr_type3'] as $typeField) {
+            if (isset($data[$typeField]) && $data[$typeField] !== ''
+                && !in_array((string) $data[$typeField], ['1', '2'], true)) {
+                $db->RollBackTran();
+                echo json_encode(['reval' => 1, 'success' => false, 'msg' => 'Invalid reservation type']);
+                exit;
+            }
+        }
         // exit();
         // print_r($data);
         // exit();
@@ -938,6 +959,13 @@ switch ($mode) {
                         , d_update = ?
                     WHERE {$keyName} = ?";
         $stmt = $db->QueryParam($sql, $arrParam);
+        try {
+            $stmt3 = savePrReservationTypes($db, $data['id'], $data);
+        } catch (InvalidArgumentException $e) {
+            $db->RollBackTran();
+            echo json_encode(['reval' => 1, 'success' => false, 'msg' => $e->getMessage()]);
+            exit;
+        }
         break;
 
     case "UPDATEDIT_TOR":

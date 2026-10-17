@@ -7,12 +7,12 @@ include("../../lib/database/apiUtil.php");
 // config ปิด session แล้ว สามารถใช้ค่าที่อ่านมาได้
 $userId = $_SESSION['user_id'] ?? null;
 
-if (!$userId) {
-    http_response_code(401);
+if ((int) $userId !== 1) {
+    http_response_code(403);
 
     echo json_encode([
         'success' => false,
-        'message' => 'Session expired',
+        'message' => 'Administrator required',
     ]);
 
     exit;
@@ -28,11 +28,11 @@ $util = new apiUtil();
 $root = "data";
 $data = array();
 $con = null;
-if ($_REQUEST["type"] == "sp_emp") {
+if (($_REQUEST["type"] ?? '') == "sp_emp") {
 
-    $sqlMain = "select a.* from NMU_DATACENTER.dbo.dc_user a "
-            . "left join sp_emp b on b.dc_emp_id = a.dc_emp_id   where a.dc_emp_id>1  ";
-    $arrParam = array(STATUS_ENABLE);
+    $sqlMain = "select a.dc_user_id, a.c_user_name, a.dc_emp_id, a.c_full_name "
+            . "from dbo.dc_user a where a.i_enable = ? and a.i_delete = ? order by a.c_full_name";
+    $arrParam = array(STATUS_ENABLE, DELETE_FALSE);
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     if ($stmt) {
 
@@ -43,10 +43,9 @@ if ($_REQUEST["type"] == "sp_emp") {
 
         while ($row = $db->Fetch($stmt)) {
             ${$root}[] = array(
-                "id" => "{$row["sp_emp_id"]}",
+                "id" => "{$row["dc_user_id"]}",
                 "dc_user_id" => "{$row["dc_user_id"]}",
                 "c_user_name" => "{$row["c_user_name"]}",
-                "c_password" => "{$row["c_password"]}",
                 "dc_emp_id" => "{$row["dc_emp_id"]}",
                 "c_name" => "{$row["c_full_name"]} "
             );

@@ -1,5 +1,5 @@
 <?php
-include("../conf/config.php");  
+require_once __DIR__ . '/../conf/config.php';
     $_SESSION = array();
     if (!headers_sent()) {
         setcookie(session_name(), "", [

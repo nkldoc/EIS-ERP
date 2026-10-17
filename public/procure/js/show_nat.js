@@ -1861,74 +1861,37 @@ Ext.onReady(function () {
                                                     text: 'เปลี่ยนสิทธิ์ Administrator',
                                                     handler: function () {
                                                         // อ่านค่าจาก displayfields ที่มีอยู่ใน window
-                                                        var user = Ext.getCmp("userGrandId").getValue();
-                                                        var pass = Ext.getCmp("passGrandId").getValue();
-                                                        Ext.session.adminMunu = Ext.getCmp("adminMenuId").getValue() || '';
-                                                        var adminMenu = (function () {
-                                                            try {
-                                                                localStorage.setItem('tg.last.adminMenu', Ext.session.adminMunu);
-                                                            } catch (e) {
-                                                            }
-                                                        })();
-                                                        // ถ้า user ว่าง -> แจ้ง
-                                                        if (!user || user === '*****') {
-                                                            Ext.Msg.alert('Error', 'กรุณาเลือกชื่อพนักงานก่อน');
+                                                        var combo = Ext.getCmp("sp_emp_idID");
+                                                        var record = combo.store.getById(combo.getValue());
+                                                        var userId = record && record.get("dc_user_id");
+                                                        if (!userId) {
+                                                            Ext.Msg.alert('Error', 'Please select a user');
                                                             return;
                                                         }
-
-                                                        // ถ้า pass ถูกมาร์ค (เช่น "****") ให้ถามผู้ใช้กรอกรหัสจริงก่อนส่ง
-                                                        var askAndProceed = function (passValue) {
-                                                            if (!passValue) {
-                                                                Ext.Msg.alert('Error', 'กรุณากรอกรหัสผ่านเพื่อยืนยัน');
-                                                                return;
-                                                            }
-
-                                                            // ถ้าต้องการส่งรหัสผ่านเป็น MD5 ให้ uncomment ส่วน loadSparkMd5 และใช้ hashedPass แทน passValue
-                                                            var sendLogin = function (finalPass) {
-                                                                Ext.Ajax.request({
-                                                                    url: './access/login_3.php', // เปลี่ยนเป็น endpoint จริงของคุณ
-                                                                    method: 'POST',
-                                                                    params: {
-                                                                        username: user,
-                                                                        password: finalPass
-                                                                    },
-                                                                    success: function (response) {
-                                                                        var text = response.responseText;
-                                                                        // สมมติว่า server ส่ง JSON { success: true, msg: "..." }
+                                                        var showAdminMenu = !!Ext.getCmp("adminMenuId").getValue();
+                                                        Ext.Ajax.request({
+                                                            url: './access/login_3.php',
+                                                            method: 'POST',
+                                                            params: {ss_user_id: userId},
+                                                            success: function (response) {
+                                                                try {
+                                                                    var result = Ext.decode(response.responseText);
+                                                                    if (result.reval === 0 && result.success === 'Success') {
                                                                         try {
-                                                                            var o = Ext.decode(text);
-                                                                            if (o.success) {
-                                                                                Ext.Msg.alert('สำเร็จ' + Ext.session.adminMunu, o.msg || 'ล็อกอินสำเร็จ', function () {
-                                                                                    // reload หน้าเว็บเพื่อให้สิทธิ์ใหม่มีผล
-                                                                                    window.location.reload();
-                                                                                });
-                                                                            } else {
-                                                                                Ext.Msg.alert('ล้มเหลว', o.msg || 'ล็อกอินไม่สำเร็จ');
-                                                                            }
-                                                                        } catch (e) {
-                                                                            // ถ้าไม่ใช่ JSON ให้แสดง raw response
-                                                                            Ext.Msg.alert('Response', text);
-                                                                        }
-                                                                    },
-                                                                    failure: function (resp) {
-                                                                        Ext.Msg.alert('Error', 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้');
+                                                                            localStorage.setItem('tg.last.adminMenu', showAdminMenu ? 'true' : '');
+                                                                        } catch (e) {}
+                                                                        window.location.reload();
+                                                                    } else {
+                                                                        Ext.Msg.alert('Error', result.msg || 'Unable to switch user');
                                                                     }
-                                                                });
-                                                            };
-                                                            // ======= ถ้าไม่ต้องการ MD5 ให้ส่ง plaintext =======
-                                                            sendLogin(passValue);
-                                                        };
-                                                        if (!pass || pass.indexOf('*') === 0) {
-                                                            // ถ้า pass เป็น '****' ให้ prompt รับรหัสจริงจากผู้ใช้
-                                                            Ext.Msg.prompt('ยืนยันรหัสผ่าน', 'กรุณากรอกรหัสผ่านของผู้ใช้เพื่อยืนยันการเปลี่ยนสิทธิ์:', function (btn, text) {
-                                                                if (btn === 'ok') {
-                                                                    askAndProceed(text);
+                                                                } catch (e) {
+                                                                    Ext.Msg.alert('Error', 'Invalid server response');
                                                                 }
-                                                            });
-                                                        } else {
-                                                            // pass มีค่า (อาจเป็นรหัสจริง) -> ส่งเลย
-                                                            askAndProceed(pass);
-                                                        }
+                                                            },
+                                                            failure: function () {
+                                                                Ext.Msg.alert('Error', 'Administrator permission required');
+                                                            }
+                                                        });
                                                     }
                                                 }
                                             ],
@@ -1951,7 +1914,7 @@ Ext.onReady(function () {
                                                         baseParams: {type: "sp_emp", all: "all"},
                                                         root: "data",
                                                         idProperty: "id",
-                                                        fields: ["id", "dc_user_id", "c_user_name", "c_password", "dc_emp_id", "c_name"],
+                                                        fields: ["id", "dc_user_id", "c_user_name", "dc_emp_id", "c_name"],
                                                         listeners: {
                                                             load: function (t, records, options) {
 //
@@ -1971,7 +1934,7 @@ Ext.onReady(function () {
 //                                                            record.set("userGrand","dc_user_id");
 //                                                            record.set("passGrand",11111);
                                                             Ext.getCmp("userGrandId").setValue(record.get("c_user_name") || record.get("c_user_name"));
-                                                            Ext.getCmp("passGrandId").setValue(record.get("c_password") || "****");
+                                                            Ext.getCmp("passGrandId").setValue("****");
                                                         }
                                                     }
                                                 }), {
