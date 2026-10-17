@@ -88,11 +88,11 @@
     function contractBookingDetails(rows) {
         var items = [];
         Ext.each(rows, function (row) {
-            items.push({source_no: row.source_no, source_name: row.source_name, amount: row.amount,
+            items.push({contract_code: row.contract_code, source_no: row.source_no, source_name: row.source_name, amount: row.amount,
                 booking_type: Number(row.booking_type) === 1 ? 'จองแบบแผน' : (Number(row.booking_type) === 2 ? 'จองแบบงวด' : null),
                 reservation_id: row.reservation_id, booking_status: row.booking_status});
         });
-        return section('รายละเอียดการจองเงินตามสัญญา', table(items, [['source_no', 'แหล่งเงินที่'], ['source_name', 'แหล่งเงิน'],
+        return section('รายละเอียดการจองเงินตามสัญญา', table(items, [['contract_code', 'เลขสัญญา'], ['source_no', 'แหล่งเงินที่'], ['source_name', 'แหล่งเงิน'],
             ['amount', 'จำนวนเงินจากแหล่งเงิน', 'money'], ['booking_type', 'ขอดำเนินการ'],
             ['reservation_id', 'รหัสการจองเงิน'], ['booking_status', 'สถานะการจองเงิน']]));
     }
@@ -182,7 +182,7 @@
             var isLast = Number(period.i_is_last) === 1;
             html += '<details class="contract-period-detail" style="border:1px solid ' + (isLast ? '#b9770e' : '#bacce0') + ';margin:12px 0;background:#fff">' +
                 '<summary style="cursor:pointer;padding:12px;background:' + (isLast ? '#fff3cd' : '#eaf1f9') + ';color:' + (isLast ? '#744600' : '#15428b') + ';font-weight:bold">' +
-                'งวดที่ ' + encode(period.i_period) + (isLast ? ' <span style="display:inline-block;background:#8a5100;color:#fff;border-radius:3px;padding:2px 7px">งวดสุดท้าย</span>' : '') +
+                (data.contracts.length > 1 ? 'สัญญา ' + encode(period.contract_code) + ' / ' : '') + 'งวดที่ ' + encode(period.i_period) + (isLast ? ' <span style="display:inline-block;background:#8a5100;color:#fff;border-radius:3px;padding:2px 7px">งวดสุดท้าย</span>' : '') +
                 ' — ' + encode(period.c_contract_code) + ' | ' + encode(periodStatus(period.i_enabled)) +
                 ' | ' + encode(display(period.f_total_amt, 'money')) + ' บาท <span class="period-show-label">(แสดงรายละเอียด)</span>' +
                 '<span class="period-hide-label">(ซ่อนรายละเอียด)</span></summary><div style="padding:12px">' +
@@ -279,10 +279,13 @@
             '<div style="flex:1 1 330px;min-width:0">' + section('รายละเอียดเงิน', money) + '</div></div>' + warrantyDetails(check);
     }
     var itemColumns = [['c_name', 'ชื่อรายการ'], ['i_qty', 'จำนวน'], ['f_unit_price', 'ราคาต่อหน่วย', 'money'], ['f_net_total_price', 'จำนวนเงิน', 'money']];
-    Ext.showContractDetails = function (record) {
-        var id = record.get('sp_tor_contract_id');
-        if (!id) return Ext.Msg.alert('รายละเอียดสัญญา', 'กรุณาเลือกสัญญา');
-        var tabs = new Ext.TabPanel({activeTab: 0, border: false, deferredRender: false, items: [
+    Ext.showContractDetails = function (record, options) {
+        options = options || {};
+        var id = options.sp_tor_id ? 0 : Number(record.get('sp_tor_contract_id') || 0);
+        var torId = Number(options.sp_tor_id || record.get('sp_tor_id') || 0);
+        if (!id && !torId) return Ext.Msg.alert('ดูรายละเอียดทั้งหมด', 'กรุณาเลือก PR หรือสัญญา');
+        var requestParams = id ? {sp_tor_contract_id: id} : {sp_tor_id: torId};
+        var tabs = new Ext.TabPanel({activeTab: options.initialTab || 0, border: false, deferredRender: false, items: [
             {title: 'PR / แหล่งเงิน / รายการ', autoScroll: true, bodyStyle: 'padding:12px', html: 'กำลังโหลดข้อมูล...'},
             {title: 'ผู้เสนอราคา / ผู้ชนะ', autoScroll: true, bodyStyle: 'padding:12px'},
             {title: 'สัญญา / งวด', autoScroll: true, bodyStyle: 'padding:12px'},
@@ -294,13 +297,14 @@
             height: Math.min(740, Ext.getBody().getViewSize().height - 30), layout: 'fit', modal: true, maximizable: true,
             items: tabs, buttons: [copyButton, {text: 'ปิด', handler: function () { win.close(); }}]});
         win.show();
-        Ext.Ajax.request({url: 'tor/api/contractDetails.php', method: 'GET', params: {sp_tor_contract_id: id},
+        Ext.Ajax.request({url: 'tor/api/contractDetails.php', method: 'GET', params: requestParams,
             callback: function (options, success, response) {
                 if (win.isDestroyed) return;
                 var data;
                 try { data = Ext.decode(response.responseText); } catch (ignore) { data = null; }
                 if (!success || !data || !data.success) {
                     tabs.items.get(0).update('<p>' + encode(data && data.msg ? data.msg : 'โหลดข้อมูลไม่สำเร็จ กรุณาลองอีกครั้ง') + '</p>');
+                    tabs.setActiveTab(0);
                     return;
                 }
                 prCode = data.pr.length ? data.pr[0].c_code : '';
@@ -316,6 +320,7 @@
                 Ext.each(data.contracts, function (contract) {
                     contractHtml += section('รายละเอียดสัญญา', table([contract], [['c_code', 'เลขสัญญา'], ['creditor_name', 'คู่สัญญา']]) + contractTerms(contract));
                 });
+                if (!data.contracts.length) contractHtml = section('รายละเอียดสัญญา', '<p style="padding:10px;color:#666">PR นี้ยังไม่มีสัญญา</p>');
                 contractHtml += contractBookingDetails(data.contractFunds || []);
                 var contractPanel = tabs.items.get(2);
                 contractPanel.update(contractHtml + renderPeriods(data, '1'));
@@ -332,7 +337,8 @@
                     var rows = children(data.checkItems, 'sp_check_period_hdr_id', check.sp_check_period_hdr_id);
                     var summary = {ir_code: check.ir_code, c_code: check.c_code, payment_code: check.payment_code,
                         checking_date: display(check.d_checking_date, 'date'), request_amount: check.f_inv_vat};
-                    var checkTitle = (check.payment_period !== null && check.payment_period !== undefined ? 'งวดเงินที่ ' + check.payment_period + ' / ' : '') + 'ตรวจรับ ' + (check.c_code || '');
+                    var checkTitle = (data.contracts.length > 1 ? 'สัญญา ' + check.contract_code + ' / ' : '') +
+                        (check.payment_period !== null && check.payment_period !== undefined ? 'งวดเงินที่ ' + check.payment_period + ' / ' : '') + 'ตรวจรับ ' + (check.c_code || '');
                     checkHtml += section(checkTitle, details([['งวดตามสัญญา', check.contract_period], ['งวดเงิน', check.payment_period], ['เลขอ้างอิงงวด', check.period_reference]]) +
                         table([summary], [['ir_code', 'เลข IR'], ['c_code', 'เลขตรวจรับ'], ['payment_code', 'เลขเบิก'], ['checking_date', 'วันที่ตรวจรับ'], ['request_amount', 'จำนวนเงินขอเบิก', 'money']]) +
                         section('รายการตรวจรับ', table(rows, [['c_name', 'ชื่อรายการ'], ['i_qty', 'จำนวน'], ['f_net_total_price', 'จำนวนเงิน', 'money']])) +

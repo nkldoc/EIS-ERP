@@ -12,7 +12,8 @@ if (!isset($_SESSION['user_id'])) {
 $db = new DatabaseServer();
 $pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"]);
 $_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"];
-$js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
+$scriptFile = __DIR__ . '/tor/' . $pg->get_js() . '.js';
+$js = $pg->get_js() . ".js?__dc=" . (is_file($scriptFile) ? filemtime($scriptFile) : __VPRODUCT_);
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -78,6 +79,7 @@ $_SESSION['menu'] = "{$pg->get_menu()}"; ?>';
         <script type="text/javascript" src="./uiData/configStoreUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
         <script type="text/javascript" src="../js/config_function.js?dc=<?= __VPRODUCT_ ?>"></script>
         <script type="text/javascript" src="./tor/receive-validation/ui/receive-validation-history.js?_dc=<?= __VPRODUCT_; ?>"></script>
+        <script type="text/javascript" src="./tor/contractDetails.js?_dc=<?= filemtime(__DIR__ . '/tor/contractDetails.js'); ?>"></script>
         <script type="text/javascript" src="./tor/<?PHP echo $js; ?>"></script>
         <!-- <script type="text/javascript" src="./tor/deliverWork.js?_dc=<?= __VPRODUCT_; ?>"></script> -->
         <!-- <script type="text/javascript" src="./tor/pageStatus.js?_dc=<?= __VPRODUCT_; ?>"></script> -->

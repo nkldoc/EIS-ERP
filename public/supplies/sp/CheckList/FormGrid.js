@@ -1536,6 +1536,11 @@ Ext.AppUx = function (app, menu) {
     Ext.buAct = null;
 
     function cellClick(grid, rowIndex, columnIndex, e) {
+        if (columnIndex === grid.getColumnModel().getIndexById("contract_detailsID")) {
+            var overviewRecord = grid.getStore().getAt(rowIndex);
+            Ext.showContractDetails(overviewRecord, {sp_tor_id: overviewRecord.get("id"), initialTab: 0});
+            return;
+        }
         var record = grid.getStore().getAt(rowIndex);
         Ext.selectRow = record;
         if (columnIndex === grid.getColumnModel().getIndexById("processDueID")) {
@@ -3963,6 +3968,16 @@ Ext.AppUx = function (app, menu) {
                         renderer: function (value, metaData, record, row, col, store, gridView) {
                             return value == null ? "" : value + " " + record.get("c_name_status");
                         },
+                    },
+                    {
+                        header: "ดูรายละเอียดทั้งหมด",
+                        id: "contract_detailsID",
+                        width: 120,
+                        align: "center",
+                        sortable: false,
+                        renderer: function () {
+                            return '<span style="cursor:pointer;color:#15428b"><img src="../images/icons/book_magnify.png" alt=""> ดูรายละเอียด</span>';
+                        }
                     },
                     {
                         header: "รหัส PR",

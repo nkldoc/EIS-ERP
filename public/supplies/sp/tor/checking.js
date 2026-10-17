@@ -10206,6 +10206,10 @@ function showCustomEditForm(rec) {
 }
 
 var cellClick = function (grid, rowIndex, columnIndex, e) {
+        if (columnIndex === grid.getColumnModel().getIndexById('contract_detailsID')) {
+                Ext.showContractDetails(grid.getStore().getAt(rowIndex), {initialTab: 3});
+                return;
+        }
         Ext.selectRow = this.selModel.selection.record;
         var column = grid.getColumnModel().getColumnAt(columnIndex);
         if (column && column.id === 'i_is_editID') {
@@ -11041,6 +11045,16 @@ Ext.AppUx = function (app, menu) {
                                                 return record.get("no");
                                         },
                                 }),
+                                {
+                                        header: "ดูรายละเอียดทั้งหมด",
+                                        id: "contract_detailsID",
+                                        width: 120,
+                                        align: "center",
+                                        sortable: false,
+                                        renderer: function () {
+                                                return '<span style="cursor:pointer;color:#15428b"><img src="../images/icons/book_magnify.png" alt=""> ดูรายละเอียด</span>';
+                                        }
+                                },
                                 {
                                         header: "ลำดับ",
                                         sortable: false,
