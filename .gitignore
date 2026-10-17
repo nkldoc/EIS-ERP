@@ -1,5 +1,6 @@
 # Local application configuration
 /public/supplies/conf/config.php
+/public/procure/conf/config.php
 /public/api-eis/
 /public/supplies/conf/presence/presence.config.php
 /public/procure/conf/presence/presence.config.php
