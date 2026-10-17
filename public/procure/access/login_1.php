@@ -119,6 +119,13 @@ while ($data = $db->Fetch($stmt)) {
 }
 
 session_write_close();
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
+    && (string)($_GET['portal_entry'] ?? '') === '1'
+    && $re['reval'] === 0) {
+    header('Cache-Control: no-store');
+    header('Location: /procure/', true, 303);
+    exit;
+}
 echo json_encode($re);
 exit;
 
