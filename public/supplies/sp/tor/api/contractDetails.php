@@ -201,7 +201,18 @@ $debtItems = $fetch('SELECT i.sp_tranf_item_id, t.sp_check_period_hdr_id, i.c_na
     LEFT JOIN ' . DB_CENTER . 'dc_acc acc ON acc.dc_acc_id=i.dc_acc_id
     WHERE (h.sp_tor_contract_id IN (' . $contractList . ') OR m.sp_contract_id IN (' . $contractList . ')) AND h.i_enabled=1 AND i.i_enabled=1
     ' . $checkFilter . ' ORDER BY t.sp_check_period_hdr_id,t.sp_tranf_hdr_id,i.sp_tranf_item_id', $checkParams);
-echo json_encode(array('success' => true, 'pr' => $pr, 'funds' => $funds, 'items' => $items,
+if (intval($_GET['preflight'] ?? 0) === 1) {
+    if ($selectedCheckId <= 0 || count($checks)!==1) {
+        http_response_code(400);echo json_encode(array('success'=>false,'msg'=>'กรุณาเลือกใบตรวจรับที่จะวิเคราะห์'));exit;
+    }
+    require_once __DIR__ . '/checkingPreflight.php';
+    $check=$checks[0];$period=null;
+    foreach($periods as $row)if(intval($row['sp_tor_hdr_period_id'])===intval($check['sp_tor_hdr_period_id']))$period=$row;
+    $result=loadCheckingPreflight($db,$check,$contractsById[intval($check['linked_contract_id'])]??array(),$period,$debtItems);
+    echo json_encode(array('success'=>true,'analysis'=>$result),JSON_UNESCAPED_UNICODE);exit;
+}
+echo json_encode(array('success' => true, 'can_admin_edit' => intval($_SESSION['dc_center_user'] ?? 0) === 1,
+    'pr' => $pr, 'funds' => $funds, 'items' => $items,
     'bidders' => $bidders, 'contracts' => $contracts, 'periods' => $periods,
     'periodItems' => $periodItems, 'checks' => $checks, 'checkItems' => $checkItems,
     'debtItems' => $debtItems, 'bidderGuarantees' => $bidderGuarantees,

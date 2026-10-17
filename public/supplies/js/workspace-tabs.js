@@ -117,6 +117,17 @@
             this.setActiveTab(tab);
             return tab;
         },
+        refreshActiveTab: function () {
+            var tab = this.getActiveTab();
+            var frame = tab && tab.body && tab.body.dom.querySelector('iframe');
+            if (!frame) return false;
+            try {
+                frame.contentWindow.location.reload();
+            } catch (error) {
+                frame.src = frame.getAttribute('src') || './' + tab.workspaceRoute;
+            }
+            return true;
+        },
         // Keep compatibility with existing toolbar actions and child pages.
         update: function (html) {
             var match = typeof html === 'string' && html.match(/<iframe\b[^>]*\bsrc=["']([^"']+)["']/i);

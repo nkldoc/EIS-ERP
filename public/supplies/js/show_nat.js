@@ -1617,8 +1617,8 @@ Ext.onReady(function () {
 
     Ext.toogleTemp = new Ext.Button({
         text: 'สมุดโน้ต',
-        icon: './images/icons/book_edit.png',
-        cls: 'supplies-notebook-button',
+        iconCls: 'supplies-icon-notebook',
+        cls: 'supplies-toolbar-action supplies-notebook-button',
         tooltip: 'เปิดสมุดโน้ต (Text Memories)',
         handler: function () { Ext.openSuppliesNotebook(); }
     });
@@ -1739,12 +1739,23 @@ Ext.onReady(function () {
                     border: false,
                     id: 'topToolBarID',
                     enableOverflow: true,
-                    items: [/*onlineCountLabel,*/ Ext.toogleTemp, {
+                    items: [/*onlineCountLabel,*/ {
+                            xtype: 'button',
+                            id: 'supplies-refresh-active-tab',
+                            text: 'รีเฟรชแท็บ',
+                            iconCls: 'supplies-icon-refresh',
+                            cls: 'supplies-toolbar-action supplies-refresh-button',
+                            tooltip: 'รีเฟรชแท็บที่กำลังเปิดอยู่',
+                            handler: function () {
+                                var workspace = Ext.getCmp('content-panel');
+                                if (workspace && workspace.refreshActiveTab) workspace.refreshActiveTab();
+                            }
+                        }, Ext.toogleTemp, {
                             xtype: 'button',
                             id: 'supplies-admin-tools',
                             text: 'เครื่องมือ ADMIN',
-                            icon: './images/icons/application_edit.png',
-                            cls: 'supplies-admin-tools-button',
+                            iconCls: 'supplies-icon-admin',
+                            cls: 'supplies-toolbar-action supplies-admin-tools-button',
                             tooltip: 'ค้นหาและแก้ไขข้อมูล TOR / สัญญา ได้จากทุกหน้า',
                             hidden: window.SUPPLIES_CAN_ADMIN_TOOLS !== true,
                             disabled: window.SUPPLIES_CAN_ADMIN_TOOLS !== true,

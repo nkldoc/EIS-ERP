@@ -9493,7 +9493,7 @@ function showCustomEditForm(rec) {
                                                                 { xtype: 'hidden', name: 'id', value: rec ? rec.data.id : '' }
                                                                 , {
                                                                         xtype: 'compositefield',
-                                                                        fieldLabel: 'ใช้เงินปีงบประมาณ',
+                                                                        fieldLabel: 'ปีที่หักเงินงบประมาณ',
                                                                         anchor: '100%',
                                                                         items: [
                                                                                 {
@@ -9501,7 +9501,7 @@ function showCustomEditForm(rec) {
                                                                                         flex: 1, // ให้ Combo ขยายพื้นที่เต็มที่เหลือ
                                                                                         mode: 'local',
                                                                                         value: rec && rec.data ? (rec.data.i_yyyy_overlapTxt || '') : '',
-                                                                                        fieldLabel: "ใช้เงินปีงบประมาณ",
+                                                                                        fieldLabel: "ปีที่หักเงินงบประมาณ",
                                                                                         allowBlank: false,
                                                                                         submitValue: true,
                                                                                         id: "i_yyyy_overlapIDs",
@@ -10210,7 +10210,8 @@ var cellClick = function (grid, rowIndex, columnIndex, e) {
                 var overviewRow = grid.getStore().getAt(rowIndex);
                 var checkId = Number(overviewRow.get('sp_check_period_hdr_id') || 0);
                 if (!checkId) return Ext.Msg.alert('ดูรายละเอียด', 'ไม่พบใบตรวจรับของแถวที่เลือก');
-                Ext.showContractDetails(overviewRow, {initialTab: 3, sp_check_period_hdr_id: checkId});
+                Ext.showContractDetails(overviewRow, {initialTab: 3, sp_check_period_hdr_id: checkId, allowAdminEdit: true,
+                        onUpdated: function () { grid.getStore().reload(); }});
                 return;
         }
         Ext.selectRow = this.selModel.selection.record;
@@ -14093,7 +14094,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         new Ext.form.ComboBox({
                                                                                                 mode: "local",
                                                                                                 // allowBlank: false,
-                                                                                                fieldLabel: "ปีงบประมาณ",
+                                                                                                fieldLabel: "ปีที่ทำรายการ",
                                                                                                 submitValue: true,
                                                                                                 allowBlank: false,
                                                                                                 id: "i_budget_year",
@@ -14157,7 +14158,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         }),
                                                                                         new Ext.form.ComboBox({
                                                                                                 mode: "local",
-                                                                                                fieldLabel: "ใช้เงินปีงบประมาณ",
+                                                                                                fieldLabel: "ปีที่หักเงินงบประมาณ",
                                                                                                 allowBlank: false,
                                                                                                 submitValue: true,
                                                                                                 id: "i_yyyy_overlapID",

@@ -73,6 +73,19 @@
 .supplies-admin-tools-button button { height:32px!important; padding-right:12px; color:#58468d; font:600 12px Tahoma,sans-serif; }
 .supplies-admin-tools-button:hover { background:#ece7fc; border-color:#a493cf; }
 .supplies-admin-tools-button.x-item-disabled { opacity:.5; }
+
+/* Matching actions: refresh first, notebook, then administrator tools. */
+.supplies-toolbar-action { margin:3px 8px 3px 0; border-radius:8px; box-shadow:0 1px 2px #1935590d; transition:background-color .12s ease,border-color .12s ease; }
+.supplies-toolbar-action td { background:none!important; }
+.supplies-toolbar-action button { height:32px!important; padding:0 10px 0 28px!important; background-size:18px 18px!important; background-position:2px center!important; font:600 12px Tahoma,sans-serif; }
+.supplies-toolbar-action:focus-within { outline:2px solid #7ba4d9; outline-offset:2px; }
+.supplies-refresh-button { margin-left:10px; border:1px solid #b8d9cc; background:#f0faf5; }
+.supplies-refresh-button button { color:#17654d; }
+.supplies-refresh-button:hover { background:#e0f4e9; border-color:#71b49a; }
+.supplies-notebook-button { background:#f5f9ff; }
+.supplies-icon-refresh { background-image:url('../images/icons/ui-refresh.svg')!important; }
+.supplies-icon-notebook { background-image:url('../images/icons/ui-notebook.svg')!important; }
+.supplies-icon-admin { background-image:url('../images/icons/ui-admin.svg')!important; }
 .supplies-notebook-window { border:1px solid #c5d3e4; border-radius:12px; overflow:hidden; box-shadow:0 16px 50px #19355938; }
 .supplies-notebook-window .x-window-tc { border-top:3px solid #507bb4; }
 .supplies-notebook-window .x-window-bbar .x-btn { border:1px solid #c5d3e4; border-radius:6px; background:#fff; margin-left:6px; }

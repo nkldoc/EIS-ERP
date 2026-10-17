@@ -224,6 +224,23 @@
         }
         return section('รายละเอียดการรับประกัน', details(rows));
     }
+    function preflightControls(checks) {
+        if(!checks.length)return '<p style="padding:16px;color:#64748b">ยังไม่มีใบตรวจรับสำหรับวิเคราะห์ก่อนส่งเบิก</p>';
+        var html='<div style="padding:16px;border:1px solid #c5d4e5;background:#f5f9ff;border-radius:8px"><b style="color:#15428b;font-size:14px">ตรวจสอบความถูกต้องก่อนส่งเบิก</b>'+
+            '<p style="margin:8px 0;color:#52647b">วิเคราะห์ 5 เงื่อนไขจากข้อมูลล่าสุด พร้อมเหตุผลและแนวทางแก้ไขทีละข้อ</p>'+
+            '<label>ใบตรวจรับ <select class="checking-preflight-select" style="padding:6px;max-width:100%">';
+        Ext.each(checks,function(check){html+='<option value="'+encode(check.sp_check_period_hdr_id)+'">งวดเงินที่ '+encode(check.payment_period)+' — '+encode(check.c_code||check.ir_code)+'</option>';});
+        return html+'</select></label> <button type="button" class="checking-preflight-run" style="padding:7px 14px;border:1px solid #93b5e2;border-radius:6px;background:#eaf2ff;color:#15428b;cursor:pointer">วิเคราะห์ก่อนส่งเบิก</button></div>'+
+            '<div class="checking-preflight-results" aria-live="polite" style="margin-top:16px"><p style="color:#64748b">กดปุ่มเพื่อเริ่มตรวจสอบรายการที่เลือก</p></div>';
+    }
+    function preflightRule(rule,index) {
+        var colors={pass:['#edf9f1','#22673b','ผ่าน'],block:['#fff1f1','#a12828','ต้องแก้ไข'],warning:['#fff8e5','#855a10','ตรวจสอบเพิ่ม']};
+        var style=colors[rule.status]||colors.warning,html='<section style="margin:10px 0;padding:14px;border:1px solid '+style[1]+'33;border-left:4px solid '+style[1]+';border-radius:6px;background:'+style[0]+'">'+
+            '<b style="color:'+style[1]+'">'+(index+1)+'. '+encode(rule.title)+' · '+style[2]+'</b><p style="margin:8px 0">'+encode(rule.message)+'</p>';
+        Ext.each(rule.evidence||[],function(value){html+='<div style="color:#52647b;margin:3px 0">'+encode(value)+'</div>';});
+        if(rule.action)html+='<p style="margin-top:8px;font-weight:bold;color:'+style[1]+'">แนวทางแก้ไข: '+encode(rule.action)+'</p>';
+        return html+'</section>';
+    }
     function checkDetails(check, rows) {
         var names = [], funds = [], expenses = [], bookings = [];
         function unique(list, value) { if (value && list.indexOf(value) === -1) list.push(value); }
@@ -290,16 +307,26 @@
             {title: 'PR / แหล่งเงิน / รายการ', autoScroll: true, bodyStyle: 'padding:12px', html: 'กำลังโหลดข้อมูล...'},
             {title: 'ผู้เสนอราคา / ผู้ชนะ', autoScroll: true, bodyStyle: 'padding:12px'},
             {title: 'สัญญา / งวด', autoScroll: true, bodyStyle: 'padding:12px'},
-            {title: 'ตรวจรับ / เลขเบิก', autoScroll: true, bodyStyle: 'padding:12px'}
+            {title: 'ตรวจรับ / เลขเบิก', autoScroll: true, bodyStyle: 'padding:12px'},
+            {title: 'ตรวจสอบก่อนส่งเบิก', autoScroll: true, bodyStyle: 'padding:12px'}
         ]});
-        var prCode = '';
+        var prCode = '', analysisRun = 0;
         var copyButton = new Ext.Button({text: 'คัดลอกเลข PR', disabled: true, handler: function () { copyToClipboard(prCode); }});
+        var adminButton = new Ext.Button({text: 'แก้ไขโดย Admin', iconCls: 'icon-edit', hidden: true, handler: function () {
+            Ext.editCheckingOverview(Number(options.sp_check_period_hdr_id), function () {
+                reloadOverview();
+                if (options.onUpdated) options.onUpdated();
+            });
+        }});
         var win = new Ext.Window({title: 'ดูรายละเอียดทั้งหมด — ' + encode(record.get('c_code')), width: Math.min(1150, Ext.getBody().getViewSize().width - 30),
             height: Math.min(740, Ext.getBody().getViewSize().height - 30), layout: 'fit', modal: true, maximizable: true,
-            items: tabs, buttons: [copyButton, {text: 'ปิด', handler: function () { win.close(); }}]});
+            items: tabs, buttons: [copyButton, adminButton, {text: 'ปิด', handler: function () { win.close(); }}]});
         win.show();
+        function reloadOverview() {
+        analysisRun++;
+        adminButton.setDisabled(true);
         Ext.Ajax.request({url: 'tor/api/contractDetails.php', method: 'GET', params: requestParams,
-            callback: function (options, success, response) {
+            callback: function (requestOptions, success, response) {
                 if (win.isDestroyed) return;
                 var data;
                 try { data = Ext.decode(response.responseText); } catch (ignore) { data = null; }
@@ -309,6 +336,9 @@
                     return;
                 }
                 prCode = data.pr.length ? data.pr[0].c_code : '';
+                var allowAdminEdit = !!(data.can_admin_edit && options.allowAdminEdit && Number(options.sp_check_period_hdr_id) > 0 && Ext.editCheckingOverview);
+                adminButton.setVisible(allowAdminEdit);
+                adminButton.setDisabled(!allowAdminEdit);
                 copyButton.setDisabled(!prCode);
                 tabs.items.get(0).update(section('PR master', table(data.pr, [['c_code', 'เลข PR'], ['c_name', 'ชื่อรายการ'], ['expense_name', 'ค่าใช้จ่าย'], ['f_total_amt', 'วงเงิน PR', 'money']]) + prYearDetails(data.pr[0] || {})) +
                     section('แหล่งเงินที่ใช้ทั้งหมด', table(data.funds, [['source', 'แหล่งเงิน'], ['amount', 'จำนวนเงิน', 'money']])) + section('PR detail — รายการ', table(data.items, itemColumns)));
@@ -324,15 +354,20 @@
                 if (!data.contracts.length) contractHtml = section('รายละเอียดสัญญา', '<p style="padding:10px;color:#666">PR นี้ยังไม่มีสัญญา</p>');
                 contractHtml += contractBookingDetails(data.contractFunds || []);
                 var contractPanel = tabs.items.get(2);
+                contractPanel.overviewData = data;
+                contractPanel.overviewHtml = contractHtml;
                 contractPanel.update(contractHtml + renderPeriods(data, '1'));
+                if (!contractPanel.overviewEventsBound) {
+                contractPanel.overviewEventsBound = true;
                 contractPanel.body.on('change', function (event, select) {
-                    contractPanel.update(contractHtml + renderPeriods(data, select.value));
+                    contractPanel.update(contractPanel.overviewHtml + renderPeriods(contractPanel.overviewData, select.value));
                 }, null, {delegate: '.contract-period-filter'});
                 contractPanel.body.on('click', function (event, button) {
                     var expand = button.getAttribute('data-expand') === 'true';
                     var nodes = contractPanel.body.dom.querySelectorAll('.contract-period-detail');
                     for (var i = 0; i < nodes.length; i++) nodes[i].open = expand;
                 }, null, {delegate: '.contract-period-toggle'});
+                }
                 var checkHtml = '';
                 Ext.each(data.checks, function (check) {
                     var rows = children(data.checkItems, 'sp_check_period_hdr_id', check.sp_check_period_hdr_id);
@@ -347,7 +382,38 @@
                         checkDetails(check, rows));
                 });
                 tabs.items.get(3).update(checkHtml || section('ตรวจรับ', table([], [])));
+                var preflightPanel=tabs.items.get(4);
+                preflightPanel.update(preflightControls(data.checks));
+                if(!preflightPanel.preflightBound){
+                    preflightPanel.preflightBound=true;
+                    preflightPanel.body.on('click',function(event,button){
+                        var select=preflightPanel.body.dom.querySelector('.checking-preflight-select');
+                        var output=preflightPanel.body.dom.querySelector('.checking-preflight-results');
+                        if(!select||!output)return;
+                        var params={};for(var key in requestParams)if(Object.prototype.hasOwnProperty.call(requestParams,key))params[key]=requestParams[key];
+                        params.sp_check_period_hdr_id=Number(select.value);params.preflight=1;
+                        var run=++analysisRun;button.disabled=true;button.textContent='กำลังตรวจสอบ...';
+                        output.innerHTML='<p style="color:#15428b">กำลังอ่านข้อมูลล่าสุดและตรวจสอบเงื่อนไข...</p>';
+                        Ext.Ajax.request({url:'tor/api/contractDetails.php',method:'GET',params:params,callback:function(request,success,response){
+                            if(win.isDestroyed||run!==analysisRun)return;
+                            var result;try{result=Ext.decode(response.responseText);}catch(ignore){result=null;}
+                            if(!success||!result||!result.success){button.disabled=false;button.textContent='วิเคราะห์ก่อนส่งเบิก';output.innerHTML='<p style="color:#a12828">'+encode(result&&result.msg?result.msg:'วิเคราะห์ไม่สำเร็จ กรุณาลองอีกครั้ง')+'</p>';return;}
+                            var analysis=result.analysis,html='<p style="color:#52647b">ใบตรวจรับ '+encode(analysis.check_code)+' · งวดเงินที่ '+encode(analysis.payment_period)+' · ตรวจสอบเมื่อ '+encode(analysis.analyzed_at)+'</p>';
+                            var step=0;
+                            function showStep(){
+                                if(win.isDestroyed||run!==analysisRun)return;
+                                if(step<analysis.rules.length){html+=preflightRule(analysis.rules[step],step);step++;output.innerHTML=html+'<p style="color:#52647b">ตรวจแล้ว '+step+'/'+analysis.rules.length+' ข้อ</p>';setTimeout(showStep,180);return;}
+                                var label=analysis.ready?'ผ่านครบ 5 เงื่อนไขที่ตรวจสอบ':('พบ '+analysis.blocked+' ข้อที่ต้องแก้ไข และ '+analysis.warnings+' ข้อที่ต้องตรวจสอบเพิ่ม');
+                                output.innerHTML=html+'<div style="padding:14px;background:'+(analysis.ready?'#edf9f1':'#fff8e5')+';border-radius:6px;font-weight:bold">'+encode(label)+'</div>';
+                                button.disabled=false;button.textContent='วิเคราะห์อีกครั้ง';
+                            }
+                            showStep();
+                        }});
+                    },null,{delegate:'.checking-preflight-run'});
+                }
             }
         });
+        }
+        reloadOverview();
     };
 }());
