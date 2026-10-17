@@ -103,3 +103,9 @@
 .supplies-menu-tree .supplies-checking-icon { width:22px; height:24px; background-size:22px 22px!important; background-position:center!important; background-repeat:no-repeat!important; }
 .supplies-menu-tree .supplies-contract-icon { background-image:url('../images/icons/ui-contract-folder.svg')!important; }
 .supplies-menu-tree .supplies-checking-icon { background-image:url('../images/icons/ui-checking.svg')!important; }
+.supplies-menu-tree .supplies-menu-icon { width:22px; height:24px; background-size:22px 22px!important; background-position:center!important; background-repeat:no-repeat!important; }
+.supplies-menu-tree .supplies-icon-contract-edit { background-image:url('../images/icons/ui-contract-edit.svg')!important; }
+.supplies-menu-tree .supplies-icon-contract-sign { background-image:url('../images/icons/ui-contract-sign.svg')!important; }
+.supplies-menu-tree .supplies-icon-payment-edit { background-image:url('../images/icons/ui-payment-edit.svg')!important; }
+.supplies-menu-tree .supplies-icon-operator-sign { background-image:url('../images/icons/ui-operator-sign.svg')!important; }
+.supplies-menu-tree .supplies-icon-requester-sign { background-image:url('../images/icons/ui-requester-sign.svg')!important; }
