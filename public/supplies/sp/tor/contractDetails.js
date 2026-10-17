@@ -322,6 +322,7 @@
             height: Math.min(740, Ext.getBody().getViewSize().height - 30), layout: 'fit', modal: true, maximizable: true,
             items: tabs, buttons: [copyButton, adminButton, {text: 'ปิด', handler: function () { win.close(); }}]});
         win.show();
+        if (options.maximized) win.maximize();
         function reloadOverview() {
         analysisRun++;
         adminButton.setDisabled(true);
