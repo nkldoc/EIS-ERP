@@ -5,15 +5,17 @@ require_once __DIR__ . "/../lib/database/DatabaseServer.php";
 
 header("Content-Type: application/json; charset=utf-8");
 
-// Temporary production connection diagnostics. Remove after checking deployment.
-echo json_encode([
+// Temporary connection diagnostics, enabled only when explicitly requested.
+if (isset($_GET['debug_config']) && $_GET['debug_config'] === '1') {
+    echo json_encode([
     'login_file' => __FILE__,
     'config_file' => realpath(__DIR__ . '/../conf/config.php'),
     'db_server' => DB_SERVER,
     'db_name' => DB_NAME,
     'database_class' => (new ReflectionClass('DatabaseServer'))->getFileName(),
-], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-exit;
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 $jsonInput = json_decode((string) file_get_contents("php://input"), true);
 $requestUserId = $_REQUEST["ss_user_id"] ?? ($jsonInput["ss_user_id"] ?? null);
