@@ -48,7 +48,7 @@
             if (busy || stopped || document.hidden) return;
             busy = true;
             fetch('docs-notifications.php', {credentials:'same-origin',cache:'no-store'})
-                .then(function (response) { if (response.status === 401) stopped = true; if (!response.ok && response.status !== 401) throw new Error('?????????????????????????? (HTTP ' + response.status + ') ??????????????????????'); return response.json(); })
+                .then(function (response) { if (response.status === 401) stopped = true; if (!response.ok && response.status !== 401) throw new Error('โหลดแจ้งเตือนเอกสารไม่สำเร็จ (HTTP ' + response.status + ') กรุณาลองใหม่อีกครั้ง'); return response.json(); })
                 .then(function (data) { if (!data.success) throw new Error(data.message); render(data); })
                 .catch(function (error) { count.hidden = true; bell.title = 'โหลดแจ้งเตือนไม่สำเร็จ'; message(error.message || 'โหลดแจ้งเตือนไม่สำเร็จ กดระฆังเพื่อลองใหม่'); })
                 .finally(function () { busy = false; });
