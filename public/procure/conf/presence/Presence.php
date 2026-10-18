@@ -49,7 +49,7 @@ final class ProcurePresence
         if (is_file(self::directory() . '/revoked/' . $key)) throw new UnexpectedValueException('Session revoked');
         $file = self::directory() . '/' . strtolower($system) . '.secret';
         if (!is_readable($file)) throw new RuntimeException('Presence service is not configured');
-        $encoded = rtrim(strtr(base64_encode(json_encode(['system'=>$system, 'uid'=>$uid, 'name'=>$name, 'department'=>$department, 'admin'=>false, 'session'=>$key, 'exp'=>time()+60], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        $encoded = rtrim(strtr(base64_encode(json_encode(['system'=>$system, 'uid'=>$uid, 'name'=>$name, 'department'=>$department, 'admin'=>false, 'chatAdmin'=>$operator !== '', 'session'=>$key, 'exp'=>time()+60], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
         return ['token'=>$encoded . '.' . hash_hmac('sha256', $encoded, trim(file_get_contents($file))), 'url'=>self::websocketUrl()];
     }
     private static function websocketUrl(): string
@@ -61,6 +61,6 @@ final class ProcurePresence
     public static function script(): string
     {
         if (!self::enabled() || empty($_SESSION['user_id'])) return '';
-        return '<link rel="stylesheet" href="/procure/assets/css/presence-chat.css?v=20261018-procure-widget"><script>window.EISPresenceConfig={tokenUrl:"/procure/access/presence-token.php",loginUrl:"/NMU_permission/"};</script><script src="/procure/assets/js/presence-client.js?v=20261018-procure-widget"></script><script src="/procure/assets/js/presence-image-viewer.js?v=20261018-procure-widget"></script><script src="/procure/assets/js/presence-chat.js?v=20261018-procure-widget"></script>';
+        return '<link rel="stylesheet" href="/procure/assets/css/presence-chat.css?v=20261018-chat-admin-v3"><script>window.EISPresenceConfig={tokenUrl:"/procure/access/presence-token.php",loginUrl:"/NMU_permission/"};</script><script src="/procure/assets/js/presence-client.js?v=20261018-procure-widget"></script><script src="/procure/assets/js/presence-image-viewer.js?v=20261018-procure-widget"></script><script src="/procure/assets/js/presence-chat.js?v=20261018-chat-admin-v3"></script>';
     }
 }

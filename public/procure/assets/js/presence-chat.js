@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   if (!window.EISPresence || window.EISChat) return;
-  var identity, online=false, rooms={}, messages={}, current='all', target=null, image=null, seen={}, unread=new Set(), users=[], sending=false, draftSignature='', draftId='', pending=null;
+  var identity, online=false, rooms={}, messages={}, current='inbox', target=null, image=null, seen={}, unread=new Set(), users=[], sending=false, draftSignature='', draftId='', pending=null;
   var chatMode='general', selectedModes={}, supportsConversations=false, unreadRooms=new Map(), badgeFrame=null;
   var controlsFrame=null, retracting=new WeakSet();
   var frame=null, renderedRoom=null, rendered=new Map(), forceBottom=false, details={}, detailRequests={}, detailBefore={};
@@ -13,22 +13,44 @@
   var modes=document.createElement('div');modes.className='eis-chat-modes';modes.setAttribute('role','group');modes.setAttribute('aria-label','ประเภทบทสนทนา');
   var generalTab=document.createElement('button'),ticketTab=document.createElement('button');generalTab.type=ticketTab.type='button';generalTab.textContent='สนทนาทั่วไป';ticketTab.textContent='Ticket แจ้งปัญหา';modes.append(generalTab,ticketTab);dialog.insertBefore(modes,$('.eis-chat-controls'));
   var teamStart=document.createElement('button');teamStart.type='button';teamStart.className='eis-chat-team-start';teamStart.textContent='+ คุยกับทีมผู้ดูแล';dialog.insertBefore(teamStart,log);
+  var backToInbox=document.createElement('button');backToInbox.type='button';backToInbox.className='eis-chat-back';backToInbox.textContent='← รายการข้อความ';backToInbox.onclick=function(){open('inbox');};log.before(backToInbox);
+  var conversationList=document.createElement('div');conversationList.className='eis-chat-conversations';log.before(conversationList);
+  function renderConversations(){
+    conversationList.replaceChildren();
+    var list=Object.values(rooms).filter(r=>r.id!=='all'&&!isTicket(r));
+    function unreadCount(room){var count=0;unread.forEach(id=>{if(unreadRooms.get(id)===room.id)count++;});return count;}
+    list.sort((a,b)=>(Number(unreadCount(b)>0)-Number(unreadCount(a)>0))||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+    if(!list.length){var empty=document.createElement('p');empty.textContent=identity?.admin?'ยังไม่มีข้อความจากผู้ใช้':'กดคุยกับทีมผู้ดูแลเพื่อเริ่มสนทนา';conversationList.append(empty);}
+    list.forEach(function(room){
+      var button=document.createElement('button');button.type='button';button.className='eis-chat-conversation';
+      var person=room.team?room.people[0]:room.people.find(p=>!identity||key(p)!==key(identity));
+      var displayName=identity?.admin?(person?.name||'ผู้ใช้'):'ทีมผู้ดูแล';
+      var avatar=document.createElement('span');avatar.className='eis-chat-avatar';avatar.textContent=Array.from(displayName)[0];avatar.setAttribute('aria-hidden','true');
+      var name=document.createElement('strong');name.textContent=displayName;var count=unreadCount(room);
+      var summary=document.createElement('small'),last=(messages[room.id]||[]).at(-1);summary.textContent=last?(last.retractedAt?'ยกเลิกข้อความแล้ว':last.text||'รูปภาพ'):'คลิกเพื่อดูบทสนทนา';
+      button.classList.toggle('has-unread',count>0);button.append(avatar,name,summary);
+      var notice=document.createElement('small');notice.className='eis-chat-notice';notice.textContent=count?'มีข้อความใหม่ · '+count+' ข้อความ':(person?.system||'')+' · คลิกเพื่อสนทนา';button.append(notice);
+      if(count){var badge=document.createElement('span');badge.className='eis-chat-count';badge.textContent=count;badge.setAttribute('aria-label',count+' ข้อความที่ยังไม่อ่าน');button.append(badge);}
+      button.onclick=function(){open(room.id);};conversationList.append(button);
+    });
+  }
   function isTicket(room){return !!(room&&(room.ticket||room.job));}
   function hasHistory(room){return !!(room&&(isTicket(room)||room.conversation));}
   function syncMode(){
-    var ticket=chatMode==='ticket',admin=!!identity?.admin;
+    var ticket=chatMode==='ticket',admin=!!identity?.admin;ticketTab.hidden=!!identity?.chatAdmin&&!identity?.docsAdmin;
     generalTab.setAttribute('aria-pressed',String(!ticket));ticketTab.setAttribute('aria-pressed',String(ticket));
     generalTab.classList.toggle('active',!ticket);ticketTab.classList.toggle('active',ticket);
-    $('header strong').textContent=ticket?'Ticket แจ้งปัญหา':'สนทนาทั่วไป';
+    var active=rooms[current],person=active?.team?active.people[0]:active?.people?.find(p=>!identity||key(p)!==key(identity));
+    $('header strong').textContent=ticket?'Ticket แจ้งปัญหา':current==='inbox'?'ข้อความจากผู้ใช้':admin?(person?.name||target?.name||'ข้อความส่วนตัว'):'คุยกับทีมผู้ดูแล';
     $('[data-support]').hidden=admin||!ticket;teamStart.hidden=admin||ticket;
-    $('[data-recipient-label]').hidden=ticket;$('[data-all]').hidden=ticket;$('[data-page]').hidden=ticket;$('[data-inbox]').hidden=!ticket;
-    $('textarea').disabled=current==='ticket-empty';$('.eis-chat-send').disabled=sending||current==='ticket-empty';
+    $('[data-recipient-label]').hidden=ticket;$('[data-all]').hidden=true;$('[data-page]').hidden=ticket;$('[data-inbox]').hidden=!ticket;
+    $('form').hidden=current==='inbox';log.hidden=current==='inbox';conversationList.hidden=ticket||current!=='inbox';backToInbox.hidden=ticket||current==='inbox';$('textarea').disabled=current==='ticket-empty';$('.eis-chat-send').disabled=sending||current==='ticket-empty';
   }
   function switchMode(mode){
     var saved=selectedModes[mode],first=Object.values(rooms).find(r=>r.id!=='all'&&isTicket(r)===(mode==='ticket'));
-    var room=saved&&rooms[saved]?saved:mode==='general'?'all':first?first.id:identity?.admin?'ticket-empty':'support-new';
+    var room=saved&&rooms[saved]?saved:mode==='general'?'inbox':first?first.id:identity?.admin?'ticket-empty':'support-new';
     chatMode=mode;open(room);
-    status.textContent=mode==='ticket'?(room==='ticket-empty'?'ยังไม่มี Ticket แจ้งปัญหา':'Ticket แจ้งปัญหา · ติดตามสถานะและการแก้ไข'):'สนทนาทั่วไป · ข้อความไม่สร้าง Ticket';
+    status.textContent=mode==='ticket'?(room==='ticket-empty'?'ยังไม่มี Ticket แจ้งปัญหา':'Ticket แจ้งปัญหา · ติดตามสถานะและการแก้ไข'):'ข้อความส่วนตัว · ข้อความไม่สร้าง Ticket';
   }
   generalTab.onclick=function(){switchMode('general');};ticketTab.onclick=function(){switchMode('ticket');};
   teamStart.onclick=function(){if(!identity){status.textContent='กำลังเชื่อมต่อ…';return;}var existing=Object.values(rooms).find(r=>r.conversation&&r.team&&r.members.includes(key(identity)));open(existing?existing.id:'team-new');};
@@ -53,22 +75,22 @@
   function options(){if(controlsFrame!==null)return;controlsFrame=requestAnimationFrame(function(){controlsFrame=null;updateOptions();});}
   function updateOptions(){
     var select=$('[data-rooms]');select.replaceChildren();
-    if(chatMode==='general')select.add(new Option('ห้องรวม · EIS-DOCS / Supplies','all'));
+    if(chatMode==='general')select.add(new Option('Messenger','inbox'));
     Object.values(rooms).filter(r=>r.id!=='all'&&isTicket(r)===(chatMode==='ticket')).forEach(r=>select.add(new Option(title(r),r.id)));
     if(target)select.add(new Option('ส่วนตัว · '+target.name+' ('+target.system+')','new'));
     if(current==='support-new')select.add(new Option('Ticket ใหม่ · แจ้งปัญหาถึงทีมผู้ดูแล','support-new'));
     if(current==='team-new')select.add(new Option('สนทนาใหม่กับทีมผู้ดูแล','team-new'));
     if(current==='ticket-empty')select.add(new Option('ยังไม่มี Ticket แจ้งปัญหา','ticket-empty'));
-    select.value=target?'new':current;syncMode();
+    select.value=target?'new':current;syncMode();renderConversations();
   }
   function badge(){
     if(badgeFrame!==null)return;
     badgeFrame=requestAnimationFrame(function(){
-      badgeFrame=null;var ticket=0,general=0;
+      badgeFrame=null;var ticket=0,general=0;renderConversations();
       unreadRooms.forEach(function(room,id){if(!unread.has(id))unreadRooms.delete(id);});
       unread.forEach(function(id){isTicket(rooms[unreadRooms.get(id)])?ticket++:general++;});
-      launcher.textContent='💬 สนทนา'+(unread.size?' ('+unread.size+')':'');
-      ticketTab.textContent='Ticket แจ้งปัญหา'+(ticket?' ('+ticket+')':'');generalTab.textContent='สนทนาทั่วไป'+(general?' ('+general+')':'');
+      launcher.textContent='💬 แจ้งแอดมิน'+(unread.size?' ('+unread.size+')':'');
+      ticketTab.textContent='Ticket แจ้งปัญหา'+(ticket?' ('+ticket+')':'');generalTab.textContent='ข้อความส่วนตัว'+(general?' ('+general+')':'');
     });
   }
   function page(){var person=target||(rooms[current]&&rooms[current].people&&rooms[current].people.find(p=>identity&&key(p)!==key(identity)));$('[data-page]').textContent=person?'หน้าที่เปิด: '+(users.find(u=>key(u)===key(person))?.pages.join(', ')||'ไม่ได้ออนไลน์ขณะนี้'):'';}
@@ -111,7 +133,7 @@
   $('[data-support]').onclick=function(){open('support-new');status.textContent='ส่งเรื่องถึงทีมผู้ดูแล · Admin สามารถตอบย้อนหลังได้';};launcher.onclick=function(){open(current,target);};$('[data-close]').onclick=function(){dialog.close();};dialog.addEventListener('cancel',()=>{});
   $('[data-rooms]').onchange=function(){open(this.value,this.value==='new'?target:null);};$('[data-all]').onclick=function(){open('all');};
   $('[data-users]').onchange=function(){var person=users.find(u=>key(u)===this.value);if(person)open('new',person);};
-  function post(text,kind){if(sending)return;if(!online){status.textContent='การเชื่อมต่อขาด กรุณารอเชื่อมต่อใหม่';return;}if(current==='ticket-empty'){status.textContent='เลือก Ticket ก่อนส่งข้อความ';return;}if((target||current==='team-new')&&!supportsConversations){status.textContent='ระบบสนทนาทั่วไปยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง';return;}if(!text.trim()&&!image)return;var signature=JSON.stringify([current,target&&key(target),text,kind,image]);if(signature!==draftSignature){draftSignature=signature;draftId=crypto.randomUUID();}var payload={type:'chat-send',clientId:draftId,text,kind,image};if(current==='support-new')payload.support=true;else if(current==='team-new'){payload.generalTeam=true;payload.conversation=true;}else if(target){payload.conversation=true;payload.target={system:target.system,uid:target.uid};}else payload.room=current;if(window.EISPresence.send(payload)){pending=payload;sending=true;$('.eis-chat-send').disabled=true;status.textContent='กำลังส่ง…';setTimeout(function(){if(pending===payload&&sending){sending=false;$('.eis-chat-send').disabled=false;status.textContent='ยังไม่ได้รับยืนยันการส่ง กดส่งอีกครั้งเพื่อตรวจสอบ';}},10000);}}
+  function post(text,kind){if(sending)return;if(!online){status.textContent='การเชื่อมต่อขาด กรุณารอเชื่อมต่อใหม่';return;}if(current==='inbox')return;if(current==='ticket-empty'){status.textContent='เลือก Ticket ก่อนส่งข้อความ';return;}if((target||current==='team-new')&&!supportsConversations){status.textContent='ระบบข้อความส่วนตัวยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง';return;}if(!text.trim()&&!image)return;var signature=JSON.stringify([current,target&&key(target),text,kind,image]);if(signature!==draftSignature){draftSignature=signature;draftId=crypto.randomUUID();}var payload={type:'chat-send',clientId:draftId,text,kind,image};if(current==='support-new')payload.support=true;else if(current==='team-new'){payload.generalTeam=true;payload.conversation=true;}else if(target){payload.conversation=true;payload.generalTeam=true;payload.target={system:target.system,uid:target.uid,name:target.name};}else payload.room=current;if(window.EISPresence.send(payload)){pending=payload;sending=true;$('.eis-chat-send').disabled=true;status.textContent='กำลังส่ง…';setTimeout(function(){if(pending===payload&&sending){sending=false;$('.eis-chat-send').disabled=false;status.textContent='ยังไม่ได้รับยืนยันการส่ง กดส่งอีกครั้งเพื่อตรวจสอบ';}},10000);}}
   $('form').onsubmit=function(e){e.preventDefault();post($('textarea').value,'message');};
   $('[data-request]').onclick=function(){if(!target&&current==='all'){status.textContent='กรุณาเลือกผู้ใช้หรือบทสนทนาส่วนตัวก่อนขอภาพหน้าจอ';return;}post('รบกวนแนบภาพหน้าจอที่กำลังใช้งาน เพื่อให้ผู้ดูแลช่วยตรวจสอบครับ','screen_request');};
   function preview(data){image=data;$('.eis-chat-preview img').src=data;$('.eis-chat-preview').hidden=false;status.textContent='ตรวจภาพและข้อมูลที่แสดงก่อนกดส่ง';}
@@ -121,11 +143,11 @@
   $('[data-screen]').onclick=async function(){var stream;this.disabled=true;try{if(!navigator.mediaDevices?.getDisplayMedia)throw new Error('เบราว์เซอร์นี้ไม่รองรับแชร์หน้าจอ กรุณาแนบรูปแทน');stream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});var video=document.createElement('video');video.srcObject=stream;video.muted=true;await video.play();preview(encode(video,video.videoWidth,video.videoHeight));video.srcObject=null;}catch(e){status.textContent=e.name==='NotAllowedError'?'ยกเลิกการแชร์หน้าจอแล้ว':e.message;}finally{if(stream)stream.getTracks().forEach(track=>track.stop());this.disabled=false;}};
   $('[data-remove]').onclick=function(){image=null;$('.eis-chat-preview').hidden=true;};
   document.addEventListener('visibilitychange',mark);
-  window.EISChat={private:function(person){var existing=identity&&Object.values(rooms).find(r=>!isTicket(r)&&!r.team&&r.id!=='all'&&r.members?.includes(key(identity))&&r.members.includes(key(person)));if(existing)open(existing.id);else open('new',person);},room:function(room){rooms[room.id]=room;open(room.id);},all:function(){open('all');},users:function(){return users;}};
+  window.EISChat={private:function(person){var existing=identity&&Object.values(rooms).find(r=>!isTicket(r)&&r.id!=='all'&&(r.team||r.members?.includes(key(identity)))&&r.members.includes(key(person)));if(existing)open(existing.id);else open('new',person);},room:function(room){rooms[room.id]=room;open(room.id);},all:function(){open('all');},users:function(){return users;}};
   window.EISPresence.on(function(type,data){
-    if(type==='connected'){supportsConversations=false;Object.values(detailRequests).forEach(clearTimeout);detailRequests={};details={};detailBefore={};unread.clear();badge();online=true;identity=data.identity;$('[data-admin]').hidden=!identity.admin;$('[data-support]').hidden=identity.admin;status.textContent='เชื่อมต่อแล้ว';window.EISPresence.send({type:'page',path:location.pathname});if(data.replay)window.EISPresence.send({type:'chat-sync'});if(dialog.open&&hasHistory(rooms[current]))requestDetail(current);options();render();}
+    if(type==='connected'){supportsConversations=false;Object.values(detailRequests).forEach(clearTimeout);detailRequests={};details={};detailBefore={};unread.clear();badge();online=true;identity=data.identity;identity.docsAdmin=identity.admin;identity.admin=!!(identity.admin||identity.chatAdmin);$('[data-admin]').hidden=!identity.admin;$('[data-support]').hidden=identity.admin;status.textContent='เชื่อมต่อแล้ว';window.EISPresence.send({type:'page',path:location.pathname});if(data.replay)window.EISPresence.send({type:'chat-sync'});if(dialog.open&&hasHistory(rooms[current]))requestDetail(current);options();render();}
     else if(type==='disconnected'||type==='connecting'||type==='unauthorized'){online=false;sending=false;$('.eis-chat-send').disabled=false;status.textContent=type==='unauthorized'?'เซสชันสิ้นสุด':'กำลังเชื่อมต่อใหม่…';render();if(type==='unauthorized'){Object.values(detailRequests).forEach(clearTimeout);detailRequests={};details={};seen={};rendered.clear();renderedRoom=null;rooms={};messages={};unread.clear();image=null;$('.eis-chat-preview img').removeAttribute('src');$('.eis-chat-preview').hidden=true;log.replaceChildren();dialog.close();launcher.hidden=true;}}
-    else if(type==='chat-ready'){supportsConversations=!!data.capabilities?.conversations;rooms={};data.rooms.forEach(r=>rooms[r.id]=r);Object.keys(messages).forEach(function(id){if(!rooms[id]){messages[id].forEach(m=>unread.delete(m.id));delete messages[id];delete details[id];}});if(current!=='all'&&current!=='new'&&current!=='support-new'&&current!=='team-new'&&current!=='ticket-empty'&&!rooms[current]){current=chatMode==='ticket'?(identity.admin?'ticket-empty':'support-new'):'all';target=null;}options();badge();render();}
+    else if(type==='chat-ready'){supportsConversations=!!data.capabilities?.conversations;rooms={};data.rooms.forEach(r=>rooms[r.id]=r);Object.keys(messages).forEach(function(id){if(!rooms[id]){messages[id].forEach(m=>unread.delete(m.id));delete messages[id];delete details[id];}});if(current!=='all'&&current!=='new'&&current!=='support-new'&&current!=='team-new'&&current!=='ticket-empty'&&!rooms[current]){current=chatMode==='ticket'?(identity.admin?'ticket-empty':'support-new'):'inbox';target=null;}options();badge();render();}
     else if(type==='chat-inbox'){if(identity.admin)$('[data-inbox]').textContent='กล่องงาน / ปิดงาน · รอตอบ '+data.jobs.filter(j=>j.status==='open').length+' งาน →';}
     else if(type==='chat-roster'){users=data.users;var select=$('[data-users]'),old=select.value;select.replaceChildren(new Option('เลือกผู้ใช้เพื่อคุยส่วนตัว',''));users.filter(u=>!identity||key(u)!==key(identity)).forEach(u=>select.add(new Option(u.name+' · '+u.system,key(u))));select.value=old;page();}
     else if(type==='chat-message'){var m=data.message;rooms[data.room.id]=data.room;messages[m.room] ||= [];remember(m);if(!details[m.room])messages[m.room]=messages[m.room].slice(-100);if(data.unread&&!m.retractedAt){unread.add(m.id);unreadRooms.set(m.id,m.room);}else unread.delete(m.id);if(!data.replay&&(target||current==='support-new'||current==='team-new')&&m.sender.key===key(identity)){target=null;current=m.room;chatMode=isTicket(data.room)?'ticket':'general';selectedModes[chatMode]=m.room;}options();if(!data.replay&&data.unread&&!dialog.open&&!(identity.admin&&(data.room.ticket||data.room.job)&&document.getElementById('support-inbox')))open(m.room);else if(current===m.room)render();badge();}
