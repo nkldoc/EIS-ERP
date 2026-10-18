@@ -103,10 +103,6 @@ Ext.onReady(function () {
       var alertHeight = window.innerHeight;
       WinDash1("win-contract-alert", "แจ้งเตือนสัญญาและวันรับประกัน", [item], alertWidth, alertHeight, 0, 0, "icon-graph").show().maximize();
     });
-    // Open the contract alert dashboard by default when the home dashboard loads.
-    window.setTimeout(function () {
-      if (contractAlert && contractAlert.dom) contractAlert.dom.click();
-    }, 400);
   }
 
   if (replyreportPermission) {
