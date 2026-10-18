@@ -86,7 +86,7 @@
 .supplies-contract-alert-button { border:1px solid #8ab2e3; background:linear-gradient(135deg,#f5f9ff,#e5efff); box-shadow:0 2px 6px #1c4f8c26; }
 .supplies-contract-alert-button button { color:#174b86; }
 .supplies-contract-alert-button:hover { border-color:#4b82c5; background:linear-gradient(135deg,#eaf3ff,#d8e8ff); box-shadow:0 3px 9px #1c4f8c36; }
-.supplies-icon-alert { background-image:url('../images/bell.png')!important; }
+.supplies-icon-alert { background-image:url('../images/icons/bell.png')!important; }
 .supplies-icon-refresh { background-image:url('../images/icons/ui-refresh.svg')!important; }
 .supplies-icon-notebook { background-image:url('../images/icons/ui-notebook.svg')!important; }
 .supplies-icon-admin { background-image:url('../images/icons/ui-admin.svg')!important; }
