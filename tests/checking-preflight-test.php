@@ -20,7 +20,7 @@ checkRule(analyzeCheckingPreflight($unapproved,$contract,$period,$debts,2027,$cl
 $notIssued=$check;$notIssued['c_code']='';
 $issuedClosed=analyzeCheckingPreflight($check,$contract,$period,$debts,2027,array('c_yyyy'=>2027,'c_mm'=>1),$billing);
 checkRule($issuedClosed,'CLOSED_PERIOD','pass');
-if(strpos($issuedClosed['rules'][1]['message'],'???????????')===false)throw new RuntimeException('Issued check must explain skipped closing check');
+if(strpos($issuedClosed['rules'][1]['message'],'ไม่ต้องตรวจ')===false)throw new RuntimeException('Issued check must explain skipped closing check');
 checkRule(analyzeCheckingPreflight($check,$contract,$period,$debts,2027,null,$billing),'CLOSED_PERIOD','pass');
 $oldDate=$notIssued;$oldDate['d_checking_date']='2026-09-30';
 checkRule(analyzeCheckingPreflight($oldDate,$contract,$period,$debts,2027,$closed,$billing),'CLOSED_PERIOD','block');

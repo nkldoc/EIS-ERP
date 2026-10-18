@@ -38,8 +38,8 @@ function analyzeCheckingPreflight($check, $contract, $period, $debts, $currentYe
     $checkingPeriod = $date ? substr($date,5,2).'/'.(intval(substr($date,0,4))+543) : 'ไม่ระบุ';
     $displayDate = $date ? substr($date,8,2).'-'.substr($date,5,2).'-'.(intval(substr($date,0,4))+543) : 'ไม่ระบุ';
     $checkingCode=trim((string)($check['c_code']??''));
-    if ($checkingCode !== '') $add('CLOSED_PERIOD','?????????????????????????????????????????','pass',
-        '????????????????? ????????????????/???????????',array('??????????: '.$checkingCode));
+    if ($checkingCode !== '') $add('CLOSED_PERIOD','ตรวจปิดงวดบัญชีประจำเดือนจากวันที่ตรวจรับ','pass',
+        'ออกเลขตรวจรับแล้ว ไม่ต้องตรวจเดือน/ปีที่ปิดงวด',array('เลขตรวจรับ: '.$checkingCode));
     elseif (!$date || !$closedValid) $add('CLOSED_PERIOD','ตรวจปิดงวดบัญชีประจำเดือนจากวันที่ตรวจรับ','warning',
         !$date?'วันที่ตรวจรับไม่ครบหรือไม่ถูกต้อง':'ไม่พบข้อมูลงวดบัญชีที่ปิดล่าสุด',array('วันที่ตรวจรับ: '.$displayDate,'เดือน/ปีที่นำไปตรวจปิดงวด: '.$checkingPeriod),'ตรวจสอบวันที่ตรวจรับและสถานะปิดงวดกับฝ่ายบัญชี');
     else {
