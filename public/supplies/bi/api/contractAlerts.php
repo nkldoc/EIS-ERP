@@ -68,6 +68,76 @@ $ensureTestQueue = static function () use ($db): void {
     if ($stmt === false) throw new RuntimeException('เตรียมกล่องแจ้งเตือนทดสอบไม่สำเร็จ');
     sqlsrv_free_stmt($stmt);
 };
+$ensureScheduleTable = static function () use ($db): void {
+    $sql = "IF OBJECT_ID(N'dbo.sp_contract_alert_schedule', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.sp_contract_alert_schedule (
+            schedule_id TINYINT NOT NULL PRIMARY KEY,
+            times_json NVARCHAR(500) NOT NULL,
+            updated_by INT NOT NULL,
+            updated_at DATETIME2 NOT NULL CONSTRAINT DF_sp_contract_alert_schedule_updated DEFAULT SYSDATETIME()
+        );
+    END";
+    $stmt = sqlsrv_query($db->conn, $sql);
+    if ($stmt === false) throw new RuntimeException('Unable to prepare alert schedule settings');
+    sqlsrv_free_stmt($stmt);
+};
+if ($mode === 'schedule') {
+    try {
+        $ensureScheduleTable();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (!$isAdmin) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Administrator access required'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $times = json_decode((string) ($_POST['times'] ?? ''), true);
+            if (!is_array($times) || count($times) !== 4) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Exactly four notification times are required'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $times = array_values(array_map('strval', $times));
+            foreach ($times as $time) {
+                if (!preg_match('/^(?:[01]\\d|2[0-3]):[0-5]\\d$/', $time)) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Invalid notification time'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            }
+            if (count(array_unique($times)) !== 4) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Notification times must be unique'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            sort($times, SORT_STRING);
+            $json = json_encode($times, JSON_UNESCAPED_UNICODE);
+            $stmt = sqlsrv_query($db->conn,
+                "IF EXISTS (SELECT 1 FROM dbo.sp_contract_alert_schedule WHERE schedule_id=1)
+                    UPDATE dbo.sp_contract_alert_schedule SET times_json=?, updated_by=?, updated_at=SYSDATETIME() WHERE schedule_id=1
+                 ELSE
+                    INSERT INTO dbo.sp_contract_alert_schedule (schedule_id, times_json, updated_by) VALUES (1, ?, ?)",
+                [$json, $userId, $json, $userId]);
+            if ($stmt === false) throw new RuntimeException('Unable to save alert schedule');
+            sqlsrv_free_stmt($stmt);
+            echo json_encode(['success' => true, 'times' => $times], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $stmt = sqlsrv_query($db->conn, 'SELECT times_json FROM dbo.sp_contract_alert_schedule WHERE schedule_id=1');
+        if ($stmt === false) throw new RuntimeException('Unable to read alert schedule');
+        $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+        sqlsrv_free_stmt($stmt);
+        $times = $row ? json_decode((string) $row['times_json'], true) : ['09:00', '11:00', '13:30', '16:00'];
+        if (!is_array($times) || count($times) !== 4) $times = ['09:00', '11:00', '13:30', '16:00'];
+        echo json_encode(['success' => true, 'isAdmin' => $isAdmin, 'times' => array_values($times)], JSON_UNESCAPED_UNICODE);
+        exit;
+    } catch (Throwable $error) {
+        http_response_code(500);
+        error_log('Contract alert schedule: ' . $error->getMessage());
+        echo json_encode(['success' => false, 'message' => $error->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
 if ($mode === 'inbox' || $mode === 'ack') {
     try {
         if ($mode === 'ack') {
@@ -88,12 +158,26 @@ if ($mode === 'inbox' || $mode === 'ack') {
         // Inbox polling is frequent. Check metadata only; create the table
         // once when an administrator actually sends a test notification.
         $existsStmt = sqlsrv_query($db->conn,
-            "SELECT 1 AS queue_exists WHERE OBJECT_ID(N'dbo.sp_contract_alert_test_queue', N'U') IS NOT NULL");
-        if ($existsStmt === false) throw new RuntimeException('ตรวจสอบกล่องแจ้งเตือนไม่สำเร็จ');
-        $queueExists = sqlsrv_fetch_array($existsStmt, SQLSRV_FETCH_ASSOC);
+            "SELECT OBJECT_ID(N'dbo.sp_contract_alert_test_queue', N'U') AS queue_exists,
+                    OBJECT_ID(N'dbo.sp_contract_alert_schedule', N'U') AS schedule_exists");
+        if ($existsStmt === false) throw new RuntimeException('Unable to check alert inbox metadata');
+        $objects = sqlsrv_fetch_array($existsStmt, SQLSRV_FETCH_ASSOC) ?: [];
         sqlsrv_free_stmt($existsStmt);
-        if (!$queueExists) {
-            echo json_encode(['success' => true, 'notifications' => []], JSON_UNESCAPED_UNICODE);
+        $scheduleTimes = ['09:00', '11:00', '13:30', '16:00'];
+        if (!empty($objects['schedule_exists'])) {
+            $scheduleStmt = sqlsrv_query($db->conn, 'SELECT times_json FROM dbo.sp_contract_alert_schedule WHERE schedule_id=1');
+            if ($scheduleStmt !== false) {
+                $scheduleRow = sqlsrv_fetch_array($scheduleStmt, SQLSRV_FETCH_ASSOC);
+                sqlsrv_free_stmt($scheduleStmt);
+                $savedTimes = $scheduleRow ? json_decode((string) $scheduleRow['times_json'], true) : null;
+                if (is_array($savedTimes) && count($savedTimes) === 4) $scheduleTimes = array_values($savedTimes);
+            }
+        }
+        $bangkokNow = new DateTimeImmutable('now', new DateTimeZone('Asia/Bangkok'));
+        $scheduleMeta = ['scheduleTimes' => $scheduleTimes, 'serverDate' => $bangkokNow->format('Y-m-d'),
+            'serverTime' => $bangkokNow->format('H:i'), 'userId' => $userId];
+        if (empty($objects['queue_exists'])) {
+            echo json_encode(array_merge(['success' => true, 'notifications' => []], $scheduleMeta), JSON_UNESCAPED_UNICODE);
             exit;
         }
         $stmt = sqlsrv_query($db->conn,
@@ -111,7 +195,7 @@ if ($mode === 'inbox' || $mode === 'ack') {
             ];
         }
         sqlsrv_free_stmt($stmt);
-        echo json_encode(['success' => true, 'notifications' => $notifications], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        echo json_encode(array_merge(['success' => true, 'notifications' => $notifications], $scheduleMeta), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     } catch (Throwable $error) {
         http_response_code(500);

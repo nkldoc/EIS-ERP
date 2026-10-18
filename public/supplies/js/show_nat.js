@@ -42,6 +42,27 @@ Ext.onReady(function () {
                 success: function (response) {
                     var payload;
                     try { payload = Ext.decode(response.responseText); } catch (e) { inboxRequestActive = false; return; }
+                    if (payload && payload.success && payload.scheduleTimes && payload.serverDate && payload.serverTime) {
+                        try {
+                            var scheduleKey = 'supplies-contract-alert-schedule-' + payload.userId + '-' + payload.serverDate;
+                            var delivered = JSON.parse(localStorage.getItem(scheduleKey) || '[]');
+                            var dueTimes = payload.scheduleTimes.filter(function (time) { return time <= payload.serverTime && delivered.indexOf(time) === -1; });
+                            if (dueTimes.length) {
+                                localStorage.setItem(scheduleKey, JSON.stringify(delivered.concat(dueTimes)));
+                                var scheduledUrl = new URL('../bi/contract-alert-dashboard.html', script ? script.src : window.location.href).toString();
+                                scheduledUrl += '?scheduled=' + encodeURIComponent(dueTimes.join(','));
+                                var scheduledWindow = hostExt.getCmp('win-global-contract-test-alert');
+                                if (scheduledWindow) { scheduledWindow.show(); scheduledWindow.toFront(); scheduledWindow.maximize(); inboxRequestActive = false; return; }
+                                scheduledWindow = new hostExt.Window({
+                                    id: 'win-global-contract-test-alert', title: 'แจ้งเตือนรายการสัญญาตามกำหนดเวลา',
+                                    x: 0, y: 0, width: host.innerWidth, height: host.innerHeight,
+                                    minWidth: 720, minHeight: 520, modal: true, maximizable: true, layout: 'fit',
+                                    items: [{xtype: 'panel', border: false, html: '<iframe src="' + scheduledUrl + '" frameborder="0" width="100%" height="100%"></iframe>'}]
+                                });
+                                scheduledWindow.show(); scheduledWindow.maximize(); inboxRequestActive = false; return;
+                            }
+                        } catch (scheduleError) { console.error('Contract alert schedule:', scheduleError); }
+                    }
                     var hasUnread = !!(payload && payload.success && payload.notifications && payload.notifications.length);
                     if (!hasUnread) { alerted = false; inboxRequestActive = false; return; }
                     if (alerted) { inboxRequestActive = false; return; }
