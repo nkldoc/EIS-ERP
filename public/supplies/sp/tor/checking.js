@@ -3431,7 +3431,6 @@ const search = function () {
                 Ext.storeDtl.setBaseParam("i_status", Ext.getCmp("s_i_statusID").getValue());
                 Ext.storeDtl.setBaseParam("i_show", Ext.get("toggle_my_status").dom.checked ? 1 : 0);
                 // Ext.storeDtl.setBaseParam("userid", Ext.getCmp("userid-ID").getValue());
-                Ext.getCmp("tabpanel1").getStore().load();
         } else {
                 Ext.Msg.alert("แจ้งเตือน", msg);
         }
@@ -10350,7 +10349,7 @@ Ext.AppUx = function (app, menu) {
         Ext.storeDtl = new Ext.data.JsonStore({
                 storeId: "storeDtl",
                 autoDestroy: false,
-                autoLoad: true,
+                autoLoad: false,
                 url: "tor/api/mnCheckingController.php",
                 baseParams: { mode: "LIST_SUB_PERIOD_HDR" },
                 root: "data",
@@ -10778,7 +10777,7 @@ Ext.AppUx = function (app, menu) {
         Ext.bg_budget_year = new Ext.data.JsonStore({
                 autoDestroy: false,
                 storeId: 'bg_budget_year',
-                autoLoad: true,
+                autoLoad: false,
                 url: "api/All_PoWorkingImpHdr.php",
                 baseParams: {
                         type: "bg_budget_year",
@@ -17708,20 +17707,12 @@ Ext.onReady(function () {
                                         } //  loadAllStores();
 
                                         function loadAllStoresWithChain() {
-                                                Ext.getBody().mask('กำลังโหลดข้อมูล...');
-                                                loadStorePromise(Ext.storeDtl)
-                                                        .then(function () {
-                                                                console.log('รายการตรวจรับ เสร็จแล้ว');
-                                                                return loadStorePromise(Ext.bg_budget_year);
-                                                        })
-                                                        .then(function () {
-                                                                Ext.getBody().unmask();
-                                                                Ext.Msg.alert('สำเร็จ', 'ข้อมูลทุกอย่างโหลดเรียงลำดับเสร็จแล้ว');
-                                                        })
-                                                        .catch(function (error) {
-                                                                Ext.getBody().unmask();
-                                                                Ext.Msg.alert('ผิดพลาด', 'โหลดข้อมูลล้มเหลว: ' + error);
-                                                        });
+                                                Promise.all([
+                                                        loadStorePromise(Ext.storeDtl),
+                                                        loadStorePromise(Ext.bg_budget_year)
+                                                ]).catch(function (error) {
+                                                        console.error('Initial checking data load failed:', error);
+                                                });
                                         }
                                         loadAllStoresWithChain();
                                 },
