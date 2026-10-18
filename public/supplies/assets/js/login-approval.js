@@ -4,7 +4,7 @@
   async function poll() {
     if (stopped) return;
     try {
-      if (deciding) return;
+      if (deciding || document.hidden) return;
       var response = await fetch('/supplies/access/login-approval', {cache:'no-store', credentials:'same-origin', signal:AbortSignal.timeout(10000)});
       if (response.status === 401) { stopped = true; if (panel) panel.remove(); return; }
       if (!response.ok) return;
@@ -32,7 +32,7 @@
           finally { deciding = false; }
         }; panel.appendChild(button);
       }); document.body.appendChild(panel);
-    } catch (error) {} finally { if (!stopped) setTimeout(poll,1000); }
+    } catch (error) {} finally { if (!stopped) setTimeout(poll,5000); }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',poll); else poll();
 })();

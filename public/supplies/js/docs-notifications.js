@@ -1,6 +1,7 @@
 (function () {
     'use strict';
     var productionDocs = location.hostname.toLowerCase() === 'eis.nmu.ac.th';
+    var notificationUrl = productionDocs ? '/supplies/docs-notifications' : 'docs-notifications.php';
     var docsHome = (productionDocs ? 'https://doc-eis.nmu.ac.th' : '') + '/eis-docs/docMain/';
     window.mountDocsNotifications = function (host) {
         if (!host || host.querySelector('.docs-notification-bell')) return;
@@ -38,7 +39,7 @@
                 title.textContent = item.title; body.textContent = item.message; date.textContent = item.created_at;
                 link.appendChild(title); link.appendChild(body); link.appendChild(date); items.appendChild(link);
                 link.addEventListener('click', function () {
-                    fetch('docs-notifications.php', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({notification_id:item.notification_id})})
+                    fetch(notificationUrl, {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({notification_id:item.notification_id})})
                         .then(function (response) { if (!response.ok) throw new Error('บันทึกสถานะอ่านไม่สำเร็จ'); return response.json(); })
                         .then(function (data) { if (data.success) render(data); }).catch(function () { bell.title = 'บันทึกสถานะอ่านไม่สำเร็จ ลองเปิดแจ้งเตือนอีกครั้ง'; });
                 });
@@ -47,7 +48,7 @@
         function refresh() {
             if (busy || stopped || document.hidden) return;
             busy = true;
-            fetch('docs-notifications.php', {credentials:'same-origin',cache:'no-store'})
+            fetch(notificationUrl, {credentials:'same-origin',cache:'no-store'})
                 .then(function (response) { if (response.status === 401) stopped = true; if (!response.ok && response.status !== 401) throw new Error('โหลดแจ้งเตือนเอกสารไม่สำเร็จ (HTTP ' + response.status + ') กรุณาลองใหม่อีกครั้ง'); return response.json(); })
                 .then(function (data) { if (!data.success) throw new Error(data.message); render(data); })
                 .catch(function (error) { count.hidden = true; bell.title = 'โหลดแจ้งเตือนไม่สำเร็จ'; message(error.message || 'โหลดแจ้งเตือนไม่สำเร็จ กดระฆังเพื่อลองใหม่'); })
@@ -69,7 +70,7 @@
         function connectSocket() {
             if (!productionDocs || stopped || socketPaused || connecting || (socket && socket.readyState < 2)) return;
             connecting = true;
-            fetch('docs-notifications.php?action=ws_token', {credentials:'same-origin',cache:'no-store'})
+            fetch(notificationUrl + '?action=ws_token', {credentials:'same-origin',cache:'no-store'})
                 .then(function (response) { if (response.status === 401) stopped = true; if (!response.ok) throw new Error('Token unavailable'); return response.json(); })
                 .then(function (data) {
                     if (socketPaused || stopped) return;
