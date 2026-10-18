@@ -18,6 +18,7 @@
                     value = Ext.util.Format.number(Number(value), '0,000.00');
                 }
                 if (c[2] === 'winner') value = Number(value) === 1 ? 'ผู้ชนะ' : 'ผู้เสนอราคา';
+                if (c[2] === 'date' || c[2] === 'year') value = display(value, c[2]);
                 html += '<td style="border:1px solid #c5d4e5;padding:8px;vertical-align:top;white-space:pre-wrap;word-break:break-word">' + encode(value) + '</td>';
             });
             html += '</tr>';
@@ -53,6 +54,42 @@
     }
     function bookingType(value) {
         return Number(value) === 1 ? '1 - เงินแผน' : (Number(value) === 2 ? '2 - เงินงวด' : '-');
+    }
+    function fundStatus(row, fallback) {
+        row = row || {};
+        fallback = fallback || {};
+        var overlap = Number(row.i_overlap || fallback.i_overlap || 0),
+            code = row.resolved_overlap_code || row.c_overlap || fallback.c_overlap,
+            year = row.resolved_overlap_year || row.i_yyyy_overlap || fallback.i_yyyy_overlap,
+            reserved = overlap > 0 || Number(row.i_type_bg) === 4 || Number(fallback.i_type_bg) === 4 || (code && String(code) !== '0');
+        if (code && fallback.c_overlap2 && String(code) === String(fallback.c_overlap2)
+                && (!year || !fallback.i_yyyy_overlap2 || Number(year) === Number(fallback.i_yyyy_overlap2))) {
+            overlap = Number(row.i_overlap || fallback.i_overlap2 || overlap);
+            year = row.resolved_overlap_year || row.i_yyyy_overlap || fallback.i_yyyy_overlap2;
+        }
+        return {kind: reserved ? (overlap === 3 ? 'debt' : 'reserve') : 'current',
+            text: reserved ? (overlap === 3 ? 'ใช้ใบกันที่ก่อหนี้แล้ว' : 'ใช้ใบกันที่ยังไม่ก่อหนี้') : 'ใช้เงินปีงบประมาณปัจจุบัน',
+            code: code && String(code) !== '0' ? code : '', year: reserved ? year : row.i_yyyy || fallback.i_yyyy,
+            booking: overlap === 1 ? 'ยังไม่จองใบกัน' : (overlap === 2 ? 'จองใบกันแล้ว' : '')};
+    }
+    function fundBadge(label, row, fallback) {
+        var status = fundStatus(row, fallback),
+            colors = {current: ['#ecfdf5', '#065f46'], reserve: ['#fffbeb', '#92400e'], debt: ['#eff6ff', '#1e40af']},
+            color = colors[status.kind];
+        return '<div role="note" style="margin:8px 0;padding:12px 14px;border:2px solid ' + color[1]
+            + ';border-left-width:7px;border-radius:5px;background:' + color[0] + ';color:' + color[1]
+            + ';font-size:14px;line-height:1.7;font-weight:bold">' + encode(label) + ': ' + encode(status.text)
+            + (status.code ? ' | เลขใบกัน: ' + encode(status.code) : '')
+            + (status.year ? ' | ปีงบประมาณ: ' + encode(display(status.year, 'year')) : '')
+            + (status.booking ? ' | ' + encode(status.booking) : '')
+            + (fallback && !row.i_overlap && !row.c_overlap && !row.resolved_overlap_code ? ' | อ้างอิงการใช้เงินจากสัญญา/PR' : '') + '</div>';
+    }
+    function fundingOverview(data) {
+        var html = fundBadge('การใช้เงิน PR ' + ((data.pr[0] || {}).c_code || ''), data.pr[0]);
+        Ext.each(data.contracts, function (contract) {
+            html += fundBadge('การใช้เงินสัญญา ' + (contract.c_code || ''), contract, data.pr[0]);
+        });
+        return html;
     }
     function prYearDetails(pr) {
         var type = Number(pr.i_type_year);
@@ -180,12 +217,17 @@
                     f_net_total_price: row.f_net_total_price, status_name: periodStatus(row.i_enabled)});
             });
             var isLast = Number(period.i_is_last) === 1;
+            var linkedContract = children(data.contracts, 'sp_tor_contract_id', period.sp_tor_contract_id)[0] || {};
+            var periodFunding = fundStatus(period, linkedContract);
             html += '<details class="contract-period-detail" style="border:1px solid ' + (isLast ? '#b9770e' : '#bacce0') + ';margin:12px 0;background:#fff">' +
                 '<summary style="cursor:pointer;padding:12px;background:' + (isLast ? '#fff3cd' : '#eaf1f9') + ';color:' + (isLast ? '#744600' : '#15428b') + ';font-weight:bold">' +
                 (data.contracts.length > 1 ? 'สัญญา ' + encode(period.contract_code) + ' / ' : '') + 'งวดที่ ' + encode(period.i_period) + (isLast ? ' <span style="display:inline-block;background:#8a5100;color:#fff;border-radius:3px;padding:2px 7px">งวดสุดท้าย</span>' : '') +
                 ' — ' + encode(period.c_contract_code) + ' | ' + encode(periodStatus(period.i_enabled)) +
-                ' | ' + encode(display(period.f_total_amt, 'money')) + ' บาท <span class="period-show-label">(แสดงรายละเอียด)</span>' +
+                ' | ' + encode(display(period.f_total_amt, 'money')) + ' บาท | ' + encode(periodFunding.text) + ' <span class="period-show-label">(แสดงรายละเอียด)</span>' +
                 '<span class="period-hide-label">(ซ่อนรายละเอียด)</span></summary><div style="padding:12px">' +
+                '<button type="button" class="contract-period-checks" data-period-id="' + encode(period.sp_tor_hdr_period_id)
+                + '" style="padding:7px 14px;margin-bottom:8px;border:1px solid #15428b;background:#eaf1f9;color:#15428b;font-weight:bold;cursor:pointer">ดูตรวจรับของงวดนี้</button>' +
+                fundBadge('การใช้เงินงวดที่ ' + period.i_period, period, linkedContract) +
                 details([['เลขอ้างอิงงวด', period.c_contract_code], ['สถานะงวด', periodStatus(period.i_enabled)]]) + periodDetails(period, rows) +
                 section('รายการในงวด', table(items, [['c_name', 'ชื่อรายการ'], ['i_qty', 'จำนวน'], ['f_net_unit_price', 'ราคาต่อหน่วย', 'money'],
                     ['f_net_total_price', 'จำนวนเงิน', 'money'], ['status_name', 'สถานะ']])) + '</div></details>';
@@ -341,18 +383,59 @@
                 adminButton.setVisible(allowAdminEdit);
                 adminButton.setDisabled(!allowAdminEdit);
                 copyButton.setDisabled(!prCode);
-                tabs.items.get(0).update(section('PR master', table(data.pr, [['c_code', 'เลข PR'], ['c_name', 'ชื่อรายการ'], ['expense_name', 'ค่าใช้จ่าย'], ['f_total_amt', 'วงเงิน PR', 'money']]) + prYearDetails(data.pr[0] || {})) +
+                var overviewFunding = fundingOverview(data);
+                var parentHtml = '';
+                if (data.parentPr && data.parentPr.length) {
+                    parentHtml += section('PR โครงการต่อเนื่อง', table(data.parentPr,
+                        [['c_code', 'เลข PR ต้นทาง'], ['c_name', 'ชื่อโครงการ'], ['expense_code', 'รหัสค่าใช้จ่าย'], ['expense_name', 'ค่าใช้จ่าย'],
+                         ['i_yyyy', 'ปีงบประมาณ', 'year'], ['f_total_amt', 'วงเงิน PR ต้นทาง', 'money']]));
+                    Ext.each(data.parentPr, function (parent) {
+                        parentHtml += section('รายละเอียด PR ต้นทาง — ' + parent.c_code,
+                            fundBadge('การใช้เงิน PR โครงการต่อเนื่อง', parent) + prYearDetails(parent) + details([
+                                ['วันที่เอกสาร PR', parent.d_doc_date, 'date'],
+                                ['รหัสเอกสารอ้างอิง', parent.c_doc_ref], ['หมายเหตุ', parent.c_remark]
+                            ]));
+                        parentHtml += section('แหล่งเงิน PR ต้นทาง — ' + parent.c_code,
+                            table(parent.funds || [], [['source', 'แหล่งเงิน'], ['amount', 'จำนวนเงิน', 'money']]));
+                        parentHtml += section('รายการย่อย PR ต้นทาง — ' + parent.c_code,
+                            table(parent.items || [], itemColumns));
+                    });
+                }
+                if (data.parentContracts && data.parentContracts.length) {
+                    parentHtml += section('สัญญาต้นทาง (Parent) — โครงการต่อเนื่อง', table(data.parentContracts,
+                        [['c_code', 'เลขสัญญาต้นทาง'], ['c_name', 'เรื่อง / โครงการ'], ['creditor_name', 'คู่สัญญา'],
+                         ['d_doc_date', 'วันที่เริ่มสัญญา', 'date'], ['d_due_date', 'วันที่สิ้นสุดสัญญา', 'date'],
+                         ['f_total_amt', 'วงเงินสัญญา', 'money']]));
+                    Ext.each(data.parentContracts, function (parent) {
+                        parentHtml += section('รายละเอียดสัญญาต้นทาง — ' + parent.c_code,
+                            fundBadge('การใช้เงินสัญญาต้นทาง', parent) + contractTerms(parent) + details([['รหัสเอกสารอ้างอิง', parent.c_doc_ref],
+                                ['หมายเหตุ', parent.c_remark]]));
+                    });
+                }
+                tabs.items.get(0).update(parentHtml + overviewFunding + section('PR master', table(data.pr, [['c_code', 'เลข PR'], ['c_name', 'ชื่อรายการ'], ['expense_code', 'รหัสค่าใช้จ่าย'], ['expense_name', 'ค่าใช้จ่าย'], ['f_total_amt', 'วงเงิน PR', 'money']]) + prYearDetails(data.pr[0] || {})) +
                     section('แหล่งเงินที่ใช้ทั้งหมด', table(data.funds, [['source', 'แหล่งเงิน'], ['amount', 'จำนวนเงิน', 'money']])) + section('PR detail — รายการ', table(data.items, itemColumns)));
                 var winners = [];
                 Ext.each(data.bidders, function (row) { if (Number(row.is_winner) === 1) winners.push(row); });
                 var bidderColumns = [['item_name', 'ชื่อรายการ'], ['creditor_name', 'ผู้เสนอราคา'], ['f_unit_price', 'ราคาที่เสนอ/หน่วย', 'money'], ['f_total_add_vat_amt', 'รวมภาษี', 'money'], ['is_winner', 'ผลการพิจารณา', 'winner']];
-                tabs.items.get(1).update(section('ผู้เสนอราคา', table(data.bidders, bidderColumns)) +
-                    guaranteeDetails(data.bidderGuarantees || []) + section('ผู้ชนะการเสนอราคา', table(winners, bidderColumns)));
-                var contractHtml = '';
-                Ext.each(data.contracts, function (contract) {
-                    contractHtml += section('รายละเอียดสัญญา', table([contract], [['c_code', 'เลขสัญญา'], ['creditor_name', 'คู่สัญญา']]) + contractTerms(contract));
+                var parentCreditorRows = [];
+                Ext.each(data.parentContracts || [], function (contract) {
+                    if (contract.creditor_name) {
+                        parentCreditorRows.push({creditor_name: contract.creditor_name, contract_code: contract.c_code});
+                    }
                 });
-                if (!data.contracts.length) contractHtml = section('รายละเอียดสัญญา', '<p style="padding:10px;color:#666">PR นี้ยังไม่มีสัญญา</p>');
+                var parentCreditorHtml = parentCreditorRows.length
+                    ? '<p>โครงการต่อเนื่อง: แสดงคู่สัญญาจากสัญญาต้นทาง เนื่องจากไม่มีข้อมูลการเสนอราคาใน PR นี้</p>'
+                        + table(parentCreditorRows, [['creditor_name', 'คู่สัญญา'], ['contract_code', 'เลขสัญญาต้นทาง']])
+                    : '';
+                tabs.items.get(1).update(overviewFunding + section('ผู้เสนอราคา', data.bidders.length || !parentCreditorHtml
+                        ? table(data.bidders, bidderColumns) : parentCreditorHtml) +
+                    guaranteeDetails(data.bidderGuarantees || []) + section('ผู้ชนะการเสนอราคา', winners.length || !parentCreditorHtml
+                        ? table(winners, bidderColumns) : parentCreditorHtml));
+                var contractHtml = overviewFunding;
+                Ext.each(data.contracts, function (contract) {
+                    contractHtml += section('รายละเอียดสัญญา', fundBadge('การใช้เงินสัญญา', contract, data.pr[0]) + table([contract], [['c_code', 'เลขสัญญา'], ['creditor_name', 'คู่สัญญา']]) + contractTerms(contract));
+                });
+                if (!data.contracts.length) contractHtml += section('รายละเอียดสัญญา', '<p style="padding:10px;color:#666">PR นี้ยังไม่มีสัญญา</p>');
                 contractHtml += contractBookingDetails(data.contractFunds || []);
                 var contractPanel = tabs.items.get(2);
                 contractPanel.overviewData = data;
@@ -368,23 +451,57 @@
                     var nodes = contractPanel.body.dom.querySelectorAll('.contract-period-detail');
                     for (var i = 0; i < nodes.length; i++) nodes[i].open = expand;
                 }, null, {delegate: '.contract-period-toggle'});
+                contractPanel.body.on('click', function (event, button) {
+                    event.stopEvent();
+                    var panel = tabs.items.get(3);
+                    panel.renderFilteredChecks(Number(button.getAttribute('data-period-id')));
+                    tabs.setActiveTab(3);
+                    if (panel.body) panel.body.dom.scrollTop = 0;
+                }, null, {delegate: '.contract-period-checks'});
                 }
+                var checksPanel = tabs.items.get(3);
+                checksPanel.renderFilteredChecks = function (periodId) {
+                checksPanel.selectedPeriodId = Number(periodId) || 0;
                 var checkHtml = '';
                 Ext.each(data.checks, function (check) {
+                    if (checksPanel.selectedPeriodId && Number(check.sp_tor_hdr_period_id) !== checksPanel.selectedPeriodId) return;
                     var rows = children(data.checkItems, 'sp_check_period_hdr_id', check.sp_check_period_hdr_id);
                     var summary = {ir_code: check.ir_code, c_code: check.c_code, payment_code: check.payment_code,
                         checking_date: display(check.d_checking_date, 'date'), request_amount: check.f_inv_vat};
                     var checkTitle = (data.contracts.length > 1 ? 'สัญญา ' + check.contract_code + ' / ' : '') +
                         (check.payment_period !== null && check.payment_period !== undefined ? 'งวดเงินที่ ' + check.payment_period + ' / ' : '') + 'ตรวจรับ ' + (check.c_code || '');
-                    checkHtml += section(checkTitle, details([['งวดตามสัญญา', check.contract_period], ['งวดเงิน', check.payment_period], ['เลขอ้างอิงงวด', check.period_reference]]) +
+                    var checkContract = children(data.contracts, 'sp_tor_contract_id', check.linked_contract_id)[0] || {};
+                    checkHtml += section(checkTitle, fundBadge('การใช้เงินตรวจรับ / งวดเงินที่ ' + check.payment_period, check, checkContract) + details([['งวดตามสัญญา', check.contract_period], ['งวดเงิน', check.payment_period], ['เลขอ้างอิงงวด', check.period_reference]]) +
                         table([summary], [['ir_code', 'เลข IR'], ['c_code', 'เลขตรวจรับ'], ['payment_code', 'เลขเบิก'], ['checking_date', 'วันที่ตรวจรับ'], ['request_amount', 'จำนวนเงินขอเบิก', 'money']]) +
                         section('รายการตรวจรับ', table(rows, [['c_name', 'ชื่อรายการ'], ['i_qty', 'จำนวน'], ['f_net_total_price', 'จำนวนเงิน', 'money']])) +
                         debtDetails(check, children(data.debtItems || [], 'sp_check_period_hdr_id', check.sp_check_period_hdr_id)) +
                         checkDetails(check, rows));
                 });
-                tabs.items.get(3).update(checkHtml || section('ตรวจรับ', table([], [])));
+                var filterHtml = '';
+                if (checksPanel.selectedPeriodId) {
+                    var period = children(data.periods, 'sp_tor_hdr_period_id', checksPanel.selectedPeriodId)[0] || {};
+                    filterHtml = '<div role="status" style="padding:14px;margin:10px 0;background:#eaf1f9;border:2px solid #15428b;color:#15428b;font-weight:bold">'
+                        + 'แสดงเฉพาะตรวจรับ: งวดที่ ' + encode(period.i_period) + ' — ' + encode(period.c_contract_code)
+                        + ' <button type="button" class="contract-checks-clear-filter" style="margin-left:12px;padding:5px 10px;cursor:pointer">แสดงตรวจรับทั้งหมด</button></div>';
+                }
+                checksPanel.update(filterHtml + overviewFunding + (checkHtml || section('ตรวจรับ', checksPanel.selectedPeriodId
+                    ? '<p style="padding:12px;font-weight:bold">งวดนี้ยังไม่มีรายการตรวจรับ</p>' : table([], []))));
+                };
+                checksPanel.renderFilteredChecks(checksPanel.selectedPeriodId);
+                if (!checksPanel.filterEventsBound) {
+                    checksPanel.filterEventsBound = true;
+                    checksPanel.body.on('click', function (event) {
+                        event.stopEvent();
+                        checksPanel.renderFilteredChecks(0);
+                    }, null, {delegate: '.contract-checks-clear-filter'});
+                }
                 var preflightPanel=tabs.items.get(4);
-                preflightPanel.update(preflightControls(data.checks));
+                var preflightFunding = overviewFunding;
+                Ext.each(data.checks, function (check) {
+                    preflightFunding += fundBadge('ตรวจรับ ' + (check.c_code || check.ir_code || '') + ' / งวดเงินที่ ' + check.payment_period,
+                        check, children(data.contracts, 'sp_tor_contract_id', check.linked_contract_id)[0]);
+                });
+                preflightPanel.update(preflightFunding + preflightControls(data.checks));
                 if(!preflightPanel.preflightBound){
                     preflightPanel.preflightBound=true;
                     preflightPanel.body.on('click',function(event,button){

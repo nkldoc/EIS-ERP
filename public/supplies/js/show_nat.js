@@ -1819,10 +1819,10 @@ Ext.onReady(function () {
                         }, Ext.toogleTemp, {
                             xtype: 'button',
                             id: 'supplies-admin-tools',
-                            text: 'เครื่องมือ ADMIN',
+                            text: 'รายละเอียด ADMIN',
                             iconCls: 'supplies-icon-admin',
                             cls: 'supplies-toolbar-action supplies-admin-tools-button',
-                            tooltip: 'ค้นหาและแก้ไขข้อมูล TOR / สัญญา ได้จากทุกหน้า',
+                            tooltip: 'ค้นหารายละเอียดจาก PR / สัญญา / IR / AP / เลขเบิก D',
                             hidden: window.SUPPLIES_CAN_ADMIN_TOOLS !== true,
                             disabled: window.SUPPLIES_CAN_ADMIN_TOOLS !== true,
                             handler: function () { Ext.openSuppliesAdminTools(); }
