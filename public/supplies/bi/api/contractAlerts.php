@@ -22,11 +22,32 @@ $mode = trim((string) ($_REQUEST['mode'] ?? 'list'));
 $testType = trim((string) ($_REQUEST['type'] ?? 'all'));
 $targetUserId = (int) ($_REQUEST['target_user_id'] ?? 0);
 $isTest = $mode === 'test';
+$testItemId = $isTest ? trim((string) ($_REQUEST['item_id'] ?? '')) : '';
 if (($mode === 'users' || $isTest) && !$isAdmin) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'เฉพาะผู้ดูแลระบบเท่านั้น'], JSON_UNESCAPED_UNICODE);
     exit;
 }
+$ensureAlertStateTable = static function () use ($db): void {
+    $sql = "IF OBJECT_ID(N'dbo.sp_contract_alert_state', N'U') IS NULL
+    BEGIN
+        CREATE TABLE dbo.sp_contract_alert_state (
+            alert_state_id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+            alert_type NVARCHAR(20) NOT NULL,
+            source_id INT NOT NULL,
+            owner_user_id INT NOT NULL,
+            is_closed BIT NOT NULL CONSTRAINT DF_sp_contract_alert_state_closed DEFAULT 0,
+            deadline_override DATE NULL,
+            updated_by INT NOT NULL,
+            updated_at DATETIME2 NOT NULL CONSTRAINT DF_sp_contract_alert_state_updated DEFAULT SYSDATETIME(),
+            CONSTRAINT UQ_sp_contract_alert_state_item UNIQUE (alert_type, source_id, owner_user_id)
+        );
+        CREATE INDEX IX_sp_contract_alert_state_owner ON dbo.sp_contract_alert_state(owner_user_id, is_closed);
+    END";
+    $stmt = sqlsrv_query($db->conn, $sql);
+    if ($stmt === false) throw new RuntimeException('เตรียมสถานะการแจ้งเตือนไม่สำเร็จ');
+    sqlsrv_free_stmt($stmt);
+};
 $ensureTestQueue = static function () use ($db): void {
     $sql = "IF OBJECT_ID(N'dbo.sp_contract_alert_test_queue', N'U') IS NULL
     BEGIN
@@ -49,7 +70,6 @@ $ensureTestQueue = static function () use ($db): void {
 };
 if ($mode === 'inbox' || $mode === 'ack') {
     try {
-        $ensureTestQueue();
         if ($mode === 'ack') {
             $rawIds = (string) ($_POST['ids'] ?? '');
             $ids = array_values(array_filter(array_map('intval', explode(',', $rawIds)), static fn($id) => $id > 0));
@@ -63,6 +83,17 @@ if ($mode === 'inbox' || $mode === 'ack') {
                 sqlsrv_free_stmt($stmt);
             }
             echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        // Inbox polling is frequent. Check metadata only; create the table
+        // once when an administrator actually sends a test notification.
+        $existsStmt = sqlsrv_query($db->conn,
+            "SELECT 1 AS queue_exists WHERE OBJECT_ID(N'dbo.sp_contract_alert_test_queue', N'U') IS NOT NULL");
+        if ($existsStmt === false) throw new RuntimeException('ตรวจสอบกล่องแจ้งเตือนไม่สำเร็จ');
+        $queueExists = sqlsrv_fetch_array($existsStmt, SQLSRV_FETCH_ASSOC);
+        sqlsrv_free_stmt($existsStmt);
+        if (!$queueExists) {
+            echo json_encode(['success' => true, 'notifications' => []], JSON_UNESCAPED_UNICODE);
             exit;
         }
         $stmt = sqlsrv_query($db->conn,
@@ -125,11 +156,11 @@ if ($isTest && ($targetUserId <= 0 || !in_array($testType, ['all', 'delivery', '
     echo json_encode(['success' => false, 'message' => 'กรุณาเลือกประเภทแจ้งเตือนและพนักงาน'], JSON_UNESCAPED_UNICODE);
     exit;
 }
-$departmentFilter = trim((string) ($_GET['department'] ?? 'all'));
+$departmentFilter = trim((string) ($_REQUEST['department'] ?? 'all'));
 $departmentSql = $departmentFilter === 'medicine' ? " AND dep.c_name LIKE N'%แพทย์%'" : '';
 $ownerSql = $isTest ? ' AND u.dc_user_id = ?' : ($isAdmin ? '' : ' AND u.dc_user_id = ?');
 $ownerParams = $isTest ? [$targetUserId] : ($isAdmin ? [] : [$userId]);
-$today = (new DateTimeImmutable('today', new DateTimeZone('Asia/Bangkok')))->format('Y-m-d');
+$today = new DateTimeImmutable('today', new DateTimeZone('Asia/Bangkok'));
 $endDate = (new DateTimeImmutable('today', new DateTimeZone('Asia/Bangkok')))->modify('+31 days')->format('Y-m-d');
 $items = [];
 
@@ -154,10 +185,10 @@ $queries = [
         LEFT JOIN dbo.sp_check_period_hdr h ON h.sp_tor_hdr_period_id=p.sp_tor_hdr_period_id AND h.i_enabled=1
         $baseJoins
         WHERE ISNULL(p.i_enabled,1)=1 AND p.d_period_date IS NOT NULL
-            AND p.d_period_date >= ? AND p.d_period_date < ?
+            AND p.d_period_date < ?
             AND h.d_arrive_date IS NULL" . $departmentSql . $ownerSql . "
         ORDER BY p.d_period_date, p.sp_tor_hdr_period_id",
-        array_merge([$today, $endDate], $ownerParams)
+        array_merge([$endDate], $ownerParams)
     ],
     'warranty' => [
         "SELECT h.sp_check_period_hdr_id AS source_id, h.c_code AS inspection_code,
@@ -173,10 +204,10 @@ $queries = [
         INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=COALESCE(NULLIF(h.sp_tor_contract_id,0),m.sp_contract_id) AND c.i_enabled=1
         $baseJoins
         WHERE h.i_enabled=1 AND h.d_warranty_date IS NOT NULL
-            AND h.d_warranty_date >= ? AND h.d_warranty_date < ?
+            AND h.d_warranty_date < ?
             AND h.i_is_warranty IN (1,3)" . $departmentSql . $ownerSql . "
         ORDER BY h.d_warranty_date, h.sp_check_period_hdr_id",
-        array_merge([$today, $endDate], $ownerParams)
+        array_merge([$endDate], $ownerParams)
     ],
     'contract' => [
         "SELECT c.sp_tor_contract_id AS source_id, c.c_code AS contract_code,
@@ -188,9 +219,9 @@ $queries = [
         FROM dbo.sp_tor_contract c
         $baseJoins
         WHERE c.i_enabled=1 AND ISNULL(c.i_is_close,0)=0 AND c.d_due_date IS NOT NULL
-            AND c.d_due_date >= ? AND c.d_due_date < ?" . $departmentSql . $ownerSql . "
+            AND c.d_due_date < ?" . $departmentSql . $ownerSql . "
         ORDER BY c.d_due_date, c.sp_tor_contract_id",
-        array_merge([$today, $endDate], $ownerParams)
+        array_merge([$endDate], $ownerParams)
     ],
     'guarantee' => [
         "SELECT c.sp_tor_contract_id AS source_id, c.c_code AS contract_code,
@@ -203,9 +234,9 @@ $queries = [
         FROM dbo.sp_tor_contract c
         $baseJoins
         WHERE c.i_enabled=1 AND ISNULL(c.i_is_return,0)=0 AND c.d_book_warranty_end IS NOT NULL
-            AND c.d_book_warranty_end >= ? AND c.d_book_warranty_end < ?" . $departmentSql . $ownerSql . "
+            AND c.d_book_warranty_end < ?" . $departmentSql . $ownerSql . "
         ORDER BY c.d_book_warranty_end, c.sp_tor_contract_id",
-        array_merge([$today, $endDate], $ownerParams)
+        array_merge([$endDate], $ownerParams)
     ],
 ];
 
@@ -216,6 +247,7 @@ function alertDate($value): string
 }
 
 try {
+    $ensureAlertStateTable();
     foreach ($queries as $type => [$sql, $params]) {
         if ($isTest && $testType !== 'all' && $type !== $testType) continue;
         $stmt = sqlsrv_query($db->conn, $sql, $params);
@@ -254,7 +286,7 @@ try {
                 'range' => '',
                 'owner' => (string) ($row['department_name'] ?? ''),
                 'officer' => (string) ($row['officer_name'] ?? 'ไม่พบข้อมูลเจ้าหน้าที่'),
-                'ownerUserId' => $isAdmin ? (int) ($row['owner_user_id'] ?? 0) : null,
+                'ownerUserId' => (int) ($row['owner_user_id'] ?? 0),
                 'line' => (string) ($row['department_name'] ?? ''),
                 'procurementHead' => '',
                 'status' => 'active',
@@ -263,11 +295,133 @@ try {
         }
         sqlsrv_free_stmt($stmt);
     }
+    $stateSql = 'SELECT alert_type, source_id, owner_user_id, is_closed, deadline_override FROM dbo.sp_contract_alert_state'
+        . ($isAdmin ? '' : ' WHERE owner_user_id=?');
+    $stateParams = $isAdmin ? [] : [$userId];
+    $stateStmt = sqlsrv_query($db->conn, $stateSql, $stateParams);
+    if ($stateStmt === false) throw new RuntimeException('อ่านสถานะการแจ้งเตือนไม่สำเร็จ');
+    $stateMap = [];
+    while ($state = sqlsrv_fetch_array($stateStmt, SQLSRV_FETCH_ASSOC)) {
+        $stateKey = (string) $state['alert_type'] . '-' . (int) $state['source_id'] . '-' . (int) $state['owner_user_id'];
+        $stateMap[$stateKey] = $state;
+    }
+    sqlsrv_free_stmt($stateStmt);
+    foreach ($items as &$item) {
+        $stateKey = $item['type'] . '-' . (int) substr($item['id'], strpos($item['id'], '-') + 1) . '-' . (int) $item['ownerUserId'];
+        $state = $stateMap[$stateKey] ?? null;
+        if (!$state) continue;
+        $item['status'] = !empty($state['is_closed']) ? 'closed' : 'active';
+        if ($state['deadline_override']) {
+            $overrideDate = $state['deadline_override'] instanceof DateTimeInterface
+                ? $state['deadline_override']->format('Y-m-d') : substr((string) $state['deadline_override'], 0, 10);
+            $item['deadlineIso'] = $overrideDate;
+            $item['end'] = date('d/m/Y', strtotime($overrideDate));
+            $item['days'] = (int) $today->diff(new DateTimeImmutable($overrideDate))->format('%r%a');
+            $item['urgent'] = $item['days'] <= 7;
+        }
+    }
+    unset($item);
+    if ($mode === 'update') {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'message' => 'ต้องส่งคำขอแบบ POST'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $action = trim((string) ($_POST['action'] ?? ''));
+        if ($action === 'close_all_overdue') {
+            if (!sqlsrv_begin_transaction($db->conn)) {
+                throw new RuntimeException('เริ่มบันทึกสถานะรายการไม่สำเร็จ');
+            }
+            $closedCount = 0;
+            foreach ($items as $candidate) {
+                if ((int) $candidate['days'] >= 0 || $candidate['status'] === 'closed') continue;
+                $sourceId = (int) substr($candidate['id'], strpos($candidate['id'], '-') + 1);
+                $targetOwnerId = (int) $candidate['ownerUserId'];
+                $stmt = sqlsrv_query($db->conn,
+                    "IF EXISTS (SELECT 1 FROM dbo.sp_contract_alert_state WHERE alert_type=? AND source_id=? AND owner_user_id=?)
+                        UPDATE dbo.sp_contract_alert_state SET is_closed=1, updated_by=?, updated_at=SYSDATETIME()
+                        WHERE alert_type=? AND source_id=? AND owner_user_id=?
+                     ELSE
+                        INSERT INTO dbo.sp_contract_alert_state (alert_type, source_id, owner_user_id, is_closed, updated_by)
+                        VALUES (?, ?, ?, 1, ?)",
+                    [$candidate['type'], $sourceId, $targetOwnerId, $userId,
+                        $candidate['type'], $sourceId, $targetOwnerId,
+                        $candidate['type'], $sourceId, $targetOwnerId, $userId]);
+                if ($stmt === false) {
+                    sqlsrv_rollback($db->conn);
+                    throw new RuntimeException('บันทึกการปิดรายการเกินกำหนดไม่สำเร็จ');
+                }
+                sqlsrv_free_stmt($stmt);
+                $closedCount++;
+            }
+            if (!sqlsrv_commit($db->conn)) {
+                sqlsrv_rollback($db->conn);
+                throw new RuntimeException('ยืนยันการปิดรายการเกินกำหนดไม่สำเร็จ');
+            }
+            echo json_encode(['success' => true, 'closedCount' => $closedCount], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $itemId = trim((string) ($_POST['item_id'] ?? ''));
+        $target = null;
+        foreach ($items as $candidate) if ($candidate['id'] === $itemId) { $target = $candidate; break; }
+        if (!$target || (!$isAdmin && (int) $target['ownerUserId'] !== $userId)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'ไม่มีสิทธิ์แก้ไขรายการนี้'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if ($action === 'close' && (int) $target['days'] >= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'ปิดสถานะได้เฉพาะรายการที่เกินกำหนด'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (!in_array($action, ['close', 'reopen', 'date'], true) || ($action === 'date' && (int) $target['days'] >= 0)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'รายการนี้ไม่สามารถแก้ไขด้วยคำสั่งที่เลือกได้'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $dateOverride = null;
+        if ($action === 'date') {
+            $dateInput = trim((string) ($_POST['deadline'] ?? ''));
+            $parsedDate = DateTimeImmutable::createFromFormat('!Y-m-d', $dateInput, new DateTimeZone('Asia/Bangkok'));
+            if (!$parsedDate || $parsedDate->format('Y-m-d') !== $dateInput) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'กรุณาระบุวันครบกำหนดให้ถูกต้อง'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $dateOverride = $dateInput;
+        }
+        $sourceId = (int) substr($target['id'], strpos($target['id'], '-') + 1);
+        $targetOwnerId = (int) $target['ownerUserId'];
+        $isClosed = $action === 'close' ? 1 : ($action === 'reopen' ? 0 : ($target['status'] === 'closed' ? 1 : 0));
+        $stmt = sqlsrv_query($db->conn,
+            "IF EXISTS (SELECT 1 FROM dbo.sp_contract_alert_state WHERE alert_type=? AND source_id=? AND owner_user_id=?)
+                UPDATE dbo.sp_contract_alert_state SET is_closed=?, deadline_override=CASE WHEN ?='date' THEN ? ELSE deadline_override END, updated_by=?, updated_at=SYSDATETIME()
+                WHERE alert_type=? AND source_id=? AND owner_user_id=?
+             ELSE
+                INSERT INTO dbo.sp_contract_alert_state (alert_type, source_id, owner_user_id, is_closed, deadline_override, updated_by)
+                VALUES (?, ?, ?, ?, ?, ?)",
+            [$target['type'], $sourceId, $targetOwnerId, $isClosed, $action, $dateOverride, $userId,
+                $target['type'], $sourceId, $targetOwnerId,
+                $target['type'], $sourceId, $targetOwnerId, $isClosed, $dateOverride, $userId]);
+        if ($stmt === false) throw new RuntimeException('บันทึกการแก้ไขแจ้งเตือนไม่สำเร็จ');
+        sqlsrv_free_stmt($stmt);
+        echo json_encode(['success' => true, 'status' => $isClosed ? 'closed' : 'active', 'deadline' => $dateOverride], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     if ($isTest) {
+        if ($testItemId !== '') {
+            $matchedItems = array_values(array_filter($items, static fn($item) => $item['id'] === $testItemId));
+            if (count($matchedItems) !== 1) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'ไม่พบรายการที่เลือกสำหรับพนักงานคนนี้'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $items = $matchedItems;
+        }
         $ensureTestQueue();
         $labels = ['all' => 'ทุกประเภท', 'delivery' => 'สิ้นสุดส่งของ', 'warranty' => 'สิ้นสุดรับประกัน',
             'contract' => 'สิ้นสุดสัญญา', 'guarantee' => 'ค้ำประกันผลงาน / คืนหลักค้ำ'];
-        $title = 'ทดสอบการแจ้งเตือน · ' . ($labels[$testType] ?? 'ทุกประเภท');
+        $title = 'ทดสอบการแจ้งเตือน · ' . ($labels[$testType] ?? 'ทุกประเภท') . ($testItemId !== '' ? ' (1 รายการ)' : '');
         $itemsJson = json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($itemsJson === false) throw new RuntimeException('จัดรูปแบบรายการทดสอบไม่สำเร็จ');
         $stmt = sqlsrv_query($db->conn,
@@ -280,6 +434,7 @@ try {
     } else {
         echo json_encode(['success' => true, 'source' => 'NMU_ERP', 'isAdmin' => $isAdmin,
             'user' => [
+                'id' => $userId,
                 'name' => (string) ($_SESSION['user_name'] ?? ''),
                 'line' => (string) ($_SESSION['c_department'] ?? ''),
                 'department' => (string) ($_SESSION['cost_name'] ?? ''),

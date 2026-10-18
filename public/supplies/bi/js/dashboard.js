@@ -96,10 +96,17 @@ Ext.onReady(function () {
       if (Ext.getCmp("win-contract-alert")) {
         Ext.getCmp("win-contract-alert").show();
         Ext.getCmp("win-contract-alert").toFront();
+        Ext.getCmp("win-contract-alert").maximize();
         return;
       }
-      WinDash1("win-contract-alert", "แจ้งเตือนสัญญาและวันรับประกัน", [item], 1120, 760, 70, 35, "icon-graph").show();
+      var alertWidth = window.innerWidth;
+      var alertHeight = window.innerHeight;
+      WinDash1("win-contract-alert", "แจ้งเตือนสัญญาและวันรับประกัน", [item], alertWidth, alertHeight, 0, 0, "icon-graph").show().maximize();
     });
+    // Open the contract alert dashboard by default when the home dashboard loads.
+    window.setTimeout(function () {
+      if (contractAlert && contractAlert.dom) contractAlert.dom.click();
+    }, 400);
   }
 
   if (replyreportPermission) {

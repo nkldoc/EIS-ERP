@@ -6,7 +6,34 @@ Ext.onReady(function () {
         var script = document.querySelector('script[src*="show_nat.js"]');
         var apiUrl = script ? new URL('../bi/api/contractAlerts.php', script.src).toString() : '/supplies/bi/api/contractAlerts.php';
         var alerted = false;
+        var inboxRequestActive = false;
+        var pollTabId = String(Math.random()) + String(new Date().getTime());
+        function alertHostWindow() {
+            var host = window;
+            while (host.parent && host.parent !== host) {
+                try {
+                    if (!host.parent.Ext || !host.parent.Ext.getCmp('content-panel')) break;
+                    host = host.parent;
+                } catch (e) { break; }
+            }
+            return host;
+        }
+        function acquireInboxPollSlot() {
+            try {
+                var slot = JSON.parse(localStorage.getItem('supplies-contract-alert-poll-slot') || 'null');
+                var now = new Date().getTime();
+                if (slot && slot.until > now && slot.id !== pollTabId) return false;
+                localStorage.setItem('supplies-contract-alert-poll-slot', JSON.stringify({id: pollTabId, until: now + 55000}));
+            } catch (e) { return true; }
+            return true;
+        }
         function checkInbox() {
+            var host = alertHostWindow();
+            var hostExt = host.Ext || Ext;
+            if (document.visibilityState !== 'visible' || inboxRequestActive
+                || !acquireInboxPollSlot()
+                || hostExt.getCmp('win-global-contract-test-alert')) return;
+            inboxRequestActive = true;
             Ext.Ajax.request({
                 url: apiUrl,
                 method: 'GET',
@@ -14,32 +41,41 @@ Ext.onReady(function () {
                 disableCaching: true,
                 success: function (response) {
                     var payload;
-                    try { payload = Ext.decode(response.responseText); } catch (e) { return; }
+                    try { payload = Ext.decode(response.responseText); } catch (e) { inboxRequestActive = false; return; }
                     var hasUnread = !!(payload && payload.success && payload.notifications && payload.notifications.length);
-                    if (!hasUnread) { alerted = false; return; }
-                    if (alerted) return;
+                    if (!hasUnread) { alerted = false; inboxRequestActive = false; return; }
+                    if (alerted) { inboxRequestActive = false; return; }
                     alerted = true;
-                    var win = Ext.getCmp('win-global-contract-test-alert');
-                    if (win) { win.show(); win.toFront(); return; }
+                    var win = hostExt.getCmp('win-global-contract-test-alert');
+                    if (win) { win.show(); win.toFront(); win.maximize(); inboxRequestActive = false; return; }
                     var pageUrl = new URL('../bi/contract-alert-dashboard.html', script ? script.src : window.location.href).toString();
                     pageUrl += '?inbox=' + new Date().getTime();
-                    new Ext.Window({
+                    var inboxWindow = new hostExt.Window({
                         id: 'win-global-contract-test-alert',
                         title: 'แจ้งเตือนสัญญาและวันรับประกัน',
-                        width: Math.min(1120, window.innerWidth - 40),
-                        height: Math.min(760, window.innerHeight - 50),
+                        x: 0,
+                        y: 0,
+                        width: host.innerWidth,
+                        height: host.innerHeight,
                         minWidth: 720,
                         minHeight: 520,
                         modal: true,
                         maximizable: true,
                         layout: 'fit',
                         items: [{xtype: 'panel', border: false, html: '<iframe src="' + pageUrl + '" frameborder="0" width="100%" height="100%"></iframe>'}]
-                    }).show();
-                }
+                    });
+                    inboxWindow.show();
+                    inboxWindow.maximize();
+                    inboxRequestActive = false;
+                },
+                failure: function () { inboxRequestActive = false; }
             });
         }
-        window.setTimeout(checkInbox, 1800);
-        window.setInterval(checkInbox, 20000);
+        window.setTimeout(checkInbox, 5000);
+        window.setInterval(checkInbox, 60000);
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') checkInbox();
+        });
     })();
     Ext.QuickTips.init();
     Ext.showLoadingMask();
@@ -1729,6 +1765,70 @@ Ext.onReady(function () {
         tooltip: 'เปิดสมุดโน้ต (Text Memories)',
         handler: function () { Ext.openSuppliesNotebook(); }
     });
+    function openContractAlertShortcut(win, visited) {
+        visited = visited || [];
+        if (!win || visited.indexOf(win) !== -1) return false;
+        visited.push(win);
+        var frames = [];
+        try {
+            var shortcut = win.document.getElementById('work-contract-alert-win-shortcut');
+            if (shortcut) {
+                shortcut.click();
+                return true;
+            }
+            if (win.parent && win.parent !== win && openContractAlertShortcut(win.parent, visited)) return true;
+            frames = win.frames;
+        } catch (e) {}
+        for (var i = 0; i < frames.length; i++) {
+            try {
+                if (openContractAlertShortcut(frames[i], visited)) return true;
+            } catch (e) {}
+        }
+        return false;
+    }
+    Ext.contractAlertToolbarButton = new Ext.Button({
+        text: 'แจ้งเตือนรายการซื้อจ้าง',
+        iconCls: 'supplies-icon-alert',
+        cls: 'supplies-toolbar-action supplies-contract-alert-button',
+        tooltip: 'เปิดรายการแจ้งเตือนสัญญาและการรับประกัน',
+        handler: function () {
+            var workspace = Ext.getCmp('content-panel');
+            if (workspace && workspace.openPage && !window.SUPPLIES_EXTERNAL_UNIT) {
+                workspace.openPage('bi/dashBoard.php');
+                var showHomeAlerts = function (attempt) {
+                    if (openContractAlertShortcut(window, [])) return;
+                    if (attempt < 10) window.setTimeout(function () { showHomeAlerts(attempt + 1); }, 300);
+                };
+                window.setTimeout(function () { showHomeAlerts(0); }, 400);
+                return;
+            }
+            if (!openContractAlertShortcut(window, [])) {
+                var alertWindow = Ext.getCmp('win-contract-alert-toolbar');
+                if (alertWindow) {
+                    alertWindow.show();
+                    alertWindow.toFront();
+                    return;
+                }
+                new Ext.Window({
+                    id: 'win-contract-alert-toolbar',
+                    title: 'แจ้งเตือนสัญญาและวันรับประกัน',
+                    width: Math.max(800, Math.min(1500, window.innerWidth - 80)),
+                    height: Math.max(600, window.innerHeight - 100),
+                    modal: false,
+                    layout: 'fit',
+                    items: [{
+                        xtype: 'box',
+                        autoEl: {
+                            tag: 'iframe',
+                            src: '/supplies/bi/contract-alert-dashboard.html?_dc=' + Math.floor(Math.random() * 1000000000),
+                            frameborder: '0',
+                            style: 'width:100%;height:100%;border:0'
+                        }
+                    }]
+                }).show();
+            }
+        }
+    });
     function safeShowNotifyList() {
         if (!window.NOTIFY_STORE.getCount()) {
             Ext.Msg.alert('แจ้งเตือน', 'กำลังโหลดข้อมูลแจ้งเตือน...');
@@ -1857,7 +1957,7 @@ Ext.onReady(function () {
                                 var workspace = Ext.getCmp('content-panel');
                                 if (workspace && workspace.refreshActiveTab) workspace.refreshActiveTab();
                             }
-                        }, Ext.toogleTemp, {
+                        }, Ext.toogleTemp, Ext.contractAlertToolbarButton, {
                             xtype: 'button',
                             id: 'supplies-admin-tools',
                             text: 'รายละเอียด ADMIN',
