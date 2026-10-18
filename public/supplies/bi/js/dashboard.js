@@ -12,6 +12,7 @@ Ext.onReady(function () {
   var replyreportPie = Ext.get("work-reply-reportPie-win-shortcut");
   var replyreportPermission = Ext.get("work-reply-permission-win-shortcut");
   var replyreportEventBar = Ext.get("work-reply-reportEventBar-win-shortcut");
+  var contractAlert = Ext.get("work-contract-alert-win-shortcut");
   var sing = Ext.get("work-sign-digital-win-shortcut");
   var desktop = Ext.get("x-desktop");
   //-----------------------------------------
@@ -82,6 +83,22 @@ Ext.onReady(function () {
   if (replyreportEventBar) {
     replyreportEventBar.on("click", function (e) {
       window.open("./Report_TorEventBar.php?_dc=" + Math.floor(Math.random() * 1000000000));
+    });
+  }
+
+  if (contractAlert) {
+    contractAlert.on("click", function (e) {
+      e.preventDefault();
+      var item = {
+        xtype: "displayfield",
+        html: '<iframe src="./contract-alert-dashboard.html?_dc=' + Math.floor(Math.random() * 1000000000) + '" frameborder="0" width="100%" height="100%"></iframe>',
+      };
+      if (Ext.getCmp("win-contract-alert")) {
+        Ext.getCmp("win-contract-alert").show();
+        Ext.getCmp("win-contract-alert").toFront();
+        return;
+      }
+      WinDash1("win-contract-alert", "แจ้งเตือนสัญญาและวันรับประกัน", [item], 1120, 760, 70, 35, "icon-graph").show();
     });
   }
 

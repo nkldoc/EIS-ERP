@@ -1,5 +1,46 @@
 //@TO ยังรีโหลดไม่ได้เพราะรูปแแบบ pageStatus ไม่ซัพอร์ตกัน
 Ext.onReady(function () {
+    // Keep the signed-in employee's contract test inbox available from every
+    // Supplies page, not only from the BI dashboard.
+    (function startContractTestAlertInbox() {
+        var script = document.querySelector('script[src*="show_nat.js"]');
+        var apiUrl = script ? new URL('../bi/api/contractAlerts.php', script.src).toString() : '/supplies/bi/api/contractAlerts.php';
+        var alerted = false;
+        function checkInbox() {
+            Ext.Ajax.request({
+                url: apiUrl,
+                method: 'GET',
+                params: {mode: 'inbox'},
+                disableCaching: true,
+                success: function (response) {
+                    var payload;
+                    try { payload = Ext.decode(response.responseText); } catch (e) { return; }
+                    var hasUnread = !!(payload && payload.success && payload.notifications && payload.notifications.length);
+                    if (!hasUnread) { alerted = false; return; }
+                    if (alerted) return;
+                    alerted = true;
+                    var win = Ext.getCmp('win-global-contract-test-alert');
+                    if (win) { win.show(); win.toFront(); return; }
+                    var pageUrl = new URL('../bi/contract-alert-dashboard.html', script ? script.src : window.location.href).toString();
+                    pageUrl += '?inbox=' + new Date().getTime();
+                    new Ext.Window({
+                        id: 'win-global-contract-test-alert',
+                        title: 'แจ้งเตือนสัญญาและวันรับประกัน',
+                        width: Math.min(1120, window.innerWidth - 40),
+                        height: Math.min(760, window.innerHeight - 50),
+                        minWidth: 720,
+                        minHeight: 520,
+                        modal: true,
+                        maximizable: true,
+                        layout: 'fit',
+                        items: [{xtype: 'panel', border: false, html: '<iframe src="' + pageUrl + '" frameborder="0" width="100%" height="100%"></iframe>'}]
+                    }).show();
+                }
+            });
+        }
+        window.setTimeout(checkInbox, 1800);
+        window.setInterval(checkInbox, 20000);
+    })();
     Ext.QuickTips.init();
     Ext.showLoadingMask();
     Ext.editComboTable = function (menu) {
