@@ -4043,6 +4043,10 @@ const PrintPreview = function (id) {
 };
 /*@TO Function*/
 const Preview = function (id, url = "../po/preview/Pre_Working.php", title = "แสดงสถานะใบขอเบิก") {
+        // Legacy NMU_EIS_HOST may use HTTP; HTTPS pages cannot embed HTTP PDFs.
+        if (window.location.protocol === "https:") {
+                url = url.replace(/^http:\/\//i, "https://");
+        }
         let loader_display = '<div id="loader_display" style="display: flex; padding: 15px 15px; font-size:14px;"><div class="loader"></div><p>&nbsp;&nbsp;กำลังโหลดสถานะกรุณารอสักครู่...</p></div>';
         new Ext.Window({
                 title: title,
@@ -12267,7 +12271,40 @@ Ext.AppUx = function (app, menu) {
                                         {
                                                 xtype: "container",
                                                 items: [
-                                                        { xtype: "container", height: 92 },
+                                                        {
+                                                                xtype: "container",
+                                                                height: 92,
+                                                                width: 230,
+                                                                layout: "vbox",
+                                                                defaults: { width: 230, height: 34, scale: "small" },
+                                                                items: [
+                                                                        {
+                                                                                xtype: "button",
+                                                                                text: "1. คู่มือตรวจรับ ใช้ใบกันเหลื่อม",
+                                                                                icon: "../images/icons/page_white_acrobat.png",
+                                                                                handler: function () {
+                                                                                        window.open("manual/checking-overlap-guide.pdf", "_blank", "noopener");
+                                                                                }
+                                                                        },
+                                                                        {
+                                                                                xtype: "button",
+                                                                                text: "2. คู่มือแก้ไขตั้งหนี้ หมวด-บัญชี<br>และแก้ไขเงินภาษี",
+                                                                                icon: "../images/icons/page_white_powerpoint.png",
+                                                                                margins: "4 0 0 0",
+                                                                                handler: function () {
+                                                                                        new Ext.Window({
+                                                                                                title: "คู่มือแก้ไขตั้งหนี้ หมวด-บัญชี และแก้ไขเงินภาษี",
+                                                                                                modal: true,
+                                                                                                maximizable: true,
+                                                                                                layout: "fit",
+                                                                                                width: Math.min(1100, Ext.getBody().getViewSize().width - 40),
+                                                                                                height: Math.min(750, Ext.getBody().getViewSize().height - 40),
+                                                                                                html: '<iframe title="คู่มือแก้ไขตั้งหนี้และเงินภาษี" src="./tutorial/tutorial_1.php" frameborder="0" width="100%" height="100%"></iframe>'
+                                                                                        }).show();
+                                                                                }
+                                                                        }
+                                                                ]
+                                                        },
                                                         {
                                                                 xtype: "label",
                                                                 html: '<img src="../images/icons/information.png">',
