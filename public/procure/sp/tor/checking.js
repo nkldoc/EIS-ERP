@@ -4043,6 +4043,10 @@ const PrintPreview = function (id) {
 };
 /*@TO Function*/
 const Preview = function (id, url = "../po/preview/Pre_Working.php", title = "แสดงสถานะใบขอเบิก") {
+        // Legacy NMU_EIS_HOST may use HTTP; HTTPS pages cannot embed HTTP PDFs.
+        if (window.location.protocol === "https:") {
+                url = url.replace(/^http:\/\//i, "https://");
+        }
         let loader_display = '<div id="loader_display" style="display: flex; padding: 15px 15px; font-size:14px;"><div class="loader"></div><p>&nbsp;&nbsp;กำลังโหลดสถานะกรุณารอสักครู่...</p></div>';
         new Ext.Window({
                 title: title,
