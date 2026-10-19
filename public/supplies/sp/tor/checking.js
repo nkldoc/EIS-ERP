@@ -12577,7 +12577,7 @@ Ext.AppUx = function (app, menu) {
                                                 if ([4, 5, 6, 99].includes(Ext.selectRow.data.i_send_gl_dr) && Ext.selectRow.data.i_overlap === 3 && Ext.selectRow.data.c_overlap != null) {
                                                         // Ext.getCmp("buSaveSub3ID").hide();
                                                 }
-                                                if (Ext.selectRow.data.c_checking_code != null) {
+                                                if ([3, 4, 5, 6, 99].includes(Number(Ext.selectRow.data.i_send_gl_dr))) {
                                                         Ext.getCmp("i_yyyy_overlapID").setReadOnly(true);
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
                                                         // Ext.getCmp("i_type_transfer").setValue(Ext.selectRow.data);
@@ -12585,7 +12585,7 @@ Ext.AppUx = function (app, menu) {
                                                 if ([1, 5].includes(Ext.selectRow.data.i_chk_bg)) {
                                                         Ext.getCmp("c_booking_radiogroup").hide();
                                                         // Ext.getCmp("chek_overlapID").show().setValue(Ext.selectRow.data.chek_overlap);
-                                                } else if (Ext.selectRow.data.c_checking_code == null && Ext.selectRow.data.i_chk_bg == 2) {
+                                                } else if (Ext.isEmpty(Ext.selectRow.data.c_checking_code) && Ext.selectRow.data.i_chk_bg == 2) {
                                                         Ext.getCmp("c_booking_radiogroup").hide(true);
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
                                                 } else if (Ext.selectRow.data.i_yyyy_overlap != Ext.BudgetYear) {
@@ -12593,7 +12593,11 @@ Ext.AppUx = function (app, menu) {
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
                                                 } else {
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
-                                                        Ext.getCmp("i_yyyy_overlapID").setReadOnly(true);
+                                                        // ปีที่หักเงินเท่ากับปีงบประมาณปัจจุบัน แต่ยังไม่ออกเลขตรวจรับ/ยังไม่ลง GL -
+                                                        // user ต้องแก้ปีเองได้ (เช่น เปลี่ยนเป็นปีก่อนเพื่อเลือกใบกัน) จึงไม่ล็อกช่องปี
+                                                        if ([3, 4, 5, 6, 99].includes(Number(Ext.selectRow.data.i_send_gl_dr))) {
+                                                                Ext.getCmp("i_yyyy_overlapID").setReadOnly(true);
+                                                        }
                                                 }
                                                 Ext.getCmp("i_chk_bgTxtID").setValue(Ext.selectRow.data.i_chk_bgTxt);
                                         },
@@ -14348,6 +14352,17 @@ Ext.AppUx = function (app, menu) {
                                                                                                 }
                                                                                         },
                                                                                         {
+                                                                                                xtype: "button",
+                                                                                                id: "btnConfirmBookingID",
+                                                                                                fieldLabel: "ยืนยันใบกัน",
+                                                                                                text: "ยืนยันกันเหลื่อมก่อหนี้ (เปิดหน้ายืนยันใบกัน)",
+                                                                                                icon: "../images/icons/book_edit.png",
+                                                                                                hidden: Number(Ext.selectRow.data.i_type_bg) !== 1,
+                                                                                                handler: function () {
+                                                                                                        win_request_edit_bg(Ext.selectRow);
+                                                                                                },
+                                                                                        },
+                                                                                        {
                                                                                                 fieldLabel: "เลขที่ใบกันเงินเหลื่อมปี",
                                                                                                 id: "c_booking_radiogroup",
                                                                                                 xtype: "radiogroup",
@@ -14365,7 +14380,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 name: "c_booking",
                                                                                                                 hiddenName: "c_booking",
                                                                                                                 id: "c_bookingID",
-                                                                                                                readOnly: Ext.selectRow.data.c_checking_code != null ? true : false,
+                                                                                                                readOnly: [3, 4, 5, 6, 99].includes(Number(Ext.selectRow.data.i_send_gl_dr)),
                                                                                                                 triggerAction: "all",
                                                                                                                 forceSelection: true,
                                                                                                                 selectOnFocus: true,
