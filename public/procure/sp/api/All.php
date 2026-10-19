@@ -32,9 +32,7 @@ if (!get($limit)) {
 $totalCount = null;
 if ($_REQUEST['type'] == 'storeSpEmp') {
 
-    $TEAM_TOR = " 2,3 "; // จัดหาหนึ่ง จัดหาสอง
-    $department_id = $_SESSION['dc_department_id'] ?? null;
-    $department_id = $_REQUEST['dc_department_id'] ?? $department_id;
+    // The contract staff picker includes active staff from every procurement team.
     ###################
     $table = "dbo.sp_emp";
 
@@ -49,7 +47,7 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
 		 , ROW_NUMBER() OVER (ORDER BY a.dc_department_id asc) as row
                 from dbo.sp_emp a
                   inner join sp_department b on b.dc_department_id = a.dc_department_id
-                where b.dc_department_id in (8,?) and  i_enable = 1"; //  and a.i_level=3 and b.dc_department_id = " . $_SESSION['dc_department_id'];
+                where a.i_enable = 1";
 
 
     if (@$mode == "SEARCH") {
@@ -57,12 +55,12 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
             $sqlTempTable .= " and " . $filter . " like ?";
         }
         $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
-        $arrParam = array($department_id, "%{$value}%", $start, $limit);
-        $arrCountParam = array($department_id, "%{$value}%");
+        $arrParam = array("%{$value}%", $start, $limit);
+        $arrCountParam = array("%{$value}%");
     } else {
         $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
-        $arrParam = array($department_id, $start, $limit);
-        $arrCountParam = array($department_id);
+        $arrParam = array($start, $limit);
+        $arrCountParam = array();
     }
 
     //     echo $sqlMain;

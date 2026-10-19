@@ -1759,6 +1759,7 @@ Ext.AppUx = function (app, menu) {
     
     /***********/
     function Extstore3() {
+        if (Ext.store3 && Ext.store3.storeId === 'myStore3') return Ext.store3;
         Ext.store3 = new Ext.data.JsonStore({
             storeId: "myStore3",
             autoDestroy: false,
@@ -1943,6 +1944,7 @@ Ext.AppUx = function (app, menu) {
     Ext.loadStore = function (status, show) {
         var statusx = status;
         var winx = show;
+        Extstore3();
         if (statusx == "edit" && Ext.isEmpty(Ext.selectRow))
             Ext.Msg.alert("แจ้งเตือน", "กรุณา click เลือกข้อมูลที่จะแก้ไขใน data grid", function (form, action) {
                 return false;
@@ -1964,9 +1966,15 @@ Ext.AppUx = function (app, menu) {
             Ext.SP_TOR_HDR_PERIOD_ID = Ext.selectRow.data.sp_tor_hdr_period_id;
             Ext.SP_CONTRACT_PO_ID = Ext.selectRow.data.sp_contract_po_id;
             Ext.I_IS_PO = Ext.selectRow.data.i_is_po;
-            Ext.store3.setBaseParam("sp_contract_po_id", Ext.SP_CONTRACT_PO_ID);
-            Ext.store3.setBaseParam("i_is_po", Ext.I_IS_PO);
-            Ext.store3.load();
+            var periodStore = Ext.getCmp("gridSub3ID").getStore();
+            periodStore.setBaseParam("sp_contract_po_id", Ext.SP_CONTRACT_PO_ID);
+            periodStore.setBaseParam("i_is_po", Ext.I_IS_PO);
+            periodStore.setBaseParam("sp_tor_id", Ext.selectRow.get("sp_tor_id"));
+            periodStore.load({
+                callback: function (records, options, success) {
+                    if (!success) Ext.Msg.alert("ผิดพลาด", "ไม่สามารถโหลดงวดส่งมอบงานได้ กรุณาลองเปิดรายการใหม่");
+                }
+            });
         }
         //
     };
