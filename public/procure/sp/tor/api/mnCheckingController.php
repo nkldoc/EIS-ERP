@@ -1686,7 +1686,7 @@ switch ($mode) {
                     . ", i_hire_type "
                     . ", i_product_type"
                     . ",(select c_name from dbo.sp_emp where sp_emp_id=sp_tor.sp_emp_id) as emp_name "
-                    . "from NMU_ERP.dbo.sp_tor where tor_id=?";
+                    . "from dbo.sp_tor where tor_id=?";
 
             $f1 = $db->GetDataBySQL($subSql, array($row["sp_tor_id"]));
 
@@ -1807,11 +1807,11 @@ switch ($mode) {
                 "t_i_pr_type2" => intVal($row["t_i_pr_type2"]),
                 "booking_type_name_tor" => $row["booking_type_name_tor"],
                 "i_is_po" => intVal($row["i_is_po"]),
-                "i_purchase" => intVal($f1["i_purchase"]),
+                "i_purchase" => intVal($f1["i_purchase"] ?? 0),
                 "i_hire_type" => intVal($row["i_hire_type"]),
                 "i_product_type" => intVal($row["i_product_type"]),
                 "withdraw_name" => $row["withdraw_name"],
-                "emp_name" => $f1["emp_name"],
+                "emp_name" => $f1["emp_name"] ?? "",
                 "dc_creditor_id" => intVal($row["dc_creditor_id"]),
                 "dc_creditor_name" => $row["dc_creditor_idTxt"],
                 "d_doc_arrive_dt" => ((empty($row["d_doc_arrive_dt"])) ? "" : $date->extDateBuddha($row["d_doc_arrive_dt"])), //d_tor_date
