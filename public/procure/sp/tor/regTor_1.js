@@ -1150,7 +1150,12 @@ Ext.AppUx = function (app, menu) {
     fields: ["id", "c_code", "c_name"],
     listeners: {
       load: function (t, records, options) {
-        Ext.getCmp("s_dc_cost_idID").setValue("0");
+        var filterCost = Ext.getCmp("s_dc_cost_idID");
+        if (filterCost) filterCost.setValue("0");
+        var ownerCost = Ext.getCmp("dc_cost2_idID");
+        if (ownerCost && ownerCost.getStore() === t) {
+          ownerCost.setValue(ownerCost.getValue());
+        }
       },
     },
   });

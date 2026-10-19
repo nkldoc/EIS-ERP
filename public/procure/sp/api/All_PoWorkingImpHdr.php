@@ -44,9 +44,9 @@ if ($_REQUEST["type"] == "dc_cost_all") {
     $sqlMain = "
 		SELECT * FROM " . DB_CENTER . "dc_cost
 		WHERE i_last = 1 AND i_enable = 1 AND i_delete = 2
-			AND dc_cost_acc_id = 77
+			AND (dc_cost_acc_id = 77 OR dc_cost_id = ?)
 		ORDER BY c_code";
-    $arrParam = array(STATUS_ENABLE, 1);
+    $arrParam = array((int) ($_SESSION["dc_cost_id"] ?? 0));
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     if ($stmt) {
 
