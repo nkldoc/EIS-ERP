@@ -35,11 +35,11 @@ if ($requestUserId === false || $requestUserId === null) {
 
 $db        = new DatabaseServer();
 $sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
-                , isnull((select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
-                , isnull((select top 1 c_code from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
-                ,(select top 1 dc_area_id from dbo.dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
+                , isnull((select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
+                , isnull((select top 1 c_code from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
+                ,(select top 1 dc_area_id from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
                 , a.i_type_user
-                , isnull((select top 1  bb.dc_cost_acc_id from dbo.dc_cost bb where bb.dc_cost_id=a.dc_cost_id),0) as dc_cost_acc_id
+                , isnull((select top 1  bb.dc_cost_acc_id from " . DB_CENTER . "dc_cost bb where bb.dc_cost_id=a.dc_cost_id),0) as dc_cost_acc_id
                 , isnull(c.c_name,'') as 'c_sp_emp'
                 , isnull(e.c_name,'') as 'c_department_type'
                 , 'สายงาน '+d.c_name as 'c_department'
