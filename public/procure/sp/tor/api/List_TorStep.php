@@ -162,7 +162,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost2_id)  as dc_cost2_idTxt
 
                         , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
@@ -445,7 +448,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost2_id)  as dc_cost2_idTxt
                         , (select top 1 i_enabled from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as sp_tor_delete
                         , (select top 1 c_comment from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as tor_delete_comment
@@ -752,7 +758,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
                         , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=s.dc_user_create_cost_id) as c_cost_creat_name
@@ -1072,7 +1081,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
                         , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=s.dc_user_create_cost_id) as c_cost_creat_name
@@ -1281,22 +1293,36 @@ if ($type == "ownnerPr") {
     $addConfDay2 = (!empty($i_pa)) ? $i_pa : 0;
     $i_post1 = $_REQUEST['i_post1'] ?? null;
     if ($act == "SEARCH") {
-//        $wh .= ($_REQUEST['tor_type_id'] != 0) ? " and a.tor_type_id =" . $_REQUEST['tor_type_id'] : "";
-        $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code like '%" . $_REQUEST['c_code'] . "%'" : "";
-        $wh .= ($_REQUEST['c_name'] != "") ? " and a.c_name like '%" . $_REQUEST['c_name'] . "%'" : "";
-        if ($_SESSION['i_level'] != 1) {
-            $wh .= ($_REQUEST['sp_emp_id'] != 0) ? " and a.sp_emp_id = " . $_REQUEST['sp_emp_id'] : " and a.dc_department_id =" . $_SESSION['dc_department_id'];
+        $searchCode = trim((string) ($_REQUEST['c_code'] ?? ''));
+        $searchName = trim((string) ($_REQUEST['c_name'] ?? ''));
+        $searchEmployee = max(0, (int) ($_REQUEST['sp_emp_id'] ?? 0));
+        $searchTorType = max(0, (int) ($_REQUEST['tor_type_id'] ?? 0));
+        if ($searchCode !== '') {
+            $wh .= " and a.c_code like N'%" . str_replace("'", "''", $searchCode) . "%'";
         }
-        $wh .= " and a.i_enabled =" . $_REQUEST['i_enabled'];
-        if ($i_post1 == 1) {
-            $wh .= " and a.sp_emp_id =" . $_REQUEST['sp_emp_id'];
+        if ($searchName !== '') {
+            $wh .= " and a.c_name like N'%" . str_replace("'", "''", $searchName) . "%'";
         }
-        if ($i_post != 0) {
-            if ($i_post == 1) {
-                $wh .= " and tor_status_id is not null";
-            } else {
-                $wh .= " and tor_status_id is null";
-            }
+        if ($searchTorType > 0) {
+            $wh .= " and a.tor_type_id = " . $searchTorType;
+        }
+        $searchDate = (string) ($_REQUEST['d_tor_date'] ?? '');
+        if (preg_match('/^\\d{4}-\\d{2}-\\d{2}$/D', $searchDate)) {
+            $wh .= " and CONVERT(date, a.d_tor_date) = '" . $searchDate . "'";
+        }
+        if ($searchEmployee > 0) {
+            $wh .= " and a.sp_emp_id = " . $searchEmployee;
+        } elseif ((int) ($_SESSION['i_level'] ?? 0) !== 1) {
+            $wh .= " and a.dc_department_id = " . (int) ($_SESSION['dc_department_id'] ?? 0);
+        }
+        $wh .= " and a.i_enabled = 1";
+        if ((int) $i_post1 === 1) {
+            $wh .= " and a.sp_emp_id = " . (int) ($_SESSION['sp_emp_id'] ?? 0);
+        }
+        if ((int) $i_post === 1) {
+            $wh .= " and tor_status_id is not null";
+        } elseif ((int) $i_post === 2) {
+            $wh .= " and tor_status_id is null";
         }
     } else {
         $wh .= ($tor_type_show == true) ? " and tor_status_id is null" : "";
@@ -1400,7 +1426,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
                         , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=s.dc_user_create_cost_id) as c_cost_creat_name
@@ -1756,7 +1785,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
                         , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=s.dc_user_create_cost_id) as c_cost_creat_name
@@ -2228,7 +2260,10 @@ if ($type == "ownnerPr") {
                     , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                     , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                     , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                    , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                    , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                     , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
                     , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
                     , (select top 1 c_name from dbo.dc_cost where dc_cost_id=s.dc_user_create_cost_id) as c_cost_creat_name
@@ -2573,7 +2608,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
                         , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=s.dc_user_create_cost_id) as c_cost_creat_name
@@ -2891,7 +2929,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
                         , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=s.dc_user_create_cost_id) as c_cost_creat_name
@@ -3177,7 +3218,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_alert, 120) as d_tor_date_alert
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost2_id)  as dc_cost2_idTxt
                         , (select top 1 i_enabled from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as sp_tor_delete
                         , (select top 1 c_comment from sp_tor_delete where s.tor_id = sp_tor_id and i_enabled = 1 ) as tor_delete_comment
@@ -3473,7 +3517,10 @@ if ($type == "ownnerPr") {
                         , convert(varchar, s.d_tor_date_pa, 120) as d_tor_date_pa
                         , isnull((select top 1 i_bg_type from dbo.dc_expense_budget_type where dc_expense_budget_type_id=s.dc_expense_budget_type_id),0)  as i_bg_type
                         , (select top 1 c_name from dbo.po_creditor where po_creditor_id=a.po_creditor_id)  as po_creditor_idTxt
-                        , (select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id)  as dc_cost_idTxt
+                        , COALESCE(
+                            (select top 1 NULLIF(c_name, '') from dbo.dc_cost where dc_cost_id=a.dc_cost_id),
+                            (select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id)
+                          )  as dc_cost_idTxt
                         , (SELECT TOP 1 c_name FROM dbo.dc_cost WHERE dc_cost_id=a.dc_cost2_id)  AS dc_cost2_idTxt
                         , (select top 1 c_full_name from dbo.dc_user where dc_user_id=s.dc_user_create_id) as c_create_name
                         , (select top 1 c_name from dbo.dc_cost where dc_cost_id=s.dc_user_create_cost_id) as c_cost_creat_name

@@ -83,6 +83,10 @@
 .supplies-refresh-button button { color:#17654d; }
 .supplies-refresh-button:hover { background:#e0f4e9; border-color:#71b49a; }
 .supplies-notebook-button { background:#f5f9ff; }
+.supplies-contract-alert-button { border:1px solid #8ab2e3; background:linear-gradient(135deg,#f5f9ff,#e5efff); box-shadow:0 2px 6px #1c4f8c26; }
+.supplies-contract-alert-button button { color:#174b86; }
+.supplies-contract-alert-button:hover { border-color:#4b82c5; background:linear-gradient(135deg,#eaf3ff,#d8e8ff); box-shadow:0 3px 9px #1c4f8c36; }
+.supplies-icon-alert { background-image:url('../images/icons/bell.png')!important; }
 .supplies-icon-refresh { background-image:url('../images/icons/ui-refresh.svg')!important; }
 .supplies-icon-notebook { background-image:url('../images/icons/ui-notebook.svg')!important; }
 .supplies-icon-admin { background-image:url('../images/icons/ui-admin.svg')!important; }
@@ -93,3 +97,19 @@
 .supplies-notebook-window .x-window-bbar .x-btn button { height:28px; color:#31577f; padding-right:10px; }
 .supplies-notebook-window .x-window-bbar .x-btn:hover { background:#e2ecfa; }
 #topToolBarID.x-toolbar { height:auto!important; min-height:44px; box-sizing:border-box; padding:3px 5px; }
+.supplies-menu-tree .x-tree-node-el.supplies-contract-folder { background:#f1ecff; border:1px solid #ddd2fa; }
+.supplies-menu-tree .x-tree-node-el.supplies-contract-folder a span { color:#6d28d9; font-weight:bold; }
+.supplies-menu-tree .x-tree-node-el.supplies-checking-menu { background:#e8f8f1; box-shadow:inset 3px 0 #059669; }
+.supplies-menu-tree .x-tree-node-el.supplies-checking-menu a span { color:#047857; font-weight:bold; }
+.supplies-menu-tree .supplies-checking-menu.x-tree-node-over,
+.supplies-menu-tree .supplies-checking-menu.x-tree-selected { background:#c9f0df; box-shadow:inset 4px 0 #047857; }
+.supplies-menu-tree .supplies-contract-icon,
+.supplies-menu-tree .supplies-checking-icon { width:22px; height:24px; background-size:22px 22px!important; background-position:center!important; background-repeat:no-repeat!important; }
+.supplies-menu-tree .supplies-contract-icon { background-image:url('../images/icons/ui-contract-folder.svg')!important; }
+.supplies-menu-tree .supplies-checking-icon { background-image:url('../images/icons/ui-checking.svg')!important; }
+.supplies-menu-tree .supplies-menu-icon { width:22px; height:24px; background-size:22px 22px!important; background-position:center!important; background-repeat:no-repeat!important; }
+.supplies-menu-tree .supplies-icon-contract-edit { background-image:url('../images/icons/ui-contract-edit.svg')!important; }
+.supplies-menu-tree .supplies-icon-contract-sign { background-image:url('../images/icons/ui-contract-sign.svg')!important; }
+.supplies-menu-tree .supplies-icon-payment-edit { background-image:url('../images/icons/ui-payment-edit.svg')!important; }
+.supplies-menu-tree .supplies-icon-operator-sign { background-image:url('../images/icons/ui-operator-sign.svg')!important; }
+.supplies-menu-tree .supplies-icon-requester-sign { background-image:url('../images/icons/ui-requester-sign.svg')!important; }

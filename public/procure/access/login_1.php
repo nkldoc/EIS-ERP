@@ -5,6 +5,18 @@ require_once __DIR__ . "/../lib/database/DatabaseServer.php";
 
 header("Content-Type: application/json; charset=utf-8");
 
+// Temporary connection diagnostics, enabled only when explicitly requested.
+if (isset($_GET['debug_config']) && $_GET['debug_config'] === '1') {
+    echo json_encode([
+    'login_file' => __FILE__,
+    'config_file' => realpath(__DIR__ . '/../conf/config.php'),
+    'db_server' => DB_SERVER,
+    'db_name' => DB_NAME,
+    'database_class' => (new ReflectionClass('DatabaseServer'))->getFileName(),
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 $jsonInput = json_decode((string) file_get_contents("php://input"), true);
 $requestUserId = $_REQUEST["ss_user_id"] ?? ($jsonInput["ss_user_id"] ?? null);
 $requestUserId = filter_var($requestUserId, FILTER_VALIDATE_INT, [
@@ -23,11 +35,11 @@ if ($requestUserId === false || $requestUserId === null) {
 
 $db        = new DatabaseServer();
 $sqlMain = "select a.dc_user_id, a.dc_cost_id, b.dc_emp_id, a.c_full_name
-                , isnull((select top 1 c_name from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
-                , isnull((select top 1 c_code from dbo.dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
-                ,(select top 1 dc_area_id from dbo.dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
+                , isnull((select top 1 c_name from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_name
+                , isnull((select top 1 c_code from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id),'ไม่พบ') as cost_code
+                ,(select top 1 dc_area_id from " . DB_CENTER . "dc_cost where dc_cost_id=a.dc_cost_id) as dc_area_id
                 , a.i_type_user
-                , isnull((select top 1  bb.dc_cost_acc_id from dbo.dc_cost bb where bb.dc_cost_id=a.dc_cost_id),0) as dc_cost_acc_id
+                , isnull((select top 1  bb.dc_cost_acc_id from " . DB_CENTER . "dc_cost bb where bb.dc_cost_id=a.dc_cost_id),0) as dc_cost_acc_id
                 , isnull(c.c_name,'') as 'c_sp_emp'
                 , isnull(e.c_name,'') as 'c_department_type'
                 , 'สายงาน '+d.c_name as 'c_department'
@@ -119,6 +131,13 @@ while ($data = $db->Fetch($stmt)) {
 }
 
 session_write_close();
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
+    && (string)($_GET['portal_entry'] ?? '') === '1'
+    && $re['reval'] === 0) {
+    header('Cache-Control: no-store');
+    header('Location: /procure/', true, 303);
+    exit;
+}
 echo json_encode($re);
 exit;
 

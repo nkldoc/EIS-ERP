@@ -1,6 +1,10 @@
 <?php
 
 include_once("../../conf/config.php");
+// Lookup queries only read session data; release the lock before database work.
+if (session_status() === PHP_SESSION_ACTIVE) {
+    session_write_close();
+}
 include_once("../../lib/database/DatabaseServer.php");
 include_once("../../lib/database/apiUtil.php");
 include_once("../../lib/date/i_date.class.php");

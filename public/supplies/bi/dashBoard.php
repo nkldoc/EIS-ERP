@@ -52,6 +52,11 @@ include("logic/permission_logic.php");
                         <div>รายการซื้อจ้างสำหรับหน่วยงาน</div>
                     </a>
                 </dt>
+                <dt id="work-contract-alert-win-shortcut" style="display:none">
+                    <a href="#"><img src="images/bell.png" width="48" height="48" alt="แจ้งเตือนสัญญา" />
+                        <div>แจ้งเตือนสัญญาและวันรับประกัน</div>
+                    </a>
+                </dt>
                 <?php if ($can_view_bi):
                     ?>
                     <!-- <dt id="work-bi-win-shortcut">

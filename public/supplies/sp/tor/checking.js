@@ -3431,7 +3431,6 @@ const search = function () {
                 Ext.storeDtl.setBaseParam("i_status", Ext.getCmp("s_i_statusID").getValue());
                 Ext.storeDtl.setBaseParam("i_show", Ext.get("toggle_my_status").dom.checked ? 1 : 0);
                 // Ext.storeDtl.setBaseParam("userid", Ext.getCmp("userid-ID").getValue());
-                Ext.getCmp("tabpanel1").getStore().load();
         } else {
                 Ext.Msg.alert("แจ้งเตือน", msg);
         }
@@ -10206,11 +10205,12 @@ function showCustomEditForm(rec) {
 }
 
 var cellClick = function (grid, rowIndex, columnIndex, e) {
-        if (columnIndex === grid.getColumnModel().getIndexById('contract_detailsID')) {
+        var isPreflightColumn = columnIndex === grid.getColumnModel().getIndexById('i_status_chkTxtID');
+        if (isPreflightColumn || columnIndex === grid.getColumnModel().getIndexById('contract_detailsID')) {
                 var overviewRow = grid.getStore().getAt(rowIndex);
                 var checkId = Number(overviewRow.get('sp_check_period_hdr_id') || 0);
                 if (!checkId) return Ext.Msg.alert('ดูรายละเอียด', 'ไม่พบใบตรวจรับของแถวที่เลือก');
-                Ext.showContractDetails(overviewRow, {initialTab: 3, sp_check_period_hdr_id: checkId, allowAdminEdit: true,
+                Ext.showContractDetails(overviewRow, {initialTab: isPreflightColumn ? 4 : 3, maximized: true, sp_check_period_hdr_id: checkId, allowAdminEdit: true,
                         onUpdated: function () { grid.getStore().reload(); }});
                 return;
         }
@@ -10349,7 +10349,7 @@ Ext.AppUx = function (app, menu) {
         Ext.storeDtl = new Ext.data.JsonStore({
                 storeId: "storeDtl",
                 autoDestroy: false,
-                autoLoad: true,
+                autoLoad: false,
                 url: "tor/api/mnCheckingController.php",
                 baseParams: { mode: "LIST_SUB_PERIOD_HDR" },
                 root: "data",
@@ -10777,7 +10777,7 @@ Ext.AppUx = function (app, menu) {
         Ext.bg_budget_year = new Ext.data.JsonStore({
                 autoDestroy: false,
                 storeId: 'bg_budget_year',
-                autoLoad: true,
+                autoLoad: false,
                 url: "api/All_PoWorkingImpHdr.php",
                 baseParams: {
                         type: "bg_budget_year",
@@ -11084,7 +11084,7 @@ Ext.AppUx = function (app, menu) {
                                         },
                                 },
                                 {
-                                        header: "สถานะ",
+                                        header: "สถานะ/ตรวจ",
                                         sortable: false,
                                         align: "center",
                                         dataIndex: "i_status_chkTxt",
@@ -11103,22 +11103,7 @@ Ext.AppUx = function (app, menu) {
 
                                                 // 3. ใส่ข้อมูลลงใน Tooltip เมื่อเอาเมาส์มาวางชี้
                                                 metaData.attr = 'ext:qtip="' + fullMessageHtml + '"';
-                                                // 4. สร้างฟังก์ชัน Global ชั่วคราว (หรือจะเขียนแบบแนบ String) เพื่อให้กดคลิกแล้วแสดงผลข้อมูล Error แบบสวยงาม
-                                                // ปล. ใช้ window.showGridError เพื่อให้ HTML string สามารถเรียกใช้ฟังก์ชันนี้ได้จากทุกแถว
-                                                window.showGridError = window.showGridError || function (encodedMsg) {
-                                                        var decodedMsg = decodeURIComponent(encodedMsg);
-                                                        Ext.Msg.show({
-                                                                title: '<span style="color: #ff4d4f;"><i class="fa fa-exclamation-triangle"></i> รายละเอียดข้อมูล</span>',
-                                                                msg: '<div style="max-height: 300px; overflow-y: auto; padding: 10px; background: #fff1f0; border: 1px solid #ffa39e; border-radius: 4px; font-family: monospace; font-size: 13px; color: #a8071a; white-space: pre-wrap; line-height: 1.6;">' + decodedMsg + '</div>',
-                                                                buttons: Ext.Msg.OK,
-                                                                icon: Ext.Msg.ERROR,
-                                                                width: 550
-                                                        });
-                                                };
-                                                // เข้ารหัสข้อความเดิม (รวม \n) เพื่อส่งผ่านทางพารามิเตอร์ของฟังก์ชัน onclick ได้อย่างปลอดภัย ไม่พังเพราะเครื่องหมายคำพูด
-                                                var safeParam = encodeURIComponent(record.get('c_name') + '\n' + record.get('budget_type') + '\n' + record.get('expense_name') + '\n' + record.get('c_yyyy'));
-                                                // 5. ส่งกลับกล่องข้อความที่ใส่สไตล์ และผูกอีเวนต์ onclick เมื่อกดคลิก
-                                                return '<div onclick="window.showGridError(\'' + safeParam + '\')" style="' +
+                                                return '<div style="' +
                                                         ' white-space: nowrap;' +
                                                         ' overflow: hidden;' +
                                                         ' text-overflow: ellipsis;' +
@@ -17722,20 +17707,12 @@ Ext.onReady(function () {
                                         } //  loadAllStores();
 
                                         function loadAllStoresWithChain() {
-                                                Ext.getBody().mask('กำลังโหลดข้อมูล...');
-                                                loadStorePromise(Ext.storeDtl)
-                                                        .then(function () {
-                                                                console.log('รายการตรวจรับ เสร็จแล้ว');
-                                                                return loadStorePromise(Ext.bg_budget_year);
-                                                        })
-                                                        .then(function () {
-                                                                Ext.getBody().unmask();
-                                                                Ext.Msg.alert('สำเร็จ', 'ข้อมูลทุกอย่างโหลดเรียงลำดับเสร็จแล้ว');
-                                                        })
-                                                        .catch(function (error) {
-                                                                Ext.getBody().unmask();
-                                                                Ext.Msg.alert('ผิดพลาด', 'โหลดข้อมูลล้มเหลว: ' + error);
-                                                        });
+                                                Promise.all([
+                                                        loadStorePromise(Ext.storeDtl),
+                                                        loadStorePromise(Ext.bg_budget_year)
+                                                ]).catch(function (error) {
+                                                        console.error('Initial checking data load failed:', error);
+                                                });
                                         }
                                         loadAllStoresWithChain();
                                 },

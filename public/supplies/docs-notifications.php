@@ -74,5 +74,5 @@ try {
 } catch (Throwable $error) {
     if (http_response_code()<400) http_response_code(500);
     error_log('Supplies document notifications: '.$error->getMessage());
-    echo json_encode(['success'=>false,'message'=>http_response_code() >= 500 ? '?????????????????????????? ??????????????????????' : $error->getMessage()],JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success'=>false,'message'=>http_response_code() >= 500 ? 'โหลดแจ้งเตือนเอกสารไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' : $error->getMessage()],JSON_UNESCAPED_UNICODE);
 } finally { if ($connection) sqlsrv_close($connection); }

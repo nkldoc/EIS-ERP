@@ -1,5 +1,6 @@
 //@TO ยังรีโหลดไม่ได้เพราะรูปแแบบ pageStatus ไม่ซัพอร์ตกัน
 Ext.onReady(function () {
+    // Contract alerts load only when the user opens the alert window.
     Ext.QuickTips.init();
     Ext.showLoadingMask();
     Ext.editComboTable = function (menu) {
@@ -912,11 +913,41 @@ Ext.onReady(function () {
         });
     };
     var root = new Ext.tree.AsyncTreeNode();
+    var frequentMenuUser = Ext.session.user_id;
+    function frequentMenuKey() {
+        return 'supplies.frequentMenus.' + frequentMenuUser + '.' + localStorage.getItem('supplies_parentId');
+    }
+    function readFrequentMenus() {
+        try { return JSON.parse(localStorage.getItem(frequentMenuKey()) || '{}') || {}; }
+        catch (e) { return {}; }
+    }
+    function renderFrequentMenus() {
+        var counts = readFrequentMenus(), menus = [], folder = root.findChild('id', 'supplies-frequent-menus');
+        root.cascade(function (node) {
+            if (node.leaf && !node.attributes.frequentOriginalId && counts[node.id] && Number(counts[node.id].count) > 0) menus.push(node);
+        });
+        menus.sort(function (a, b) {
+            return Number(counts[b.id].count) - Number(counts[a.id].count) || Number(counts[b.id].last) - Number(counts[a.id].last);
+        });
+        if (!folder) {
+            folder = new Ext.tree.TreeNode({id: 'supplies-frequent-menus', text: 'เมนูที่ใช้บ่อยที่สุด', leaf: false, expanded: true});
+            root.insertBefore(folder, root.firstChild);
+        }
+        folder.removeAll(true);
+        for (var i = 0; i < Math.min(4, menus.length); i++) {
+            var menu = menus[i];
+            folder.appendChild(new Ext.tree.TreeNode({id: 'supplies-frequent-' + i, text: menu.text, leaf: true,
+                icon: menu.attributes.icon, iconCls: menu.attributes.iconCls, cls: menu.attributes.cls, frequentOriginalId: menu.id,
+                qtip: 'เปิดใช้งาน ' + Number(counts[menu.id].count) + ' ครั้ง'}));
+        }
+        folder.expand(false, false);
+    }
     var loader = new Ext.tree.TreeLoader({
         dataUrl: "/supplies/api/userMenu/userTree.php",
         requestMethod: "get",
         baseParams: {url: window.location.href, parent_id: localStorage.getItem("supplies_parentId")}
     });
+    loader.on('load', function () { renderFrequentMenus(); });
     Ext.urlEIS =
             location.protocol + '//' +
             location.hostname +
@@ -928,12 +959,43 @@ Ext.onReady(function () {
         id: "TreePanel1ID",
         cls: 'supplies-menu-tree',
         tbar: [{
-            xtype: 'textfield',
+            xtype: 'combo',
             id: 'supplies-menu-search',
             emptyText: 'ค้นหาเมนู...',
             width: 220,
+            mode: 'local',
+            store: new Ext.data.ArrayStore({fields: ['menuId', 'menuText']}),
+            displayField: 'menuText',
+            valueField: 'menuText',
+            triggerAction: 'all',
+            hideTrigger: true,
+            minChars: 1,
+            queryDelay: 150,
+            typeAhead: false,
+            forceSelection: false,
+            listWidth: 350,
+            maxHeight: 280,
+            tpl: '<tpl for="."><div class="x-combo-list-item">{menuText:htmlEncode}</div></tpl>',
             enableKeyEvents: true,
             listeners: {
+                beforequery: function (event) {
+                    var field=event.combo, query=String(event.query||'').toLowerCase().replace(/^\s+|\s+$/g,''), matches=[];
+                    root.cascade(function (node) {
+                        if(node.leaf&&!node.attributes.frequentOriginalId){
+                            var text=Ext.util.Format.stripTags(node.text||'');
+                            if(query&&text.toLowerCase().indexOf(query)!==-1)matches.push([node.id,text]);
+                        }
+                    });
+                    field.store.loadData(matches);
+                    event.forceAll=true;
+                    delete field.lastQuery;
+                    if(!matches.length){field.collapse();event.cancel=true;}
+                },
+                select: function (field, record) {
+                    var node=TreePanel1.getNodeById(record.get('menuId'));
+                    field.collapse();
+                    if(node)TreePanel1.fireEvent('click',node);
+                },
                 keyup: {buffer: 200, fn: function (field) {
                     var tree = Ext.getCmp('TreePanel1ID');
                     var query = String(field.getValue() || '').toLowerCase().replace(/^\s+|\s+$/g, '');
@@ -1053,11 +1115,15 @@ Ext.onReady(function () {
     };
     TreePanel1.on("click", function (n) {
         if (n.leaf) {
+            var originalMenuId = n.attributes.frequentOriginalId || n.id;
+            var menuCounts = readFrequentMenus();
+            menuCounts[originalMenuId] = {count: Number((menuCounts[originalMenuId] || {}).count || 0) + 1, last: new Date().getTime()};
+            try { localStorage.setItem(frequentMenuKey(), JSON.stringify(menuCounts)); } catch (storageError) {}
             // ignore clicks on folders and currently selected node
 
 
 
-            var url = n.id.replace(new RegExp("-", "g"), "/");
+            var url = originalMenuId.replace(new RegExp("-", "g"), "/");
             var fullURL = url;
             var fullNameSplit = fullURL.split("?");
             var uri = fullNameSplit[0];
@@ -1065,7 +1131,7 @@ Ext.onReady(function () {
             Ext.page = Ext.apply({uri: uri, method: method});
             if (n.leaf) {
 
-                let accessManu = {menuID: n.id, menuTxt: n.text, browser: getBrowsers()};
+                let accessManu = {menuID: originalMenuId, menuTxt: n.text, browser: getBrowsers()};
                 let accessinfo = Ext.apply({sysUserId: Ext.session.user_id}, accessManu);
                 Ext.session = Ext.apply({adminMunu: false});
 //                Ext.getCmp('north').fnNotifBe('menuname', n.text);
@@ -1078,6 +1144,7 @@ Ext.onReady(function () {
                     }
                 });
                 Ext.getCmp("content-panel").openPage(Ext.page.uri + '.php?' + Ext.page.method, Ext.util.Format.stripTags(n.text));
+                renderFrequentMenus();
             }
         }
     });
@@ -1622,6 +1689,70 @@ Ext.onReady(function () {
         tooltip: 'เปิดสมุดโน้ต (Text Memories)',
         handler: function () { Ext.openSuppliesNotebook(); }
     });
+    function openContractAlertShortcut(win, visited) {
+        visited = visited || [];
+        if (!win || visited.indexOf(win) !== -1) return false;
+        visited.push(win);
+        var frames = [];
+        try {
+            var shortcut = win.document.getElementById('work-contract-alert-win-shortcut');
+            if (shortcut) {
+                shortcut.click();
+                return true;
+            }
+            if (win.parent && win.parent !== win && openContractAlertShortcut(win.parent, visited)) return true;
+            frames = win.frames;
+        } catch (e) {}
+        for (var i = 0; i < frames.length; i++) {
+            try {
+                if (openContractAlertShortcut(frames[i], visited)) return true;
+            } catch (e) {}
+        }
+        return false;
+    }
+    Ext.contractAlertToolbarButton = new Ext.Button({
+        text: 'แจ้งเตือนรายการซื้อจ้าง',
+        iconCls: 'supplies-icon-alert',
+        cls: 'supplies-toolbar-action supplies-contract-alert-button',
+        tooltip: 'เปิดรายการแจ้งเตือนสัญญาและการรับประกัน',
+        handler: function () {
+            var workspace = Ext.getCmp('content-panel');
+            if (workspace && workspace.openPage && !window.SUPPLIES_EXTERNAL_UNIT) {
+                workspace.openPage('bi/dashBoard.php');
+                var showHomeAlerts = function (attempt) {
+                    if (openContractAlertShortcut(window, [])) return;
+                    if (attempt < 10) window.setTimeout(function () { showHomeAlerts(attempt + 1); }, 300);
+                };
+                window.setTimeout(function () { showHomeAlerts(0); }, 400);
+                return;
+            }
+            if (!openContractAlertShortcut(window, [])) {
+                var alertWindow = Ext.getCmp('win-contract-alert-toolbar');
+                if (alertWindow) {
+                    alertWindow.show();
+                    alertWindow.toFront();
+                    return;
+                }
+                new Ext.Window({
+                    id: 'win-contract-alert-toolbar',
+                    title: 'แจ้งเตือนสัญญาและวันรับประกัน',
+                    width: Math.max(800, Math.min(1500, window.innerWidth - 80)),
+                    height: Math.max(600, window.innerHeight - 100),
+                    modal: false,
+                    layout: 'fit',
+                    items: [{
+                        xtype: 'box',
+                        autoEl: {
+                            tag: 'iframe',
+                            src: '/supplies/bi/contract-alert-dashboard.html?_dc=' + Math.floor(Math.random() * 1000000000),
+                            frameborder: '0',
+                            style: 'width:100%;height:100%;border:0'
+                        }
+                    }]
+                }).show();
+            }
+        }
+    });
     function safeShowNotifyList() {
         if (!window.NOTIFY_STORE.getCount()) {
             Ext.Msg.alert('แจ้งเตือน', 'กำลังโหลดข้อมูลแจ้งเตือน...');
@@ -1750,13 +1881,13 @@ Ext.onReady(function () {
                                 var workspace = Ext.getCmp('content-panel');
                                 if (workspace && workspace.refreshActiveTab) workspace.refreshActiveTab();
                             }
-                        }, Ext.toogleTemp, {
+                        }, Ext.toogleTemp, Ext.contractAlertToolbarButton, {
                             xtype: 'button',
                             id: 'supplies-admin-tools',
-                            text: 'เครื่องมือ ADMIN',
+                            text: 'รายละเอียด ADMIN',
                             iconCls: 'supplies-icon-admin',
                             cls: 'supplies-toolbar-action supplies-admin-tools-button',
-                            tooltip: 'ค้นหาและแก้ไขข้อมูล TOR / สัญญา ได้จากทุกหน้า',
+                            tooltip: 'ค้นหารายละเอียดจาก PR / สัญญา / IR / AP / เลขเบิก D',
                             hidden: window.SUPPLIES_CAN_ADMIN_TOOLS !== true,
                             disabled: window.SUPPLIES_CAN_ADMIN_TOOLS !== true,
                             handler: function () { Ext.openSuppliesAdminTools(); }

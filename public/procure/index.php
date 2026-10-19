@@ -208,5 +208,9 @@ echo htmlspecialchars(
         </style>
     </head>
     <body>
+        <?php
+        require_once __DIR__ . '/conf/presence/Presence.php';
+        echo ProcurePresence::script();
+        ?>
     </body>
 </html>

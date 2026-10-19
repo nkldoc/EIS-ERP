@@ -48,7 +48,7 @@ final class Presence
         if (is_file(self::directory() . '/revoked/' . $key)) throw new UnexpectedValueException('Session revoked');
         $file = self::directory() . '/' . strtolower($system) . '.secret';
         if (!is_readable($file)) throw new RuntimeException('Presence service is not configured');
-        $encoded = rtrim(strtr(base64_encode(json_encode(['system'=>$system, 'uid'=>$uid, 'name'=>$name, 'department'=>$department, 'admin'=>$system === 'EIS-DOCS' && $admin, 'session'=>$key, 'exp'=>time()+60], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        $encoded = rtrim(strtr(base64_encode(json_encode(['system'=>$system, 'uid'=>$uid, 'name'=>$name, 'department'=>$department, 'admin'=>$system === 'EIS-DOCS' && $admin, 'chatAdmin'=>$system === 'SUPPLIES' && (int)($_SESSION['i_type_user'] ?? 0) === 2 && !isset($_SESSION['impersonation_admin_center_id']) && !isset($_SESSION['impersonation_admin']), 'session'=>$key, 'exp'=>time()+60], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
         return ['token'=>$encoded . '.' . hash_hmac('sha256', $encoded, trim(file_get_contents($file))), 'url'=>self::websocketUrl()];
     }
     private static function websocketUrl(): string
@@ -71,6 +71,6 @@ final class Presence
             $origin = ($parts['scheme'] === 'wss' ? 'https://' : 'http://') . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
             $preconnect = '<link rel="preconnect" href="' . htmlspecialchars($origin, ENT_QUOTES, 'UTF-8') . '" crossorigin>';
         }
-        return ($system === 'SUPPLIES' ? '<script src="/supplies/assets/js/login-approval.js?v=20261012-routes"></script>' : '') . $preconnect . '<link rel="stylesheet" href="' . $assets . '/css/presence-chat.css?v=20261012-channels"><script>window.EISPresenceConfig={tokenUrl:' . json_encode($url, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) . ',loginUrl:' . json_encode($loginUrl, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) . '};</script><script src="' . $client . '?v=20261013-ws-safe"></script><script src="' . $assets . '/js/presence-image-viewer.js?v=20261012-fast"></script><script src="' . $assets . '/js/presence-chat.js?v=20261013-ws-safe"></script>';
+        return ($system === 'SUPPLIES' ? '<script src="/supplies/assets/js/login-approval.js?v=20261018-poll"></script>' : '') . $preconnect . '<link rel="stylesheet" href="' . $assets . '/css/presence-chat.css?v=20261018-chat-admin-v3"><script>window.EISPresenceConfig={tokenUrl:' . json_encode($url, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) . ',loginUrl:' . json_encode($loginUrl, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) . '};</script><script src="' . $client . '?v=20261013-ws-safe"></script><script src="' . $assets . '/js/presence-image-viewer.js?v=20261012-fast"></script><script src="' . $assets . '/js/presence-chat.js?v=20261018-chat-admin-v3"></script>';
     }
 }

@@ -83,5 +83,30 @@ function arrForJSON($arr, $index)
 			}
 		}
 	}
+	foreach ($arrReturn as &$menuNode) {
+		$menuText=trim(html_entity_decode(strip_tags($menuNode['text']),ENT_QUOTES,'UTF-8'));
+		$menuIcons=array(
+			'บันทึกรายละเอียดในสัญญา'=>'contract-edit',
+			'ลงนามในสัญญา'=>'contract-sign',
+			'บันทึกใบขอเบิก EIS'=>'payment-edit',
+			'ผู้ดำเนินการลงนาม EIS'=>'operator-sign',
+			'ผู้ขอเบิกลงนาม EIS'=>'requester-sign'
+		);
+		foreach($menuIcons as $label=>$icon){
+			if(strpos($menuText,$label)!==false){
+				$menuNode['text']=$menuText;
+				$menuNode['iconCls']='supplies-menu-icon supplies-icon-'.$icon;
+				break;
+			}
+		}
+		if (trim($menuNode['text']) === 'บริหารสัญญา') {
+			$menuNode['cls'] = 'supplies-contract-folder';
+			$menuNode['iconCls'] = 'supplies-contract-icon';
+		} elseif (strpos($menuNode['id'], 'sp-checking') === 0 || trim($menuNode['text']) === 'ตรวจรับพัสดุ/ครุภัณฑ์') {
+			$menuNode['cls'] = 'supplies-checking-menu';
+			$menuNode['iconCls'] = 'supplies-checking-icon';
+		}
+	}
+	unset($menuNode);
 	return $arrReturn;
 }

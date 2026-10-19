@@ -594,14 +594,6 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             boxLabel: "จองแบบงวด",
                         },
                     ],
-                    listeners: {
-                        change: function () {
-                            if (bg_reserve_money1_id) {
-                                Ext.Msg.alert("แจ้งเตือน", "จองเงินไปแล้วไม่สามารถแก้ไขรายการได้");
-                                Ext.getCmp("i_pr_type1ID").setValue(i_pr_type);
-                            }
-                        },
-                    },
                 },
                 {
                     xtype: "textfield",
@@ -788,16 +780,6 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             boxLabel: "จองแบบงวด",
                         },
                     ],
-                    listeners: {
-                        change: function () {
-                            if (bg_reserve_money2_id) {
-                                Ext.Msg.alert("แจ้งเตือน", "จองเงินไปแล้วไม่สามารถแก้ไขรายการได้");
-                                // Ext.getCmp("i_pr_type2ID").setValue(Ext.selectRow.get("i_pr_type2"));
-                                Ext.getCmp("i_pr_type2ID").setValue(i_pr_type2);
-
-                            }
-                        },
-                    },
                 },
                 {
                     xtype: "textfield",
@@ -935,14 +917,6 @@ Ext.getBodyMultiBudget = function (rec, status) {
                             boxLabel: "จองแบบงวด",
                         },
                     ],
-                    listeners: {
-                        change: function () {
-                            if (Ext.selectRow.get("bg_reserve_money3_id") > 0) {
-                                Ext.Msg.alert("แจ้งเตือน", "จองเงินไปแล้วไม่สามารถแก้ไขรายการได้");
-                                Ext.getCmp("i_pr_type3ID").setValue(i_pr_type3);
-                            }
-                        },
-                    },
                 },
                 {
                     xtype: "textfield",

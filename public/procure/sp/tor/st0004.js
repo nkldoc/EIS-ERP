@@ -1117,6 +1117,14 @@ DeleteTor_dtl = function (record) {
         },
     });
     //interlizing
+    function loadDepartmentStore(options) {
+        // This lookup is already loaded when the page starts.
+        if (Ext.dc_cost.getCount() > 0) {
+            options.callback.call(Ext.dc_cost, Ext.dc_cost.getRange(), null, true);
+        } else {
+            Ext.dc_cost.reload(options);
+        }
+    }
     Ext.loadStore = function (status, show) {
         var statusx = status;
         var winx = show;
@@ -1125,7 +1133,7 @@ DeleteTor_dtl = function (record) {
                 return false;
             });
         else
-            Ext.dc_cost.reload({
+            loadDepartmentStore({
                 callback: function (recordx, operation, success) {
                     if (success) {
                         Ext.po_emp.reload({
@@ -1216,12 +1224,45 @@ DeleteTor_dtl = function (record) {
             });
     };
     var AppPoStore = function (statuss) {
+        // Seed existing PR departments so labels do not depend on the lookup request.
+        var currentDepartmentLabels = [
+            {id: Ext.selectRow.get("dc_cost_id"), c_name: Ext.selectRow.get("dc_cost_idTxt")},
+            {id: Ext.selectRow.get("dc_cost2_id"), c_name: Ext.selectRow.get("dc_cost2_idTxt")}
+        ];
+        var ensureDepartmentLabels = function () {
+            Ext.each(currentDepartmentLabels, function (item) {
+                if (item.id && item.c_name && Ext.dc_cost.findExact("id", String(item.id)) < 0
+                        && Ext.dc_cost.findExact("id", item.id) < 0) {
+                    Ext.dc_cost.add(new Ext.dc_cost.recordType(item, String(item.id)));
+                }
+            });
+        };
+        ensureDepartmentLabels();
+        var bindDepartmentLabel = function (combo) {
+            var refreshLabel = function () {
+                if (!combo.isDestroyed) {
+                    var value = combo.getValue();
+                    ensureDepartmentLabels();
+                    combo.setValue(value);
+                }
+            };
+            combo.mon(Ext.dc_cost, "load", refreshLabel);
+            refreshLabel();
+        };
         var comboCost = new Ext.form.ComboBox({
+            setValue: function (value) {
+                Ext.form.ComboBox.prototype.setValue.call(this, value);
+                var label = Ext.selectRow && Ext.selectRow.get("dc_cost_idTxt");
+                if (label && String(value) === String(Ext.selectRow.get("dc_cost_id"))) {
+                    this.setRawValue(label);
+                }
+                return this;
+            },
             mode: "local",
             store: Ext.dc_cost,
             anchor: "50%",
             readOnly: true,
-            value: Ext.costID,
+            value: Ext.selectRow.get("dc_cost_id"),
             fieldLabel: "หน่วยงานที่รับผิดชอบ",
             valueField: "id",
             displayField: "c_name",
@@ -1241,6 +1282,7 @@ DeleteTor_dtl = function (record) {
             },
             listeners: {
                 afterrender: function () {
+                    bindDepartmentLabel(this);
                     this.fn = function () {};
                 },
                 Change: function () {
@@ -1265,7 +1307,7 @@ DeleteTor_dtl = function (record) {
             store: Ext.dc_cost,
             anchor: "50%",
             readOnly: (Ext.isAudit ? true : false),
-            value: Ext.costID,
+            value: Ext.selectRow.get("dc_cost2_id"),
             fieldLabel: "หน่วยงานเจ้าของเรื่อง",
             valueField: "id",
             id: "dc_cost2_idID",
@@ -1286,6 +1328,7 @@ DeleteTor_dtl = function (record) {
             },
             listeners: {
                 afterrender: function () {
+                    bindDepartmentLabel(this);
                     this.fn = function () {};
                 },
                 Change: function () {
@@ -3540,12 +3583,7 @@ DeleteTor_dtl = function (record) {
                                                     if ([null,0,""].includes(Ext.getCmp("f_totalID").getValue()  )){
                                                         msg +=  "- กรุณากรอกจำนวนเงิน" + "\n"
                                                     }
-                                                    if (Ext.getCmp("i_type_contractID").getValue() === null){
-                                                        msg +=  "- กรุณากรอกประเภทสัญญา" + "\n"
-                                                    }
-                                                    if(Ext.isEmpty(Ext.getCmp("i_type_contractID").getValue())){
-                                                        msg +=  "- กรุณาเลือก ประเภทสัญญา" + "\n"
-                                                    }
+                                                    // Contract type is optional while editing PR details.
                                                     if(Ext.getCmp("i_type_bgID").getValue() != Ext.selectRow.data.i_type_bg){
                                                         Ext.Msg.alert("แจ้งเตือน", "มีการเปลี่ยนแปลงประเภท ", function (bu, action) {
                                                             return false;
@@ -3792,7 +3830,7 @@ DeleteTor_dtl = function (record) {
                                             this.store.load({
                                                 callback: function (record, operation, success) {
                                                     if (success) {
-                                                        Ext.getCmp("stor_type_idID").setValue(this.data.items[0].get("c_name"));
+                                                        Ext.getCmp("stor_type_idID").setValue(this.data.items[0].get("id"));
                                                     }
                                                 },
                                             });
@@ -3862,21 +3900,29 @@ DeleteTor_dtl = function (record) {
                         {
                             text: "ค้นหา",
                             handler: function () {
-                                //Ext.getCmp('winSearchFrm').search();
-                                //   console.log(Ext.session.i_level)
-                                Ext.storeDtl.setBaseParam("mode", "LIST");
-                                Ext.storeDtl.setBaseParam("act", "SEARCH");
-                                Ext.storeDtl.setBaseParam("d_tor_date", Ext.getCmp("sd_tor_dateID").getValue());
-                                Ext.storeDtl.setBaseParam("tor_type_id", Ext.getCmp("stor_type_idID").getValue());
-
-                                Ext.storeDtl.setBaseParam("c_code", Ext.getCmp("sc_codeID").getValue());
-                                Ext.storeDtl.setBaseParam("c_name", Ext.getCmp("sc_nameID").getValue());
-                                Ext.storeDtl.setBaseParam("sp_emp_id", Ext.getCmp("sp_emp_idID").getValue());
-                                Ext.storeDtl.setBaseParam("i_enabled", 1); // Ext.getCmp("searchEnabledID").getValue().inputValue);
-                                Ext.storeDtl.setBaseParam("i_post", Ext.getCmp("searchPostID").getValue().inputValue);
-                                // Ext.storeDtl.setBaseParam("sp_emp_id", Ext.getCmp("sp_emp_idID").getValue().inputValue);
-
-                                Ext.storeDtl.load();
+                                var dateValue = Ext.getCmp("sd_tor_dateID").getValue();
+                                Ext.apply(Ext.storeDtl.baseParams, {
+                                    mode: "LIST",
+                                    act: "SEARCH",
+                                    d_tor_date: dateValue && dateValue.format ? dateValue.format("Y-m-d") : "",
+                                    tor_type_id: parseInt(Ext.getCmp("stor_type_idID").getValue(), 10) || 0,
+                                    c_code: String(Ext.getCmp("sc_codeID").getValue() || "").replace(/^\s+|\s+$/g, ""),
+                                    c_name: String(Ext.getCmp("sc_nameID").getValue() || "").replace(/^\s+|\s+$/g, ""),
+                                    sp_emp_id: parseInt(Ext.getCmp("sp_emp_idID").getValue(), 10) || 0,
+                                    i_enabled: 1,
+                                    i_post: Ext.getCmp("searchPostID").getValue().inputValue,
+                                    i_post1: 0
+                                });
+                                Ext.storeDtl.load({
+                                    params: {start: 0, limit: Ext.rows || 20},
+                                    callback: function (records, options, success) {
+                                        if (success) {
+                                            Ext.getCmp("winSearchFrm").hide();
+                                        } else {
+                                            Ext.Msg.alert("Error", "Unable to load search results");
+                                        }
+                                    }
+                                });
                             },
                         },
                         {

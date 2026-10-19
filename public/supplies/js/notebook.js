@@ -9,14 +9,14 @@
         var existing = Ext.getCmp('supplies-admin-tools-window');
         if (existing) { existing.show(); existing.toFront(); return; }
         new Ext.Window({
-            id: 'supplies-admin-tools-window', title: 'เครื่องมือ ADMIN · TOR / สัญญา',
+            id: 'supplies-admin-tools-window', title: 'รายละเอียด PR / สัญญา / ตรวจรับ · ADMIN',
             iconCls: 'supplies-admin-tools-icon', cls: 'supplies-admin-tools-window',
             width: Math.min(1160, Ext.getBody().getViewSize().width - 24),
             height: Math.min(780, Ext.getBody().getViewSize().height - 24),
             layout: 'fit', maximizable: true, constrain: true, modal: false,
             items: [{xtype: 'box', autoEl: {
                 tag: 'iframe', src: '/supplies/sp/admin-tools.php',
-                title: 'ค้นหาและแก้ไขข้อมูล TOR หรือสัญญา', frameborder: '0',
+                title: 'ค้นหาและเปิดรายละเอียด PR สัญญา IR AP และเลขเบิก D', frameborder: '0',
                 style: 'display:block;width:100%;height:100%;border:0;background:#f4f7fb;'
             }}]
         }).show();

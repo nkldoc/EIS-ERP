@@ -35,7 +35,9 @@ $fetch = function ($sql, $params) use ($db) {
 // Apply the same department/employee scope as the contract listing.
 $scope = '';
 $params = array($contractId > 0 ? $contractId : $requestedTorId);
-if (intval($_SESSION['i_level'] ?? 0) === 2) {
+if (intval($_SESSION['dc_center_user'] ?? 0) === 1) {
+    // Authorized central admins search details across departments.
+} elseif (intval($_SESSION['i_level'] ?? 0) === 2) {
     $scope = ' AND e.dc_department_id=?';
     $params[] = intval($_SESSION['dc_department_id'] ?? 0);
 } elseif (intval($_SESSION['i_level'] ?? 0) === 3) {
@@ -68,12 +70,46 @@ $contractsById = array();
 foreach ($contracts as $contract) $contractsById[intval($contract['sp_tor_contract_id'])] = $contract;
 // IDs come only from contracts belonging to the authorized PR above.
 $contractList = $contractsById ? implode(',', array_keys($contractsById)) : '0';
+// PRs considered separately link directly through PR.parent_id, even without contracts.
+// Continuing projects may instead link through the original contract.
+// Resolve both kinds of parents only through the PR/contracts authorized above.
+$parentContracts = $fetch('SELECT p.*,
+    cr.c_name AS creditor_name
+    FROM dbo.sp_tor_contract p
+    LEFT JOIN ' . DB_NMU . 'dc_creditor cr ON cr.dc_creditor_id=p.dc_creditor_id
+    WHERE EXISTS (SELECT 1 FROM dbo.sp_tor_contract child
+        WHERE child.sp_tor_contract_id IN (' . $contractList . ')
+        AND p.sp_tor_contract_id=child.parent_id AND p.sp_tor_contract_id<>child.sp_tor_contract_id)
+    ORDER BY p.sp_tor_contract_id', array());
+$parentPr = $fetch('SELECT p.*, expense.c_code AS expense_code,
+    expense.c_name AS expense_name, bg.c_name AS pr_type_name
+    FROM dbo.sp_tor p
+    LEFT JOIN ' . DB_NMU_EIS . 'bg_expense expense ON expense.bg_expense_id=p.po_expense_id
+    LEFT JOIN dbo.sp_type_bg bg ON bg.sp_type_bg_id=p.i_type_bg
+    WHERE p.tor_id<>? AND (p.tor_id=? OR EXISTS (
+        SELECT 1 FROM dbo.sp_tor_contract child
+        INNER JOIN dbo.sp_tor_contract original ON original.sp_tor_contract_id=child.parent_id
+        WHERE child.sp_tor_contract_id IN (' . $contractList . ') AND original.sp_tor_id=p.tor_id))
+    ORDER BY p.tor_id', array($torId, intval($pr[0]['parent_id'] ?? 0)));
 $funds = array();
 $budgetName = function ($id) use ($fetch) {
     if (!$id) return '';
     $rows = $fetch('SELECT c_name FROM ' . DB_CENTER . 'dc_expense_budget_type WHERE dc_expense_budget_type_id=?', array($id));
     return $rows[0]['c_name'] ?? '';
 };
+foreach ($parentPr as &$parent) {
+    $parent['funds'] = array();
+    for ($i = 1; $i <= 5; $i++) {
+        $suffix = $i === 1 ? '' : strval($i);
+        $id = $parent['dc_expense_budget_type' . $suffix . '_id'] ?? null;
+        $amount = $parent['f_type' . $suffix . '_amt'] ?? null;
+        if ($id || floatval($amount) != 0) {
+            $parent['funds'][] = array('source' => $budgetName($id), 'amount' => $amount);
+        }
+    }
+    $parent['items'] = $fetch('SELECT * FROM dbo.sp_tor_dtl WHERE sp_tor_id=? ORDER BY sp_tor_dtl_id', array(intval($parent['tor_id'])));
+}
+unset($parent);
 for ($i = 1; $i <= 5; $i++) {
     $suffix = $i === 1 ? '' : strval($i);
     $id = $pr[0]['dc_expense_budget_type' . $suffix . '_id'] ?? null;
@@ -98,8 +134,9 @@ foreach ($contracts as $contract) {
             'booking_final' => $contract['bg_reserve_i_last' . $i] ?? null);
     }
 }
-$expense = $fetch('SELECT b.c_name FROM dbo.sp_tor t LEFT JOIN ' . DB_NMU_EIS . 'bg_expense b ON b.bg_expense_id=t.po_expense_id WHERE t.tor_id=?', array($torId));
+$expense = $fetch('SELECT b.c_code, b.c_name FROM dbo.sp_tor t LEFT JOIN ' . DB_NMU_EIS . 'bg_expense b ON b.bg_expense_id=t.po_expense_id WHERE t.tor_id=?', array($torId));
 $pr[0]['expense_name'] = $expense[0]['c_name'] ?? '';
+$pr[0]['expense_code'] = $expense[0]['c_code'] ?? '';
 $items = $fetch('SELECT * FROM dbo.sp_tor_dtl WHERE sp_tor_id=? ORDER BY sp_tor_dtl_id', array($torId));
 $bidderGuarantees = $fetch('SELECT b.sp_tor_bidder_hdr_id, cr.c_name AS creditor_name,
     b.i_is_guarantee, gt.c_name AS guarantee_type, b.d_doc_guarantee_ref,
@@ -168,7 +205,12 @@ $fundUsage = array(1 => 'ใช้เงินกันเหลื่อมย�
     2 => 'ใช้เงินกันเหลื่อมยังไม่ก่อหนี้ - จองใบกันแล้ว', 3 => 'ใช้เงินกันเหลื่อมก่อหนี้แล้ว');
 foreach ($checks as &$check) {
     $contract = $contractsById[intval($check['linked_contract_id'])] ?? array();
-    $overlap = intval($contract['i_overlap'] ?? 0);
+    $overlap = intval($check['i_overlap'] ?? 0) ?: intval($contract['i_overlap'] ?? 0);
+    if (trim((string)($check['resolved_overlap_code'] ?? '')) !== ''
+        && trim((string)($check['resolved_overlap_code'] ?? '')) === trim((string)($contract['c_overlap2'] ?? ''))
+        && intval($check['resolved_overlap_year'] ?? 0) === intval($contract['i_yyyy_overlap2'] ?? 0)) {
+        $overlap = intval($check['i_overlap'] ?? 0) ?: intval($contract['i_overlap2'] ?? $overlap);
+    }
     $check['fund_usage'] = $fundUsage[$overlap] ?? (intval($pr[0]['i_type_bg'] ?? 0) === 1
         ? 'ใช้เงินปีงบปัจจุบัน' : 'โครงการต่อเนื่อง ใช้เงินปีงบปัจจุบัน');
     $secondCode = trim((string) ($contract['c_overlap2'] ?? ''));
@@ -212,7 +254,8 @@ if (intval($_GET['preflight'] ?? 0) === 1) {
     echo json_encode(array('success'=>true,'analysis'=>$result),JSON_UNESCAPED_UNICODE);exit;
 }
 echo json_encode(array('success' => true, 'can_admin_edit' => intval($_SESSION['dc_center_user'] ?? 0) === 1,
-    'pr' => $pr, 'funds' => $funds, 'items' => $items,
+    'pr' => $pr, 'parentPr' => $parentPr, 'parentContracts' => $parentContracts,
+    'funds' => $funds, 'items' => $items,
     'bidders' => $bidders, 'contracts' => $contracts, 'periods' => $periods,
     'periodItems' => $periodItems, 'checks' => $checks, 'checkItems' => $checkItems,
     'debtItems' => $debtItems, 'bidderGuarantees' => $bidderGuarantees,

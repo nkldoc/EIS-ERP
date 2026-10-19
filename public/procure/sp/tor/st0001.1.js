@@ -1584,7 +1584,15 @@ Ext.AppUx = function (app, menu) {
   };
   var AppPoStore = function (statuss) {
     var comboCost = new Ext.form.ComboBox({
-      mode: "local",
+      setValue: function (value) {
+                Ext.form.ComboBox.prototype.setValue.call(this, value);
+                var label = Ext.selectRow && Ext.selectRow.get("dc_cost_idTxt");
+                if (label && String(value) === String(Ext.selectRow.get("dc_cost_id"))) {
+                    this.setRawValue(label);
+                }
+                return this;
+            },
+            mode: "local",
       store: Ext.dc_cost,
       anchor: "50%",
       readOnly: true,
