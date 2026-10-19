@@ -325,6 +325,7 @@ echo htmlspecialchars(
     <script type="text/javascript" src="js/workspace-tabs.js?v=<?php echo (string)filemtime(__DIR__ . '/js/workspace-tabs.js'); ?>"></script>
     <script type="text/javascript" src="js/notebook.js?v=<?php echo (string)filemtime(__DIR__ . '/js/notebook.js'); ?>"></script>
     <script type="text/javascript" src="js/contract-backdate.js?v=<?php echo filemtime(__DIR__ . '/js/contract-backdate.js'); ?>"></script>
+    <script type="text/javascript" src="js/contract-alert-scheduler.js?v=<?php echo filemtime(__DIR__ . '/js/contract-alert-scheduler.js'); ?>"></script>
     <script type="text/javascript" src="js/show_nat.js?_dc=<?php echo rand(0, 100000); ?>"></script>
     <body>
         <?php require_once __DIR__ . '/conf/presence/Presence.php'; echo Presence::script('SUPPLIES'); ?>

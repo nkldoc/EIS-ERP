@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../conf/config.php';
 require_once __DIR__ . '/../../lib/database/DatabaseServer.php';
+require_once __DIR__ . '/ContractAlertFrequency.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, private');
@@ -78,6 +79,8 @@ $ensureScheduleTable = static function () use ($db): void {
             updated_at DATETIME2 NOT NULL CONSTRAINT DF_sp_contract_alert_schedule_updated DEFAULT SYSDATETIME()
         );
     END";
+    $sql .= " IF COL_LENGTH('dbo.sp_contract_alert_schedule','frequency_json') IS NULL
+        ALTER TABLE dbo.sp_contract_alert_schedule ADD frequency_json nvarchar(500) NULL;";
     $stmt = sqlsrv_query($db->conn, $sql);
     if ($stmt === false) throw new RuntimeException('Unable to prepare alert schedule settings');
     sqlsrv_free_stmt($stmt);
@@ -111,25 +114,30 @@ if ($mode === 'schedule') {
                 exit;
             }
             sort($times, SORT_STRING);
+            try { $frequency=contractAlertFrequencyValidate(json_decode((string)($_POST['frequency'] ?? json_encode(contractAlertFrequencyDefaults())),true)); }
+            catch (InvalidArgumentException $error) { http_response_code(400); echo json_encode(['success'=>false,'message'=>$error->getMessage()]); exit; }
+            $frequencyJson=json_encode($frequency);
             $json = json_encode($times, JSON_UNESCAPED_UNICODE);
             $stmt = sqlsrv_query($db->conn,
                 "IF EXISTS (SELECT 1 FROM dbo.sp_contract_alert_schedule WHERE schedule_id=1)
-                    UPDATE dbo.sp_contract_alert_schedule SET times_json=?, updated_by=?, updated_at=SYSDATETIME() WHERE schedule_id=1
+                    UPDATE dbo.sp_contract_alert_schedule SET times_json=?, updated_by=?, frequency_json=?, updated_at=SYSDATETIME() WHERE schedule_id=1
                  ELSE
-                    INSERT INTO dbo.sp_contract_alert_schedule (schedule_id, times_json, updated_by) VALUES (1, ?, ?)",
-                [$json, $userId, $json, $userId]);
+                    INSERT INTO dbo.sp_contract_alert_schedule (schedule_id, times_json, updated_by,frequency_json) VALUES (1, ?, ?, ?)",
+                [$json, $userId, $frequencyJson, $json, $userId,$frequencyJson]);
             if ($stmt === false) throw new RuntimeException('Unable to save alert schedule');
             sqlsrv_free_stmt($stmt);
-            echo json_encode(['success' => true, 'times' => $times], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => true, 'times' => $times,'frequency'=>$frequency], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        $stmt = sqlsrv_query($db->conn, 'SELECT times_json FROM dbo.sp_contract_alert_schedule WHERE schedule_id=1');
+        $stmt = sqlsrv_query($db->conn, 'SELECT times_json,frequency_json FROM dbo.sp_contract_alert_schedule WHERE schedule_id=1');
         if ($stmt === false) throw new RuntimeException('Unable to read alert schedule');
         $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
         sqlsrv_free_stmt($stmt);
         $times = $row ? json_decode((string) $row['times_json'], true) : ['09:00', '11:00', '13:30', '16:00'];
         if (!is_array($times) || count($times) !== 4) $times = ['09:00', '11:00', '13:30', '16:00'];
-        echo json_encode(['success' => true, 'isAdmin' => $isAdmin, 'times' => array_values($times)], JSON_UNESCAPED_UNICODE);
+        $frequency=contractAlertFrequencyDefaults();
+        if (!empty($row['frequency_json'])) { try {$frequency=contractAlertFrequencyValidate(json_decode($row['frequency_json'],true));} catch (InvalidArgumentException $e) {} }
+        echo json_encode(['success' => true, 'isAdmin' => $isAdmin, 'times' => array_values($times),'frequency'=>$frequency], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (Throwable $error) {
         http_response_code(500);
@@ -244,6 +252,7 @@ $departmentFilter = trim((string) ($_REQUEST['department'] ?? 'all'));
 $departmentSql = $departmentFilter === 'medicine' ? " AND dep.c_name LIKE N'%แพทย์%'" : '';
 $ownerSql = $isTest ? ' AND u.dc_user_id = ?' : ($isAdmin ? '' : ' AND u.dc_user_id = ?');
 $ownerParams = $isTest ? [$targetUserId] : ($isAdmin ? [] : [$userId]);
+if ($mode === 'scheduled') { $ownerSql=' AND u.dc_user_id = ?'; $ownerParams=[$userId]; }
 $today = new DateTimeImmutable('today', new DateTimeZone('Asia/Bangkok'));
 $endDate = (new DateTimeImmutable('today', new DateTimeZone('Asia/Bangkok')))->modify('+31 days')->format('Y-m-d');
 $items = [];
@@ -490,6 +499,40 @@ try {
         if ($stmt === false) throw new RuntimeException('บันทึกการแก้ไขแจ้งเตือนไม่สำเร็จ');
         sqlsrv_free_stmt($stmt);
         echo json_encode(['success' => true, 'status' => $isClosed ? 'closed' : 'active', 'deadline' => $dateOverride], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($mode === 'scheduled') {
+        $ensureScheduleTable();
+        $stmt=sqlsrv_query($db->conn,'SELECT times_json,frequency_json FROM dbo.sp_contract_alert_schedule WHERE schedule_id=1');
+        if (!$stmt) throw new RuntimeException('Unable to load schedule');
+        $settings=sqlsrv_fetch_array($stmt,SQLSRV_FETCH_ASSOC) ?: [];
+        $times=json_decode($settings['times_json'] ?? 'null',true) ?: ['09:00','11:00','13:30','16:00'];
+        $policy=contractAlertFrequencyDefaults();
+        try { if (!empty($settings['frequency_json'])) $policy=contractAlertFrequencyValidate(json_decode($settings['frequency_json'],true)); } catch (InvalidArgumentException $e) {}
+        $now=new DateTimeImmutable('now',new DateTimeZone('Asia/Bangkok'));
+        $stmt=sqlsrv_query($db->conn,"IF OBJECT_ID('dbo.sp_contract_alert_delivery','U') IS NULL
+            CREATE TABLE dbo.sp_contract_alert_delivery (
+                user_id int NOT NULL,item_id varchar(80) NOT NULL,delivery_date date NOT NULL,
+                slot varchar(5) NOT NULL,created_at datetime2 NOT NULL DEFAULT SYSDATETIME(),
+                CONSTRAINT PK_contract_alert_delivery PRIMARY KEY(user_id,item_id,delivery_date,slot))");
+        if (!$stmt) throw new RuntimeException('Unable to prepare notification delivery');
+        if (!sqlsrv_begin_transaction($db->conn)) throw new RuntimeException('Unable to start notification delivery');
+        $due=[];
+        try {
+            foreach ($items as $item) {
+                if ($item['status']==='closed' || (int)$item['ownerUserId']!==$userId) continue;
+                $slot=contractAlertFrequencySlot((int)$item['days'],$now,$times,$policy);
+                if ($slot===null) continue;
+                $stmt=sqlsrv_query($db->conn,'SELECT slot FROM dbo.sp_contract_alert_delivery WITH (UPDLOCK,HOLDLOCK) WHERE user_id=? AND item_id=? AND delivery_date=? AND slot=?',[$userId,$item['id'],$now->format('Y-m-d'),$slot]);
+                if (!$stmt) throw new RuntimeException('Unable to check notification delivery');
+                if (sqlsrv_fetch_array($stmt,SQLSRV_FETCH_ASSOC)) continue;
+                $stmt=sqlsrv_query($db->conn,'INSERT dbo.sp_contract_alert_delivery(user_id,item_id,delivery_date,slot) VALUES(?,?,?,?)',[$userId,$item['id'],$now->format('Y-m-d'),$slot]);
+                if (!$stmt) throw new RuntimeException('Unable to record notification delivery');
+                $due[]=$item;
+            }
+            if (!sqlsrv_commit($db->conn)) throw new RuntimeException('Unable to complete notification delivery');
+        } catch (Throwable $error) {sqlsrv_rollback($db->conn);throw $error;}
+        echo json_encode(['success'=>true,'items'=>$due,'frequency'=>$policy],JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
     if ($isTest) {
