@@ -10208,7 +10208,7 @@ Ext.AppUx = function (app, menu) {
         Ext.storeDtl = new Ext.data.JsonStore({
                 storeId: "storeDtl",
                 autoDestroy: false,
-                autoLoad: true,
+                autoLoad: false,
                 url: "tor/api/mnCheckingController.php",
                 baseParams: { mode: "LIST_SUB_PERIOD_HDR" },
                 root: "data",
@@ -10636,7 +10636,7 @@ Ext.AppUx = function (app, menu) {
         Ext.bg_budget_year = new Ext.data.JsonStore({
                 autoDestroy: false,
                 storeId: 'bg_budget_year',
-                autoLoad: true,
+                autoLoad: false,
                 url: "api/All_PoWorkingImpHdr.php",
                 baseParams: {
                         type: "bg_budget_year",
@@ -17556,7 +17556,7 @@ Ext.onReady(function () {
                                                                         if (success) {
                                                                                 resolve(store); // โหลดสำเร็จ ส่งสัญญานไปต่อ
                                                                         } else {
-                                                                                reject('ไม่สามารถโหลดข้อมูล Store ได้'); // โหลดพัง ส่งสัญญาณหยุด
+                                                                                reject('ไม่สามารถโหลดข้อมูลจาก ' + (store.url || store.storeId || 'Store') + ' ได้'); // โหลดพัง ส่งสัญญาณหยุด
                                                                         }
                                                                 }
                                                         });

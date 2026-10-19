@@ -1426,6 +1426,16 @@ switch ($mode) {
                         ";
         $arrParam[] = $start;
         $arrParam[] = $limit;
+        // Older databases do not have the optional accounting-disable extension.
+        $hasDisableAccounting = $db->GetDataBySQL("SELECT CASE WHEN
+            COL_LENGTH('dbo.sp_check_period_disable_acc', 'sp_check_period_disable_acc_id') IS NOT NULL
+            AND COL_LENGTH('dbo.sp_check_period_disable_acc', 'i_status') IS NOT NULL
+            AND COL_LENGTH('dbo.sp_check_period_disable_acc', 'i_enable') IS NOT NULL
+            AND COL_LENGTH('dbo.sp_check_period_hdr', 'sp_check_period_disable_acc_id') IS NOT NULL
+            THEN 1 ELSE 0 END", array());
+        $disableAccountingJoin = $hasDisableAccounting
+            ? " left join dbo.sp_check_period_disable_acc acc on c.sp_check_period_disable_acc_id = acc.sp_check_period_disable_acc_id and acc.i_enable = 1 "
+            : " left join (SELECT CAST(NULL AS INT) AS i_status) acc ON 1 = 0 ";
         $sqlMain = "select a.*
         , case when  bb.i_type_bg = 1 and isnull(b.i_overlap,0) =  0  then  1
             when  isnull(b.i_overlap,0) =  3  then 2
@@ -1535,7 +1545,7 @@ switch ($mode) {
                 . " inner join sp_tor_hdr_period d on d.sp_tor_hdr_period_id = c.sp_tor_hdr_period_id"
                 . " left join sp_gl_monthly_hdr e on  c.sp_tor_hdr_period_id = e.sp_tor_hdr_period_id and e.i_enabled = 1 "
                 . " left join " . DB_CENTER . "dc_map_send_ap dc on  dc.sp_check_period_hdr_id = c.sp_check_period_hdr_id and dc.i_enable = 1 and dc.i_sys = 1 "
-                . " left join sp_check_period_disable_acc acc on c.sp_check_period_disable_acc_id = acc.sp_check_period_disable_acc_id  and acc.i_enable = 1 "
+                . $disableAccountingJoin
                 . " left join  sp_tor bb on b.sp_tor_id = bb.tor_id "
                 . " WHERE row > ? and row <= ?   ";
         if (@$_REQUEST["show_sql"]) {
