@@ -3495,6 +3495,7 @@ switch ($mode) {
         ###########################################
         $root = "data";
         $data = array();
+        $total = 0;
         $con = '';
         if (@$_REQUEST['sp_po_id'] > 0) {
             $con = " and sp_po_id = {$_REQUEST['sp_po_id']}";
