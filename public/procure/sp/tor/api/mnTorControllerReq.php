@@ -26,7 +26,7 @@ if (empty($_SESSION['user_id'])) {
 // toDoLog
 }
 
-$mode = $_REQUEST["mode"];
+$mode = $_REQUEST["mode"] ?? "";
 ////Java Session
 //require_once("../../../java/Java.inc");
 //$session = procure_java_session();
@@ -38,6 +38,8 @@ $data = $util->mnUser($_REQUEST);
 $data["i_delete"] = DELETE_FALSE;
 $c_code_gen = "PR";
 $re_id = null;
+$stmt = false;
+$sql = "";
 $stmt2 = true;
 $stmt3 = true;
 
@@ -1454,7 +1456,7 @@ switch ($mode) {
         $ret_id = $data["id"];
         $code_dc = (string) $c_code_gen;
         $now = str_replace('-', '/', date('Y-m-d'));
-        if ($_REQUEST['i_type_year'] == 2) {
+        if (($_REQUEST['i_type_year'] ?? null) == 2) {
             $bcm = date('Y' . $_REQUEST['mm_start'], strtotime($now . "+543 years"));
         } else {
             $bcm = date('Ym', strtotime($now . "+543 years"));
@@ -1490,7 +1492,7 @@ switch ($mode) {
         $ret_id = $data["id"];
         $code_dc = (string) $c_code_gen;
         $now = str_replace('-', '/', date('Y-m-d'));
-        if ($_REQUEST['i_type_year'] == 2) {
+        if (($_REQUEST['i_type_year'] ?? null) == 2) {
             $bcm = date('Y' . $_REQUEST['mm_start'], strtotime($now . "+543 years"));
         } else {
             $bcm = date('Ym', strtotime($now . "+543 years"));
@@ -1688,7 +1690,7 @@ switch ($mode) {
                     $data2["i_pr_type1"] = null;
                     //                    $data2["dc_bg_budget_type_id"] = $data["dc_expense_budget_type_id"];
                     $data2["i_product_type"] = $data["i_product_type"];
-                    $data2["i_is_inv"] = $data["i_is_inv"];
+                    $data2["i_is_inv"] = $data["i_is_inv"] ?? null;
                     $data2["po_expense_id"] = $data["po_expense_id"];
                     $data2["dc_creditor_id"] = $data["dc_creditor_id"] ?? null;
                     $data2["i_hire_type"] = $data["i_hire_type"] ?? null;
@@ -2393,7 +2395,7 @@ switch ($mode) {
                     $data2["bg_reserve_money_id"] = null;
                     //                    $data2["dc_bg_budget_type_id"] = $data["dc_expense_budget_type_id"];
                     $data2["i_product_type"] = $data["i_product_type"];
-                    $data2["i_is_inv"] = $data["i_is_inv"];
+                    $data2["i_is_inv"] = $data["i_is_inv"] ?? null;
                     $data2["po_expense_id"] = $data["po_expense_id"];
                     $data2["dc_creditor_id"] = $data["dc_creditor_id"] ?? null;
                     $data2["i_hire_type"] = $data["i_hire_type"] ?? null;
