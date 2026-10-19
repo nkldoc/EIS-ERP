@@ -688,6 +688,69 @@ if ($_REQUEST["type"] == "dc_cost_all") {
             ${$root}[] = $temp;
         }
     }
+} else if ($_REQUEST["type"] == "dc_expense_budget_type_cost") {
+    if (@$_REQUEST['dc_cost_acc_id']) {
+        $sql = "
+		SET NOCOUNT ON
+		DECLARE  @TEMP_SP_COST_TO_BG_TYPE TABLE (dc_expense_budget_type_id BIGINT);
+		INSERT INTO @TEMP_SP_COST_TO_BG_TYPE EXEC " . DB_CENTER . "SP_COST_TO_BG_TYPE ?;
+		SELECT ISNULL(STRING_AGG(CAST(dc_expense_budget_type_id AS VARCHAR), ','),0) FROM @TEMP_SP_COST_TO_BG_TYPE;
+		";
+        $comma = $db->GetDataBySQL($sql, array($_REQUEST['dc_cost_acc_id']));
+        $con .= " AND a.dc_expense_budget_type_id in (" . $comma . ")";
+    } else {
+        if (@$_REQUEST["i_read"] < 4) {
+            $sql = "
+				SET NOCOUNT ON
+				DECLARE @dc_cost_id_s VARCHAR(max) = '';
+				DECLARE @TEMP_SP_USER_COST_SYS TABLE (dc_cost_id BIGINT);
+				INSERT INTO @TEMP_SP_USER_COST_SYS EXEC " . DB_CENTER . "SP_USER_COST_SYS "
+                    . (@$_SESSION["dc_center_user"] ?? "null") . ","
+                    . (@$_SESSION['i_type_user'] ?? "null") . ","
+                    . (@$_REQUEST["i_read"] ?? "null") . ","
+                    . (@$_REQUEST["c_code_sys"] ? "'" . $_REQUEST["c_code_sys"] . "'" : "null") . ";
+
+				DECLARE  @TEMP_SP_COST_TO_BG_TYPE TABLE (dc_expense_budget_type_id BIGINT);
+				SELECT @dc_cost_id_s = STRING_AGG(CAST(dc_cost_id AS VARCHAR), ',') FROM @TEMP_SP_USER_COST_SYS;
+				INSERT INTO @TEMP_SP_COST_TO_BG_TYPE EXEC " . DB_CENTER . "SP_COST_TO_BG_TYPE @dc_cost_id_s;
+				SELECT ISNULL(STRING_AGG(CAST(dc_expense_budget_type_id AS VARCHAR), ','),0) FROM @TEMP_SP_COST_TO_BG_TYPE;
+			";
+            $comma = $db->GetDataBySQL($sql, array($_SESSION["dc_cost_id"]));
+            $con .= " AND a.dc_expense_budget_type_id in (" . $comma . ")";
+        }
+    }
+
+    $sqlMain = "
+		SET NOCOUNT ON
+		SELECT a.*
+		FROM  " . DB_CENTER . "dc_expense_budget_type a
+		WHERE i_enable = ?
+			{$con}
+		ORDER BY c_name
+	";
+    $arrParam = array(STATUS_ENABLE);
+    $bgType = array(0 => "เงินรายทั่วไป", 1 => "เงินงวด");
+    $stmt = $db->QueryParam($sqlMain, $arrParam);
+    if ($stmt) {
+
+        if (@$_REQUEST["all"] == "all") {
+            ${$root}[] = array(
+                "id" => "0",
+                "c_name" => "- เลือกทั้งหมด -"
+            );
+        }
+
+        while ($row = $db->Fetch($stmt)) {
+            $i_bg_type = (int) ($row["i_bg_type"] ?? 0);
+            $temp = array(
+                "id" => "{$row["dc_expense_budget_type_id"]}",
+                "i_bg_type" => $i_bg_type,
+                "c_bg_type" => $bgType[$i_bg_type] ?? "",
+                "c_name" => "{$row["c_name"]}"
+            );
+            ${$root}[] = $temp;
+        }
+    }
 } else if ($_REQUEST["type"] == "dc_expense_budget_type2") {
 
     $sqlMain = "SELECT * FROM " . DB_CENTER . "dc_expense_budget_type "
