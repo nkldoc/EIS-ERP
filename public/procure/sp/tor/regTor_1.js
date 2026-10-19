@@ -3901,35 +3901,45 @@ Ext.AppUx = function (app, menu) {
                     if (msg == "") {
                       var formSubmit = function (form) {
                         i_type_bg = Ext.getCmp("i_type_bgID").getValue();
+                        Ext.getCmp("buSaveSubID").disable();
                         form.submit({
                           waitMsg: "Saving Data...",
+                          failure: function (form, action) {
+                            Ext.getCmp("buSaveSubID").enable();
+                            Ext.Msg.alert("Failure", (action.result && action.result.msg) || "บันทึกไม่สำเร็จ");
+                          },
                           success: function (form, action) {
+                            // เพิ่มรายการใหม่: ยังไม่มี selectRow -> โหลดรายการที่เพิ่งสร้างกลับมา แล้วจองเงิน/ออกเลข PR ต่อทันที
+                            var newTorId = !Ext.selectRow && action.result ? parseInt(action.result.id, 10) : 0;
+                            var isNewPR = newTorId > 0;
+                            var runAfterSave = function () {
+                            var isGenPR = isNewPR || Ext.getCmp("GENCODEPRID").getValue() == true;
                             var API_STATUS = [];
                             var Moneyready = 0;
                             Promise.all([])
                               .then((CheckMoney) => {
-                                if (Ext.getCmp("GENCODEPRID").getValue() == true  && Ext.getCmp("i_type_bgID").getValue()  == "1") {
+                                if (isGenPR  && Ext.getCmp("i_type_bgID").getValue()  == "1") {
                                   Ext.getCmp(Ext.poFormID).getEl().mask("Please wait...", "x-mask-loading");
                                   return genBooklink(Ext.getCmp("f_bg_amt[0]ID").getValue(), 1, i);
                                 }
                               })
                               .then((CheckMoney) => {
                                 API_STATUS.push(CheckMoney);
-                                if (Ext.getCmp("GENCODEPRID").getValue() == true && (i == 2 || i == 3)) {
+                                if (isGenPR && (i == 2 || i == 3)) {
                                   Ext.getCmp(Ext.poFormID).getEl().mask("Please wait...", "x-mask-loading");
                                   return genBooklink(Ext.getCmp("f_bg_amt[1]ID").getValue(), 2, i);
                                 }
                               })
                               .then((CheckMoney) => {
                                 API_STATUS.push(CheckMoney);
-                                if (Ext.getCmp("GENCODEPRID").getValue() == true && i == 3) {
+                                if (isGenPR && i == 3) {
                                   Ext.getCmp(Ext.poFormID).getEl().mask("Please wait...", "x-mask-loading");
                                   return genBooklink(Ext.getCmp("f_bg_amt[2]ID").getValue(), 3, i);
                                 }
                               })
                               .then((CheckMoney) => {
                                 API_STATUS.push(CheckMoney);
-                                if (Ext.getCmp("GENCODEPRID").getValue() == true && i_type_bg == "1"  ) {
+                                if (isGenPR && i_type_bg == "1"  ) {
                                   Check = 0;
                                   for (let ii = 0; ii < i; ii++) {
                                     Check += API_STATUS[ii].Money.Check;
@@ -3950,19 +3960,19 @@ Ext.AppUx = function (app, menu) {
                               })
                               .then((CheckMoney) => {
                                 API_STATUS.push(CheckMoney);
-                                if (Ext.getCmp("GENCODEPRID").getValue() == true && Moneyready == 1 && i_type_bg == "1"  ) {
+                                if (isGenPR && Moneyready == 1 && i_type_bg == "1"  ) {
                                   return getlink(Ext.getCmp("f_bg_amt[0]ID").getValue(), 1, 0);
                                 }
                               })
                               .then((CheckMoney) => {
                                 API_STATUS.push(CheckMoney);
-                                if (Ext.getCmp("GENCODEPRID").getValue() == true && Moneyready == 1 && i > 1 && i_type_bg == "1") {
+                                if (isGenPR && Moneyready == 1 && i > 1 && i_type_bg == "1") {
                                   return getlink(Ext.getCmp("f_bg_amt[1]ID").getValue(), 2, 1);
                                 }
                               })
                               .then((CheckMoney) => {
                                 API_STATUS.push(CheckMoney);
-                                if (Ext.getCmp("GENCODEPRID").getValue() == true && Moneyready == 1 && i == 3 && i_type_bg == "1") {
+                                if (isGenPR && Moneyready == 1 && i == 3 && i_type_bg == "1") {
                                   return getlink(Ext.getCmp("f_bg_amt[2]ID").getValue(), 3, 2);
                                 }
                               })
@@ -3981,7 +3991,7 @@ Ext.AppUx = function (app, menu) {
                                       Ext.storeDtl.reload({
                                         callback: function (record, operation, success) {
                                           if (success) {
-                                            Ext.Msg.alert("Success", "<span style='white-space: nowrap;'>" + action.result.msg + "</spa>", function (form, action) {
+                                            Ext.Msg.alert("Success", "<span style='white-space: nowrap;'>" + genDoneMsg() + "</spa>", function (form, action) {
                                               // Ext.getCmp("i_pr_type[0]ID")getValue()
                                               Ext.getCmp(Ext.poFormID).getEl().unmask();
                                               Ext.getCmp("po_expense_id_ID").setReadOnly(true);
@@ -3996,8 +4006,8 @@ Ext.AppUx = function (app, menu) {
                                       });
                                     },
                                   });
-                                } else if (Moneyready == 1 && Ext.getCmp("GENCODEPRID").getValue() == true) {
-                                  // if(Ext.getCmp("GENCODEPRID").getValue() == true ){
+                                } else if (Moneyready == 1 && isGenPR) {
+                                  // if(isGenPR ){
                                   // }
                                   // return
                                   return Ext.Ajax.request({
@@ -4013,7 +4023,7 @@ Ext.AppUx = function (app, menu) {
                                       Ext.storeDtl.reload({
                                         callback: function (record, operation, success) {
                                           if (success) {
-                                            Ext.Msg.alert("Success", "<span style='white-space: nowrap;'>" + action.result.msg + "</spa>", function (form, action) {
+                                            Ext.Msg.alert("Success", "<span style='white-space: nowrap;'>" + genDoneMsg() + "</spa>", function (form, action) {
                                               // Ext.getCmp("i_pr_type[0]ID")getValue()
                                               Ext.getCmp(Ext.poFormID).getEl().unmask();
                                               Ext.getCmp("po_expense_id_ID").setReadOnly(true);
@@ -4043,10 +4053,34 @@ Ext.AppUx = function (app, menu) {
                                   });
                                 }
                               });
-                            let results = []; // สร้าง array เพื่อเก็บ object ที่เก็บข้อมูลหลายค่า
-                            return results; // ส่งผลลัพธ์ทั้งหมดกลับ
-                            // return false;
-                            //จองเงิน
+                            };
+                            // ข้อความสำเร็จ: รายการใหม่ -> บันทึกและออกเลข PR
+                            var genDoneMsg = function () {
+                              return isNewPR ? "บันทึกรายการและออกเลข PR เรียบร้อย" : action.result.msg;
+                            };
+                            if (isNewPR) {
+                              Ext.getCmp(Ext.poFormID).getEl().mask("Please wait...", "x-mask-loading");
+                              Ext.getCmp("tabpanel1").getStore().reload({
+                                callback: function () {
+                                  var store = Ext.getCmp("tabpanel1").getStore();
+                                  var idx = store.findBy(function (r) {
+                                    return parseInt(r.get("id"), 10) === newTorId;
+                                  });
+                                  if (idx < 0) {
+                                    Ext.getCmp(Ext.poFormID).getEl().unmask();
+                                    Ext.Msg.alert("แจ้งเตือน", "บันทึกรายการแล้ว แต่ไม่พบรายการในตาราง กรุณาเปิดรายการแล้วติ๊ก ออกเลขPR", function () {
+                                      Ext.getCmp("winMain").destroy();
+                                    });
+                                    return;
+                                  }
+                                  Ext.selectRow = store.getAt(idx);
+                                  Ext.HDR_ID = newTorId;
+                                  runAfterSave();
+                                },
+                              });
+                            } else {
+                              runAfterSave();
+                            }
                           },
                         }); // from
                         // failure: function (form, action) {

@@ -1658,6 +1658,7 @@ switch ($mode) {
         $ss_id = $db->Fetch($stmt);
         if (true) {
             $sp_tor_id = $ss_id["sp_tor_id"];
+            $re_id = $sp_tor_id; // ส่ง id รายการที่เพิ่งสร้างกลับไปให้หน้าเว็บออกเลข PR ต่อได้
             if (true) {
 
                 //                $sql0 = "

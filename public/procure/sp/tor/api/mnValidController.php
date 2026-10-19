@@ -20,10 +20,10 @@ f_net_total_amt: 998750*/
         $dc_cost2_id= $_REQUEST['dc_cost2_id'] ?? null; 
         $f_total_amt = $_REQUEST['f_net_total_amt'] ?? null; 
         $i_year = $_REQUEST['i_year'] ?? null; 
-        $c_code= $db->GetDataBySQL("select top 1 c_code from dbo.sp_tor where i_yyyy = {$i_year}  and TRIM(d_doc_ref)=?", array($txt));
-        $count= $db->GetDataBySQL("select count(*) from dbo.sp_tor where i_yyyy = {$i_year}  and TRIM(d_doc_ref)=?", array($txt));
-        $count2= $db->GetDataBySQL("select count(*) from dbo.sp_tor where i_yyyy = {$i_year}  and dc_cost2_id=? and f_total_amt=?", array($dc_cost2_id,$f_total_amt));
-        $code_count= $db->GetDataBySQL("select  top 1 c_code from dbo.sp_tor where i_yyyy = {$i_year}  and  dc_cost2_id=? and f_total_amt=?", array($dc_cost2_id,$f_total_amt));
+        $c_code= $db->GetDataBySQL("select top 1 c_code from dbo.sp_tor where i_enabled <> 2 and i_yyyy = {$i_year}  and TRIM(d_doc_ref)=?", array($txt));
+        $count= $db->GetDataBySQL("select count(*) from dbo.sp_tor where i_enabled <> 2 and i_yyyy = {$i_year}  and TRIM(d_doc_ref)=?", array($txt));
+        $count2= $db->GetDataBySQL("select count(*) from dbo.sp_tor where i_enabled <> 2 and i_yyyy = {$i_year}  and dc_cost2_id=? and f_total_amt=?", array($dc_cost2_id,$f_total_amt));
+        $code_count= $db->GetDataBySQL("select  top 1 c_code from dbo.sp_tor where i_enabled <> 2 and i_yyyy = {$i_year}  and  dc_cost2_id=? and f_total_amt=?", array($dc_cost2_id,$f_total_amt));
         $c_code = $code_count!= '' ? $code_count : $c_code ;
     break;
 }
