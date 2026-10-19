@@ -1888,7 +1888,9 @@ Ext.onReady(function () {
                             xtype: 'button',
                             id: 'backdate-request-notification',
                             text: 'คำขอออกเลขย้อนหลัง',
-                            icon: './images/icons/bell.png',
+                            iconCls: 'supplies-icon-backdate',
+                            cls: 'supplies-toolbar-action supplies-backdate-button',
+                            tooltip: 'เปิดคำขอออกเลขย้อนหลัง ดูเหตุผลและผลพิจารณา',
                             handler: function () {
                                 if (typeof Ext.openBackdateRequests === 'function') { Ext.openBackdateRequests(); return; }
                                 var script = document.createElement('script');

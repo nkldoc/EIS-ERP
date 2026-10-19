@@ -105,7 +105,13 @@
         call({mode:'LIST'},function (result) {
             if (!result) return;
             var button = Ext.getCmp('backdate-request-notification');
-            if (button) button.setText((result.is_approver ? 'คำขอย้อนหลังรออนุมัติ' : 'คำขอออกเลขย้อนหลัง')+' ('+result.pending+')');
+            if (button) {
+                var count = Math.max(0, Number(result.pending) || 0);
+                button.setText('<span class="backdate-button-label">'+(result.is_approver ? 'คำขอย้อนหลังรออนุมัติ' : 'คำขอออกเลขย้อนหลัง')+'</span> <span class="backdate-button-count">'+count+'</span>');
+                if (count > 0) button.addClass('supplies-backdate-pending');
+                else button.removeClass('supplies-backdate-pending');
+                button.setTooltip((result.is_approver ? 'คำขอรออนุมัติ ' : 'คำขอรอพิจารณา ') + count + ' รายการ — คลิกเพื่อดูรายละเอียด');
+            }
         },true);
     };
     Ext.onReady(function () { Ext.refreshBackdateBadge(); window.setInterval(Ext.refreshBackdateBadge,30000); });

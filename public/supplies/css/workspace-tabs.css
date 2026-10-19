@@ -87,6 +87,16 @@
 .supplies-contract-alert-button button { color:#174b86; }
 .supplies-contract-alert-button:hover { border-color:#4b82c5; background:linear-gradient(135deg,#eaf3ff,#d8e8ff); box-shadow:0 3px 9px #1c4f8c36; }
 .supplies-icon-alert { background-image:url('../images/icons/bell.png')!important; }
+.supplies-backdate-button { border:1px solid #c7c9ea; background:linear-gradient(135deg,#faf9ff,#eeedfc); box-shadow:0 2px 5px #53488c14; }
+.supplies-backdate-button button { color:#514087; white-space:nowrap; }
+.supplies-backdate-button:hover { border-color:#a399d1; background:#e9e5fa; }
+.supplies-icon-backdate { background-image:url('../images/icons/ui-backdate.svg')!important; }
+.backdate-button-label { vertical-align:middle; }
+.backdate-button-count { display:inline-block; min-width:20px; height:20px; line-height:20px; margin-left:6px; padding:0 5px; box-sizing:border-box; border-radius:10px; background:#dfdaef; color:#62557d; font-size:11px; font-weight:bold; text-align:center; vertical-align:middle; }
+.supplies-backdate-pending { border-color:#ddb66c; background:linear-gradient(135deg,#fffaf0,#fff0d5); }
+.supplies-backdate-pending button { color:#855618; }
+.supplies-backdate-pending:hover { background:#ffedc8; border-color:#c49646; }
+.supplies-backdate-pending .backdate-button-count { background:#b86b11; color:#fff; }
 .supplies-icon-refresh { background-image:url('../images/icons/ui-refresh.svg')!important; }
 .supplies-icon-notebook { background-image:url('../images/icons/ui-notebook.svg')!important; }
 .supplies-icon-admin { background-image:url('../images/icons/ui-admin.svg')!important; }
