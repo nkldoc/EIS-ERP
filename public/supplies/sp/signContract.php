@@ -246,6 +246,22 @@ $js = $pg->get_js() . ".js?__dc=" . (is_file($scriptFile) ? filemtime($scriptFil
     <script type="text/javascript" src="../js/contract-backdate.js?v=<?= filemtime(__DIR__ . '/../js/contract-backdate.js'); ?>"></script>
     <script type="text/javascript" src="./tor/<?PHP echo $js; ?>"></script>
     <script type="text/javascript" src="./tor/pageStatus.js?_dc=<?= __VPRODUCT_; ?>"></script>
+    <script type="text/javascript">
+        Ext.onReady(function () {
+            var grid = Ext.getCmp('tabpanel1');
+            var toolbar = grid && grid.getTopToolbar();
+            if (!toolbar) return;
+            toolbar.add('->', {
+                text: 'คู่มือขอออกเลขย้อนหลัง',
+                icon: '../images/icons/page_white_acrobat.png',
+                tooltip: 'คู่มือผู้ขอและหัวหน้าพัสดุ เปิดเป็น PDF ในแท็บใหม่',
+                handler: function () {
+                    window.open('manual/contract-backdate-user-guide.pdf?v=<?= filemtime(__DIR__ . '/manual/contract-backdate-user-guide.pdf'); ?>', '_blank', 'noopener');
+                }
+            });
+            toolbar.doLayout();
+        });
+    </script>
 </head>
 
 <body>
