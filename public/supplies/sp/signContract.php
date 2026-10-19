@@ -128,7 +128,8 @@ class clsPageStatus
 
 $pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"]);
 $_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"];
-$js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
+$scriptFile = __DIR__ . '/tor/' . $pg->get_js() . '.js';
+$js = $pg->get_js() . ".js?__dc=" . (is_file($scriptFile) ? filemtime($scriptFile) : __VPRODUCT_);
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -242,6 +243,7 @@ $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
     <script type="text/javascript" src="./uiData/configStoreUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
     <script type="text/javascript" src="../js/show_nat.js?dc=<?= __VPRODUCT_ ?>"></script>
     <script type="text/javascript" src="./tor/torUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
+    <script type="text/javascript" src="../js/contract-backdate.js?v=<?= filemtime(__DIR__ . '/../js/contract-backdate.js'); ?>"></script>
     <script type="text/javascript" src="./tor/<?PHP echo $js; ?>"></script>
     <script type="text/javascript" src="./tor/pageStatus.js?_dc=<?= __VPRODUCT_; ?>"></script>
 </head>

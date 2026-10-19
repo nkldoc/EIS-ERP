@@ -6,6 +6,8 @@ class Rows {
     function __construct($rows = array()) { $this->rows = $rows; }
 }
 class BackdateDB {
+    public $approved = true;
+    public $approvalConsumed = false;
     public $conn;
     public $sameDay = true;
     public $hasPrevious = true;
@@ -33,6 +35,8 @@ class BackdateDB {
     }
 }
 function sqlsrv_query($db, $sql, $params = array()) {
+    if (strpos($sql, 'SELECT TOP 1 request_id') !== false) return new Rows($db->approved && $params === array(88,77,'2026-10-12',10) ? array(array('request_id'=>5)) : array());
+    if (strpos($sql, 'UPDATE dbo.sp_contract_backdate_request') !== false) { $db->approvalConsumed = true; return new Rows(); }
     if (strpos($sql, 'sp_getapplock') !== false) return new Rows(array(array('lock_result' => 0)));
     if (strpos($sql, 'SELECT c.c_code') !== false) return new Rows(array(array(
         'c_code' => $db->existingCode, 'i_purchase' => 1, 'i_type_contract' => 1, 'i_yyyy' => 2026)));
@@ -42,6 +46,9 @@ function sqlsrv_query($db, $sql, $params = array()) {
     throw new Exception('Unexpected query');
 }
 function sqlsrv_rows_affected($stmt) { return 1; }
+define('SQLSRV_FETCH_ASSOC', 2);
+function sqlsrv_fetch_array($stmt, $mode) { return array_shift($stmt->rows); }
+require_once __DIR__ . '/../public/supplies/sp/tor/api/ContractBackdateApproval.php';
 function checkBackdate($condition, $message) {
     if (!$condition) throw new Exception($message);
 }
@@ -54,6 +61,7 @@ function runBackdate($db, $mode = 'SAVE_BACKDATE', $day = '2026-10-12') {
     $start = strpos($source, '$mode =');
     $end = strpos($source, '$table =');
     $source = substr($source, $start, $end - $start);
+    $source = str_replace("require_once __DIR__ . '/ContractBackdateApproval.php';", '', $source);
     $source = str_replace('exit;', 'throw new EndpointFinished();', $source);
     ob_start();
     try { eval($source); } catch (EndpointFinished $e) {}
@@ -63,6 +71,7 @@ $db = new BackdateDB();
 $result = runBackdate($db);
 checkBackdate($result['success'] && $result['code'] === 'พวช.ซ.039122.1/2569', 'First suffix');
 checkBackdate($db->committed && !$db->rolledBack, 'Successful transaction');
+checkBackdate($db->approvalConsumed, 'Approval consumed in numbering transaction');
 checkBackdate(array_slice($db->insert, 0, 8) === array(4, 77, 2569, 39122, 10, 20, '2026-10-12', $result['code']), 'Document fields and parent running number');
 checkBackdate($db->insert[8] === "วันที่ออกเลข: 12-10-2569\r\nเลขสัญญา: พวช.ซ.039122.1/2569\r\nประเภท: ย้อนหลัง (สัญญาซื้อ)", 'Stored numbering detail');
 checkBackdate($db->update[0] === $result['code'] && $db->update[4] === 88, 'Contract linked to generated number');
@@ -93,4 +102,13 @@ checkBackdate($result['success'] && $result['normal'] && !$db->insert
 $db = new BackdateDB();
 runBackdate($db, 'SAVE_BACKDATE', $today);
 checkBackdate($_REQUEST['mode'] === 'GENCODECST' && !$db->insert, 'Today routes to existing numbering even after unlock');
-echo "Backdate contract: 9 scenarios passed\n";
+$db = new BackdateDB(); $db->approved = false;
+$result = runBackdate($db);
+checkBackdate(!$result['success'] && $db->rolledBack && !$db->insert && !$db->approvalConsumed, 'No approved request cannot issue a number');
+$db = new BackdateDB();
+$result = runBackdate($db, 'SAVE_BACKDATE', '2026-10-11');
+checkBackdate(!$result['success'] && $db->rolledBack && !$db->insert, 'Different date cannot reuse approval');
+$db = new BackdateDB(); $db->approved = false;
+$result = runBackdate($db, 'GENCODECST', '2026-10-12');
+checkBackdate(!$result['success'] && $db->rolledBack && !$db->insert, 'Normal mode with backdate still requires approval');
+echo "Backdate contract: 12 scenarios passed\n";

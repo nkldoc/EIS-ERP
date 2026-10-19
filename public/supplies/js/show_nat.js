@@ -1869,6 +1869,9 @@ Ext.onReady(function () {
             items: [new Ext.Toolbar({
                     border: false,
                     id: 'topToolBarID',
+                    listeners: {afterrender: function () {
+                        if (typeof Ext.refreshBackdateBadge === 'function') Ext.refreshBackdateBadge();
+                    }},
                     enableOverflow: true,
                     items: [/*onlineCountLabel,*/ {
                             xtype: 'button',
@@ -1882,6 +1885,19 @@ Ext.onReady(function () {
                                 if (workspace && workspace.refreshActiveTab) workspace.refreshActiveTab();
                             }
                         }, Ext.toogleTemp, Ext.contractAlertToolbarButton, {
+                            xtype: 'button',
+                            id: 'backdate-request-notification',
+                            text: 'คำขอออกเลขย้อนหลัง',
+                            icon: './images/icons/bell.png',
+                            handler: function () {
+                                if (typeof Ext.openBackdateRequests === 'function') { Ext.openBackdateRequests(); return; }
+                                var script = document.createElement('script');
+                                script.src = '/supplies/js/contract-backdate.js?v=20261019';
+                                script.onload = function () { Ext.openBackdateRequests(); };
+                                script.onerror = function () { Ext.Msg.alert('คำขอ', 'โหลดหน้าคำขอไม่สำเร็จ กรุณาลองใหม่'); };
+                                document.head.appendChild(script);
+                            }
+                        }, {
                             xtype: 'button',
                             id: 'supplies-admin-tools',
                             text: 'รายละเอียด ADMIN',

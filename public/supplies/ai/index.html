@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI ถามตอบ · Gemini</title>
+    <link rel="stylesheet" href="./style.css">
+    <script src="./app.js" defer></script>
+</head>
+<body>
+<main>
+    <header><span class="badge">AI ถามตอบ</span><h1>ผู้ช่วยงานจัดซื้อด้วย Gemini</h1>
+        <p>เตรียมคำถามที่นี่ แล้วเปิด Gemini ด้วยบัญชี Google ของคุณในแท็บใหม่</p></header>
+    <ol class="flow" aria-label="ขั้นตอนใช้งาน">
+        <li><b>1</b><span>เตรียมคำถาม</span></li>
+        <li><b>2</b><span>คัดลอกข้อความ</span></li>
+        <li><b>3</b><span>เปิด Gemini และเลือกบัญชี</span></li>
+        <li><b>4</b><span>วางคำถามแล้วส่ง</span></li>
+    </ol>
+    <section class="card" aria-labelledby="question-title">
+        <h2 id="question-title">เตรียมคำถาม</h2>
+        <p>เลือกหัวข้อเริ่มต้น หรือพิมพ์คำถามของคุณเอง</p>
+        <div class="templates" aria-label="ตัวอย่างคำถาม">
+            <button type="button" data-template="overlap">ตรวจรับและใบกันเหลื่อม</button>
+            <button type="button" data-template="accounting">ตั้งหนี้และภาษี</button>
+            <button type="button" data-template="document">ร่างเอกสารจัดซื้อ</button>
+        </div>
+        <label for="question">คำถามที่จะนำไปใช้ใน Gemini</label>
+        <textarea id="question" rows="8" placeholder="พิมพ์รายละเอียดและคำถามที่ต้องการให้ Gemini ช่วย…"></textarea>
+        <div class="actions">
+            <button type="button" id="copy" class="primary">คัดลอกคำถาม</button>
+            <a href="https://gemini.google.com/app" target="_blank" rel="noopener noreferrer" class="open">เปิด Gemini ↗</a>
+            <button type="button" id="clear">ล้างข้อความ</button>
+        </div>
+        <p id="status" role="status" aria-live="polite">คัดลอกคำถาม จากนั้นเปิด Gemini แล้ววางด้วย Ctrl+V หรือเมนูวาง</p>
+    </section>
+    <section class="card help" aria-labelledby="account-title">
+        <h2 id="account-title">ใช้บัญชี Google ของคุณ</h2>
+        <p>เมื่อเปิด Gemini ให้ตรวจรูปโปรไฟล์มุมขวาบน หากเป็นคนละบัญชี ให้กดรูปโปรไฟล์แล้วเลือกบัญชีที่ต้องการ หากยังไม่ได้ลงชื่อเข้าใช้ ให้ลงชื่อเข้าใช้ที่หน้า Google</p>
+        <p>บัญชีในระบบจัดซื้อและบัญชี Google อาจเป็นคนละบัญชีกัน รูปโปรไฟล์ Chrome ไม่ได้ยืนยันว่าบัญชีใน Gemini เป็นบัญชีเดียวกัน</p>
+        <p>หน้า AI นี้ไม่ส่งคำถามหรือข้อมูลรายการจัดซื้อให้ Google อัตโนมัติ และไม่บันทึกข้อความที่พิมพ์ เมื่อรีเฟรชหรือปิดหน้านี้ข้อความจะหาย</p>
+        <p>หากบัญชีหน่วยงานเปิด Gemini ไม่ได้ โปรดติดต่อผู้ดูแล Google Workspace ของหน่วยงาน</p>
+        <a href="https://support.google.com/gemini/answer/13278668?hl=th" target="_blank" rel="noopener noreferrer">ดูวิธีลงชื่อเข้าใช้ Gemini จาก Google ↗</a>
+    </section>
+</main>
+</body>
+</html>

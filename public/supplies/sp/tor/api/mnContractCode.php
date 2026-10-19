@@ -12,7 +12,13 @@ $date = new i_date();
 $util = new apiUtil();
 
 $mode = $_REQUEST["mode"];
+require_once __DIR__ . '/ContractBackdateApproval.php';
 $contractToday = (new DateTime('now', new DateTimeZone('Asia/Bangkok')))->format('Y-m-d');
+// A caller cannot bypass approval by selecting normal mode for a past date.
+if ($mode === 'GENCODECST' && !empty($_REQUEST['contract_date']) && $_REQUEST['contract_date'] < $contractToday) {
+    $mode = 'SAVE_BACKDATE';
+    $_REQUEST['mode'] = $mode;
+}
 // Unlocking the field alone must not switch normal numbering to a dotted number.
 if ($mode === 'SAVE_BACKDATE' && isset($_REQUEST['contract_date'])
         && $_REQUEST['contract_date'] >= $contractToday) {
@@ -59,6 +65,12 @@ if ($mode === 'PREVIEW_BACKDATE' || $mode === 'SAVE_BACKDATE') {
         $docId = intval($contract['i_purchase']) + (intval($contract['i_type_contract']) === 2 ? 0 : 3);
         $year = intval($contract['i_yyyy']);
         if ($year < 2400) $year += 543;
+        $approvalId = backdateApprovalId($db->conn, $contractId, intval($_REQUEST['id'] ?? 0), $day, intval($_SESSION['user_id']));
+        if (!$approvalId) {
+            $db->RollBackTran();
+            echo json_encode(array('success' => false, 'msg' => 'ต้องได้รับอนุมัติจากหัวหน้าพัสดุสำหรับสัญญาและวันที่นี้ก่อนออกเลขย้อนหลัง'));
+            exit;
+        }
     }
     $parsed = DateTime::createFromFormat('!Y-m-d', $day);
     $result = array('success' => false, 'msg' => 'กรุณาตรวจสอบประเภทสัญญา ปี และวันที่เริ่มสัญญา');
@@ -154,7 +166,13 @@ if ($mode === 'PREVIEW_BACKDATE' || $mode === 'SAVE_BACKDATE') {
                                 array($result['code'], $day, $_SESSION['user_id'], $_SESSION['dc_cost_id'], $contractId));
                         }
                     }
-                    if (!$insert || !$update || sqlsrv_rows_affected($update) !== 1) {
+                    $approvalUsed = false;
+                    if ($insert && $update && sqlsrv_rows_affected($update) === 1) {
+                        $approvalUsed = sqlsrv_query($db->conn,
+                            "UPDATE dbo.sp_contract_backdate_request SET status='used',used_at=SYSDATETIME() WHERE request_id=? AND status='approved'",
+                            array($approvalId));
+                    }
+                    if (!$insert || !$update || !$approvalUsed || sqlsrv_rows_affected($approvalUsed) !== 1) {
                         $result = array('success' => false, 'msg' => 'ไม่สามารถบันทึกเลขสัญญาได้ กรุณาโหลดตัวอย่างใหม่แล้วลองอีกครั้ง');
                     } else {
                         $result['msg'] = 'ออกเลขสัญญาเรียบร้อยแล้ว: ' . $result['code'];

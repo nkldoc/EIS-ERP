@@ -3926,16 +3926,17 @@ function d_period_dateID_change() {
                               {
                                   xtype: "button",
                                   id: "buBackdateContractID",
-                                  text: "ปลดล็อกออกเลขสัญญาย้อนหลัง",
+                                  text: "ขออนุมัติ / ใช้สิทธิ์ออกเลขสัญญาย้อนหลัง",
                                   style: "margin-left:205px;margin-bottom:5px;",
                                   handler: function () {
-                                      Ext.contractDateLock.release();
-                                      var field = Ext.getCmp("d_contract_dateID");
-                                      field.setReadOnly(false);
-                                      field.focus();
-                                      this.setText("ปลดล็อกแล้ว: แก้ไขวันที่เริ่มสัญญาได้");
-                                      this.disable();
+                                      Ext.applyApprovedBackdate();
                                   },
+                              },
+                              {
+                                  xtype: "button",
+                                  text: "ดูคำขอ / เหตุผล / ผลพิจารณา",
+                                  style: "margin-left:205px;margin-bottom:5px;",
+                                  handler: function () { Ext.openBackdateRequests(); },
                               },
                               {
                                   xtype: "button",
