@@ -68,47 +68,47 @@ class clsPageStatus {
     }
 
     function get_id() {
-        return $this->temp['id'];
+        return $this->temp['id'] ?? 0;
     }
 
     function get_type_id() {
-        return $this->temp['type_id'];
+        return $this->temp['type_id'] ?? 0;
     }
 
     function get_i_alarm() {
-        return $this->temp['i_alarm'];
+        return $this->temp['i_alarm'] ?? 0;
     }
 
     function get_i_day() {
-        return $this->temp['i_day'];
+        return $this->temp['i_day'] ?? 0;
     }
 
     function get_i_config() {
-        return $this->temp['i_config'];
+        return $this->temp['i_config'] ?? 0;
     }
 
     function get_js() {
-        return $this->temp['js'];
+        return $this->temp['js'] ?? '';
     }
 
     function get_i_last() {
-        return $this->temp['i_last'];
+        return $this->temp['i_last'] ?? 0;
     }
 
     function get_i_entrance() {
-        return $this->temp['i_entrance'];
+        return $this->temp['i_entrance'] ?? 0;
     }
 
     function get_code() {
-        return $this->temp['c_code'];
+        return $this->temp['c_code'] ?? '';
     }
 
     function get_code_tomenu() {
-        return $this->temp['code_tomenu'];
+        return $this->temp['code_tomenu'] ?? '';
     }
 
     function get_menu() {
-        return $this->temp['c_name'];
+        return $this->temp['c_name'] ?? '';
     }
 
 }
