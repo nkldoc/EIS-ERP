@@ -1351,6 +1351,9 @@ switch ($mode) {
             }
             if ($_REQUEST["i_status"] > 0) {
                 $wh .= " AND CASE
+            WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr cancel_po WHERE cancel_po.po_working_hdr_id=cc.po_working_hdr_id AND cancel_po.i_enable=2) THEN 6
+            WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr dispute_po WHERE dispute_po.po_working_hdr_id=cc.po_working_hdr_id AND dispute_po.i_enable=1 AND dispute_po.i_status_last=3) THEN 7
+            WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr paid_po WHERE paid_po.po_working_hdr_id=cc.po_working_hdr_id AND paid_po.i_enable=1 AND paid_po.i_status_last=11) THEN 8
             WHEN cc.i_status_billing IS NULL AND cc.i_status_checking IS NULL AND cc.c_code IS NULL THEN 1
             WHEN cc.i_status_billing IS NULL AND cc.i_status_checking = 1 AND cc.c_code IS NOT NULL AND ccc.c_code IS NULL THEN 2
             WHEN cc.i_status_billing IS NULL AND cc.i_status_checking = 1 AND cc.c_code IS NOT NULL AND ccc.c_code IS NOT NULL THEN 3
@@ -1439,7 +1442,10 @@ switch ($mode) {
             when b.i_overlap = 2  then isnull(b.c_overlap,'ยังไม่ได้เลือกใบกัน')
             else  'ใช้เงินปีงบปัจุบัน'
             end  as chek_overlap
-            , case when c.i_status_billing  is null  and  c.i_status_checking  is null and c.c_code is null then 1 -- ยังไม่ตรวจรับ
+            , case when exists (select 1 from NMU_EIS.dbo.po_working_hdr cancel_po where cancel_po.po_working_hdr_id=c.po_working_hdr_id and cancel_po.i_enable=2) then 6
+            when exists (select 1 from NMU_EIS.dbo.po_working_hdr dispute_po where dispute_po.po_working_hdr_id=c.po_working_hdr_id and dispute_po.i_enable=1 and dispute_po.i_status_last=3) then 7
+            when exists (select 1 from NMU_EIS.dbo.po_working_hdr paid_po where paid_po.po_working_hdr_id=c.po_working_hdr_id and paid_po.i_enable=1 and paid_po.i_status_last=11) then 8
+            when c.i_status_billing  is null  and  c.i_status_checking  is null and c.c_code is null then 1 -- ยังไม่ตรวจรับ
             when c.i_status_billing  is null  and  c.i_status_checking  = 1 and c.c_code is not null and cc.c_code  is  null then 2 -- ตรวจรับ
             when c.i_status_billing  is null  and  c.i_status_checking  = 1 and c.c_code is not null and cc.c_code  is not null  then 3   -- ออกเลขวางบิลแล้ว
             when c.i_status_billing  = 4  and  c.i_status_checking  = 1 and c.c_code is not null and cc.c_code  is not null  and  c.po_working_hdr_id is null   then 4   -- ผ่านรายการวางบิลแล้วรอเบิก
@@ -1717,6 +1723,14 @@ switch ($mode) {
                     $i_status_chk = "<b style='color:#FF00FF'>เบิกแล้ว</b>";
                     break;
             };
+            // Cancellation in the disbursement header takes precedence over registration status.
+            if (intval($row["i_status_chk"]) === 6) {
+                $i_status_chk = "<b style='color:#CC0000'>ยกเลิกเบิก</b>";
+            } elseif (intval($row["i_status_chk"]) === 7) {
+                $i_status_chk = "<b style='color:#CC6600'>ทักท้วง</b>";
+            } elseif (intval($row["i_status_chk"]) === 8) {
+                $i_status_chk = "<b style='color:#008040'>จ่ายแล้ว</b>";
+            }
             $row["i_is_waiting"] = $row["i_request"]; //i_request
             $txtRed = "";
             if ($row["c_check_code"] != "" && $row["i_is_waiting"] == 1 && $row["i_step"] == 3) {
