@@ -5699,7 +5699,7 @@ switch ($mode) {
         unset($data);
         unset($arrValue);
         // ============== //update dbo.sp_tor_hdr_period i_is_last = null where sp_tor_contract_id = {$data['sp_tor_contract_id']}
-        $db->GetDataBySQL('update dbo.sp_tor_hdr_period set i_is_last = null where sp_tor_contract_id = ?', array($_REQUEST['sp_tor_contract_id']));
+        $db->QueryParam('update dbo.sp_tor_hdr_period set i_is_last = null where sp_tor_contract_id = ?', array($_REQUEST['sp_tor_contract_id']));
         $d_update = date("Y-m-d H:i:s");
         $data["sp_tor_contract_id"] = $_REQUEST['sp_tor_contract_id'];
         $data["dc_expense_budget_type_id"] = $_REQUEST['dc_expense_budget_type_id'] ?? null;
@@ -5919,10 +5919,10 @@ switch ($mode) {
             //i_product_type am_mode_id inv_mode_id
             $data["inv_mode_id"] = $_REQUEST["inv_mode_id"] ?? null;
             $data["am_mode_id"] = $_REQUEST["am_mode_id"] ?? null;
-            $data["c_name"] = $_REQUEST["c_name"];
+            $data["c_name"] = $_REQUEST["c_name_dtl"] ?? $_REQUEST["c_name"] ?? null;
             $data["i_qty"] = $_REQUEST["i_qty"];
-            $data["f_net_unit_price"] = str_replace(',', '', $_REQUEST["f_total_amt"]);
-            $data["f_net_total_price"] = $data["f_total_amt"] * $data["i_qty"];
+            $data["f_net_unit_price"] = str_replace(',', '', $_REQUEST["f_net_unit_price"]);
+            $data["f_net_total_price"] = $data["f_net_unit_price"] * $data["i_qty"];
             $data["dc_unit_type_id"] = $_REQUEST["sp_unit_type_id"];
             $data["dc_creditor_id"] = $db->GetDataBySQL('SELECT dc_creditor_id FROM sp_tor_contract WHERE  sp_tor_contract_id = ?', array($_REQUEST["sp_tor_contract_id"]));
 
@@ -5971,7 +5971,7 @@ switch ($mode) {
             );
         } else {
             $db->RollBackTran();
-            $re = array("reval" => 1, "success" => "Error", "msg" => "check statement : {$sql}");
+            $re = array("reval" => 1, "success" => false, "msg" => "Unable to save the contract period.");
         }
         echo json_encode($re);
         exit;

@@ -1752,7 +1752,14 @@ function win_hdr_periodAll(event, rec, mode) {
                                                                     Ext.Msg.alert("แจ้งเตือน", "กรอกข้อมูลให้ครบถ้วน !!!");
                                                                     break;
                                                                 case Ext.form.Action.CONNECT_FAILURE:
-                                                                    Ext.Msg.alert("แจ้งเตือน", "พลข้อผิดพลาดในการเชื่อต่อเครือข่าย");
+                                                                    var response = action.response || {};
+                                                                    var message = "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่";
+                                                                    if (response.status === 401) {
+                                                                        message = "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่";
+                                                                    } else if (response.status) {
+                                                                        message = "บันทึกงวดไม่สำเร็จ เซิร์ฟเวอร์ตอบกลับ HTTP " + response.status;
+                                                                    }
+                                                                    Ext.Msg.alert("แจ้งเตือน", message);
                                                                     break;
                                                                 case Ext.form.Action.SERVER_INVALID:
                                                                     Ext.Msg.alert("แจ้งเตือน", action.result.msg);
