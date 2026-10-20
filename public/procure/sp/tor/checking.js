@@ -9,7 +9,13 @@ Ext.setCheckingAssetMode = function (value, singlePeriodSingleFunding) {
         var fixed = singlePeriodSingleFunding === true;
         field.setReadOnly(fixed);
         field.setWidth(400);
-        if (!fixed) { Ext.setCheckingModeValue(field, value); return; }
+        // A newly changed asset has no saved category yet. Default it to the
+        // holding account as well, while keeping other cases selectable.
+        if (!fixed && Number(value) > 0) { Ext.setCheckingModeValue(field, value); return; }
+        field.clearValue();
+        field.setRawValue('บัญชีพักครุภัณฑ์');
+        var addButton = Ext.getCmp('ButtonsproductID');
+        if (addButton) { addButton.disable(); }
         var applyFixedMode = function () {
                 if (field.destroyed || field.isDestroyed) { return; }
                 var index = field.getStore().findBy(function (record) {
@@ -20,14 +26,23 @@ Ext.setCheckingAssetMode = function (value, singlePeriodSingleFunding) {
                         var mode = field.getStore().getAt(index);
                         mode.set('c_name', 'บัญชีพักครุภัณฑ์');
                         field.setValue(mode.get('id'));
+                        field.setRawValue('บัญชีพักครุภัณฑ์');
+                        if (addButton && !addButton.destroyed) { addButton.enable(); }
                 } else {
                         field.clearValue();
                         Ext.Msg.alert('แจ้งเตือน', 'ไม่พบหมวดบัญชีพักครุภัณฑ์ในข้อมูลหลัก กรุณาติดต่อผู้ดูแลระบบ');
                 }
         };
-        if (field.getStore().getCount()) { applyFixedMode(); }
-        else { field.getStore().load({ callback: function (records, options, success) {
+        var hasHoldingMode = field.getStore().findBy(function (record) {
+                return Number(record.get('id')) === 35 || String(record.get('c_name') || '').indexOf('บัญชีพักครุภัณฑ์') !== -1;
+        }) >= 0;
+        if (hasHoldingMode) { applyFixedMode(); }
+        else { field.getStore().load({ params: { include_checking_default: 1 }, callback: function (records, options, success) {
                 if (success) { applyFixedMode(); }
+                else {
+                        field.clearValue();
+                        Ext.Msg.alert('แจ้งเตือน', 'โหลดบัญชีพักครุภัณฑ์ไม่สำเร็จ กรุณาเปิดรายการใหม่');
+                }
         } }); }
 };
 
