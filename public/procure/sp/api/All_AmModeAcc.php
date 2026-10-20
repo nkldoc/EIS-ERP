@@ -13,7 +13,8 @@ $con = null;
 
 if ($_REQUEST["type"] == "am_mode_acc") {
 
-    $sqlMain = "SELECT am_mode_id,c_code ,c_acc_name, c_name  FROM dbo.am_mode_acc WHERE i_enabled = ? ORDER BY c_code";
+    $includeCheckingDefault = !empty($_REQUEST['include_checking_default']) ? ' OR am_mode_id = 35' : '';
+    $sqlMain = "SELECT am_mode_id,c_code ,c_acc_name, c_name FROM dbo.am_mode_acc WHERE (i_enabled = ?{$includeCheckingDefault}) ORDER BY c_code";
     $arrParam = array(STATUS_ENABLE);
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     if ($stmt) {

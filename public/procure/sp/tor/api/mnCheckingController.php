@@ -1578,7 +1578,7 @@ switch ($mode) {
                     INNER JOIN sp_tor_contract c ON c.sp_tor_contract_id = h.sp_tor_contract_id
                     WHERE ISNULL(c.dc_expense_budget_type2_id, 0) = 0
                       AND ISNULL(c.dc_expense_budget_type3_id, 0) = 0
-                      AND h.i_enabled =1 AND c.i_enabled =1 and h.i_is_last = 1 and h.sp_tor_hdr_period_id = ?
+                      AND h.i_enabled =1 AND c.i_enabled =1 and h.sp_tor_hdr_period_id = ?
                       AND (SELECT COUNT(*) FROM sp_tor_hdr_period p WHERE p.sp_tor_contract_id = h.sp_tor_contract_id AND p.i_enabled = 1) = 1
                     GROUP BY h.sp_tor_contract_id ,h.sp_tor_hdr_period_id
                     HAVING COUNT(*) = 1";
@@ -2230,7 +2230,11 @@ switch ($mode) {
                 , isnull((select sum(isnull(i_qty,i_workin_process)) from sp_tranf_item bbb where bbb.sp_check_period_dtl_id =a.sp_check_period_dtl_id  and bbb.i_enabled = 1  ),0)  as i_qty_tranf
                 , ( select  top 1  i_yyyy_overlap from sp_tor_contract aa where c.sp_tor_contract_id = aa.sp_tor_contract_id ) as i_yyyy_overlap
                 , a.sp_check_period_dtl_id
-                ,c.sp_tor_contract_id
+                 ,c.sp_tor_contract_id
+                ,CASE WHEN (SELECT COUNT(*) FROM sp_tor_hdr_period p WHERE p.sp_tor_contract_id = c.sp_tor_contract_id AND p.i_enabled = 1) = 1
+                  AND EXISTS (SELECT 1 FROM sp_tor_contract t WHERE t.sp_tor_contract_id = c.sp_tor_contract_id
+                    AND ISNULL(t.dc_expense_budget_type2_id,0) = 0 AND ISNULL(t.dc_expense_budget_type3_id,0) = 0)
+                  THEN 1 ELSE 0 END AS onePeriodOneBgBudget
                 , a.sp_tor_dtl_period_id
                     ,a.sp_check_period_hdr_id
                     ,a.sp_tor_dtl_period_id
@@ -2296,6 +2300,7 @@ switch ($mode) {
                 "sp_tor_hdr_period_id" => intval($row["sp_tor_hdr_period_id"]),
                 "sp_tranf_hdr_id" => intval($row["sp_tranf_hdr_id"]),
                 "i_product_type" => intval($row["i_product_type"]),
+                "onePeriodOneBgBudget" => (bool) $row["onePeriodOneBgBudget"],
                 "am_mode_id" => intval($row["am_mode_id"]),
                 "inv_mode_id" => intval($row["inv_mode_id"]),
                 "i_is_inv" => intval($row["i_is_inv"]),

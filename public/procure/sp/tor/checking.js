@@ -3,20 +3,23 @@ Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
 
-Ext.setCheckingAssetMode = function (value) {
+Ext.setCheckingAssetMode = function (value, singlePeriodSingleFunding) {
         var field = Ext.getCmp('am_mode_idID');
         if (!field) { return; }
-        var fixed = !!(Ext.selectRow && Ext.selectRow.get('onePeriodOneBgBudget'));
+        var fixed = singlePeriodSingleFunding === true;
         field.setReadOnly(fixed);
-        if (field.trigger) { field.trigger.setDisplayed(!fixed); }
+        field.setWidth(400);
         if (!fixed) { Ext.setCheckingModeValue(field, value); return; }
         var applyFixedMode = function () {
                 if (field.destroyed || field.isDestroyed) { return; }
                 var index = field.getStore().findBy(function (record) {
                         return String(record.get('c_name') || '').indexOf('บัญชีพักครุภัณฑ์') !== -1;
                 });
+                if (index < 0) { index = field.getStore().findBy(function (record) { return Number(record.get('id')) === 35; }); }
                 if (index >= 0) {
-                        field.setValue(field.getStore().getAt(index).get('id'));
+                        var mode = field.getStore().getAt(index);
+                        mode.set('c_name', 'บัญชีพักครุภัณฑ์');
+                        field.setValue(mode.get('id'));
                 } else {
                         field.clearValue();
                         Ext.Msg.alert('แจ้งเตือน', 'ไม่พบหมวดบัญชีพักครุภัณฑ์ในข้อมูลหลัก กรุณาติดต่อผู้ดูแลระบบ');
@@ -10943,6 +10946,7 @@ Ext.AppUx = function (app, menu) {
                         { name: "po_expense_id" },
                         { name: "i_hire_type" },
                         { name: "i_product_type" },
+                        { name: "onePeriodOneBgBudget", type: "boolean" },
                         { name: "am_mode_id" },
                         { name: "inv_mode_id" },
                         { name: "i_is_inv" },
@@ -10987,6 +10991,7 @@ Ext.AppUx = function (app, menu) {
                 url: "api/All_AmModeAcc.php",
                 baseParams: {
                         type: "am_mode_acc",
+                        include_checking_default: 1,
                 },
                 root: "data",
                 idProperty: "id",
@@ -12672,7 +12677,7 @@ Ext.AppUx = function (app, menu) {
                                                                                 mode: "local",
                                                                                 store: Ext.am_mode_acc,
                                                                                 fieldLabel: "หมวดค่าสินทรัพย์",
-                                                                                anchor: "98%",
+                                                                                width: 400,
                                                                                 id: "am_mode_idID",
                                                                                 hidden: true,
                                                                                 submitValue: true,
@@ -17463,7 +17468,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                         } else if (rec.get("i_product_type") == 2) {
                                                                                                                                                 // Ext.getCmp("tabpanelMain4ID").getForm().loadRecord(record);
                                                                                                                                                 Ext.getCmp("am_mode_idID").show();
-                                                                                                        Ext.setCheckingAssetMode(rec.get("am_mode_id") || "");
+                                                                                                        Ext.setCheckingAssetMode(rec.get("am_mode_id") || "", rec.get("onePeriodOneBgBudget"));
                                                                                                                                                 Ext.getCmp("inv_mode_idID").hide();
                                                                                                                                                 Ext.getCmp("inv_mode_idID").clearValue();
                                                                                                                                                 Ext.getCmp("workin_processID").show();
