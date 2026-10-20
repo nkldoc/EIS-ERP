@@ -10652,11 +10652,12 @@ Ext.AppUx = function (app, menu) {
                 },
         });
         // หน่วยงานที่ใช้ค้นหาใบกัน: เงินของ PR จองไว้ที่หน่วยงานเจ้าของเรื่อง (dc_cost_id2) ไม่ใช่หน่วยงานผู้ทำสัญญา
-        // โหมดขอแก้ไขงบ (Edit_bg) ให้ใช้หน่วยงานที่ผู้ใช้เลือกในฟอร์มเหมือนเดิม
+        // โหมดขอแก้ไขงบ (Edit_bg): ถ้าผู้ใช้เปลี่ยนหน่วยงานในฟอร์มเอง (ต่างจากของรายการ) ให้ใช้ค่าที่เลือก
         Ext.bookingCostId = function () {
                 var d = Ext.selectRow && Ext.selectRow.data ? Ext.selectRow.data : {};
                 var cmp = Ext.getCmp("dc_cost_idID");
-                if (Ext.arrEdit && Ext.arrEdit[0] == "Edit_bg" && cmp) return cmp.getValue();
+                var isEditBg = Ext.arrEdit && [].concat(Ext.arrEdit).indexOf("Edit_bg") >= 0;
+                if (isEditBg && cmp && cmp.getValue() && String(cmp.getValue()) !== String(d.dc_cost_id)) return cmp.getValue();
                 if (Number(d.dc_cost_id2) > 0) return d.dc_cost_id2;
                 return cmp ? cmp.getValue() : d.dc_cost_id;
         };
