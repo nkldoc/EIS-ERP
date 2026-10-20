@@ -5690,9 +5690,17 @@ switch ($mode) {
         break;
     case "UP_SP_TOR_HDR_PERIOD":
         // Keep SQL failures in this action inside the JSON error handler.
-        $db = new class($db->conn) extends DatabaseServer {
-            public function __construct($connection) {
-                $this->conn = $connection;
+        $db = new class($db) extends DatabaseServer {
+            private $connectionOwner;
+
+            public function __construct($database) {
+                // Retain the original object: its destructor owns this connection.
+                $this->connectionOwner = $database;
+                $this->conn = $database->conn;
+            }
+
+            public function __destruct() {
+                // The original DatabaseServer closes the shared connection once.
             }
 
             public function QueryParam($sql, $arrParam) {
