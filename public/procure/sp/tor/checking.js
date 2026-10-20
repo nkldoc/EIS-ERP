@@ -10543,11 +10543,22 @@ Ext.AppUx = function (app, menu) {
                 autoLoad: true,
                 url: "api/All_PoWorkingImpHdr.php",
                 baseParams: {
-                        type: "dc_cost",
+                        type: "dc_cost_all",
                 },
                 root: "data",
                 idProperty: "id",
                 fields: ["id", "c_code", "c_name"],
+                listeners: {
+                        load: function () {
+                                // Resolve values assigned before the department names finished loading.
+                                Ext.each(["dc_cost_idID", "dc_cost2_idID"], function (id) {
+                                        var field = Ext.getCmp(id);
+                                        if (field) {
+                                                field.setValue(field.getValue());
+                                        }
+                                });
+                        },
+                },
         });
         // หน่วยงานที่ใช้ค้นหาใบกัน: เงินของ PR จองไว้ที่หน่วยงานเจ้าของเรื่อง (dc_cost_id2) ไม่ใช่หน่วยงานผู้ทำสัญญา
         // โหมดขอแก้ไขงบ (Edit_bg) ให้ใช้หน่วยงานที่ผู้ใช้เลือกในฟอร์มเหมือนเดิม

@@ -5689,6 +5689,22 @@ switch ($mode) {
 
         break;
     case "UP_SP_TOR_HDR_PERIOD":
+        // Keep SQL failures in this action inside the JSON error handler.
+        $db = new class($db->conn) extends DatabaseServer {
+            public function __construct($connection) {
+                $this->conn = $connection;
+            }
+
+            public function QueryParam($sql, $arrParam) {
+                $stmt = sqlsrv_query($this->conn, $sql, $arrParam);
+                if ($stmt === false) {
+                    throw new RuntimeException(json_encode(sqlsrv_errors(SQLSRV_ERR_ERRORS), JSON_UNESCAPED_UNICODE));
+                }
+                return $stmt;
+            }
+        };
+
+        try {
 
         $root = "data";
         $data = array();
@@ -5699,13 +5715,18 @@ switch ($mode) {
         unset($data);
         unset($arrValue);
         // ============== //update dbo.sp_tor_hdr_period i_is_last = null where sp_tor_contract_id = {$data['sp_tor_contract_id']}
-        $db->GetDataBySQL('update dbo.sp_tor_hdr_period set i_is_last = null where sp_tor_contract_id = ?', array($_REQUEST['sp_tor_contract_id']));
+        $isLastPeriod = filter_var($_REQUEST['i_is_last'] ?? false, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+        if ($isLastPeriod) {
+            $db->QueryParam('UPDATE dbo.sp_tor_hdr_period SET i_is_last = 0 WHERE sp_tor_contract_id = ? AND sp_tor_hdr_period_id <> ?', array(
+                $_REQUEST['sp_tor_contract_id'], (int) ($_REQUEST['sp_tor_hdr_period_id'] ?? 0)
+            ));
+        }
         $d_update = date("Y-m-d H:i:s");
         $data["sp_tor_contract_id"] = $_REQUEST['sp_tor_contract_id'];
         $data["dc_expense_budget_type_id"] = $_REQUEST['dc_expense_budget_type_id'] ?? null;
         $data["i_period"] = $_REQUEST['i_period'];
         $data["i_pr_type1"] = $_REQUEST['i_pr_type1'] ?? null;
-        $data["i_is_last"] = $_REQUEST['i_is_last'] ?? null;
+        $data["i_is_last"] = $isLastPeriod;
 
         $data['d_doc_date'] = !empty($_REQUEST['d_doc_date']) ? $date->bc_to_ad($_REQUEST['d_doc_date']) : null;
 
@@ -5729,9 +5750,14 @@ switch ($mode) {
 
         if ($_REQUEST['sp_tor_hdr_period_id'] > 0) {
 
-            if ($_REQUEST['copy_contract_dtl'] == 'save') {
+            if (($_REQUEST['copy_contract_dtl'] ?? 'save') == 'save') {
+                // Editing an existing period must preserve its creation and creditor data.
+                unset($data['dc_user_create_id'], $data['dc_user_create_cost_id'], $data['dc_user_create_department_id'], $data['d_create']);
+                if (empty($_REQUEST['dc_creditor_id'])) {
+                    unset($data['dc_creditor_id']);
+                }
                 foreach ($data as $fldA => $value) {
-                    $arrValue[] = ($value != "") ? $value : null;
+                    $arrValue[] = ($value !== "" && $value !== null) ? $value : null;
                     $addField .= ", {$fldA} = ?";
                 }
                 $sql = "UPDATE sp_tor_hdr_period SET " . substr($addField, 1) . " WHERE sp_tor_hdr_period_id = ?";
@@ -5748,6 +5774,12 @@ switch ($mode) {
                 $i_period = $data["i_period"];
                 $d_period_date = $data['d_period_date'];
                 $f_total_amt = $data["f_total_amt"];
+
+                $contractInfo = $db->GetDataBySQL('SELECT c_code, dc_creditor_id FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ?', array($data['sp_tor_contract_id']));
+                $c_doc_ref_contract = $contractInfo['c_code'] ?? null;
+                $dc_creditor_name = !empty($contractInfo['dc_creditor_id'])
+                    ? $db->GetDataBySQL('SELECT c_name FROM NMU.dbo.dc_creditor WHERE dc_creditor_id = ?', array($contractInfo['dc_creditor_id']))
+                    : null;
 
                 $arrValue2[] = $_REQUEST['i_product_type'];
                 $arrValue2[] = $_REQUEST['i_hire_type_l'];
@@ -5919,10 +5951,10 @@ switch ($mode) {
             //i_product_type am_mode_id inv_mode_id
             $data["inv_mode_id"] = $_REQUEST["inv_mode_id"] ?? null;
             $data["am_mode_id"] = $_REQUEST["am_mode_id"] ?? null;
-            $data["c_name"] = $_REQUEST["c_name"];
+            $data["c_name"] = $_REQUEST["c_name_dtl"] ?? $_REQUEST["c_name"] ?? null;
             $data["i_qty"] = $_REQUEST["i_qty"];
-            $data["f_net_unit_price"] = str_replace(',', '', $_REQUEST["f_total_amt"]);
-            $data["f_net_total_price"] = $data["f_total_amt"] * $data["i_qty"];
+            $data["f_net_unit_price"] = str_replace(',', '', $_REQUEST["f_net_unit_price"]);
+            $data["f_net_total_price"] = $data["f_net_unit_price"] * $data["i_qty"];
             $data["dc_unit_type_id"] = $_REQUEST["sp_unit_type_id"];
             $data["dc_creditor_id"] = $db->GetDataBySQL('SELECT dc_creditor_id FROM sp_tor_contract WHERE  sp_tor_contract_id = ?', array($_REQUEST["sp_tor_contract_id"]));
 
@@ -5971,11 +6003,23 @@ switch ($mode) {
             );
         } else {
             $db->RollBackTran();
-            $re = array("reval" => 1, "success" => "Error", "msg" => "check statement : {$sql}");
+            $re = array("reval" => 1, "success" => false, "msg" => "Unable to save the contract period.");
         }
         echo json_encode($re);
         exit;
         break;
+        } catch (Throwable $error) {
+            $db->RollBackTran();
+            $errorRef = uniqid('period-');
+            error_log('[UP_SP_TOR_HDR_PERIOD][' . $errorRef . '] ' . (string) $error);
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(array(
+                'success' => false,
+                'msg' => 'บันทึกงวดไม่สำเร็จ รหัสข้อผิดพลาด: ' . $errorRef
+            ), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
     case "UP_SP_TOR_HDR_PERIOD_PRO":
         $root = "data";
         $data = array();
