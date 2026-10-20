@@ -1740,6 +1740,10 @@ function win_hdr_periodAll(event, rec, mode) {
 
                                                 var formSubmit = function () {
                                                     form.submit({
+                                                        params: {
+                                                            i_is_last: Ext.getCmp("i_is_lastID").getValue() ? 1 : 0,
+                                                            copy_contract_dtl: Ext.getCmp("copy_contract_dtl_id").getValue().inputValue
+                                                        },
                                                         waitMsg: "Saving Data...",
                                                         success: function (form, action) {
                                                             Ext.getCmp("period-addAllID").setDisabled(false);
@@ -1758,6 +1762,14 @@ function win_hdr_periodAll(event, rec, mode) {
                                                                         message = "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่";
                                                                     } else if (response.status) {
                                                                         message = "บันทึกงวดไม่สำเร็จ เซิร์ฟเวอร์ตอบกลับ HTTP " + response.status;
+                                                                    }
+                                                                    try {
+                                                                        var errorResult = Ext.decode(response.responseText);
+                                                                        if (errorResult && errorResult.msg) {
+                                                                            message = Ext.util.Format.htmlEncode(String(errorResult.msg));
+                                                                        }
+                                                                    } catch (ignore) {
+                                                                        // A proxy may return an HTML error page instead of JSON.
                                                                     }
                                                                     Ext.Msg.alert("แจ้งเตือน", message);
                                                                     break;
