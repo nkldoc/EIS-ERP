@@ -3,6 +3,13 @@ Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
 
+Ext.showCheckingCategory = function (productType) {
+        var asset = Ext.getCmp('am_mode_idID');
+        var material = Ext.getCmp('inv_mode_idID');
+        if (asset) { asset.setVisible(Number(productType) === 2); asset.setReadOnly(false); }
+        if (material) { material.setVisible(Number(productType) === 1); material.setReadOnly(false); }
+};
+
 Ext.setCheckingAssetMode = function (value, singlePeriodSingleFunding) {
         var field = Ext.getCmp('am_mode_idID');
         if (!field) { return; }
@@ -10944,6 +10951,7 @@ Ext.AppUx = function (app, menu) {
                         { name: "i_hire_type" },
                         { name: "i_product_type" },
                         { name: "onePeriodOneBgBudget", type: "boolean" },
+                        { name: "contract_period_count", type: "int" },
                         { name: "am_mode_id" },
                         { name: "inv_mode_id" },
                         { name: "i_is_inv" },
@@ -12822,7 +12830,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         if (storePeriodDtlTransf.data.i_product_type == 1 && Ext.getCmp("inv_mode_idID").getValue() == "") {
                                                                                                 msg += "กรุณาระบุ หมวดวัสดุ";
                                                                                         }
-                                                                                        if (storePeriodDtlTransf.data.i_product_type == 2 && Ext.getCmp("am_mode_idID").getValue() == "") {
+                                                                                        if (storePeriodDtlTransf.data.i_product_type == 2 && Ext.getCmp("workin_processID").getValue().inputValue != 1 && Ext.getCmp("am_mode_idID").getValue() == "") {
                                                                                                 msg += "กรุณาระบุ หมวดสินทรัพย์";
                                                                                         }
                                                                                         if (Ext.getCmp("am_mode_idID").getValue() == "") {
@@ -12947,7 +12955,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                         if (Ext.recDtl.get("i_product_type") === 2) {
                                                                                                                 Ext.getCmp("am_mode_idID").show();
                                                                                                                 Ext.getCmp("workin_process2ID").hide();
-                                                                                                        } else if (Ext.recDtl.get("i_product_type" == 0)) {
+                                                                                                        } else if (Number(Ext.recDtl.get("i_product_type")) === 0) {
                                                                                                                 Ext.getCmp("workin_process2ID").hide();
                                                                                                         } else {
                                                                                                                 Ext.getCmp("inv_mode_idID").show();
@@ -12961,7 +12969,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                         if (Ext.recDtl.get("i_product_type") === 2) {
                                                                                                                 Ext.getCmp("am_mode_idID").show();
                                                                                                                 Ext.getCmp("workin_process2ID").hide();
-                                                                                                        } else if (Ext.recDtl.get("i_product_type" == 0)) {
+                                                                                                        } else if (Number(Ext.recDtl.get("i_product_type")) === 0) {
                                                                                                                 Ext.getCmp("workin_process2ID").hide();
                                                                                                         } else {
                                                                                                                 Ext.getCmp("inv_mode_idID").show();
@@ -12972,8 +12980,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                         Ext.getCmp("f_wip_total_priceID").setValue(Ext.getCmp("f_totalID").getValue());
                                                                                                         Ext.getCmp("f_net_total_priceID").setValue(0);
                                                                                                         Ext.getCmp("f_net_total_priceID").hide();
-                                                                                                        Ext.getCmp("inv_mode_idID").hide();
-                                                                                                        Ext.getCmp("am_mode_idID").hide();
+                                                                                                        Ext.showCheckingCategory(Ext.recDtl ? Ext.recDtl.get("i_product_type") : 0);
                                                                                                         Ext.getCmp("f_under_total_priceID").setValue(0);
                                                                                                         Ext.getCmp("f_under_total_priceID").hide();
                                                                                                         Ext.getCmp("i_qty3ID").hide();
@@ -17485,7 +17492,15 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                         }
                                                                                                                                 });
                                                                                                                                 Ext.getCmp("f_totalID").setValue(Ext.floatRenderer(Ext.f_net_tranf_price));
-                                                                                                                                // Ext.getCmp("i_qty_tranfID").setValue(Ext.floatRenderer(Ext.i_qty_tranf));
+                                                                                        if (Ext.recDtl && Number(Ext.recDtl.get("i_product_type")) === 2 && Ext.recDtl.get("contract_period_count") > 1) {
+                                                                                                Ext.getCmp("workin_processID").setValue({ i_workin_process: 1 });
+                                                                                                Ext.getCmp("f_wip_total_priceID").setValue(Ext.floatRenderer(Ext.f_net_tranf_price));
+                                                                                                Ext.getCmp("f_net_total_priceID").setValue(0);
+                                                                                                Ext.getCmp("f_under_total_priceID").setValue(0);
+                                                                                        }
+
+                                                                                                                                if (Ext.recDtl) { Ext.showCheckingCategory(Ext.recDtl.get("i_product_type")); }
+                                                                                        // Ext.getCmp("i_qty_tranfID").setValue(Ext.floatRenderer(Ext.i_qty_tranf));
                                                                                                                                 // Ext.getCmp("f_total_add_vat_amtID").setValue(Ext.floatRenderer(Ext.f_total_add_vat_amt));
                                                                                                                         }
                                                                                                                 },
