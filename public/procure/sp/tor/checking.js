@@ -10543,11 +10543,22 @@ Ext.AppUx = function (app, menu) {
                 autoLoad: true,
                 url: "api/All_PoWorkingImpHdr.php",
                 baseParams: {
-                        type: "dc_cost",
+                        type: "dc_cost_all",
                 },
                 root: "data",
                 idProperty: "id",
                 fields: ["id", "c_code", "c_name"],
+                listeners: {
+                        load: function () {
+                                // Resolve values assigned before the department names finished loading.
+                                Ext.each(["dc_cost_idID", "dc_cost2_idID"], function (id) {
+                                        var field = Ext.getCmp(id);
+                                        if (field) {
+                                                field.setValue(field.getValue());
+                                        }
+                                });
+                        },
+                },
         });
         Ext.booking_store = new Ext.data.JsonStore({
                 autoDestroy: false,
