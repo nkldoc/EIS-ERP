@@ -183,6 +183,9 @@ function previewValueExpression($fieldName, $dataType, $alias) {
 }
 
 function shouldUseWorkInProcessAccount($request, $db) {
+    if (!empty($request['_force_multi_period_wip'])) {
+        return true;
+    }
     if (intval(isset($request['i_workin_process']) ? $request['i_workin_process'] : 0) !== 1) {
         return false;
     }
@@ -2231,6 +2234,7 @@ switch ($mode) {
                 , ( select  top 1  i_yyyy_overlap from sp_tor_contract aa where c.sp_tor_contract_id = aa.sp_tor_contract_id ) as i_yyyy_overlap
                 , a.sp_check_period_dtl_id
                  ,c.sp_tor_contract_id
+                ,(SELECT COUNT(*) FROM sp_tor_hdr_period p WHERE p.sp_tor_contract_id = c.sp_tor_contract_id AND p.i_enabled = 1) AS contract_period_count
                 ,CASE WHEN ISNULL(cc.i_is_last,0) = 1
                   AND (SELECT COUNT(*) FROM sp_tor_hdr_period p WHERE p.sp_tor_contract_id = c.sp_tor_contract_id AND p.i_enabled = 1) = 1
                   AND EXISTS (SELECT 1 FROM sp_tor_contract t WHERE t.sp_tor_contract_id = c.sp_tor_contract_id
@@ -2302,6 +2306,7 @@ switch ($mode) {
                 "sp_tranf_hdr_id" => intval($row["sp_tranf_hdr_id"]),
                 "i_product_type" => intval($row["i_product_type"]),
                 "onePeriodOneBgBudget" => (bool) $row["onePeriodOneBgBudget"],
+                "contract_period_count" => (int) $row["contract_period_count"],
                 "am_mode_id" => intval($row["am_mode_id"]),
                 "inv_mode_id" => intval($row["inv_mode_id"]),
                 "i_is_inv" => intval($row["i_is_inv"]),
@@ -2408,6 +2413,28 @@ switch ($mode) {
         exit();
         break;
     case "INSERT_CHECKING_DTL":
+        $multiPeriodAsset = $db->GetDataBySQL('SELECT COUNT(*) FROM dbo.sp_tor_hdr_period p
+            WHERE p.i_enabled = 1 AND p.sp_tor_contract_id IN (
+                SELECT h.sp_tor_contract_id FROM dbo.sp_check_period_hdr h
+                INNER JOIN dbo.sp_check_period_dtl d ON d.sp_check_period_hdr_id = h.sp_check_period_hdr_id
+                WHERE h.sp_check_period_hdr_id = ? AND d.sp_check_period_dtl_id = ? AND d.i_product_type = 2)',
+            array((int) ($_REQUEST['sp_check_period_hdr_id'] ?? 0), (int) ($_REQUEST['id'] ?? 0)));
+        if ($multiPeriodAsset > 1) {
+            $_REQUEST['_force_multi_period_wip'] = true;
+            $_REQUEST['i_product_type'] = 2;
+            $_REQUEST['i_workin_process'] = 1;
+            $_REQUEST['workin_process'] = 1;
+            $_REQUEST['i_workin_process2'] = 0;
+            $_REQUEST['inv_mode_id'] = 0;
+            $_REQUEST['f_wip_total_price'] = (float) str_replace(',', '', $_REQUEST['f_wip_total_price'] ?? '0')
+                + (float) str_replace(',', '', $_REQUEST['f_net_total_price'] ?? '0')
+                + (float) str_replace(',', '', $_REQUEST['f_under_total_price'] ?? '0');
+            $_REQUEST['f_net_total_price'] = 0;
+            $_REQUEST['f_under_total_price'] = 0;
+            $data['i_product_type'] = 2;
+        } else {
+            unset($_REQUEST['_force_multi_period_wip']);
+        }
         // Derive the forced account from persisted period data, not the selected category.
         $forceHoldingAccount = $db->GetDataBySQL('SELECT COUNT(*)
             FROM dbo.sp_check_period_dtl d
