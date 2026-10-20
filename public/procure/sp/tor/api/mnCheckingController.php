@@ -2946,7 +2946,7 @@ switch ($mode) {
                                     where b.i_is_last = 1 and sp_check_period_hdr_id = ?";
             $f1 = $db->GetDataBySQL($subSql, array($data["id"]));
 
-            $i_last_period = $f1['i_is_last'];
+            $i_last_period = $f1['i_is_last'] ?? 0;
             $f2 = $db->GetDataBySQL("select sp_gl_monthly_hdr_id from dbo.sp_gl_monthly_hdr a where  i_enabled  = 1 and  a.sp_tor_hdr_period_id  = ?", array($data["sp_tor_hdr_period_id"]));
 
             $sp_gl_monthly_hdr_id = $f2;

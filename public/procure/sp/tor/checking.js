@@ -4215,7 +4215,7 @@ Ext.editHistoryAp = (statusx) => {
                 Ext.dc_acc.load();
         }
         if (Ext.selectRow.data.c_checking_code == null) {
-                Ext.booking_store.setBaseParam("dc_cost_id", Ext.selectRow.data.dc_cost_id);
+                Ext.booking_store.setBaseParam("dc_cost_id", Ext.bookingCostId());
                 Ext.booking_store.setBaseParam("i_yyyy_overlap", Ext.selectRow.data.i_yyyy_overlap);
                 Ext.booking_store.setBaseParam("dc_expense_budget_type_id", Ext.selectRow.data.dc_expense_budget_type_id);
                 console.log("at line setep ", Ext.stempDbClickRow, "booking_store load start", "dc_cost_id =", Ext.selectRow.data.dc_cost_id);
@@ -4346,7 +4346,7 @@ Ext.editHistoryAp = (statusx) => {
                                                         console.log("at line setep ", Ext.stempDbClickRow, "booking_store Edit_bg load start", "dc_cost_id =", Ext.selectRow.data.dc_cost_id);
                                                         Ext.stempDbClickRow++;
                                                         Ext.booking_store.load({
-                                                                params: { dc_cost_id: Ext.selectRow.data.dc_cost_id, i_yyyy_overlap: Ext.selectRow.data.i_yyyy_overlap, dc_expense_budget_type_id: Ext.selectRow.data.dc_expense_budget_type_id },
+                                                                params: { dc_cost_id: Ext.bookingCostId(), i_yyyy_overlap: Ext.selectRow.data.i_yyyy_overlap, dc_expense_budget_type_id: Ext.selectRow.data.dc_expense_budget_type_id },
                                                                 callback: function (record, operation, success) {
                                                                         console.log("at line setep ", Ext.stempDbClickRow, "booking_store Edit_bg callback", "success =", success, "count =", record ? record.length : 0);
                                                                         Ext.stempDbClickRow++;
@@ -10549,6 +10549,15 @@ Ext.AppUx = function (app, menu) {
                 idProperty: "id",
                 fields: ["id", "c_code", "c_name"],
         });
+        // หน่วยงานที่ใช้ค้นหาใบกัน: เงินของ PR จองไว้ที่หน่วยงานเจ้าของเรื่อง (dc_cost_id2) ไม่ใช่หน่วยงานผู้ทำสัญญา
+        // โหมดขอแก้ไขงบ (Edit_bg) ให้ใช้หน่วยงานที่ผู้ใช้เลือกในฟอร์มเหมือนเดิม
+        Ext.bookingCostId = function () {
+                var d = Ext.selectRow && Ext.selectRow.data ? Ext.selectRow.data : {};
+                var cmp = Ext.getCmp("dc_cost_idID");
+                if (Ext.arrEdit && Ext.arrEdit[0] == "Edit_bg" && cmp) return cmp.getValue();
+                if (Number(d.dc_cost_id2) > 0) return d.dc_cost_id2;
+                return cmp ? cmp.getValue() : d.dc_cost_id;
+        };
         Ext.booking_store = new Ext.data.JsonStore({
                 autoDestroy: false,
                 autoLoad: false,
@@ -12448,7 +12457,7 @@ Ext.AppUx = function (app, menu) {
                                                 if ([4, 5, 6, 99].includes(Ext.selectRow.data.i_send_gl_dr) && Ext.selectRow.data.i_overlap === 3 && Ext.selectRow.data.c_overlap != null) {
                                                         // Ext.getCmp("buSaveSub3ID").hide();
                                                 }
-                                                if (Ext.selectRow.data.c_checking_code != null) {
+                                                if ([3, 4, 5, 6, 99].includes(Number(Ext.selectRow.data.i_send_gl_dr))) {
                                                         Ext.getCmp("i_yyyy_overlapID").setReadOnly(true);
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
                                                         // Ext.getCmp("i_type_transfer").setValue(Ext.selectRow.data);
@@ -12456,7 +12465,7 @@ Ext.AppUx = function (app, menu) {
                                                 if ([1, 5].includes(Ext.selectRow.data.i_chk_bg)) {
                                                         Ext.getCmp("c_booking_radiogroup").hide();
                                                         // Ext.getCmp("chek_overlapID").show().setValue(Ext.selectRow.data.chek_overlap);
-                                                } else if (Ext.selectRow.data.c_checking_code == null && Ext.selectRow.data.i_chk_bg == 2) {
+                                                } else if (Ext.isEmpty(Ext.selectRow.data.c_checking_code) && Ext.selectRow.data.i_chk_bg == 2) {
                                                         Ext.getCmp("c_booking_radiogroup").hide(true);
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
                                                 } else if (Ext.selectRow.data.i_yyyy_overlap != Ext.BudgetYear) {
@@ -12464,7 +12473,11 @@ Ext.AppUx = function (app, menu) {
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
                                                 } else {
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
-                                                        Ext.getCmp("i_yyyy_overlapID").setReadOnly(true);
+                                                        // ปีที่หักเงินเท่ากับปีงบประมาณปัจจุบัน แต่ยังไม่ออกเลขตรวจรับ/ยังไม่ลง GL -
+                                                        // user ต้องแก้ปีเองได้ (เช่น เปลี่ยนเป็นปีก่อนเพื่อเลือกใบกัน) จึงไม่ล็อกช่องปี
+                                                        if ([3, 4, 5, 6, 99].includes(Number(Ext.selectRow.data.i_send_gl_dr))) {
+                                                                Ext.getCmp("i_yyyy_overlapID").setReadOnly(true);
+                                                        }
                                                 }
                                                 Ext.getCmp("i_chk_bgTxtID").setValue(Ext.selectRow.data.i_chk_bgTxt);
                                         },
@@ -14110,7 +14123,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                 Ext.getCmp("c_bookingID").setReadOnly(false);
                                                                                                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                                                                                                 Ext.booking_store.load({
-                                                                                                                                        params: { dc_cost_id: Ext.getCmp("dc_cost_idID").getValue(), i_yyyy_overlap: Ext.getCmp("i_yyyy_overlapID").getValue() },
+                                                                                                                                        params: { dc_cost_id: Ext.bookingCostId(), i_yyyy_overlap: Ext.getCmp("i_yyyy_overlapID").getValue() },
                                                                                                                                         callback: function (record, success) {
                                                                                                                                                 if (success) {
                                                                                                                                                         Ext.getCmp("winPeriodHdrID").getEl().unmask();
@@ -14216,7 +14229,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                                                                                 Ext.booking_store.load({
                                                                                                                         params: {
-                                                                                                                                dc_cost_id: Ext.getCmp("dc_cost_idID").getValue(),
+                                                                                                                                dc_cost_id: Ext.bookingCostId(),
                                                                                                                                 i_yyyy_overlap: overlapYear,
                                                                                                                                 c_booking: overlapCode
                                                                                                                         },
@@ -14248,6 +14261,17 @@ Ext.AppUx = function (app, menu) {
                                                                                                 }
                                                                                         },
                                                                                         {
+                                                                                                xtype: "button",
+                                                                                                id: "btnConfirmBookingID",
+                                                                                                fieldLabel: "ยืนยันใบกัน",
+                                                                                                text: "ยืนยันกันเหลื่อมก่อหนี้ (เปิดหน้ายืนยันใบกัน)",
+                                                                                                icon: "../images/icons/book_edit.png",
+                                                                                                hidden: Number(Ext.selectRow.data.i_type_bg) !== 1,
+                                                                                                handler: function () {
+                                                                                                        win_request_edit_bg(Ext.selectRow);
+                                                                                                },
+                                                                                        },
+                                                                                        {
                                                                                                 fieldLabel: "เลขที่ใบกันเงินเหลื่อมปี",
                                                                                                 id: "c_booking_radiogroup",
                                                                                                 xtype: "radiogroup",
@@ -14265,7 +14289,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 name: "c_booking",
                                                                                                                 hiddenName: "c_booking",
                                                                                                                 id: "c_bookingID",
-                                                                                                                readOnly: Ext.selectRow.data.c_checking_code != null ? true : false,
+                                                                                                                readOnly: [3, 4, 5, 6, 99].includes(Number(Ext.selectRow.data.i_send_gl_dr)),
                                                                                                                 triggerAction: "all",
                                                                                                                 forceSelection: true,
                                                                                                                 selectOnFocus: true,
@@ -14304,7 +14328,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                 if (
                                                                                                                                         (record.data.dc_expense_budget_type_id != Ext.getCmp("dc_expense_budget_type_idTxtID").getValue() ||
                                                                                                                                                 record.data.bg_expense_id != Ext.getCmp("po_expense_idID").getValue() ||
-                                                                                                                                                record.data.dc_cost_id != Ext.getCmp("dc_cost_idID").getValue()) &&
+                                                                                                                                                record.data.dc_cost_id != Ext.bookingCostId()) &&
                                                                                                                                         Ext.arrEdit[0] != "Edit_bg"
                                                                                                                                 ) {
                                                                                                                                         var index = Ext.dc_expense_budget_type.findExact("id", record.data.dc_expense_budget_type_id);
@@ -14319,7 +14343,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                 } else if (
                                                                                                                                         (record.data.dc_expense_budget_type_id != Ext.getCmp("dc_expense_budget_type_idTxtID").getValue() ||
                                                                                                                                                 record.data.bg_expense_id != Ext.getCmp("po_expense_idID").getValue() ||
-                                                                                                                                                record.data.dc_cost_id != Ext.getCmp("dc_cost_idID").getValue()) &&
+                                                                                                                                                record.data.dc_cost_id != Ext.bookingCostId()) &&
                                                                                                                                         Ext.arrEdit[0] == "Edit_bg"
                                                                                                                                 ) {
                                                                                                                                         Ext.Msg.alert("แจ้งเตือน", "ข้อมูลการตรวจรับไม่ตรงกับข้อมูลใบกันติดต่องบประมาณเพื่อเช็คข้อมูลงบประมาณในระบบกับใบกัน");
