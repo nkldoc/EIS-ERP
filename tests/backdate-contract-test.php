@@ -6,6 +6,7 @@ class Rows {
     function __construct($rows = array()) { $this->rows = $rows; }
 }
 class BackdateDB {
+    public $employeeCode = '074';
     public $approved = true;
     public $approvalConsumed = false;
     public $conn;
@@ -25,13 +26,15 @@ class BackdateDB {
     function Fetch($stmt) { return array_shift($stmt->rows); }
     function QueryParam($sql, $params) {
         if (strpos($sql, 'sp_contract_year') !== false) return new Rows(array(array('i_year_be' => 2570)));
-        if (strpos($sql, 'FROM dbo.sp_emp') !== false) return new Rows(array(array('emp_code' => '03')));
+        if (strpos($sql, 'FROM dbo.sp_emp') !== false) {
+            checkBackdate($params === array($_REQUEST['mode'] === 'SAVE_BACKDATE' ? 21300 : 999), 'Employee comes from persisted TOR when saving');
+            return new Rows(array(array('emp_code' => $this->employeeCode))); }
         if (strpos($sql, 'FROM dbo.sp_doc d') !== false) return new Rows(array(array('c_code' => 'พวช.ซ.', 'i_digit' => 4, 'next_value' => 9123)));
         if (strpos($sql, 'TOP 1') !== false) {
             $found = strpos($sql, 'd_create >=') !== false ? $this->sameDay : $this->hasPrevious;
-            return new Rows($found ? array(array('i_value' => 39122, 'c_gen' => 'พวช.ซ.039122/2569')) : array());
+            return new Rows($found ? array(array('i_value' => 39122, 'c_gen' => 'พวช.ซ.0779122/2569')) : array());
         }
-        return new Rows($this->suffix ? array(array('c_gen' => 'พวช.ซ.039122.' . $this->suffix . '/2569')) : array());
+        return new Rows($this->suffix ? array(array('c_gen' => 'พวช.ซ.0749122.' . $this->suffix . '/2569')) : array());
     }
 }
 function sqlsrv_query($db, $sql, $params = array()) {
@@ -39,7 +42,7 @@ function sqlsrv_query($db, $sql, $params = array()) {
     if (strpos($sql, 'UPDATE dbo.sp_contract_backdate_request') !== false) { $db->approvalConsumed = true; return new Rows(); }
     if (strpos($sql, 'sp_getapplock') !== false) return new Rows(array(array('lock_result' => 0)));
     if (strpos($sql, 'SELECT c.c_code') !== false) return new Rows(array(array(
-        'c_code' => $db->existingCode, 'i_purchase' => 1, 'i_type_contract' => 1, 'i_yyyy' => 2026)));
+        'c_code' => $db->existingCode, 'i_purchase' => 1, 'i_type_contract' => 1, 'i_yyyy' => 2026, 'sp_emp_id' => 21300)));
     if (strpos($sql, 'SELECT c_gen') !== false) return new Rows();
     if (strpos($sql, 'INSERT') !== false) { $db->insert = $params; return new Rows(); }
     if (strpos($sql, 'UPDATE') !== false) { $db->update = $params; return $db->failUpdate ? false : new Rows(); }
@@ -56,7 +59,7 @@ function runBackdate($db, $mode = 'SAVE_BACKDATE', $day = '2026-10-12') {
     $_SESSION = array('user_id' => 10, 'dc_cost_id' => 20);
     // Deliberately send incorrect doc/year: saving must use the persisted contract.
     $_REQUEST = array('mode' => $mode, 'dc_doc_id' => 2, 'c_yyyy' => 2570,
-        'id' => 77, 'sp_tor_contract_id' => 88, 'contract_date' => $day);
+        'id' => 77, 'sp_tor_contract_id' => 88, 'contract_date' => $day, 'sp_emp_id' => 999);
     $source = file_get_contents(__DIR__ . '/../public/supplies/sp/tor/api/mnContractCode.php');
     $start = strpos($source, '$mode =');
     $end = strpos($source, '$table =');
@@ -69,15 +72,15 @@ function runBackdate($db, $mode = 'SAVE_BACKDATE', $day = '2026-10-12') {
 }
 $db = new BackdateDB();
 $result = runBackdate($db);
-checkBackdate($result['success'] && $result['code'] === 'พวช.ซ.039122.1/2569', 'First suffix');
+checkBackdate($result['success'] && $result['code'] === 'พวช.ซ.0749122.1/2569', 'First suffix');
 checkBackdate($db->committed && !$db->rolledBack, 'Successful transaction');
 checkBackdate($db->approvalConsumed, 'Approval consumed in numbering transaction');
 checkBackdate(array_slice($db->insert, 0, 8) === array(4, 77, 2569, 39122, 10, 20, '2026-10-12', $result['code']), 'Document fields and parent running number');
-checkBackdate($db->insert[8] === "วันที่ออกเลข: 12-10-2569\r\nเลขสัญญา: พวช.ซ.039122.1/2569\r\nประเภท: ย้อนหลัง (สัญญาซื้อ)", 'Stored numbering detail');
+checkBackdate($db->insert[8] === "วันที่ออกเลข: 12-10-2569\r\nเลขสัญญา: พวช.ซ.0749122.1/2569\r\nประเภท: ย้อนหลัง (สัญญาซื้อ)", 'Stored numbering detail');
 checkBackdate($db->update[0] === $result['code'] && $db->update[4] === 88, 'Contract linked to generated number');
 $db = new BackdateDB(); $db->sameDay = false; $db->suffix = 2;
 $result = runBackdate($db);
-checkBackdate($result['success'] && $result['code'] === 'พวช.ซ.039122.3/2569', 'Fallback and next suffix');
+checkBackdate($result['success'] && $result['code'] === 'พวช.ซ.0749122.3/2569', 'Fallback and next suffix');
 $db = new BackdateDB(); $db->failUpdate = true;
 $result = runBackdate($db);
 checkBackdate(!$result['success'] && $db->rolledBack && !$db->committed, 'Rollback on contract update failure');
@@ -97,7 +100,7 @@ $today = (new DateTime('now', new DateTimeZone('Asia/Bangkok')))->format('Y-m-d'
 $db = new BackdateDB();
 $result = runBackdate($db, 'PREVIEW_BACKDATE', $today);
 checkBackdate($result['success'] && $result['normal'] && !$db->insert
-    && $result['code'] === 'พวช.ซ.039123/2570' && $result['issue_date'] === $today
+    && $result['code'] === 'พวช.ซ.0749123/2570' && $result['issue_date'] === $today
     && $result['numbering_type'] === 'ปกติ', 'Today previews next normal number with active year and department');
 $db = new BackdateDB();
 runBackdate($db, 'SAVE_BACKDATE', $today);
@@ -111,4 +114,10 @@ checkBackdate(!$result['success'] && $db->rolledBack && !$db->insert, 'Different
 $db = new BackdateDB(); $db->approved = false;
 $result = runBackdate($db, 'GENCODECST', '2026-10-12');
 checkBackdate(!$result['success'] && $db->rolledBack && !$db->insert, 'Normal mode with backdate still requires approval');
-echo "Backdate contract: 12 scenarios passed\n";
+
+
+$db = new BackdateDB(); $db->employeeCode = '';
+$result = runBackdate($db);
+checkBackdate(!$result['success'] && $db->rolledBack && !$db->insert, 'Missing employee code cannot issue number');
+
+echo "Backdate contract: all scenarios passed\n";
