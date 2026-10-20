@@ -3380,6 +3380,26 @@ switch ($mode) {
         break;
     case "updateMaterialType":
 
+        $materialPeriodId = (int) ($_REQUEST['sp_tor_hdr_period_id'] ?? 0);
+        $materialTypes = json_decode($_REQUEST['i_product_types'] ?? '[]', true);
+        if ($materialPeriodId <= 0 || !is_array($materialTypes) || !isset($materialTypes[0]) || !in_array((string) $materialTypes[0], array('0', '1', '2'), true)) {
+            $db->RollBackTran();
+            echo json_encode(array('success' => false, 'msg' => 'กรุณาเลือกงวดและประเภทวัสดุ/ครุภัณฑ์ให้ถูกต้อง'));
+            exit;
+        }
+        $materialPeriodExists = $db->GetDataBySQL('SELECT COUNT(*) FROM dbo.sp_tor_hdr_period WITH (UPDLOCK, HOLDLOCK) WHERE sp_tor_hdr_period_id = ?', array($materialPeriodId));
+        $hasDisbursement = $db->GetDataBySQL('SELECT COUNT(*)
+            FROM dbo.sp_check_period_hdr h WITH (UPDLOCK, HOLDLOCK)
+            INNER JOIN ' . DB_NMU_EIS . 'po_working_dtl d WITH (UPDLOCK, HOLDLOCK) ON d.po_working_hdr_id = h.po_working_hdr_id
+            WHERE h.sp_tor_hdr_period_id = ? AND LTRIM(d.c_code) LIKE ?', array($materialPeriodId, 'D%'));
+        if (!$materialPeriodExists || $hasDisbursement) {
+            $db->RollBackTran();
+            echo json_encode(array('success' => false, 'msg' => $hasDisbursement
+                ? 'รายการนี้มีเลขใบเบิก D แล้ว ไม่สามารถแก้ไขประเภทวัสดุ/ครุภัณฑ์ได้'
+                : 'ไม่พบงวดที่ต้องการแก้ไข'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         $stmt1 = true;
         $stmt2 = true;
         $stmt3 = true;

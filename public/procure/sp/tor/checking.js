@@ -3,6 +3,47 @@ Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
 
+Ext.editCheckingMaterialType = function () {
+        var rec = Ext.selectRow;
+        if (!rec) { return; }
+        if (/^D/i.test(String(rec.get('c_code_po') || '').replace(/^\s+/, ''))) {
+                Ext.Msg.alert('แจ้งเตือน', 'รายการนี้มีเลขใบเบิก D แล้ว ไม่สามารถแก้ไขประเภทวัสดุ/ครุภัณฑ์ได้');
+                return;
+        }
+        var combo = new Ext.form.ComboBox({
+                fieldLabel: 'ประเภทวัสดุ/ครุภัณฑ์', mode: 'local', editable: false,
+                triggerAction: 'all', forceSelection: true, allowBlank: false, anchor: '100%',
+                store: new Ext.data.ArrayStore({ fields: ['id', 'text'], data: [[0, 'ไม่ระบุของ'], [1, 'วัสดุ'], [2, 'ครุภัณฑ์']] }),
+                valueField: 'id', displayField: 'text', value: Number(rec.get('i_product_type') || 0)
+        });
+        var saveButton = new Ext.Button({ text: 'บันทึก', iconCls: 'icon-save', handler: function () {
+                if (!combo.isValid()) { return; }
+                saveButton.disable();
+                Ext.Ajax.request({
+                        url: 'tor/api/mnCheckingController.php', method: 'POST',
+                        params: { mode: 'updateMaterialType', sp_tor_hdr_period_id: rec.get('sp_tor_hdr_period_id'),
+                                i_product_types: Ext.encode([combo.getValue()]) },
+                        callback: function (options, success, response) {
+                                saveButton.enable();
+                                var result;
+                                try { result = Ext.decode(response.responseText); } catch (error) { result = {}; }
+                                if (success && (result.success === 'Success' || result.success === true || result.reval === 0)) {
+                                        rec.set('i_product_type', Number(combo.getValue()));
+                                        win.close();
+                                        Ext.Msg.alert('แจ้งเตือน', 'บันทึกประเภทวัสดุ/ครุภัณฑ์เรียบร้อยแล้ว กรุณาเปิดรายละเอียดใหม่');
+                                        if (Ext.storeDtl) { Ext.storeDtl.reload(); }
+                                } else {
+                                        Ext.Msg.alert('แจ้งเตือน', Ext.util.Format.htmlEncode(result.msg || 'บันทึกไม่สำเร็จ กรุณาลองใหม่'));
+                                }
+                        }
+                });
+        }});
+        var win = new Ext.Window({ title: 'แก้ไขประเภทวัสดุ/ครุภัณฑ์', width: 440, autoHeight: true,
+                modal: true, layout: 'form', labelWidth: 145, bodyStyle: 'padding:15px', items: [combo],
+                buttons: [saveButton, { text: 'ปิด', handler: function () { win.close(); } }] });
+        win.show();
+};
+
 Ext.submod = "";
 const edit_bg = function (data) {
         let msg = "";
@@ -12504,6 +12545,9 @@ Ext.AppUx = function (app, menu) {
                                                 labelWidth: 100,
                                                 height: 250,
                                                 id: "groupProductTypeID",
+                                                                tbar: [{ text: 'แก้ไขประเภทวัสดุ/ครุภัณฑ์', iconCls: 'icon-building-edit',
+                                                                        disabled: /^D/i.test(String(Ext.selectRow.get('c_code_po') || '').replace(/^\s+/, '')),
+                                                                        handler: Ext.editCheckingMaterialType }],
                                                 layout: "column", // กำหนด layout ให้เป็น column เพื่อให้แบ่งเป็นคอลัมน์ได้
 
                                                 // columns: [10,10],
