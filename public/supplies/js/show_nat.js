@@ -922,30 +922,57 @@ Ext.onReady(function () {
     var root = new Ext.tree.AsyncTreeNode();
     var frequentMenuUser = Ext.session.user_id;
     function frequentMenuKey() {
-        return 'supplies.frequentMenus.' + frequentMenuUser + '.' + localStorage.getItem('supplies_parentId');
+        return 'supplies.favoriteMenus.' + frequentMenuUser + '.' + localStorage.getItem('supplies_parentId');
     }
     function readFrequentMenus() {
         try { return JSON.parse(localStorage.getItem(frequentMenuKey()) || '{}') || {}; }
         catch (e) { return {}; }
     }
+    function setFavoriteMenu(menuId, checked) {
+        var favorites = readFrequentMenus();
+        if (checked) favorites[menuId] = true;
+        else delete favorites[menuId];
+        try { localStorage.setItem(frequentMenuKey(), JSON.stringify(favorites)); }
+        catch (e) { Ext.Msg.alert('Error', 'Unable to save favorite menus'); return false; }
+        renderFrequentMenus();
+        return true;
+    }
+    function bindFavoriteMenuCheckboxes(field) {
+        if (field.favoriteCheckboxesBound) return;
+        field.favoriteCheckboxesBound = true;
+        function isCheckbox(event) {
+            return event.target && event.target.className === 'supplies-favorite-checkbox';
+        }
+        field.list.dom.addEventListener('mousedown', function (event) {
+            if (isCheckbox(event)) { event.preventDefault(); event.stopPropagation(); }
+        }, true);
+        field.list.dom.addEventListener('click', function (event) {
+            if (!isCheckbox(event)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            var row = Ext.fly(event.target).findParent('.x-combo-list-item', field.list.dom);
+            var index = field.view.indexOf(row), record = field.store.getAt(index);
+            if (record && setFavoriteMenu(record.get('menuId'), !record.get('favorite'))) {
+                record.set('favorite', !record.get('favorite'));
+                field.view.refresh();
+            }
+        }, true);
+    }
     function renderFrequentMenus() {
-        var counts = readFrequentMenus(), menus = [], folder = root.findChild('id', 'supplies-frequent-menus');
+        var favorites = readFrequentMenus(), menus = [], folder = root.findChild('id', 'supplies-frequent-menus');
         root.cascade(function (node) {
-            if (node.leaf && !node.attributes.frequentOriginalId && counts[node.id] && Number(counts[node.id].count) > 0) menus.push(node);
-        });
-        menus.sort(function (a, b) {
-            return Number(counts[b.id].count) - Number(counts[a.id].count) || Number(counts[b.id].last) - Number(counts[a.id].last);
+            if (node.leaf && !node.attributes.frequentOriginalId && favorites[node.id]) menus.push(node);
         });
         if (!folder) {
             folder = new Ext.tree.TreeNode({id: 'supplies-frequent-menus', text: 'เมนูที่ใช้บ่อยที่สุด', leaf: false, expanded: true});
             root.insertBefore(folder, root.firstChild);
         }
         folder.removeAll(true);
-        for (var i = 0; i < Math.min(4, menus.length); i++) {
+        for (var i = 0; i < menus.length; i++) {
             var menu = menus[i];
             folder.appendChild(new Ext.tree.TreeNode({id: 'supplies-frequent-' + i, text: menu.text, leaf: true,
                 icon: menu.attributes.icon, iconCls: menu.attributes.iconCls, cls: menu.attributes.cls, frequentOriginalId: menu.id,
-                qtip: 'เปิดใช้งาน ' + Number(counts[menu.id].count) + ' ครั้ง'}));
+                checked: true}));
         }
         folder.expand(false, false);
     }
@@ -971,7 +998,7 @@ Ext.onReady(function () {
             emptyText: 'ค้นหาเมนู...',
             width: 220,
             mode: 'local',
-            store: new Ext.data.ArrayStore({fields: ['menuId', 'menuText']}),
+            store: new Ext.data.ArrayStore({fields: ['menuId', 'menuText', 'favorite']}),
             displayField: 'menuText',
             valueField: 'menuText',
             triggerAction: 'all',
@@ -982,7 +1009,10 @@ Ext.onReady(function () {
             forceSelection: false,
             listWidth: 350,
             maxHeight: 280,
-            tpl: '<tpl for="."><div class="x-combo-list-item">{menuText:htmlEncode}</div></tpl>',
+            tpl: new Ext.XTemplate('<tpl for="."><div class="x-combo-list-item" style="padding-right:30px;position:relative;">',
+                '{menuText:htmlEncode}<input type="checkbox" class="supplies-favorite-checkbox" ',
+                'aria-label="Favorite" title="Favorite" style="position:absolute;right:8px;top:4px;" ',
+                '<tpl if="favorite">checked="checked"</tpl> /></div></tpl>'),
             enableKeyEvents: true,
             listeners: {
                 beforequery: function (event) {
@@ -990,12 +1020,14 @@ Ext.onReady(function () {
                     root.cascade(function (node) {
                         if(node.leaf&&!node.attributes.frequentOriginalId){
                             var text=menuSearchText(node.text);
-                            if(query&&text.toLowerCase().indexOf(query)!==-1)matches.push([node.id,text]);
+                            if(query&&text.toLowerCase().indexOf(query)!==-1)matches.push([node.id,text,!!readFrequentMenus()[node.id]]);
                         }
                     });
                     // Results already match anywhere in the plain menu label.
                     // Cancel ComboBox's default prefix filter so it cannot filter them again.
                     event.cancel = true;
+                    field.initList();
+                    bindFavoriteMenuCheckboxes(field);
                     field.store.clearFilter();
                     field.store.loadData(matches);
                     if (matches.length) {
@@ -1125,12 +1157,14 @@ Ext.onReady(function () {
 
         return browserName + "  = " + fullVersion + ",Major version = " + majorVersion + ",navigator.appName = " + navigator.appName + ",navigator.userAgent = " + navigator.userAgent;
     };
+    TreePanel1.on('checkchange', function (node, checked) {
+        if (node.attributes.frequentOriginalId) {
+            setFavoriteMenu(node.attributes.frequentOriginalId, checked);
+        }
+    });
     TreePanel1.on("click", function (n) {
         if (n.leaf) {
             var originalMenuId = n.attributes.frequentOriginalId || n.id;
-            var menuCounts = readFrequentMenus();
-            menuCounts[originalMenuId] = {count: Number((menuCounts[originalMenuId] || {}).count || 0) + 1, last: new Date().getTime()};
-            try { localStorage.setItem(frequentMenuKey(), JSON.stringify(menuCounts)); } catch (storageError) {}
             // ignore clicks on folders and currently selected node
 
 
