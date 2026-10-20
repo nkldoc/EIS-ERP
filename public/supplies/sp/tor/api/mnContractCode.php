@@ -51,7 +51,7 @@ if ($mode === 'PREVIEW_BACKDATE' || $mode === 'SAVE_BACKDATE') {
             echo json_encode(array('success' => false, 'msg' => 'ระบบกำลังออกเลขสัญญา กรุณาลองใหม่'));
             exit;
         }
-        $stmt = sqlsrv_query($db->conn, 'SELECT c.c_code, t.i_purchase, t.i_type_contract, t.i_yyyy
+        $stmt = sqlsrv_query($db->conn, 'SELECT c.c_code, t.i_purchase, t.i_type_contract, t.i_yyyy, t.sp_emp_id
             FROM dbo.sp_tor_contract c WITH (UPDLOCK, HOLDLOCK)
             INNER JOIN dbo.sp_tor t ON t.tor_id = c.sp_tor_id
             WHERE c.sp_tor_contract_id = ? AND c.sp_tor_id = ?',
@@ -121,7 +121,18 @@ if ($mode === 'PREVIEW_BACKDATE' || $mode === 'SAVE_BACKDATE') {
         } elseif (!$last) {
             $result['msg'] = 'ไม่พบเลขสัญญาในวันที่เลือกหรือก่อนหน้าในประเภทและปีที่ระบุ';
         } elseif (preg_match('~^(.+?\d+)(?:\.(\d+))?/([0-9]{4})$~u', trim($last['c_gen']), $parts)) {
-            $base = $parts[1];
+            // Keep the reference running number, but use this TOR's employee code.
+            $stmt = $db->QueryParam('SELECT emp_code FROM dbo.sp_emp WHERE sp_emp_id = ?',
+                array($saving ? intval($contract['sp_emp_id']) : intval($_REQUEST['sp_emp_id'] ?? 0)));
+            $employee = $stmt ? $db->Fetch($stmt) : false;
+            $employeeCode = $employee ? trim((string)$employee['emp_code']) : '';
+            if (!preg_match('/^[0-9]{3}$/', $employeeCode)
+                    || !preg_match('~^(.*?)[0-9]{3}([0-9]+)$~u', $parts[1], $baseParts)) {
+                if ($saving) $db->RollBackTran();
+                echo json_encode(array('success' => false, 'msg' => 'Invalid employee code or reference contract number'));
+                exit;
+            }
+            $base = $baseParts[1] . $employeeCode . $baseParts[2];
             $suffix = 0;
             $stmt = $db->QueryParam(
                 'SELECT c_gen FROM dbo.sp_doc_gen WHERE dc_doc_id = ? AND c_yyyy = ? AND i_value = ?',
