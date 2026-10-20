@@ -6,44 +6,26 @@ Ext.formSubmitHistory = [];
 Ext.setCheckingAssetMode = function (value, singlePeriodSingleFunding) {
         var field = Ext.getCmp('am_mode_idID');
         if (!field) { return; }
-        var fixed = singlePeriodSingleFunding === true;
-        field.setReadOnly(fixed);
+        field.setReadOnly(false);
+        field.hideTrigger = false;
         field.setWidth(400);
-        // A newly changed asset has no saved category yet. Default it to the
-        // holding account as well, while keeping other cases selectable.
-        if (!fixed && Number(value) > 0) { Ext.setCheckingModeValue(field, value); return; }
-        field.clearValue();
-        field.setRawValue('บัญชีพักครุภัณฑ์');
+        if (field.trigger) { field.trigger.show(); }
         var addButton = Ext.getCmp('ButtonsproductID');
-        if (addButton) { addButton.disable(); }
-        var applyFixedMode = function () {
+        if (addButton) { addButton.enable(); }
+        var applyMode = function () {
                 if (field.destroyed || field.isDestroyed) { return; }
-                var index = field.getStore().findBy(function (record) {
-                        return String(record.get('c_name') || '').indexOf('บัญชีพักครุภัณฑ์') !== -1;
-                });
-                if (index < 0) { index = field.getStore().findBy(function (record) { return Number(record.get('id')) === 35; }); }
-                if (index >= 0) {
-                        var mode = field.getStore().getAt(index);
-                        mode.set('c_name', 'บัญชีพักครุภัณฑ์');
-                        field.setValue(mode.get('id'));
-                        field.setRawValue('บัญชีพักครุภัณฑ์');
-                        if (addButton && !addButton.destroyed) { addButton.enable(); }
-                } else {
-                        field.clearValue();
-                        Ext.Msg.alert('แจ้งเตือน', 'ไม่พบหมวดบัญชีพักครุภัณฑ์ในข้อมูลหลัก กรุณาติดต่อผู้ดูแลระบบ');
-                }
+                var fixed = singlePeriodSingleFunding === true || Number(singlePeriodSingleFunding) === 1;
+                var selectedValue = fixed || !Number(value) ? 35 : value;
+                var record = field.findRecord(field.valueField, selectedValue);
+                if (record) { field.setValue(record.get(field.valueField)); }
+                else { field.clearValue(); }
         };
-        var hasHoldingMode = field.getStore().findBy(function (record) {
-                return Number(record.get('id')) === 35 || String(record.get('c_name') || '').indexOf('บัญชีพักครุภัณฑ์') !== -1;
-        }) >= 0;
-        if (hasHoldingMode) { applyFixedMode(); }
-        else { field.getStore().load({ params: { include_checking_default: 1 }, callback: function (records, options, success) {
-                if (success) { applyFixedMode(); }
-                else {
-                        field.clearValue();
-                        Ext.Msg.alert('แจ้งเตือน', 'โหลดบัญชีพักครุภัณฑ์ไม่สำเร็จ กรุณาเปิดรายการใหม่');
-                }
-        } }); }
+        if (field.getStore().getCount()) { applyMode(); }
+        else {
+                field.getStore().load({ params: { include_checking_default: 1 }, callback: function (records, options, success) {
+                        if (success) { applyMode(); }
+                } });
+        }
 };
 
 Ext.setCheckingModeValue = function (field, value) {

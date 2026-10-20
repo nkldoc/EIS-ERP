@@ -2231,7 +2231,8 @@ switch ($mode) {
                 , ( select  top 1  i_yyyy_overlap from sp_tor_contract aa where c.sp_tor_contract_id = aa.sp_tor_contract_id ) as i_yyyy_overlap
                 , a.sp_check_period_dtl_id
                  ,c.sp_tor_contract_id
-                ,CASE WHEN (SELECT COUNT(*) FROM sp_tor_hdr_period p WHERE p.sp_tor_contract_id = c.sp_tor_contract_id AND p.i_enabled = 1) = 1
+                ,CASE WHEN ISNULL(cc.i_is_last,0) = 1
+                  AND (SELECT COUNT(*) FROM sp_tor_hdr_period p WHERE p.sp_tor_contract_id = c.sp_tor_contract_id AND p.i_enabled = 1) = 1
                   AND EXISTS (SELECT 1 FROM sp_tor_contract t WHERE t.sp_tor_contract_id = c.sp_tor_contract_id
                     AND ISNULL(t.dc_expense_budget_type2_id,0) = 0 AND ISNULL(t.dc_expense_budget_type3_id,0) = 0)
                   THEN 1 ELSE 0 END AS onePeriodOneBgBudget
@@ -2407,6 +2408,26 @@ switch ($mode) {
         exit();
         break;
     case "INSERT_CHECKING_DTL":
+        // Derive the forced account from persisted period data, not the selected category.
+        $forceHoldingAccount = $db->GetDataBySQL('SELECT COUNT(*)
+            FROM dbo.sp_check_period_dtl d
+            INNER JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id = d.sp_tor_hdr_period_id
+            INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id = p.sp_tor_contract_id
+            WHERE d.sp_check_period_dtl_id = ? AND d.sp_check_period_hdr_id = ?
+              AND d.i_product_type = 2 AND p.i_is_last = 1 AND p.i_enabled = 1
+              AND ISNULL(c.dc_expense_budget_type2_id,0) = 0
+              AND ISNULL(c.dc_expense_budget_type3_id,0) = 0
+              AND (SELECT COUNT(*) FROM dbo.sp_tor_hdr_period otherPeriod
+                   WHERE otherPeriod.sp_tor_contract_id = p.sp_tor_contract_id AND otherPeriod.i_enabled = 1) = 1',
+            array((int) ($_REQUEST['id'] ?? 0), (int) ($_REQUEST['sp_check_period_hdr_id'] ?? 0)));
+        if ($forceHoldingAccount) {
+            $_REQUEST['am_mode_id'] = 35;
+            $_REQUEST['inv_mode_id'] = 0;
+            $_REQUEST['i_product_type'] = 2;
+            $data['am_mode_id'] = 35;
+            $data['inv_mode_id'] = 0;
+            $data['i_product_type'] = 2;
+        }
         $hdr_id = $data['sp_tranf_hdr_id'] ?? null;
         $i_product_type = $data['i_product_type'] ?? null; //
         if ($hdr_id > 0) {
