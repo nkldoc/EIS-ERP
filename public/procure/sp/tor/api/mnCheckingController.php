@@ -1579,12 +1579,11 @@ switch ($mode) {
                     WHERE ISNULL(c.dc_expense_budget_type2_id, 0) = 0
                       AND ISNULL(c.dc_expense_budget_type3_id, 0) = 0
                       AND h.i_enabled =1 AND c.i_enabled =1 and h.i_is_last = 1 and h.sp_tor_hdr_period_id = ?
+                      AND (SELECT COUNT(*) FROM sp_tor_hdr_period p WHERE p.sp_tor_contract_id = h.sp_tor_contract_id AND p.i_enabled = 1) = 1
                     GROUP BY h.sp_tor_contract_id ,h.sp_tor_hdr_period_id
                     HAVING COUNT(*) = 1";
             $f1 = $db->GetDataBySQL($sqlOne, [$row["sp_tor_hdr_period_id"]]);
-            if ($f1) {
-                $onePeriodOneBgBudget = true;
-            }
+            $onePeriodOneBgBudget = (bool) $f1;
 
             switch (intval($row["i_chk_bg"])) {
                 case 0:

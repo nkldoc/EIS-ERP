@@ -3,6 +3,31 @@ Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
 
+Ext.setCheckingAssetMode = function (value) {
+        var field = Ext.getCmp('am_mode_idID');
+        if (!field) { return; }
+        var fixed = !!(Ext.selectRow && Ext.selectRow.get('onePeriodOneBgBudget'));
+        field.setReadOnly(fixed);
+        if (field.trigger) { field.trigger.setDisplayed(!fixed); }
+        if (!fixed) { Ext.setCheckingModeValue(field, value); return; }
+        var applyFixedMode = function () {
+                if (field.destroyed || field.isDestroyed) { return; }
+                var index = field.getStore().findBy(function (record) {
+                        return String(record.get('c_name') || '').indexOf('บัญชีพักครุภัณฑ์') !== -1;
+                });
+                if (index >= 0) {
+                        field.setValue(field.getStore().getAt(index).get('id'));
+                } else {
+                        field.clearValue();
+                        Ext.Msg.alert('แจ้งเตือน', 'ไม่พบหมวดบัญชีพักครุภัณฑ์ในข้อมูลหลัก กรุณาติดต่อผู้ดูแลระบบ');
+                }
+        };
+        if (field.getStore().getCount()) { applyFixedMode(); }
+        else { field.getStore().load({ callback: function (records, options, success) {
+                if (success) { applyFixedMode(); }
+        } }); }
+};
+
 Ext.setCheckingModeValue = function (field, value) {
         if (!field) { return; }
         var applyValue = function () {
@@ -10190,7 +10215,7 @@ var cellClick = function (grid, rowIndex, columnIndex, e) {
                 controller(Ext.selectRow, "processDue"); //on
         } else if (columnIndex === grid.getColumnModel().getIndexById("view_ap")) {
 
-                Ext.isOnePeriodOneBgBudget = Ext.selectRow.get('onePeriodOneBgBudget') || true;
+                Ext.isOnePeriodOneBgBudget = !!Ext.selectRow.get('onePeriodOneBgBudget');
                 Ext.isIprocudtType2 = Ext.selectRow.get('i_product_type') || 0;
                 console.log(Ext.isOnePeriodOneBgBudget, Ext.selectRow.get('i_register'));
                 console.log('isIprocudtType2 ', Ext.isIprocudtType2);
@@ -17438,7 +17463,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                         } else if (rec.get("i_product_type") == 2) {
                                                                                                                                                 // Ext.getCmp("tabpanelMain4ID").getForm().loadRecord(record);
                                                                                                                                                 Ext.getCmp("am_mode_idID").show();
-                                                                                                                                                Ext.setCheckingModeValue(Ext.getCmp("am_mode_idID"), rec.get("am_mode_id") || "");
+                                                                                                        Ext.setCheckingAssetMode(rec.get("am_mode_id") || "");
                                                                                                                                                 Ext.getCmp("inv_mode_idID").hide();
                                                                                                                                                 Ext.getCmp("inv_mode_idID").clearValue();
                                                                                                                                                 Ext.getCmp("workin_processID").show();
