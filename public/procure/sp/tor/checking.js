@@ -30,7 +30,8 @@ Ext.editCheckingMaterialType = function () {
                                 if (success && (result.success === 'Success' || result.success === true || result.reval === 0)) {
                                         rec.set('i_product_type', Number(combo.getValue()));
                                         win.close();
-                                        Ext.Msg.alert('แจ้งเตือน', 'บันทึกประเภทวัสดุ/ครุภัณฑ์เรียบร้อยแล้ว กรุณาเปิดรายละเอียดใหม่');
+                                        var checkingWindow = Ext.getCmp('winPeriodHdrID');
+                                        if (checkingWindow) { checkingWindow.close(); }
                                         if (Ext.storeDtl) { Ext.storeDtl.reload(); }
                                 } else {
                                         Ext.Msg.alert('แจ้งเตือน', Ext.util.Format.htmlEncode(result.msg || 'บันทึกไม่สำเร็จ กรุณาลองใหม่'));
@@ -38,7 +39,7 @@ Ext.editCheckingMaterialType = function () {
                         }
                 });
         }});
-        var win = new Ext.Window({ title: 'แก้ไขประเภทวัสดุ/ครุภัณฑ์', width: 440, autoHeight: true,
+        var win = new Ext.Window({ title: 'แก้ไขประเภทวัสดุ/ครุภัณฑ์', width: 440, height: 170, resizable: false,
                 modal: true, layout: 'form', labelWidth: 145, bodyStyle: 'padding:15px', items: [combo],
                 buttons: [saveButton, { text: 'ปิด', handler: function () { win.close(); } }] });
         win.show();
@@ -10946,6 +10947,10 @@ Ext.AppUx = function (app, menu) {
                 root: "data",
                 idProperty: "id",
                 fields: ["id", "c_code", "c_name"],
+                listeners: { load: function () {
+                        var field = Ext.getCmp("am_mode_idID");
+                        if (field) { field.setValue(field.getValue()); }
+                } },
         });
         Ext.inv_mode_acc = new Ext.data.JsonStore({
                 autoDestroy: false,
@@ -10958,6 +10963,10 @@ Ext.AppUx = function (app, menu) {
                 root: "data",
                 idProperty: "id",
                 fields: ["id", "c_code", "c_name"],
+                listeners: { load: function () {
+                        var field = Ext.getCmp("inv_mode_idID");
+                        if (field) { field.setValue(field.getValue()); }
+                } },
         });
         Ext.poFormID = "grid-form-cheque";
         Ext.extend(
@@ -12543,7 +12552,7 @@ Ext.AppUx = function (app, menu) {
                                                 checkboxToggle: true,
                                                 animCollapse: true, // Enables collapse animation
                                                 labelWidth: 100,
-                                                height: 250,
+                                                autoHeight: true,
                                                 id: "groupProductTypeID",
                                                                 tbar: [{ text: 'แก้ไขประเภทวัสดุ/ครุภัณฑ์', iconCls: 'icon-building-edit',
                                                                         disabled: /^D/i.test(String(Ext.selectRow.get('c_code_po') || '').replace(/^\s+/, '')),
@@ -12623,8 +12632,8 @@ Ext.AppUx = function (app, menu) {
                                                                                 id: "am_mode_idID",
                                                                                 hidden: true,
                                                                                 submitValue: true,
-                                                                                value: "35",
-                                                                                readOnly: true,
+                                                                                value: "",
+                                                                                editable: false,
                                                                                 name: "c_am_mode_id",
                                                                                 hiddenName: "am_mode_id",
                                                                                 valueField: "id",
