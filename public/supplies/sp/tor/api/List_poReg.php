@@ -1256,7 +1256,7 @@ if ($_REQUEST["type"] == "po_working_hdr") {
 		FROM ({$sqlTempTable}) temp
 		INNER JOIN " . DB_NMU_ERP . "sp_check_period_hdr a ON temp.sp_check_period_hdr_id = a.sp_check_period_hdr_id
 		inner join " . DB_NMU_ERP . "sp_tor_contract b on b.sp_tor_contract_id = a.sp_tor_contract_id
-		LEFT join "  .DB_CENTER . "vw_sp_po_asset_acc d ON temp.sp_check_period_hdr_id =  d.chk_id  and d.i_sys = 1
+		OUTER APPLY (SELECT TOP 1 * FROM "  .DB_CENTER . "vw_sp_po_asset_acc dd0 WHERE dd0.chk_id = temp.sp_check_period_hdr_id AND dd0.i_sys = 1 ORDER BY dd0.dc_acc_id1 DESC) d
 		--inner join " . DB_NMU_ERP . "sp_gl_monthly_hdr d ON d.sp_tor_hdr_period_id = a.sp_tor_hdr_period_id and d.i_enabled = 1 
 		--inner join " . DB_NMU_ERP . "sp_gl_monthly_dtl dd ON d.sp_gl_monthly_hdr_id = dd.sp_gl_monthly_hdr_id and  dd.f_dr  > 0
 		inner join " . DB_NMU_ERP . "sp_tor c on c.tor_id = b.sp_tor_id
@@ -1601,7 +1601,7 @@ if ($_REQUEST["type"] == "po_working_hdr") {
 		FROM ({$sqlTempTable}) temp
 		INNER JOIN " . DB_EIS_PROCURE . "sp_check_period_hdr a ON temp.sp_check_period_hdr_id = a.sp_check_period_hdr_id
 		inner join " . DB_EIS_PROCURE . "sp_tor_contract b on b.sp_tor_contract_id = a.sp_tor_contract_id
-		LEFT join "  .DB_CENTER . "vw_sp_po_asset_acc d ON temp.sp_check_period_hdr_id =  d.chk_id  and d.i_sys = 3
+		OUTER APPLY (SELECT TOP 1 * FROM "  .DB_CENTER . "vw_sp_po_asset_acc dd0 WHERE dd0.chk_id = temp.sp_check_period_hdr_id AND dd0.i_sys = 3 ORDER BY dd0.dc_acc_id1 DESC) d
 		--inner join " . DB_EIS_PROCURE . "sp_gl_monthly_hdr d ON d.sp_tor_hdr_period_id = a.sp_tor_hdr_period_id and d.i_enabled = 1
 		--inner join " . DB_EIS_PROCURE . "sp_gl_monthly_dtl dd ON d.sp_gl_monthly_hdr_id = dd.sp_gl_monthly_hdr_id and  dd.f_dr  > 0
 		inner join " . DB_EIS_PROCURE . "sp_tor c on c.tor_id = b.sp_tor_id
