@@ -977,11 +977,17 @@ Ext.onReady(function () {
         folder.expand(false, false);
     }
     var loader = new Ext.tree.TreeLoader({
+        preloadChildren: true,
         dataUrl: "/supplies/api/userMenu/userTree.php",
         requestMethod: "get",
         baseParams: {url: window.location.href, parent_id: localStorage.getItem("supplies_parentId")}
     });
-    loader.on('load', function () { renderFrequentMenus(); });
+    loader.on('load', function (treeLoader, loadedNode) {
+        // The API returns every permitted level, but Ext 3 normally creates only
+        // expanded branches. Materialize collapsed branches for search/favorites.
+        loadedNode.eachChild(function (child) { treeLoader.doPreload(child); });
+        renderFrequentMenus();
+    });
     Ext.urlEIS =
             location.protocol + '//' +
             location.hostname +
