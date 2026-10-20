@@ -912,6 +912,13 @@ Ext.onReady(function () {
             }
         });
     };
+    function menuSearchText(value) {
+        var decoder = document.createElement('textarea');
+        decoder.innerHTML = Ext.util.Format.stripTags(String(value || ''));
+        return Ext.util.Format.stripTags(decoder.value)
+            .replace(/[\u00a0\u200b-\u200d\ufeff]/g, ' ')
+            .replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+    }
     var root = new Ext.tree.AsyncTreeNode();
     var frequentMenuUser = Ext.session.user_id;
     function frequentMenuKey() {
@@ -979,17 +986,22 @@ Ext.onReady(function () {
             enableKeyEvents: true,
             listeners: {
                 beforequery: function (event) {
-                    var field=event.combo, query=String(event.query||'').toLowerCase().replace(/^\s+|\s+$/g,''), matches=[];
+                    var field=event.combo, query=menuSearchText(event.query).toLowerCase(), matches=[];
                     root.cascade(function (node) {
                         if(node.leaf&&!node.attributes.frequentOriginalId){
-                            var text=Ext.util.Format.stripTags(node.text||'');
+                            var text=menuSearchText(node.text);
                             if(query&&text.toLowerCase().indexOf(query)!==-1)matches.push([node.id,text]);
                         }
                     });
+                    // Results already match anywhere in the plain menu label.
+                    // Cancel ComboBox's default prefix filter so it cannot filter them again.
+                    event.cancel = true;
+                    field.store.clearFilter();
                     field.store.loadData(matches);
-                    event.forceAll=true;
-                    delete field.lastQuery;
-                    if(!matches.length){field.collapse();event.cancel=true;}
+                    if (matches.length) {
+                        field.expand();
+                        field.restrictHeight();
+                    } else field.collapse();
                 },
                 select: function (field, record) {
                     var node=TreePanel1.getNodeById(record.get('menuId'));
@@ -998,10 +1010,10 @@ Ext.onReady(function () {
                 },
                 keyup: {buffer: 200, fn: function (field) {
                     var tree = Ext.getCmp('TreePanel1ID');
-                    var query = String(field.getValue() || '').toLowerCase().replace(/^\s+|\s+$/g, '');
+                    var query = menuSearchText(field.getRawValue()).toLowerCase();
                     var visible = {};
                     tree.root.cascade(function (node) {
-                        if (String(node.text || '').toLowerCase().indexOf(query) !== -1) {
+                        if (menuSearchText(node.text).toLowerCase().indexOf(query) !== -1) {
                             node.cascade(function (child) { visible[child.id] = true; });
                             var parent = node;
                             while (parent) { visible[parent.id] = true; parent = parent.parentNode; }
@@ -1958,10 +1970,6 @@ Ext.onReady(function () {
                                     })();
                                     isAdmin = !!(Ext.session && String(Ext.session.user_id) === '1') || adminMenu;
                                     // สลับซ่อน/แสดงตามสิทธิ์
-                                    m.getComponent('mnPdfID').setVisible(isAdmin);
-                                    m.getComponent('signPdfID').setVisible(isAdmin);
-                                    m.getComponent('mnInsertPdfID').setVisible(isAdmin); //'mnRightID','mnPdfID','signPdfID', 'mnInsertPdfID',
-                                    m.getComponent('mnAdminSystemLogID').setVisible(isAdmin);
                                 }
                             },
                             menu: {
@@ -1986,25 +1994,6 @@ Ext.onReady(function () {
                                     icon: './images/icons/comments.png',
                                     handler: function () {
                                         Ext.getCmp("content-panel").update('<iframe src="./ai/index.html" frameborder="0" width="100%" height="100%"></iframe>');
-                                    }
-                                }, {
-                                    text: 'รายการแจ้ง Admin/Log ระบบ',
-                                    id: 'mnAdminSystemLogID',
-                                    hidden: !isAdmin,
-                                    icon: '/supplies/images/icons/application_view_list.png',
-                                    handler: Ext.openAdminSystemLog
-                                }, {
-                                    text: 'จัดการเล่ม',
-                                    id: 'mnBookMarksID', hidden: !isAdmin,
-                                    handler: function () {
-
-                                    }
-                                }, {
-                                    text: 'จัดการเล่ม edit combo table ',
-                                    id: 'mnEditComboTableID', hidden: !isAdmin,
-                                    handler: function () {
-                                        var editComboTable = Ext.editComboTable("");
-                                        editComboTable.process();
                                     }
                                 }, {
                                     text: 'เปลี่ยนสิทธิ์',
@@ -2155,36 +2144,6 @@ Ext.onReady(function () {
                                                     checked: adminMenu,
                                                 })]
                                         }).show();
-                                    }
-                                }, {
-                                    text: 'ตัวอย่างและการแสดงข้อมูลเอกสาร PDF',
-                                    id: 'mnTabPdfID', hidden: !isAdmin,
-                                    handler: function () {
-                                        Ext.getCmp("content-panel").update('<iframe src="./sp/app/tab.php" frameborder="0" width="100%" height="100%"></iframe>');
-                                    }
-                                }, {
-                                    text: 'รายการส่งตรวจก่อนลงนาม',
-                                    id: 'mnAuditPdfID', hidden: !isAdmin,
-                                    handler: function () {
-                                        Ext.getCmp("content-panel").update('<iframe src="./sp/appAuditDoc01.php" frameborder="0" width="100%" height="100%"></iframe>');
-                                    }
-                                }, {
-                                    text: 'จัดการเอกสารเล่ม PDF',
-                                    id: 'mnPdfID', hidden: !isAdmin,
-                                    handler: function () {
-                                        Ext.getCmp("content-panel").update('<iframe src="./sp/app/mnBookmark.php" frameborder="0" width="100%" height="100%"></iframe>');
-                                    }
-                                }, {
-                                    text: 'ลงนามลายเซนต์ ทดสอบ',
-                                    id: 'signPdfID', hidden: !isAdmin,
-                                    handler: function () {
-                                        Ext.getCmp("content-panel").update('<iframe src="./sp/app/signDigitGrid.php" frameborder="0" width="100%" height="100%"></iframe>');
-                                    }
-                                }, {
-                                    text: 'เข้าเล่ม /แยกเล่ม ทดสอบ',
-                                    id: 'mnInsertPdfID', hidden: !isAdmin,
-                                    handler: function () {
-                                        Ext.getCmp("content-panel").update('<iframe src="./sp/app/bookmark.php" frameborder="0" width="100%" height="100%"></iframe>');
                                     }
                                 }, {
 //                                    iconCls: 'icon-tv',
