@@ -4392,6 +4392,7 @@ Ext.editHistoryAp = (statusx) => {
                                                         Ext.getCmp("groupProductTypeID").expand();
                                                         Ext.getCmp("groupProductTypeID").doLayout();
                                                 }
+                                                if (Ext.syncCheckingPdfUpload) Ext.syncCheckingPdfUpload();
                                         }, 1000);
                                 }
                                 let date = new Date(); // วันที่ปัจจุบัน
@@ -12550,6 +12551,24 @@ Ext.AppUx = function (app, menu) {
         Ext.AppPoStore = function () {
                 var urlUpload = window.location.protocol + "//" + window.location.hostname + "/sp_mn/api/mnUploadDocChk.php"; // ไฟล์ที่อัพโหลด
                 var linkDownload = window.location.protocol + "//" + window.location.hostname + "/sp_mn/api/upload_chk"; // ที่วางไฟล์
+                function hasCheckingPdf() {
+                        var row = Ext.selectRow && Ext.selectRow.data || {};
+                        return Number(Ext.check_pdf) === 1 && !!String(row.i_is_upload_chk || '').replace(/\s/g, '');
+                }
+                function syncCheckingPdfUpload() {
+                        var field = Ext.getCmp("upload_pdf1");
+                        var save = Ext.getCmp("saveCheckingPdfID");
+                        var unlock = Ext.getCmp("unlockCheckingPdfID");
+                        var allowed = !hasCheckingPdf() || (Number(Ext.session.dc_center_user) === 1 && field && field.adminPdfUnlocked);
+                        var stored = Ext.getCmp("storedCheckingPdfID");
+                        if (stored) {
+                                stored.setValue(Ext.util.Format.htmlEncode(String(Ext.selectRow.data.i_is_upload_chk || '')));
+                                stored.setVisible(!allowed);
+                        }
+                        if (field) field.setVisible(allowed);
+                        if (save) save.setVisible(allowed);
+                        if (unlock) unlock.setVisible(Number(Ext.session.dc_center_user) === 1 && hasCheckingPdf() && !allowed);
+                }
                 function getPDF(a) {
                         if (Ext.check_pdf == 1) {
                                 return (
@@ -16372,6 +16391,12 @@ Ext.AppUx = function (app, menu) {
                                                                                                 id: "c_arrive_codeID",
                                                                                         },
                                                                                         {
+                                                                                                xtype: "displayfield",
+                                                                                                id: "storedCheckingPdfID",
+                                                                                                fieldLabel: "เอกสารใบตรวจรับ (PDF)",
+                                                                                                value: "",
+                                                                                        },
+                                                                                        {
                                                                                                 xtype: "fileuploadfield",
                                                                                                 id: "upload_pdf1",
                                                                                                 hidden: Ext.getCmp("submodeID").getValue() != "modeEditAp" ? false : true,
@@ -16392,56 +16417,63 @@ Ext.AppUx = function (app, menu) {
                                                                                         {
                                                                                                 xtype: "panel",
                                                                                                 border: false,
+                                                                                                id: "checkingPdfDownloadID",
                                                                                                 html: getPDF(),
                                                                                         },
                                                                                 ],
                                                                                 buttonAlign: "left",
                                                                                 buttons: [
                                                                                         {
-                                                                                                // hidden:  Ext.getCmp("submodeID").getValue() != "modeEditAp"  ? true : false  ,
-                                                                                                text: "บันทึกเอกสาร",
-                                                                                                hidden: true,
+                                                                                                id: "unlockCheckingPdfID",
+                                                                                                text: "Admin: เปิดให้อัปโหลด PDF ใหม่",
+                                                                                                hidden: Number(Ext.session.dc_center_user) !== 1 || !hasCheckingPdf(),
                                                                                                 handler: function () {
-                                                                                                        var form = Ext.getCmp("tabpanelMain3ID").getForm();
-                                                                                                        form.url = urlUpload;
-                                                                                                        form.submit({
-                                                                                                                waitMsg: "Saving Data...",
+                                                                                                        Ext.getCmp("upload_pdf1").adminPdfUnlocked = true;
+                                                                                                        syncCheckingPdfUpload();
+                                                                                                }
+                                                                                        },
+                                                                                        {
+                                                                                                id: "saveCheckingPdfID",
+                                                                                                text: "บันทึก PDF",
+                                                                                                hidden: hasCheckingPdf(),
+                                                                                                handler: function () {
+                                                                                                        var field = Ext.getCmp("upload_pdf1");
+                                                                                                        if (!/\.pdf$/i.test(field.getValue())) {
+                                                                                                                Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกไฟล์ PDF");
+                                                                                                                return;
+                                                                                                        }
+                                                                                                        var button = this;
+                                                                                                        button.disable();
+                                                                                                        Ext.getCmp("tabpanelMain3ID").getForm().submit({
+                                                                                                                url: "tor/api/uploadCheckingPdf.php",
+                                                                                                                clientValidation: false,
+                                                                                                                params: {id: Ext.selectRow.get("sp_check_period_hdr_id")},
+                                                                                                                waitMsg: "กำลังบันทึก PDF...",
                                                                                                                 success: function (form, action) {
-                                                                                                                        Ext.Msg.alert("Success", "เรียบร้อย", function (form, action) {
-                                                                                                                                Ext.storePeriodHdr.reload({
-                                                                                                                                        callback: function (record, operation, success) {
-                                                                                                                                                if (success) {
-                                                                                                                                                        upload = Ext.getCmp("upload_pdf1").getValue();
-                                                                                                                                                        Ext.check_pdf = 1;
-                                                                                                                                                        Ext.storeDtl.reload();
-                                                                                                                                                        Ext.getCmp("frmUplaodID").destroy();
-                                                                                                                                                        Ext.getCmp("groupUploadID").insert(1, Ext.getCmp("groupUploadID").fnUpload(1));
-                                                                                                                                                        Ext.getCmp("groupUploadID").doLayout();
-                                                                                                                                                        Ext.getCmp("upload_pdf1").setValue(upload);
-                                                                                                                                                }
-                                                                                                                                        },
-                                                                                                                                });
-                                                                                                                        });
+                                                                                                                        button.enable();
+                                                                                                                        Ext.check_pdf = 1;
+                                                                                                                        Ext.selectRow.set("check_pdf", 1);
+                                                                                                                        Ext.selectRow.set("i_is_upload_chk", action.result.file_path);
+                                                                                                                        field.adminPdfUnlocked = false;
+                                                                                                                        field.setValue(action.result.file_path);
+                                                                                                                        Ext.getCmp("checkingPdfDownloadID").update(getPDF());
+                                                                                                                        syncCheckingPdfUpload();
+                                                                                                                        Ext.storePeriodHdr.reload();
+                                                                                                                        Ext.Msg.alert("สำเร็จ", action.result.msg);
                                                                                                                 },
                                                                                                                 failure: function (form, action) {
-                                                                                                                        switch (action.failureType) {
-                                                                                                                                case Ext.form.Action.CLIENT_INVALID:
-                                                                                                                                        Ext.Msg.alert("Failure", "Form fields may not be submitted with invalid values");
-                                                                                                                                        break;
-                                                                                                                                case Ext.form.Action.CONNECT_FAILURE:
-                                                                                                                                        Ext.Msg.alert("Failure", "พบข้อผิดพลาดในการเชื่อต่อเครือข่าย");
-                                                                                                                                        break;
-                                                                                                                                case Ext.form.Action.SERVER_INVALID:
-                                                                                                                                        Ext.Msg.alert("Failure", action.result.msg);
-                                                                                                                        }
-                                                                                                                },
+                                                                                                                        button.enable();
+                                                                                                                        Ext.Msg.alert("บันทึกไม่สำเร็จ", action.result && action.result.msg || "ไม่สามารถอัปโหลด PDF ได้");
+                                                                                                                }
                                                                                                         });
-                                                                                                },
+                                                                                                }
                                                                                         },
                                                                                 ],
                                                                         };
                                                                 };
                                                                 Ext.getCmp("groupUploadID").insert(1, this.fnUpload());
+                                                                Ext.syncCheckingPdfUpload = syncCheckingPdfUpload;
+                                                                syncCheckingPdfUpload();
                                                                 // this.add(fnUpload);
                                                         },
                                                 },
