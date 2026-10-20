@@ -233,6 +233,11 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
     } else {
         $dc_cost_id = $_SESSION['dc_cost_id'] ?? null;
     }
+    // ใบกันอยู่ใต้หน่วยงานเจ้าของเรื่อง (dc_cost2_id) ไม่ใช่หน่วยงานของผู้ใช้ที่ล็อกอิน (เช่น หน่วยงานจัดซื้อ)
+    // ถ้าหน้าเว็บส่ง dc_cost_id มา ให้ใช้ค่านั้นค้นหา ไม่ส่งมาก็ใช้ของ session เหมือนเดิม
+    if (isset($_REQUEST['dc_cost_id']) && ctype_digit((string) $_REQUEST['dc_cost_id']) && (int) $_REQUEST['dc_cost_id'] > 0) {
+        $dc_cost_id = (int) $_REQUEST['dc_cost_id'];
+    }
 
     // $sqlTempTable = "select "
     //         . "bg_budget_dtl_overlap_id"
@@ -337,7 +342,7 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
     // echo $sql; exit;
     // /********************/
   //  $db->debugSql($sqlMain,$sqlMain);  
-    $stmt = $db->QueryParam($sqlMain, $sqlMain);
+    $stmt = $db->QueryParam($sqlMain, $arrParam);
     
     $i = $start + 1;
 
