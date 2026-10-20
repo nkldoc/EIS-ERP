@@ -2246,6 +2246,8 @@ switch ($mode) {
                             ,a.po_expense_id
                             ,a.i_hire_type
                             ,a.i_product_type
+                            ,(SELECT TOP 1 p.am_mode_id FROM sp_tor_dtl_period p WHERE p.sp_tor_dtl_period_id = a.sp_tor_dtl_period_id) AS am_mode_id
+                            ,(SELECT TOP 1 p.inv_mode_id FROM sp_tor_dtl_period p WHERE p.sp_tor_dtl_period_id = a.sp_tor_dtl_period_id) AS inv_mode_id
                             ,a.i_is_inv
                             ,cc.i_is_last
                             ,b.dc_acc_id
@@ -2295,6 +2297,8 @@ switch ($mode) {
                 "sp_tor_hdr_period_id" => intval($row["sp_tor_hdr_period_id"]),
                 "sp_tranf_hdr_id" => intval($row["sp_tranf_hdr_id"]),
                 "i_product_type" => intval($row["i_product_type"]),
+                "am_mode_id" => intval($row["am_mode_id"]),
+                "inv_mode_id" => intval($row["inv_mode_id"]),
                 "i_is_inv" => intval($row["i_is_inv"]),
                 "i_qty" => intval($row["i_qty"]),
                 "i_qty_tranf" => intval($row["i_qty_tranf"]),

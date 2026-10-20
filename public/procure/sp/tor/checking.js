@@ -3,6 +3,23 @@ Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
 
+Ext.setCheckingModeValue = function (field, value) {
+        if (!field) { return; }
+        var applyValue = function () {
+                if (field.destroyed || field.isDestroyed) { return; }
+                var record = field.findRecord(field.valueField, value);
+                if (record) { field.setValue(record.get(field.valueField)); }
+                else { field.clearValue(); }
+        };
+        if (field.getStore().getCount()) { applyValue(); }
+        else {
+                field.clearValue();
+                field.getStore().load({ callback: function (records, options, success) {
+                        if (success) { applyValue(); }
+                } });
+        }
+};
+
 Ext.editCheckingMaterialType = function () {
         var rec = Ext.selectRow;
         if (!rec) { return; }
@@ -10901,6 +10918,8 @@ Ext.AppUx = function (app, menu) {
                         { name: "po_expense_id" },
                         { name: "i_hire_type" },
                         { name: "i_product_type" },
+                        { name: "am_mode_id" },
+                        { name: "inv_mode_id" },
                         { name: "i_is_inv" },
                         { name: "i_yyyy_overlap" },
                         { name: "i_yyyy_overlap2" },
@@ -17414,11 +17433,12 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                 // Ext.getCmp("f_under_total_priceID").hide();
                                                                                                                                                 Ext.getCmp("workin_process2ID").hide();
                                                                                                                                                 Ext.getCmp("inv_mode_idID").show();
+                                                                                                                                        Ext.setCheckingModeValue(Ext.getCmp("inv_mode_idID"), rec.get("inv_mode_id") || "");
                                                                                                                                                 Ext.getCmp("workin_processID").show();
                                                                                                                                         } else if (rec.get("i_product_type") == 2) {
                                                                                                                                                 // Ext.getCmp("tabpanelMain4ID").getForm().loadRecord(record);
                                                                                                                                                 Ext.getCmp("am_mode_idID").show();
-                                                                                                                                                Ext.getCmp("am_mode_idID").setValue("35");
+                                                                                                                                                Ext.setCheckingModeValue(Ext.getCmp("am_mode_idID"), rec.get("am_mode_id") || "");
                                                                                                                                                 Ext.getCmp("inv_mode_idID").hide();
                                                                                                                                                 Ext.getCmp("inv_mode_idID").clearValue();
                                                                                                                                                 Ext.getCmp("workin_processID").show();
