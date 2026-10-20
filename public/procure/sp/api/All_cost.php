@@ -31,9 +31,9 @@ if ($_REQUEST["type"] == "dc_cost") {
 		SELECT * FROM " . DB_CENTER . "dc_cost a
 		WHERE i_last = 1 AND i_enable = 1 AND i_delete = 2
         {$con}
-		AND c_sub between '01' and '07'
+		AND (a.c_sub between '01' and '07' OR a.dc_cost_id = 131)
 		ORDER BY c_code";
-    $arrParam = array(STATUS_ENABLE, 1);
+    $arrParam = array();
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     if ($stmt) {
 
