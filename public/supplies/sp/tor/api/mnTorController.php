@@ -882,6 +882,15 @@ switch ($mode) {
 //            exit();
             $stmt = $db->QueryParam($sql, $arrParam);
         }
+        // สถานะโครงงาน (ตามแผน/นอกแผน) ลำดับที่ รหัสแผน - บันทึกเมื่อฟอร์มส่งค่ามา
+        if (isset($data["plan_status"]) && !empty($data["id"])) {
+            $db->QueryParam("UPDATE {$table} SET plan_status = ?, plan_code = ?, plan_seq = ? WHERE {$keyName} = ?", array(
+                $data["plan_status"],
+                $data["plan_code"] ?? null,
+                $data["plan_seq"] ?? null,
+                $data["id"]
+            ));
+        }
         break;
     //----------------------------------------------------------------
     case "UPDATEFORMSTSATUSST0001.1":
