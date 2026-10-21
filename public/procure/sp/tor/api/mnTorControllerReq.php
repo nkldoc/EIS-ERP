@@ -2329,7 +2329,9 @@ switch ($mode) {
         //test
         $arrParam["dc_cost2_id"] = $data["dc_cost2_id"];
         $arrParam["tag"] = $data["tag"];
-        $arrParam["i_owner_bg"] = $data["i_owner_bg"];
+        if (isset($data["i_owner_bg"])) {
+            $arrParam["i_owner_bg"] = $data["i_owner_bg"];
+        }
         $arrParam["i_type_bg"] = $data["i_type_bg"];
         $arrParam["txtsub_cost"] = ($data["txtsub_cost"] == "*ถ้ามี" ? "" : $data["txtsub_cost"]);
         $arrParam["i_is_more"] = (($f_total_amt >= 500000) ? 1 : 0);
@@ -2342,7 +2344,9 @@ switch ($mode) {
         //=====================================================================
         $arrParam["c_comment"] = $data["c_comment"];
         $arrParam["i_type_bg"] = $data["i_type_bg"];
-        $arrParam["sp_type_id"] = $data["sp_type_id"];
+        if (isset($data["sp_type_id"])) {
+            $arrParam["sp_type_id"] = $data["sp_type_id"];
+        }
         //        $arrParam[] = $data["i_enabled"];
         $arrParam["dc_user_update_id"] = $data["dc_user_update_id"];
         $arrParam["dc_user_update_cost_id"] = $data["dc_user_update_cost_id"];
@@ -2383,7 +2387,7 @@ switch ($mode) {
                     $data2["dc_bg_budget_type_id"] = $v;
                     $data2["f_unit_price"] = !empty($data['f_bg_amt'][$k]) ? str_replace(',', '', $data['f_bg_amt'][$k]) : 0;
                     $data2["f_total_price"] = !empty($data['f_bg_amt'][$k]) ? str_replace(',', '', $data['f_bg_amt'][$k]) : 0;
-                    $data2["i_pr_type1"] = $data["i_pr_type" . $k];
+                    $data2["i_pr_type1"] = $data["i_pr_type" . $k] ?? ($data["i_pr_type"][$k] ?? null);
                     //*****************************************/
                     $data2["sp_tor_id"] = $data["id"];
                     $data2["c_name"] = $data["c_name"];
@@ -2446,6 +2450,8 @@ switch ($mode) {
         }
 
 
+        $addField = "";
+        $arrValue = array();
         foreach ($arrParam as $fld => $value) {
             $arrValue[] = ($value != "") ? $value : null;
             $addField .= ",
