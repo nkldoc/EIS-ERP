@@ -210,6 +210,7 @@ switch ($mode) {
         }
         $arrParam = array();
         $arrCountParam = array();
+        $checkingDateConditions = array();
         foreach (array('date_from', 'date_to') as $dateKey) {
             $dateValue = trim($_REQUEST[$dateKey] ?? '');
             if ($dateValue === '') { continue; }
@@ -219,7 +220,9 @@ switch ($mode) {
                 echo json_encode(array('success' => false, 'msg' => 'วันที่ไม่ถูกต้อง'), JSON_UNESCAPED_UNICODE);
                 exit;
             }
-            $wh .= $dateKey === 'date_from' ? ' AND a.d_doc_date >= ?' : ' AND a.d_doc_date < DATEADD(day, 1, CAST(? AS date))';
+            $checkingDateConditions[] = $dateKey === 'date_from'
+                ? 'checking.d_checking_date >= ?'
+                : 'checking.d_checking_date < DATEADD(day, 1, CAST(? AS date))';
             $arrParam[] = $dateValue;
             $arrCountParam[] = $dateValue;
         }
@@ -228,16 +231,35 @@ switch ($mode) {
             echo json_encode(array('success' => false, 'msg' => 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด'), JSON_UNESCAPED_UNICODE);
             exit;
         }
+        if ($checkingDateConditions) {
+            // Both date bounds must match the same inspection record.
+            $wh .= ' AND EXISTS (SELECT 1 FROM NMU_ERP.dbo.sp_check_period_hdr checking
+                INNER JOIN NMU_ERP.dbo.sp_tor_contract checkingContract
+                    ON checkingContract.sp_tor_contract_id = checking.sp_tor_contract_id
+                WHERE checkingContract.sp_tor_id = a.tor_id AND '
+                . implode(' AND ', $checkingDateConditions) . ')';
+        }
+        // Use the same NMU creditor master and tax address fields as DcCreditorTax_nmu.
         $vendorSelect = $isVendorOperations ? ", vendor.c_name AS creditor_name,
-            CONCAT(ISNULL(vendor.tax_c_house_no,''), ' ', ISNULL(vendor.tax_c_bldg,''), ' ',
-                ISNULL(vendor.tax_c_village,''), ' ', ISNULL(vendor.tax_c_village_no,''), ' ',
-                ISNULL(vendor.tax_c_lane,''), ' ถนน ', ISNULL(vendor.tax_c_road,''),
-                ' ตำบล/แขวง ', ISNULL(vendor.tax_c_tambon,''), ' อำเภอ/เขต ', ISNULL(vendor.tax_c_district,''),
-                ' จังหวัด ', ISNULL(vendor.tax_c_province,''), ' ', ISNULL(vendor.tax_c_post_code,'')) AS creditor_address,
+            LTRIM(RTRIM(CONCAT(
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_branch)),'') IS NOT NULL THEN ' สาขา ' + vendor.tax_c_branch ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_bldg)),'') IS NOT NULL THEN ' อาคาร ' + vendor.tax_c_bldg ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_room_no)),'') IS NOT NULL THEN ' ห้อง ' + vendor.tax_c_room_no ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_floor)),'') IS NOT NULL THEN ' ชั้น ' + vendor.tax_c_floor ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_village)),'') IS NOT NULL THEN ' หมู่บ้าน ' + vendor.tax_c_village ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_house_no)),'') IS NOT NULL THEN ' ' + vendor.tax_c_house_no ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_village_no)),'') IS NOT NULL THEN ' หมู่ ' + vendor.tax_c_village_no ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_lane)),'') IS NOT NULL THEN ' ซอย ' + vendor.tax_c_lane ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_road)),'') IS NOT NULL THEN ' ถนน ' + vendor.tax_c_road ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_tambon)),'') IS NOT NULL THEN ' ตำบล/แขวง ' + vendor.tax_c_tambon ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_district)),'') IS NOT NULL THEN ' อำเภอ/เขต ' + vendor.tax_c_district ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_province)),'') IS NOT NULL THEN ' จังหวัด ' + vendor.tax_c_province ELSE '' END,
+                CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_post_code)),'') IS NOT NULL THEN ' ' + vendor.tax_c_post_code ELSE '' END
+            ))) AS creditor_address,
             vendor.c_tax_number_imp AS vendor_tax_number" : '';
         $vendorJoin = $isVendorOperations ? " OUTER APPLY (
             SELECT TOP 1 cr.* FROM dbo.sp_tor_contract ct
-            INNER JOIN " . DB_NMU . "dc_creditor cr ON cr.dc_creditor_id = ct.dc_creditor_id
+            INNER JOIN NMU.dbo.dc_creditor cr ON cr.dc_creditor_id = ct.dc_creditor_id
             WHERE ct.sp_tor_id = s.tor_id AND ct.i_enabled = 1 ORDER BY ct.sp_tor_contract_id DESC
         ) vendor " : '';
         $sqlTempTable = "SELECT a.tor_id
