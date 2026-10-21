@@ -6,6 +6,12 @@ include("../../../lib/database/apiUtil.php");
 include("../../../lib/date/i_date.class.php");
 
 ###################
+if (empty($_SESSION['user_id'])) {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(array('success' => false, 'msg' => 'กรุณาเข้าสู่ระบบพัสดุใหม่'), JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $db = new DatabaseServer();
 $date = new i_date();
 $util = new apiUtil();
@@ -641,19 +647,32 @@ if ($type == "WITHDRAW") {
     }
     $wh .= " and a.i_status_billing >= 4";
 
-    if ($_SESSION["user_id"] !== 1) {
+    if ((int) $_SESSION["user_id"] !== 1) {
         if ($appAp) {
-            if ($_SESSION['super_user'] == 1) {
+            if ((int) ($_SESSION['super_user'] ?? 0) === 1) {
                 // $wh .= "  and  (select top 1 dc_cost_acc_id from NMU_DATACENTER..dc_cost   where dc_cost_id = f.dc_cost2_id  )
                 // 	=  (select dc_cost_acc_id  from NMU_DATACENTER..dc_cost where dc_cost_id =  " . $_SESSION["dc_cost_acc_id"] .")";
                 $wh .= " and f.dc_cost2_id != 77 "; // user แจ้งว่าใช้ ส่วนงาน
             } else {
+                $billingCostAccountId = (int) ($_SESSION['dc_cost_acc_id'] ?? 0);
+                if ($billingCostAccountId <= 0 && !empty($_SESSION['dc_cost_id'])) {
+                    $billingCostAccountId = (int) $db->GetDataBySQL(
+                        'SELECT dc_cost_acc_id FROM NMU_DATACENTER.dbo.dc_cost WHERE dc_cost_id = ?',
+                        array((int) $_SESSION['dc_cost_id'])
+                    );
+                }
+                if ($billingCostAccountId <= 0) {
+                    http_response_code(403);
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode(array('success' => false, 'msg' => 'ไม่พบหน่วยงานบัญชีของผู้ใช้ กรุณาเข้าสู่ระบบใหม่หรือติดต่อผู้ดูแลระบบ'), JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
                 $wh .= "  and  (select top 1 dc_cost_acc_id from NMU_DATACENTER..dc_cost   where dc_cost_id = f.dc_cost2_id  )
-                    =  (select dc_cost_acc_id  from NMU_DATACENTER..dc_cost where dc_cost_id =  " . $_SESSION["dc_cost_acc_id"] . ")";
+                    =  (select dc_cost_acc_id  from NMU_DATACENTER..dc_cost where dc_cost_id =  " . $billingCostAccountId . ")";
                 // $wh .= " and f.dc_cost2_id = " . $_SESSION["dc_cost_id"]; //หน่วยงานที่เบิก   user แจ้งว่าใช้ ส่วนงาน
             }
         } else {
-            $wh .= " and a.sp_emp_id = " . $_SESSION["sp_emp_id"]; //เจ้าหน้าที่ของเรื่อง
+            $wh .= " and a.sp_emp_id = " . (int) ($_SESSION["sp_emp_id"] ?? 0); //เจ้าหน้าที่ของเรื่อง
         }
     }
     $sqlTempTable = "select a.sp_check_period_hdr_id,f.dc_cost_id ,a.sp_emp_id,a.i_is_upload
