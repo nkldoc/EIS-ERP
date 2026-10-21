@@ -1956,6 +1956,9 @@ if ($type == "ownnerPr") {
                         , s.i_edit
                         , s.i_type_bg
                         , s.c_remake
+                        , s.plan_status
+                        , s.plan_code
+                        , s.plan_seq
                         , s.i_yyyy as i_yyyy
                         , convert(varchar, s.d_tor_date, 120) as d_tor_date
                         , convert(varchar, s.d_tor_status_date, 120) as d_tor_status_date
@@ -2178,6 +2181,9 @@ if ($type == "ownnerPr") {
             "i_type_fix_rate" => $row["i_type_fix_rate"],
             "i_product_type" => $row["i_product_type"],
             "i_delivery_date" => $row["i_delivery_date"],
+             "plan_status" => $row["plan_status"],
+             "plan_code" => $row["plan_code"],
+             "plan_seq" => $row["plan_seq"],
             "dc_expense_budget_type_id" => intval($row["dc_expense_budget_type_id"]),
             "dc_expense_budget_type2_id" => intval($row["dc_expense_budget_type2_id"]),
             "dc_expense_budget_type3_id" => intval($row["dc_expense_budget_type3_id"]),

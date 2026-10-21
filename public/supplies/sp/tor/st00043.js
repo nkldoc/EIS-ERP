@@ -1701,6 +1701,15 @@ Ext.AppUx = function (app, menu) {
                 name: "i_delivery_date",
             },
             {
+                name: "plan_status",
+            },
+            {
+                name: "plan_code",
+            },
+            {
+                name: "plan_seq",
+            },
+            {
                 name: "i_enabled",
             }
         ],
@@ -2170,14 +2179,24 @@ Ext.AppUx = function (app, menu) {
         }
         function purchase2(id, bg_reserve_money_id, ii) {
             console.log(id + " == " + bg_reserve_money_id + " == " + ii);
+            var params = {
+                mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
+                hdr_id: id, //sp_dtl_id
+                bg_reserve_money_id: bg_reserve_money_id,
+                ii: ii,
+            };
+            var planStatusCmp = Ext.getCmp("plan_statusID");
+            if (planStatusCmp) {
+                params.plan_status = planStatusCmp.getValue().inputValue;
+                params.plan_code = Ext.getCmp("plan_codeID") ? Ext.getCmp("plan_codeID").getValue() : "";
+                params.plan_seq = Ext.getCmp("plan_seqID") ? Ext.getCmp("plan_seqID").getValue() : "";
+            }
+            if (Ext.getCmp("c_remakeID")) {
+                params.c_remake = Ext.getCmp("c_remakeID").getValue();
+            }
             Ext.Ajax.request({
                 url: "tor/api/mnTorController.php",
-                params: {
-                    mode: "UPDATE_TOR_BG", //UPDATE_TOR_DTL_BG
-                    hdr_id: id, //sp_dtl_id
-                    bg_reserve_money_id: bg_reserve_money_id,
-                    ii: ii,
-                },
+                params: params,
                 method: "POST", //POST
                 success: function (result, request) {
                     Ext.store2.load({
@@ -3599,6 +3618,65 @@ Ext.AppUx = function (app, menu) {
                                                 },
                                                 comboUsedBgYear,
                                                 comboTypeBg,
+                                                {
+                                                    xtype: 'radiogroup',
+                                                    fieldLabel: 'สถานะโครงงาน',
+                                                    id: 'plan_statusID',
+                                                    columns: 1,
+                                                    items: [
+                                                        { boxLabel: 'ไม่ระบุ', name: 'plan_status', inputValue: 0, checked: Ext.selectRow.get('plan_status') ? false : true },
+                                                        { boxLabel: 'ตามแผน (1)', name: 'plan_status', inputValue: 1, checked: Ext.selectRow.get('plan_status') == 1 },
+                                                        { boxLabel: 'นอกแผน (2)', name: 'plan_status', inputValue: 2, checked: Ext.selectRow.get('plan_status') == 2 }
+                                                    ],
+                                                    listeners: {
+                                                        afterrender: function () {
+                                                            var v = Ext.selectRow.get('plan_status');
+                                                            Ext.getCmp('plan_codeID').setVisible(v == 1);
+                                                            if (Ext.getCmp('plan_seqID')) Ext.getCmp('plan_seqID').setVisible(v == 1);
+                                                        },
+                                                        change: function (grp, radio) {
+                                                            var on = radio.inputValue == 1;
+                                                            ['plan_codeID', 'plan_seqID'].forEach(function (id) {
+                                                                var c = Ext.getCmp(id);
+                                                                if (!c) return;
+                                                                if (on) {
+                                                                    c.show();
+                                                                } else {
+                                                                    c.hide();
+                                                                    c.setValue('');
+                                                                    c.clearInvalid();
+                                                                }
+                                                            });
+                                                        },
+                                                    },
+                                                },
+                                                {
+                                                    xtype: 'textfield',
+                                                    fieldLabel: 'ลำดับที่',
+                                                    name: 'plan_seq',
+                                                    id: 'plan_seqID',
+                                                    anchor: '80%',
+                                                    value: Ext.selectRow.get('plan_seq') || '',
+                                                    hidden: Ext.selectRow.get('plan_status') != 1,
+                                                },
+                                                {
+                                                    xtype: 'textfield',
+                                                    fieldLabel: 'รหัสแผน',
+                                                    name: 'plan_code',
+                                                    id: 'plan_codeID',
+                                                    anchor: '80%',
+                                                    value: Ext.selectRow.get('plan_code') || '',
+                                                    hidden: Ext.selectRow.get('plan_status') != 1,
+                                                },
+                                                {
+                                                    xtype: 'textarea',
+                                                    fieldLabel: 'หมายเหตุ',
+                                                    name: 'c_remake',
+                                                    id: 'c_remakeID',
+                                                    anchor: '80%',
+                                                    height: 60,
+                                                    value: Ext.selectRow.get('c_remake') || '',
+                                                },
                                                 comboExpense,
                                                 comboCost,
                                                 comboCost2,
@@ -4171,6 +4249,12 @@ Ext.AppUx = function (app, menu) {
                                     },
                                     handler: function () {
                                         var msg = "";
+                                        if (Ext.getCmp("plan_statusID") && Ext.getCmp("plan_statusID").getValue().inputValue == 1 && [null, 0, ""].includes(Ext.getCmp("plan_codeID").getValue())) {
+                                            msg += "- กรุณากรอกรหัสแผน" + "\n";
+                                        }
+                                        if (Ext.getCmp("plan_statusID") && Ext.getCmp("plan_statusID").getValue().inputValue == 1 && Ext.getCmp("plan_seqID") && [null, 0, ""].includes(Ext.getCmp("plan_seqID").getValue())) {
+                                            msg += "- กรุณากรอกลำดับที่" + "\n";
+                                        }
                                             if ( [1,2].includes(Ext.getCmp("i_is_registerID").getValue().inputValue) ) {
                                                     if(Ext.getCmp("dc_expense_budget_type_hdr_id").getValue() == null ){
                                                         msg +=  "- กรุณาเลือกแหล่งเงินจ่ายก่อนบันทึก" + "\n"
