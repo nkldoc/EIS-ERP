@@ -65,7 +65,24 @@ const Timeline = (group, text) => {
     }
 
 };
+const checkListDateRange = function () {
+    var from = Ext.getCmp('checklist_date_from');
+    var to = Ext.getCmp('checklist_date_to');
+    if ((from && !from.isValid()) || (to && !to.isValid())) { return null; }
+    var first = from ? from.getValue() : '';
+    var last = to ? to.getValue() : '';
+    if (first && last && first > last) {
+        Ext.Msg.alert('แจ้งเตือน', 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด');
+        return null;
+    }
+    return { date_from: first ? Ext.util.Format.gridDate(first, 'Y-m-d') : '',
+        date_to: last ? Ext.util.Format.gridDate(last, 'Y-m-d') : '' };
+};
 const search = function () {
+    var dateRange = checkListDateRange();
+    if (!dateRange) { return; }
+    Ext.storeDtl.setBaseParam('date_from', dateRange.date_from);
+    Ext.storeDtl.setBaseParam('date_to', dateRange.date_to);
     var msg = "";
     if (msg == "") {
         Ext.storeDtl.setBaseParam("mode", "LIST");
@@ -99,7 +116,10 @@ const search = function () {
 
 // Export all records using the values currently entered in the search form.
 // Read the form directly so changed filters apply even before Search is pressed.
-const exportExcel = function () {
+const exportExcel = async function (button) {
+    if (Ext.checkListExporting) { return; }
+    var dateRange = checkListDateRange();
+    if (!dateRange) { return; }
     var getCmpValue = function (id, defaultValue) {
         var cmp = Ext.getCmp(id);
         return cmp ? cmp.getValue() : defaultValue;
@@ -108,6 +128,9 @@ const exportExcel = function () {
         mode: "LIST",
         type: "SEARCH",
         export_excel: 1,
+        vendor_operations: getCmpValue('checklist_vendor_operations', false) ? 1 : 0,
+        date_from: dateRange.date_from,
+        date_to: dateRange.date_to,
         filter: getCmpValue("filter", "c_code"),
         value: getCmpValue("value-box", ""),
         dc_expense_budget_type_id: getCmpValue("s_dc_expense_budget_type_id", 0),
@@ -125,7 +148,36 @@ const exportExcel = function () {
         i_year_contract: getCmpValue("s_i_year_contract", 0),
         sp_tor_status_id: getCmpValue("sp_tor_status_id", 0)
     };
-    window.location.href = "tor/api/mnTorCheckList.php?" + Ext.urlEncode(params);
+    var loading = new Ext.LoadMask(Ext.getBody(), {msg: 'กำลังเตรียมไฟล์ Excel กรุณารอสักครู่...'});
+    Ext.checkListExporting = true;
+    if (button) { button.disable(); }
+    loading.show();
+    try {
+        var response = await fetch('tor/api/mnTorCheckList.php?' + Ext.urlEncode(params), {
+            credentials: 'same-origin'
+        });
+        if (!response.ok || (response.headers.get('Content-Type') || '').indexOf('application/vnd.ms-excel') === -1) {
+            throw new Error(response.status === 401 ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' : 'ไม่สามารถสร้างไฟล์ Excel ได้ กรุณาลองใหม่');
+        }
+        var blob = await response.blob();
+        var disposition = response.headers.get('Content-Disposition') || '';
+        var filename = disposition.match(/filename="([^"]+)"/);
+        var downloadUrl = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename ? filename[1] : 'tor_checklist.xls';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 60000);
+    } catch (error) {
+        Ext.Msg.alert('แจ้งเตือน', Ext.util.Format.htmlEncode(error.message || 'Export Excel ไม่สำเร็จ'));
+    } finally {
+        loading.hide();
+        loading.destroy();
+        Ext.checkListExporting = false;
+        if (button && !button.destroyed) { button.enable(); }
+    }
 };
 Ext.getBodyMultiBudget = function (rec, status) {
     i_amount_bg = Ext.selectRow.get("i_amount_bg") || Ext.selectRow.json.i_amount_bg;
@@ -4777,6 +4829,17 @@ Ext.AppUx = function (app, menu) {
                                         {xtype: "tbspacer", width: 4},
                                     ],
                                 },
+                                {
+                                    xtype: 'buttongroup', frame: false,
+                                    items: [
+                                        {xtype: 'label', text: 'วันที่เอกสาร PR : '},
+                                        {xtype: 'datefield', id: 'checklist_date_from', width: 110, format: 'd-m-Y'},
+                                        {xtype: 'label', text: ' ถึงวันที่ : '},
+                                        {xtype: 'datefield', id: 'checklist_date_to', width: 110, format: 'd-m-Y'},
+                                        {xtype: 'checkbox', id: 'checklist_vendor_operations',
+                                            boxLabel: 'ข้อมูลรายการดำเนินงานกับผู้ขาย/ผู้รับจ้าง'},
+                                    ],
+                                },
                             ],
                             buttonAlign: "left",
                             buttons: [
@@ -5121,8 +5184,8 @@ Ext.AppUx = function (app, menu) {
                                 {
                                     text: "Export Excel",
                                     iconCls: "icon-excel",
-                                    handler: function () {
-                                        exportExcel();
+                                    handler: function (button) {
+                                        exportExcel(button);
                                     },
                                 },
                             ],

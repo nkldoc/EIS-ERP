@@ -64,6 +64,7 @@ switch ($mode) {
     case "LIST":
         ###########################################
         $isExportExcel = isset($_REQUEST["export_excel"]) && intval($_REQUEST["export_excel"]) === 1;
+        $isVendorOperations = $isExportExcel && intval($_REQUEST['vendor_operations'] ?? 0) === 1;
         $mode = $_REQUEST["mode"] ?? null;
         $filter = $_REQUEST["filter"] ?? null;
         $value = $_REQUEST["value"] ?? null;
@@ -209,6 +210,36 @@ switch ($mode) {
         }
         $arrParam = array();
         $arrCountParam = array();
+        foreach (array('date_from', 'date_to') as $dateKey) {
+            $dateValue = trim($_REQUEST[$dateKey] ?? '');
+            if ($dateValue === '') { continue; }
+            $parsedDate = DateTime::createFromFormat('!Y-m-d', $dateValue);
+            if (!$parsedDate || $parsedDate->format('Y-m-d') !== $dateValue) {
+                http_response_code(400);
+                echo json_encode(array('success' => false, 'msg' => 'วันที่ไม่ถูกต้อง'), JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $wh .= $dateKey === 'date_from' ? ' AND a.d_doc_date >= ?' : ' AND a.d_doc_date < DATEADD(day, 1, CAST(? AS date))';
+            $arrParam[] = $dateValue;
+            $arrCountParam[] = $dateValue;
+        }
+        if (!empty($_REQUEST['date_from']) && !empty($_REQUEST['date_to']) && $_REQUEST['date_from'] > $_REQUEST['date_to']) {
+            http_response_code(400);
+            echo json_encode(array('success' => false, 'msg' => 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $vendorSelect = $isVendorOperations ? ", vendor.c_name AS creditor_name,
+            CONCAT(ISNULL(vendor.tax_c_house_no,''), ' ', ISNULL(vendor.tax_c_bldg,''), ' ',
+                ISNULL(vendor.tax_c_village,''), ' ', ISNULL(vendor.tax_c_village_no,''), ' ',
+                ISNULL(vendor.tax_c_lane,''), ' ถนน ', ISNULL(vendor.tax_c_road,''),
+                ' ตำบล/แขวง ', ISNULL(vendor.tax_c_tambon,''), ' อำเภอ/เขต ', ISNULL(vendor.tax_c_district,''),
+                ' จังหวัด ', ISNULL(vendor.tax_c_province,''), ' ', ISNULL(vendor.tax_c_post_code,'')) AS creditor_address,
+            vendor.c_tax_number_imp AS vendor_tax_number" : '';
+        $vendorJoin = $isVendorOperations ? " OUTER APPLY (
+            SELECT TOP 1 cr.* FROM dbo.sp_tor_contract ct
+            INNER JOIN " . DB_NMU . "dc_creditor cr ON cr.dc_creditor_id = ct.dc_creditor_id
+            WHERE ct.sp_tor_id = s.tor_id AND ct.i_enabled = 1 ORDER BY ct.sp_tor_contract_id DESC
+        ) vendor " : '';
         $sqlTempTable = "SELECT a.tor_id
                                 , a.po_expense_id
                                 , a.po_creditor_id
@@ -343,8 +374,10 @@ switch ($mode) {
                                     ORDER BY d_create desc )) as event_type
                             , (SELECT TOP 1 event_detail from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id ORDER BY d_create desc ) as sp_event_detail
                             "
+                . $vendorSelect
                 . " FROM ({$sqlTempTable}) a "
                 . " INNER JOIN dbo.sp_tor s ON s.tor_id=a.tor_id"
+                . $vendorJoin
                 // . " LEFT JOIN dbo.sp_tor_contract ss ON s.tor_id= ss.sp_tor_id"
                 // . " LEFT JOIN  vw_sp_tor_period_po_working b on  ss.sp_tor_contract_id  = b.sp_tor_contract_id and isnull(b.i_is_last,0) = 1 and b.i_sys = 3 "
                 . " WHERE a.row > ? AND a.row <= ?";
@@ -567,7 +600,11 @@ switch ($mode) {
                 'd_doc_date' => 'วันที่เอกสาร',
                 'd_create' => 'วันที่สร้าง'
             );
-            $fileName = 'tor_checklist_' . date('Ymd_His') . '.xls';
+            if ($isVendorOperations) {
+                $excelColumns = array('c_name' => 'c_name', 'creditor_name' => 'creditor_name',
+                    'creditor_address' => 'creditor_address', 'vendor_tax_number' => 'เลขภาษี', 'c_create_name' => 'dc_user_name');
+            }
+            $fileName = ($isVendorOperations ? 'vendor_operations_' : 'tor_checklist_') . date('Ymd_His') . '.xls';
             header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
             header('Content-Disposition: attachment; filename="' . $fileName . '"');
             header('Cache-Control: max-age=0');
@@ -575,13 +612,15 @@ switch ($mode) {
             echo '<html><head><meta charset="UTF-8"><style>'
                 . 'table{border-collapse:collapse}th,td{border:1px solid #999;padding:4px;vertical-align:top}'
                 . 'th{background:#d9ead3;font-weight:bold}.text{mso-number-format:"\\@"}.number{mso-number-format:"#,##0.00"}'
-                . '</style></head><body><table><thead><tr><th>ลำดับ</th>';
+                . '</style></head><body><table><thead><tr>';
+            if (!$isVendorOperations) { echo '<th>ลำดับ</th>'; }
             foreach ($excelColumns as $title) {
                 echo '<th>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</th>';
             }
             echo '</tr></thead><tbody>';
             foreach ($exportRows as $index => $exportRow) {
-                echo '<tr><td>' . ($index + 1) . '</td>';
+                echo '<tr>';
+                if (!$isVendorOperations) { echo '<td>' . ($index + 1) . '</td>'; }
                 foreach ($excelColumns as $field => $title) {
                     $cellValue = isset($exportRow[$field]) ? $exportRow[$field] : '';
                     $cellClass = in_array($field, array('f_total_amt', 'f_total_contract')) ? 'number' : 'text';
