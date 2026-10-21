@@ -1935,7 +1935,25 @@ Ext.onReady(function () {
                                                     selectOnFocus: true,
                                                     typeAhead: false,
                                                     emptyText: "เลือกเปลี่ยนสิทธิ์ User",
+                                                    minChars: 1,
                                                     listeners: {
+                                                        beforequery: function (query) {
+                                                            var combo = query.combo;
+                                                            var term = query.forceAll ? '' : String(query.query || '').toLowerCase();
+                                                            combo.store.clearFilter(true);
+                                                            if (term) {
+                                                                combo.store.filterBy(function (record) {
+                                                                    return String(record.get('c_name') || '').toLowerCase().indexOf(term) !== -1 ||
+                                                                        String(record.get('c_user_name') || '').toLowerCase().indexOf(term) !== -1;
+                                                                });
+                                                            }
+                                                            combo.lastQuery = query.query;
+                                                            combo.selectedIndex = -1;
+                                                            combo.initList();
+                                                            combo.onLoad();
+                                                            query.cancel = true;
+                                                            return false;
+                                                        },
                                                         select: function (combo, record, index) {
                                                             // อัปเดตค่าของ displayfield
 //                                                            record.set("userGrand","dc_user_id");
