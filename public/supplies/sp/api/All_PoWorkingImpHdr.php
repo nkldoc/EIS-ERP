@@ -295,12 +295,29 @@ if ($_REQUEST["type"] == "dc_cost_all") {
         $con_cost = " AND dc_cost_id = ? AND a.i_year = ? ";
     }
 
+    // หน้าตรวจรับ (แก้ใบกัน): ใบเบิกที่อยู่สายเดียวกับรายการตรวจรับนี้ (ใบเดิมที่ยกเลิก + ใบใหม่ที่ทำแทนผ่าน parent_id)
+    // ไม่นับเป็นยอดที่ใช้ใบกัน ไม่งั้นใบกันที่ใบเบิกใหม่ของ IR นี้ถือไว้จะถูกซ่อนจนเลือกให้ IR เดิมไม่ได้
+    $ownWorkingHdrId = isset($_REQUEST["own_po_working_hdr_id"]) ? intval($_REQUEST["own_po_working_hdr_id"]) : 0;
+    $ownWorkingCte = "";
+    $ownWorkingCon = "";
+    if ($ownWorkingHdrId > 0) {
+        $ownWorkingCte = "
+                ;WITH own_chain AS (
+                    SELECT po_working_hdr_id FROM " . DB_NMU_EIS . "po_working_hdr WHERE po_working_hdr_id = {$ownWorkingHdrId}
+                    UNION ALL
+                    SELECT c.po_working_hdr_id FROM " . DB_NMU_EIS . "po_working_hdr c
+                    INNER JOIN own_chain p ON c.parent_id = p.po_working_hdr_id
+                )";
+        $ownWorkingCon = " AND a.po_working_hdr_id NOT IN (SELECT po_working_hdr_id FROM own_chain) ";
+    }
+
     $sqlMain = " SET NOCOUNT ON
                 -- ✅ ตรวจสอบและลบตารางชั่วคราวหากมีอยู่
                 IF OBJECT_ID('tempdb..#tmp_working') IS NOT NULL
                     DROP TABLE #tmp_working;
 
                 -- ✅ สร้าง Temporary Table เพื่อเก็บข้อมูล
+                {$ownWorkingCte}
                 SELECT
                     b.c_booking,
                     SUM(ISNULL(b.f_total, 0) - ISNULL(ret.f_return, 0)) AS f_total
@@ -315,6 +332,7 @@ if ($_REQUEST["type"] == "dc_cost_all") {
                 ) ret ON a.po_working_hdr_id = ret.po_working_hdr_id
                 WHERE a.i_enable = 1
                 AND b.c_booking IS NOT NULL
+                {$ownWorkingCon}
                 GROUP BY b.c_booking;
 
                 -- ✅ ดึงข้อมูลพร้อม JOIN Temporary Table

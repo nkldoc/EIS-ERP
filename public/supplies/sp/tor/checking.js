@@ -4213,6 +4213,8 @@ Ext.editHistoryAp = (statusx) => {
                 Ext.stempDbClickRow++;
                 Ext.dc_acc.load();
         }
+        // ใบเบิกในสายเดียวกับรายการนี้ (ใบเดิมที่ยกเลิก + ใบใหม่ที่ทำแทน) ไม่นับเป็นยอดที่ใช้ใบกัน
+        Ext.booking_store.setBaseParam("own_po_working_hdr_id", Ext.selectRow.data.po_working_hdr_id || 0);
         if (Ext.selectRow.data.c_checking_code == null) {
                 Ext.booking_store.setBaseParam("dc_cost_id", Ext.selectRow.data.dc_cost_id);
                 Ext.booking_store.setBaseParam("i_yyyy_overlap", Ext.selectRow.data.i_yyyy_overlap);
