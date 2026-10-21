@@ -135,7 +135,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'
     && (string)($_GET['portal_entry'] ?? '') === '1'
     && $re['reval'] === 0) {
     header('Cache-Control: no-store');
-    header('Location: /procure/', true, 303);
+    // Only known internal destinations are accepted; never redirect to a URL
+    // supplied by the caller. Normal portal launches retain their landing page.
+    $destination = (string) ($_GET['destination'] ?? '');
+    $landingUrl = $destination === 'billing-approved'
+        ? '/procure/sp/spBillingApproved?' . http_build_query([
+            'i_is_ap' => 'true', 'access_by_eis' => 1, '_dc' => __VPRODUCT_
+        ])
+        : '/procure/';
+    header('Location: ' . $landingUrl, true, 303);
     exit;
 }
 echo json_encode($re);
