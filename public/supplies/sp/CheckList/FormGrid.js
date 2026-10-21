@@ -4741,6 +4741,10 @@ Ext.AppUx = function (app, menu) {
                                                 },
                                             },
                                         }),
+                                        {xtype: 'tbspacer', width: 4},
+                                        {xtype: 'button', text: 'ค้นหา', width: 88,
+                                            iconCls: 'icon-magnifier', handler: function () { search(); }},
+
                                                 // { xtype: "tbspacer", width: 10 },
                                                 // new Ext.form.Checkbox({
                                                 //   id: "i_pdf",
@@ -4832,12 +4836,24 @@ Ext.AppUx = function (app, menu) {
                                 {
                                     xtype: 'buttongroup', frame: false,
                                     items: [
-                                        {xtype: 'label', text: 'วันที่เอกสาร PR : '},
+                                        {xtype: 'label', text: 'วันที่ตรวจรับ : '},
                                         {xtype: 'datefield', id: 'checklist_date_from', width: 110, format: 'd-m-Y'},
                                         {xtype: 'label', text: ' ถึงวันที่ : '},
                                         {xtype: 'datefield', id: 'checklist_date_to', width: 110, format: 'd-m-Y'},
                                         {xtype: 'checkbox', id: 'checklist_vendor_operations',
-                                            boxLabel: 'ข้อมูลรายการดำเนินงานกับผู้ขาย/ผู้รับจ้าง'},
+                                            boxLabel: 'ข้อมูลรายการดำเนินงานกับผู้ขาย/ผู้รับจ้าง',
+                                            listeners: {
+                                                check: function (checkbox, checked) {
+                                                    var today = new Date();
+                                                    var firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                                                    Ext.getCmp('checklist_date_from').setValue(checked ? firstDay : '');
+                                                    Ext.getCmp('checklist_date_to').setValue(checked ? today : '');
+                                                    if (!checked) {
+                                                        Ext.storeDtl.setBaseParam('date_from', '');
+                                                        Ext.storeDtl.setBaseParam('date_to', '');
+                                                    }
+                                                }
+                                            }},
                                     ],
                                 },
                             ],
@@ -5173,13 +5189,6 @@ Ext.AppUx = function (app, menu) {
                                     },
                                 },
                                 {xtype: "tbfill"},
-                                {
-                                    text: "ค้นหา",
-                                    iconCls: "icon-magnifier",
-                                    handler: function () {
-                                        search();
-                                    },
-                                },
                                 {xtype: "tbspacer", width: 4},
                                 {
                                     text: "Export Excel",
