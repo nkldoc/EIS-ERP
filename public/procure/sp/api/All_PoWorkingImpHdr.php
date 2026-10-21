@@ -41,10 +41,14 @@ if ($_REQUEST["type"] == "dc_cost_all") {
     }
 } else if ($_REQUEST["type"] == "dc_cost") {
 
+    $costCondition = "(dc_cost_acc_id = 77 OR dc_cost_id = ?)";
+    if (($_REQUEST['scope'] ?? '') === 'owner') {
+        $costCondition = "c_sub = (SELECT NULLIF(c_sub, '') FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = ?)";
+    }
     $sqlMain = "
 		SELECT * FROM " . DB_CENTER . "dc_cost
 		WHERE i_last = 1 AND i_enable = 1 AND i_delete = 2
-			AND (dc_cost_acc_id = 77 OR dc_cost_id = ?)
+			AND {$costCondition}
 		ORDER BY c_code";
     $arrParam = array((int) ($_SESSION["dc_cost_id"] ?? 0));
     $stmt = $db->QueryParam($sqlMain, $arrParam);

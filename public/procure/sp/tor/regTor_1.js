@@ -1234,6 +1234,21 @@ Ext.AppUx = function (app, menu) {
       // },
     },
   });
+  Ext.owner_cost = new Ext.data.JsonStore({
+    autoDestroy: false,
+    autoLoad: true,
+    url: "api/All_PoWorkingImpHdr.php",
+    baseParams: { type: "dc_cost", scope: "owner" },
+    root: "data",
+    idProperty: "id",
+    fields: ["id", "c_code", "c_name"],
+    listeners: {
+      load: function (store) {
+        var owner = Ext.getCmp("dc_cost2_idID");
+        if (owner && owner.getStore() === store) owner.setValue(owner.getValue());
+      }
+    }
+  });
   Ext.dc_cost_main = new Ext.data.JsonStore({
     autoDestroy: false,
     autoLoad: true,
@@ -1255,7 +1270,7 @@ Ext.AppUx = function (app, menu) {
           Ext.dc_cost.load({ params: { dc_cost_acc_id: Ext.dc_cost_acc_default } });
           Ext.dc_expense_budget_type.load({ params: { dc_cost_acc_id: Ext.dc_cost_acc_default } });
         } else {
-          Ext.cost_main =  Ext.dc_cost                  
+          Ext.cost_main = Ext.owner_cost;
           Ext.dc_cost_main_default = Ext.session.dc_cost_id;
         }
         // console.log(Ext.cost_main.baseParams.type);
@@ -2156,7 +2171,7 @@ Ext.AppUx = function (app, menu) {
         },
         afterrender: function () {
           if(statuss == 'edit' && Ext.cost_main.baseParams.type == 'dc_cost'){ 
-            Ext.cost_main = Ext.dc_cost;
+            Ext.cost_main = Ext.owner_cost;
           }
           // console.log(Ext.selectRow.data.c_code);
           if (statusx == "edit") {
@@ -2195,7 +2210,7 @@ Ext.AppUx = function (app, menu) {
           if (statusx == "add") {
             // console.log(Ext.getCmp("dc_cost2_idID"));
             if(Ext.cost_main.baseParams.type == 'dc_cost' && Ext.session.dc_center_user != 1 ){
-              Ext.getCmp("dc_cost2_idID").setReadOnly(true); 
+              Ext.getCmp("dc_cost2_idID").setReadOnly(false);
             } 
             Ext.getCmp("GENCODEPRID").hide();
           }
