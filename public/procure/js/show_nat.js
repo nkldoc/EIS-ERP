@@ -1278,6 +1278,13 @@ Ext.onReady(function () {
                                 });
                             });
                             Ext.getCmp("menu-system").doLayout();
+                            var systemButton = Ext.getCmp("txt-system");
+                            if (obj.data && obj.data.length === 1) {
+                                systemButton.menu = null;
+                                if (systemButton.el) {
+                                    systemButton.el.select('.x-btn-arrow').removeClass('x-btn-arrow');
+                                }
+                            }
                             Ext.getCmp("west").add(TreePanel1);
                             Ext.getCmp("west").update();
                             Ext.getCmp("west").doLayout();
@@ -1803,7 +1810,7 @@ Ext.onReady(function () {
                         {
                             xtype: "displayfield",
                             width: 50,
-                            html: "<div style=\" font:bold 13px/10px 'Mitr', sans-serif;  color:#000;\">" + Ext.doMain + "</div>",
+                            html: "<div style=\" font:bold 13px/10px 'Mitr', sans-serif;  color:#000;\">" + ((Ext.doMain && Ext.doMain !== "undefined") ? Ext.util.Format.htmlEncode(String(Ext.doMain)) : "") + "</div>",
                         },
                         "->",
                         {
