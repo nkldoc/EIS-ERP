@@ -1608,6 +1608,7 @@ switch ($mode) {
                 case 4:
                     $i_chk_bg = "color:#FF00FF";
                     $i_chk_bgTxt = "ใช้เงินกันเหลื่อมยังไม่ก่อหนี้ - ยังไม่จองใบกัน";
+                    break;
                 case 5:
                     $i_chk_bg = "color:#06e7fe";
                     $i_chk_bgTxt = "โครงการต่อเนื่อง ใช้เงินปีงบปัจจุบัน";

@@ -6273,7 +6273,9 @@ Ext.c_overlap_close = function (rec, event, edit) {
                                                         i_overlap: event == "c_overlap_close" ? 3 : 2,
                                                         bg_reserve_overlap_id: jsonData.bg_reserve_overlap_id,
                                                         i_yyyy_overlap: i_yyyy_overlap,
-                                                        c_booking: event == "c_overlap_close" ? rec.c_contract_overlap : Ext.getCmp("c_bookingID").lastSelectionText,
+                                                        c_booking: event == "c_overlap_close"
+                                                                ? ((((Ext.getCmp("use_contract_overlap2ID") || {}).getValue && Ext.getCmp("use_contract_overlap2ID").getValue() === true) || Ext.useContractOverlap2 === true) ? Ext.selectRow.get("c_overlap2") : rec.c_contract_overlap)
+                                                                : Ext.getCmp("c_bookingID").lastSelectionText,
                                                         edit: "edit",
                                                         i_yyyy: Ext.getCmp("i_budget_year").getValue(),
                                                 },
