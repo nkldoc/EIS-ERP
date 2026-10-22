@@ -119,8 +119,8 @@ class clsPageStatus
 $user_type_audit = $db->GetDataBySQL("select case when count(*) > 0 then 'audit' else null end as is_audit from dc_user_menu  where dc_menu_id = 150741 and dc_user_id = ?", array($_SESSION["user_id"]));
 $level = ($_SESSION["i_level"] == 2) ? 0 : 1;
 $dc_department_id = $_SESSION["dc_department_id"];
-$st = $_GET["st"] ?? $_SESSION["st"];
-$_SESSION["st"] = $st ?? $_SESSION["st"];
+$st = $_GET["st"] ?? $_SESSION["st"] ?? null;
+$_SESSION["st"] = $st ?? $_SESSION["st"] ?? null;
 $pg = new clsPageStatus($db, $st);
 $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
 ?>

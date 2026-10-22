@@ -140,30 +140,36 @@
       types.set(tn, t);
     });
 
-    // จำนวนเรื่อง / ตามแผน-นอกแผน จากรายการ PR รายเรื่อง
-    const plan = { 1: { amt: 0, ids: new Set() }, 2: { amt: 0, ids: new Set() }, 0: { amt: 0, ids: new Set() } };
+    // จำนวนรายการ = PR ทั้งหมด (นับแถวเหมือนการ์ด "PR ตามแผน / นอกแผน" ใน Dashboard)
+    // ยอดทำสัญญา = "จองสัญญา (PO)" = ผลรวม f_amt ของ PR ที่มี PO แล้ว (has_po > 0)
+    const plan = { 1: { amt: 0, ids: new Set(), po: 0 }, 2: { amt: 0, ids: new Set(), po: 0 }, 0: { amt: 0, ids: new Set(), po: 0 } };
     const allIds = new Set();
-    // ยอดจองทั้งหมด (PR+PO) แยกตามแผน — ใช้เทียบกับยอดทำสัญญา (PO) ในกราฟ
+    let poCount = 0;
     const planReserved = { 1: 0, 2: 0, 0: 0 };
-    prs.forEach((r) => {
+    const getF = (r) => {
+      const fid = String(r.dc_expense_budget_type_id);
+      if (!funds.has(fid)) funds.set(fid, { name: r.dc_expense_budget_type || "ไม่ทราบแหล่งเงิน", budget: 0, contract: 0, ids: new Set() });
+      return funds.get(fid);
+    };
+    const getT = (r) => {
+      const tn = nameOfExpense(r.bg_expense);
+      if (!types.has(tn)) types.set(tn, { name: tn, budget: 0, contract: 0, ids: new Set() });
+      return types.get(tn);
+    };
+    prs.forEach((r, idx) => {
       const ps = num(r.plan_status) === 1 ? 1 : num(r.plan_status) === 2 ? 2 : 0;
-      planReserved[ps] += num(r.f_amt);
-    });
-    // ยอดทำสัญญา = "จองสัญญา (PO)" ของ Dashboard = ผลรวม f_amt ของ PR ที่มี PO แล้ว (has_po > 0)
-    prs.filter((r) => num(r.has_po) > 0).forEach((r, idx) => {
-      const ps = num(r.plan_status) === 1 ? 1 : num(r.plan_status) === 2 ? 2 : 0;
-      plan[ps].amt += num(r.f_amt);
-      // นับแบบ "รายการ" (แถว) เหมือนการ์ด PR ตามแผน/นอกแผน ใน Dashboard
+      const amt = num(r.f_amt);
+      planReserved[ps] += amt;
       plan[ps].ids.add(idx);
       allIds.add(idx);
-      const amt = num(r.f_amt);
-      totContract += amt;
-      const fid = String(r.dc_expense_budget_type_id);
-      const f = funds.get(fid) || { name: r.dc_expense_budget_type || "ไม่ทราบแหล่งเงิน", budget: 0, contract: 0, ids: new Set() };
-      f.contract += amt; f.ids.add(idx); funds.set(fid, f);
-      const tn = nameOfExpense(r.bg_expense);
-      const t = types.get(tn) || { name: tn, budget: 0, contract: 0, ids: new Set() };
-      t.contract += amt; t.ids.add(idx); types.set(tn, t);
+      const f = getF(r), t = getT(r);
+      f.ids.add(idx); t.ids.add(idx);
+      if (num(r.has_po) > 0) {
+        plan[ps].amt += amt; plan[ps].po++;
+        poCount++;
+        totContract += amt;
+        f.contract += amt; t.contract += amt;
+      }
     });
 
     const fundList = Array.from(funds.values()).sort((a, b) => b.contract - a.contract);
@@ -177,7 +183,7 @@
     $("#kpiSave").text(fmt(save));
     $("#kpiSaveSub").text("อัตราประหยัด " + pct(ratio(save, totBudget)) + " จากงบจัดสรร");
     $("#kpiCount").text(allIds.size.toLocaleString("en-US"));
-    $("#kpiCountSub").text("ตามแผน " + plan[1].ids.size + " รายการ · นอกแผน " + plan[2].ids.size + " รายการ" + (plan[0].ids.size ? " · ไม่ระบุ " + plan[0].ids.size + " รายการ" : ""));
+    $("#kpiCountSub").text("ตามแผน " + plan[1].ids.size + " รายการ · นอกแผน " + plan[2].ids.size + " รายการ" + (plan[0].ids.size ? " · ไม่ระบุ " + plan[0].ids.size + " รายการ" : "") + " (มี PO แล้ว " + poCount + ")");
 
     renderPlanTable(totBudget, totContract);
     renderFundTable(fundList, totBudget, totContract);
@@ -192,7 +198,7 @@
     // งบประมาณไม่ได้แยกตามแผน/นอกแผนในบัญชีจัดสรร จึงแสดงงบ/ส่วนต่าง/อัตราประหยัดเฉพาะแถวรวม
     let h = "<tr><th>แผนงานการจัดซื้อ</th><th>งบประมาณจัดสรร (บาท)</th><th>ยอดทำสัญญา (บาท)</th><th>ส่วนต่างประหยัดได้ (บาท)</th><th>อัตราประหยัด (%)</th></tr>";
     rows.forEach(([n, v]) => {
-      h += `<tr><td>${n} <small class="text-muted">(${v.ids.size} รายการ)</small></td><td class="n">-</td><td class="n">${fmt(v.amt)}</td><td class="n">-</td><td class="n">-</td></tr>`;
+      h += `<tr><td>${n} <small class="text-muted">(${v.ids.size} รายการ · มี PO ${v.po})</small></td><td class="n">-</td><td class="n">${fmt(v.amt)}</td><td class="n">-</td><td class="n">-</td></tr>`;
     });
     const save = totBudget - totContract;
     h += `<tr class="tot"><td>รวมทั้งสิ้น</td><td class="n">${fmt(totBudget)}</td><td class="n">${fmt(totContract)}</td><td class="n">${fmt(save)}</td><td class="n">${pct(ratio(save, totBudget))}</td></tr>`;
@@ -209,7 +215,7 @@
   }
 
   function renderTypeTable(list, totBudget, totContract, totCount) {
-    let h = "<tr><th>ประเภทค่าใช้จ่าย</th><th>จำนวนรายการ</th><th>งบประมาณจัดสรร (บาท)</th><th>ยอดทำสัญญา (บาท)</th><th>ส่วนต่างประหยัดได้ (บาท)</th><th>อัตราประหยัด (%)</th></tr>";
+    let h = "<tr><th>ประเภทค่าใช้จ่าย</th><th>จำนวนรายการ PR</th><th>งบประมาณจัดสรร (บาท)</th><th>ยอดทำสัญญา (บาท)</th><th>ส่วนต่างประหยัดได้ (บาท)</th><th>อัตราประหยัด (%)</th></tr>";
     list.forEach((t) => {
       h += `<tr><td>${esc(t.name)}</td><td class="c">${t.ids.size}</td><td class="n">${fmt(t.budget)}</td><td class="n">${fmt(t.contract)}</td><td class="n">${fmt(t.budget - t.contract)}</td><td class="n">${pct(ratio(t.budget - t.contract, t.budget))}</td></tr>`;
     });

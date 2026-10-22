@@ -6,8 +6,8 @@ include("../lib/database/apiUtil.php");
 include("../lib/date/i_date.class.php"); //pageStatus.class
 include("./class/pageStatus.class.php"); //pageStatus.class
 $db = new DatabaseServer();
-$pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"]);
-$_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"];
+$pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"] ?? null);
+$_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"] ?? null;
 $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">

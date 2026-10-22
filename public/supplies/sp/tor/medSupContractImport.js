@@ -3,7 +3,7 @@
 // เมนู "นำเข้าสัญญา (เวชภัณฑ์)" (ST00097) - นำเข้าสัญญา/งวดทีละหลายรายการจากไฟล์ Excel
 // หน้าหลัก = ประวัติการนำเข้าแต่ละครั้ง (ชื่อรายการ/ไฟล์/จำนวนสัญญา/ยอดรวม/ผู้นำเข้า)
 // "นำเข้าใหม่" = กรอกชื่อรายการ (เช่น "นำเข้าสัญญา 100 รายการ") + แนบไฟล์ Excel -> "ตรวจสอบ
-// ข้อมูล" แสดงรายละเอียดทุกแถวพร้อมผลตรวจก่อน -> "บันทึกเข้าระบบ" (กดได้เมื่อไม่มีแถวผิด)
+// ข้อมูล" แสดงรายละเอียดทุกแถวพร้อมผลตรวจก่อน -> "บันทึกเข้าระบบ" (นำเข้าเฉพาะสัญญาที่ติ๊ก "นำเข้า" - สัญญาที่มีแถวผิดติ๊กไม่ได้)
 // ไฟล์อ่านที่เบราว์เซอร์ด้วย SheetJS (bi/lib/xlsx.full.min.js) ตรวจ/บันทึกจริงที่
 // tor/api/mnMedSupContractImport.php (ตรวจซ้ำทุกครั้งตอนบันทึก) บันทึกลง sp_tor_period_bill
 // ตารางเดียวกับเมนู "บันทึกรายละเอียดในสัญญา (เวชภัณฑ์)" (ST00092)
@@ -452,15 +452,25 @@ function winMedSupImportNew() {
         {header: "(คำนวณ) จำนวนเงินก่อน VAT", key: "calc_before", align: "right", render: calcRender},
         {header: "(คำนวณ) ภาษีมูลค่าเพิ่ม", key: "calc_vat", align: "right", render: calcRender},
         {header: "(คำนวณ) ภาษีหัก ณ ที่จ่าย", key: "calc_wht", align: "right", render: calcRender},
+        {header: "(คำนวณ) ค่าปรับ", key: "calc_penalty", align: "right", render: calcRender},
         {header: "(คำนวณ) ค่าประกันผลงาน", key: "calc_guar", align: "right", render: calcRender},
         {header: "(คำนวณ) จำนวนเงินที่จ่าย", key: "calc_pay", align: "right", render: function (v) {
             return calcRender(v) ? "<b>" + calcRender(v) + "</b>" : "";
         }},
     ];
     var previewCols = [
+        // [ผู้ใช้ขอ] เลือกนำเข้าเฉพาะบางรายการได้ - ติ๊กอัตโนมัติทุกสัญญาที่ถูกต้อง, สัญญา (ลำดับสัญญา)
+        // ที่มีแถวผิดติ๊กไม่ได้, ติ๊ก/เอาติ๊กออกแถวใดแถวหนึ่ง = ทั้งสัญญา (ทุกแถวของลำดับสัญญาเดียวกัน)
+        {
+            header: "นำเข้า", key: "_imp", align: "center",
+            render: function (v, r) {
+                return "<input type=\"checkbox\" class=\"medsup-imp-sel\" data-i=\"" + r._i + "\" data-seq=\"" + enc(r.seq) + "\""
+                    + (v ? " checked" : "") + (r._bad ? " disabled" : "") + ">";
+            }
+        },
         // [ผู้ใช้ขอ] ติ๊กอัตโนมัติที่รายการ "ไม่พบการจองในระบบงบ" - ใช้เลือกแถวที่จะดาวน์โหลด Excel ส่งคืนผู้ใช้
         {
-            header: "เลือก", key: "_chk", align: "center",
+            header: "เลือก (ดาวน์โหลด)", key: "_chk", align: "center",
             render: function (v, r) {
                 return "<input type=\"checkbox\" class=\"medsup-imp-chk\" data-i=\"" + r._i + "\"" + (v ? " checked" : "") + ">";
             }
@@ -509,6 +519,14 @@ function winMedSupImportNew() {
     function checkedRows() {
         return previewRows.filter(function (r) { return r._chk; });
     }
+    function importRows() {
+        return previewRows.filter(function (r) { return r._imp; });
+    }
+    function updateSaveBtn() {
+        var n = importRows().length;
+        saveBtn.setText("บันทึกเข้าระบบ" + (n ? " (" + n + " แถว)" : ""));
+        saveBtn.setDisabled(!n);
+    }
     function updateExportBtn() {
         var n = checkedRows().length;
         exportBtn.setText("ดาวน์โหลด Excel รายการที่เลือก" + (n ? " (" + n + " แถว)" : ""));
@@ -552,7 +570,7 @@ function winMedSupImportNew() {
         previewRows = [];
         previewPanel.update("<div class=\"medsup-imp-empty\">เลือกไฟล์แล้วกด \"ตรวจสอบข้อมูล\"..</div>");
         summaryFld.setValue("");
-        saveBtn.disable();
+        updateSaveBtn();
         updateExportBtn();
     }
 
@@ -650,29 +668,39 @@ function winMedSupImportNew() {
                     return Ext.apply({
                         _i: i, row_no: raw._row, status: r.status || "", message: r.message || "", rsv_status: r.rsv_status || "",
                         calc_before: r.calc_before, calc_vat: r.calc_vat, calc_wht: r.calc_wht,
-                        calc_guar: r.calc_guar, calc_pay: r.calc_pay,
+                        calc_guar: r.calc_guar, calc_penalty: r.calc_penalty, calc_pay: r.calc_pay,
                     }, raw);
                 });
                 // ติ๊กอัตโนมัติ: ทุกแถวของสัญญา (ลำดับสัญญาเดียวกัน) ที่มีแถวไม่พบการจองในระบบงบ - ไฟล์ส่งคืนจะได้ครบทั้งสัญญา
                 var noRsv = previewRows.filter(function (r) { return Ext.fnImportRsvNotFound(r.rsv_status); });
                 var noRsvSeq = {};
                 noRsv.forEach(function (r) { noRsvSeq[String(r.seq)] = true; });
+                // สัญญา (ลำดับสัญญา) ที่มีแถวผิดอย่างน้อย 1 แถว = นำเข้าไม่ได้ทั้งสัญญา
+                var badSeq = {};
                 previewRows.forEach(function (r) {
-                    r._chk = Ext.fnImportRsvNotFound(r.rsv_status) || (String(r.seq) !== "" && noRsvSeq[String(r.seq)] === true);
+                    if (r.status === "ERROR") {
+                        badSeq[String(r.seq)] = true;
+                    }
+                });
+                previewRows.forEach(function (r) {
+                    r._bad = badSeq[String(r.seq)] === true;
+                    r._imp = !r._bad;
+                    // [ผู้ใช้ขอ] แถวผิด (สีแดง) ติ๊กดาวน์โหลดให้อัตโนมัติ - ส่งไฟล์คืนผู้ใช้ไปแก้ได้เลย
+                    r._chk = r._bad || Ext.fnImportRsvNotFound(r.rsv_status) || (String(r.seq) !== "" && noRsvSeq[String(r.seq)] === true);
                 });
                 previewPanel.update(Ext.fnImportHtmlTable(previewCols, previewRows, function (r) {
                     return r.status === "ERROR" ? "err" : (r.status === "WARN" || Ext.fnImportRsvNotFound(r.rsv_status) ? "warn" : "");
                 }));
                 updateExportBtn();
+                updateSaveBtn();
                 var ok = res.error_rows === 0;
                 summaryFld.setValue(
                     "สัญญา " + res.contract_count + " รายการ / " + res.row_count + " งวด / รับของ "
                     + res.receive_count + " รายการ / ยอดรวม "
                     + Ext.util.Format.number(res.total, "0,000.00") + " บาท - "
                     + (ok ? "<span style=\"color:#080;\">&#10004; ข้อมูลถูกต้อง พร้อมบันทึก</span>"
-                        : "<span style=\"color:#c00;\">ผิดพลาด " + res.error_rows + " แถว (ตัวแดง) - แก้ไฟล์แล้วตรวจสอบใหม่</span>")
+                        : "<span style=\"color:#c00;\">ผิดพลาด " + res.error_rows + " แถว (ตัวแดง) - แก้ไฟล์แล้วตรวจสอบใหม่ หรือติ๊ก \"นำเข้า\" เฉพาะสัญญาที่ถูกต้อง</span>")
                 );
-                saveBtn.setDisabled(!ok);
                 if (noRsv.length) {
                     var noRsvMsg = "ไม่พบการจองในระบบงบ " + noRsv.length + " รายการ (ติ๊กเลือกให้แล้ว)";
                     summaryFld.setValue(summaryFld.getValue() + "<br><span style=\"color:#c00;\">" + noRsvMsg
@@ -703,7 +731,15 @@ function winMedSupImportNew() {
         if (!parsedRows) {
             return;
         }
-        Ext.Msg.confirm("ยืนยัน", "บันทึก \"" + Ext.util.Format.htmlEncode(nameFld.getValue()) + "\"<br>" + summaryFld.getValue()
+        // ส่งเฉพาะแถวที่ติ๊ก "นำเข้า" (เซิร์ฟเวอร์ตรวจซ้ำกับชุดที่ส่งไป)
+        var sel = importRows();
+        if (!sel.length) {
+            Ext.Msg.alert("แจ้งเตือน", "กรุณาติ๊กเลือกรายการที่ต้องการนำเข้า");
+            return;
+        }
+        var selRows = sel.map(function (r) { return parsedRows[r._i]; });
+        Ext.Msg.confirm("ยืนยัน", "บันทึก \"" + Ext.util.Format.htmlEncode(nameFld.getValue()) + "\"<br>"
+            + "นำเข้า " + sel.length + " แถว จากทั้งหมด " + previewRows.length + " แถวในไฟล์"
             + "<br><br>เข้าระบบใช่หรือไม่?", function (btn) {
             if (btn !== "yes") {
                 return;
@@ -714,7 +750,7 @@ function winMedSupImportNew() {
                 url: Ext.MEDSUP_IMPORT_URL,
                 method: "POST",
                 timeout: 300000,
-                params: {mode: "SAVE", c_import_name: nameFld.getValue(), c_file_name: fileName, rows: Ext.encode(parsedRows)},
+                params: {mode: "SAVE", c_import_name: nameFld.getValue(), c_file_name: fileName, rows: Ext.encode(selRows)},
                 success: function (response) {
                     mask.hide();
                     var res = Ext.decode(response.responseText);
@@ -767,6 +803,22 @@ function winMedSupImportNew() {
     fileFld.getEl().on("change", resetPreview);
     // ติ๊ก/เอาติ๊กออกในตารางก่อนบันทึก (ตารางถูกสร้างใหม่ทุกครั้งที่ตรวจสอบ จึงดักที่ตัวพาเนล)
     previewPanel.body.on("click", function (e, t) {
+        // ติ๊ก "นำเข้า" = ทั้งสัญญา (ทุกแถวของลำดับสัญญาเดียวกัน)
+        if (t && t.className === "medsup-imp-sel" && previewRows[t.getAttribute("data-i")]) {
+            var seq = String(previewRows[t.getAttribute("data-i")].seq);
+            previewRows.forEach(function (r) {
+                if (String(r.seq) === seq && !r._bad) {
+                    r._imp = t.checked;
+                }
+            });
+            Ext.each(previewPanel.body.dom.querySelectorAll(".medsup-imp-sel"), function (el) {
+                if (String(previewRows[el.getAttribute("data-i")].seq) === seq && !el.disabled) {
+                    el.checked = t.checked;
+                }
+            });
+            updateSaveBtn();
+            return;
+        }
         if (t && t.className === "medsup-imp-chk" && previewRows[t.getAttribute("data-i")]) {
             previewRows[t.getAttribute("data-i")]._chk = t.checked;
             updateExportBtn();

@@ -127,8 +127,8 @@ class clsPageStatus
     }
 }
 
-$pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"]);
-$_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"];
+$pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"] ?? null);
+$_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"] ?? null;
 $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
 ?> 
 <html xmlns="http://www.w3.org/1999/xhtml"> 
