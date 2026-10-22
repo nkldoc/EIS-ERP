@@ -215,7 +215,8 @@ switch ($mode) {
             echo json_encode(array("success" => false, "msg" => "กรุณาเลือกรายการตรวจรับ"));
             exit;
         }
-        // Apply the same scope as LIST_SUB_PERIOD_HDR, and only repair missing names.
+        // Repair missing employee names even after document issuance or acceptance.
+        // Keep the LIST_SUB_PERIOD_HDR access scope; do not change document status.
         $sql = "UPDATE c SET sp_emp_id=t.sp_emp_id,
                     dc_user_update_id=?, dc_user_update_cost_id=?, d_update=GETDATE()
                 OUTPUT inserted.sp_emp_id

@@ -211,6 +211,46 @@ function shouldUseWorkInProcessAccount($request, $db) {
 }
 
 switch ($mode) {
+    case "UPDATE_MISSING_WITHDRAW_EMP":
+        header("Content-Type: application/json; charset=utf-8");
+        $checkId = filter_var($_POST['sp_check_period_hdr_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$checkId || $checkId < 1) {
+            echo json_encode(array("success" => false, "msg" => "กรุณาเลือกรายการตรวจรับ"));
+            exit;
+        }
+        // Repair missing employee names even after document issuance or acceptance.
+        // Keep the LIST_SUB_PERIOD_HDR access scope; do not change document status.
+        $sql = "UPDATE c SET sp_emp_id=t.sp_emp_id,
+                    dc_user_update_id=?, dc_user_update_cost_id=?, d_update=GETDATE()
+                OUTPUT inserted.sp_emp_id
+                FROM dbo.sp_check_period_hdr c
+                INNER JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id=c.sp_tor_hdr_period_id
+                INNER JOIN dbo.sp_tor_contract b ON b.sp_tor_contract_id=p.sp_tor_contract_id
+                INNER JOIN dbo.sp_tor t ON t.tor_id=b.sp_tor_id
+                INNER JOIN dbo.sp_emp e ON e.sp_emp_id=t.sp_emp_id
+                WHERE c.sp_check_period_hdr_id=?
+                  AND NULLIF(LTRIM(RTRIM(e.c_name)), '') IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM dbo.sp_emp old
+                      WHERE old.sp_emp_id=c.sp_emp_id
+                        AND NULLIF(LTRIM(RTRIM(old.c_name)), '') IS NOT NULL)
+                  AND (?=1 OR (?=2 AND t.dc_department_id=?) OR (?=3 AND t.sp_emp_id=?))";
+        $level = intval($_SESSION['i_level'] ?? 0);
+        $params = array($_SESSION['user_id'], $data['dc_user_update_cost_id'] ?? null, $checkId,
+            $level, $level, intval($_SESSION['dc_department_id'] ?? 0),
+            $level, intval($_SESSION['sp_emp_id'] ?? 0));
+        $result = sqlsrv_query($db->conn, $sql, $params);
+        $updated = $result ? $db->Fetch($result) : false;
+        if ($result) {
+            $db->FreeSTMT($result);
+        }
+        if (!$updated || !$db->CommitTran()) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ไม่สามารถอัปเดตได้: ชื่อพนักงานเบิกมีอยู่แล้ว ไม่พบพนักงานสายงาน หรือไม่มีสิทธิ์แก้ไขรายการนี้"));
+        } else {
+            echo json_encode(array("success" => true, "msg" => "อัปเดตพนักงานเบิกให้ตรงกับพนักงานสายงานแล้ว"));
+        }
+        exit;
+
     case "SEARCH_RELATION_CODES":
         if (empty($_SESSION['user_id']) || intval($_SESSION['dc_center_user'] ?? 0) !== 1) {
             echo json_encode(array("success" => false, "data" => array(), "msg" => "ไม่มีสิทธิ์เปิดเครื่องมือข้อมูล ADMIN"));

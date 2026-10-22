@@ -10169,7 +10169,47 @@ function showCustomEditForm(rec) {
         }
 }
 
+var updateMissingWithdrawEmp = function (grid, record, button) {
+        if (!record || !record.get("sp_check_period_hdr_id")) {
+                Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกรายการตรวจรับที่ต้องการอัปเดต");
+                return;
+        }
+        if (String(record.get("withdraw_name") || "").replace(/\s/g, "")) {
+                Ext.Msg.alert("แจ้งเตือน", "รายการนี้มีชื่อพนักงานเบิกอยู่แล้ว");
+                return;
+        }
+        if (!String(record.get("emp_name") || "").replace(/\s/g, "")) {
+                Ext.Msg.alert("แจ้งเตือน", "ไม่พบชื่อพนักงานสายงานสำหรับรายการนี้");
+                return;
+        }
+        button.disable();
+        Ext.Ajax.request({
+                url: "tor/api/mnCheckingController.php",
+                method: "POST",
+                params: { mode: "UPDATE_MISSING_WITHDRAW_EMP", sp_check_period_hdr_id: record.get("sp_check_period_hdr_id") },
+                callback: function (options, success, response) {
+                        button.enable();
+                        var result;
+                        try { result = Ext.decode(response.responseText); } catch (e) { result = {}; }
+                        Ext.Msg.alert("แจ้งเตือน", result.msg || "ไม่สามารถอัปเดตข้อมูลได้ กรุณาลองใหม่");
+                        if (success && result.success) { grid.getStore().reload(); }
+                }
+        });
+};
+
+
 var cellClick = function (grid, rowIndex, columnIndex, e) {
+        var updateButton = e.getTarget("button.update-missing-withdraw-emp");
+        if (updateButton) {
+                e.stopEvent();
+                if (!updateButton.disabled) {
+                        updateMissingWithdrawEmp(grid, grid.getStore().getAt(rowIndex), {
+                                disable: function () { updateButton.disabled = true; },
+                                enable: function () { updateButton.disabled = false; }
+                        });
+                }
+                return;
+        }
         Ext.selectRow = this.selModel.selection.record;
         var column = grid.getColumnModel().getColumnAt(columnIndex);
         if (column && column.id === 'i_is_editID') {
@@ -11413,6 +11453,15 @@ Ext.AppUx = function (app, menu) {
                                         align: "left",
                                         dataIndex: "withdraw_name",
                                         width: 180,
+                                        renderer: function (value, metaData, record) {
+                                                if (String(value || "").replace(/\s/g, "")) {
+                                                        return Ext.util.Format.htmlEncode(value);
+                                                }
+                                                if (record.get("sp_check_period_hdr_id") && String(record.get("emp_name") || "").replace(/\s/g, "")) {
+                                                        return '<button type="button" class="update-missing-withdraw-emp" style="cursor:pointer;color:#b00000;border:1px solid #d9534f;border-radius:3px;background:#fff;padding:2px 10px;">อัปเดต</button>';
+                                                }
+                                                return "";
+                                        },
                                 },
                                 {
                                         header: "หน่วยงานเจ้าของเรื่อง",
@@ -12396,6 +12445,15 @@ Ext.AppUx = function (app, menu) {
                                                         { xtype: "tbspacer", width: 4 },
                                                         { xtype: "label", text: " : แสดงรายการของตัวเอง" },
                                                 ],
+                                        },
+                                        {
+                                                xtype: "button",
+                                                text: "อัปเดตพนักงานเบิกที่หาย",
+                                                icon: "../images/icons/user_edit.png",
+                                                handler: function (button) {
+                                                        var grid = button.findParentByType("grid");
+                                                        updateMissingWithdrawEmp(grid, grid.getSelectionModel().getSelected(), button);
+                                                }
                                         },
                                         { xtype: "tbfill" },
                                         {
