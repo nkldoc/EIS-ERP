@@ -1,0 +1,43 @@
+body { background:#fff; font-family:"Sarabun","Tahoma",sans-serif; font-size:13px; color:#212529; }
+.ps-wrap { padding:0 0 40px; }
+.ps-title { background:#1a73c8; color:#fff; font-size:20px; font-weight:700; text-align:center; padding:12px 16px; position:relative; }
+.ps-year { position:absolute; right:16px; top:50%; transform:translateY(-50%); font-size:13px; padding:2px 6px; border-radius:4px; border:0; }
+.ps-loading { text-align:center; padding:60px 0; color:#6c757d; }
+
+.ps-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:28px; padding:14px 16px 6px; }
+.ps-kpi { border:1px solid #c9ccd6; background:#f6f6ff; text-align:center; padding:14px 8px 18px; min-height:120px; }
+.ps-kpi-green { background:#f1faf3; border-color:#b8dcc0; }
+.ps-kpi-t { color:#1a56b0; font-size:13px; }
+.ps-kpi-s { color:#6c757d; font-size:11px; margin-bottom:12px; }
+.ps-kpi-v { font-size:20px; font-weight:700; color:#1a3d8f; }
+.ps-green { color:#1e7e34; }
+
+.ps-row { display:flex; gap:28px; padding:6px 16px; align-items:flex-start; }
+.ps-col { flex:1 1 0; min-width:0; }
+.ps-col-wide { flex:1.25 1 0; }
+.ps-col-narrow { flex:1 1 0; }
+.ps-h { color:#1a56b0; font-weight:700; font-size:13px; margin:12px 0 4px; }
+.ps-h2 { margin-top:16px; }
+
+.ps-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.ps-tbl th { background:#1a56b0; color:#fff; text-align:center; font-weight:700; padding:5px 6px; border:1px solid #fff; }
+.ps-tbl td { padding:3px 8px; border-bottom:1px solid #dfe3ea; }
+.ps-tbl td.n { text-align:right; white-space:nowrap; }
+.ps-tbl td.c { text-align:center; }
+.ps-tbl tr.tot td { background:#dcebf8; font-weight:700; border-top:1px solid #1a56b0; }
+.ps-tbl tr:nth-child(even):not(.tot) td { background:#fafbfd; }
+.ps-chart { height:300px; border:1px solid #c9ccd6; }
+.ps-chart-tall { height:760px; }
+
+@media (max-width: 992px) {
+	.ps-kpis { grid-template-columns:repeat(2,1fr); gap:12px; }
+	.ps-row { flex-direction:column; }
+	.ps-col, .ps-col-wide, .ps-col-narrow { width:100%; flex:none; }
+	.ps-title { padding-right:150px; font-size:16px; }
+}
+
+.ps-fundbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 16px 0; }
+.ps-chip-label { font-weight:700; color:#1a56b0; margin-right:2px; }
+.ps-chip { border:1px solid #1a56b0; background:#fff; color:#1a56b0; border-radius:999px; padding:4px 14px; font-size:13px; cursor:pointer; transition:background .15s,color .15s; }
+.ps-chip:hover { background:#e8f0fb; }
+.ps-chip.active { background:#1a56b0; color:#fff; }

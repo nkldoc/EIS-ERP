@@ -217,11 +217,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                         <input type="checkbox" class="custom-control-input" id="darkToggle">
                                                         <label class="custom-control-label" for="darkToggle"><i class="bi bi-moon-stars"></i> Dark</label>
                                                 </div>
-                                                <button id="btnExportReserve"
-        class="btn btn-warning btn-sm rounded-pill px-3"
-        onclick="exportReserveSummary()">
-    📊 Export จองเงิน/ใช้ไปแล้ว
-</button>
+                                                <button id="btnProcureSummary" type="button"
+                                                        class="btn btn-primary btn-sm rounded-pill px-3 ml-2"
+                                                        onclick="openProcureSummary()">
+                                                        📈 สรุปยอดปริมาณการจัดซื้อจัดจ้าง
+                                                </button>
+                                                <script>
+                                                function openProcureSummary() {
+                                                        var sel = document.getElementById('budget_year_filter');
+                                                        var th = sel && sel.value ? sel.value : '';
+                                                        var en = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].dataset.yearEn : '';
+                                                        var q = th ? '?year_th=' + encodeURIComponent(th) + '&year_en=' + encodeURIComponent(en) : '';
+                                                        window.open('Budget_Procurement_Summary.php' + q, '_blank');
+                                                }
+                                                </script>
                                         </div>
                                 </div>
 
