@@ -68,6 +68,7 @@ const Timeline = (group, text) => {
 const checkListDateRange = function () {
     var from = Ext.getCmp('checklist_date_from');
     var to = Ext.getCmp('checklist_date_to');
+    var dateType = Ext.getCmp('checklist_date_type');
     if ((from && !from.isValid()) || (to && !to.isValid())) { return null; }
     var first = from ? from.getValue() : '';
     var last = to ? to.getValue() : '';
@@ -75,7 +76,7 @@ const checkListDateRange = function () {
         Ext.Msg.alert('แจ้งเตือน', 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด');
         return null;
     }
-    return { date_from: first ? Ext.util.Format.gridDate(first, 'Y-m-d') : '',
+    return { date_type: dateType ? dateType.getValue() : 'contract', date_from: first ? Ext.util.Format.gridDate(first, 'Y-m-d') : '',
         date_to: last ? Ext.util.Format.gridDate(last, 'Y-m-d') : '' };
 };
 const search = function () {
@@ -83,6 +84,7 @@ const search = function () {
     if (!dateRange) { return; }
     Ext.storeDtl.setBaseParam('date_from', dateRange.date_from);
     Ext.storeDtl.setBaseParam('date_to', dateRange.date_to);
+    Ext.storeDtl.setBaseParam('date_type', dateRange.date_type);
     var msg = "";
     if (msg == "") {
         Ext.storeDtl.setBaseParam("mode", "LIST");
@@ -131,6 +133,7 @@ const exportExcel = async function (button) {
         vendor_operations: getCmpValue('checklist_vendor_operations', false) ? 1 : 0,
         date_from: dateRange.date_from,
         date_to: dateRange.date_to,
+        date_type: dateRange.date_type,
         filter: getCmpValue("filter", "c_code"),
         value: getCmpValue("value-box", ""),
         dc_expense_budget_type_id: getCmpValue("s_dc_expense_budget_type_id", 0),
@@ -4759,84 +4762,16 @@ Ext.AppUx = function (app, menu) {
                                     ],
                                 },
                                 {
-                                    xtype: "buttongroup",
-                                    frame: false,
-                                    items: [
-                                        // { xtype: "tbspacer", width: 4 },
-                                        {xtype: "label", text: "จำนวนเงิน PR : "},
-                                        {
-                                            xtype: "textfield",
-                                            fieldLabel: "จำนวนเงินงวด",
-                                            // readOnly: true,
-                                            // readOnly: Ext.session.dc_center_user == 1 ? false : true,
-                                            id: "f_total_amtPrID",
-                                            name: "f_total_amtPr",
-                                            listeners: {
-                                                afterrender: function () {
-                                                    this.fn = function () {
-                                                        this.setValue(floatRenderer(floatMinus(this.getValue().replace(/,/g, ""), 2)));
-                                                    };
-                                                    this.fn();
-                                                },
-                                                blur: function () {
-                                                    var f_total = parseFloat(this.getValue().replace(/,/g, "") / 1);
-                                                    this.setValue(Ext.floatRenderer(f_total));
-                                                },
-                                                keyup: function () {
-                                                    // Ext.getCmp("f_totalID").setValue(floatRenderer(floatMinus(Ext.getCmp("f_type_amtID").getValue().replace(/,/g, ""))));
-                                                },
-                                            },
-                                            style: {
-                                                labelAlign: "right",
-                                                "font-weight": "bold",
-                                                padding: "1px",
-                                                margin: "1px",
-                                                color: "blue",
-                                                "background-color": "#fff",
-                                                "text-align": "right",
-                                            },
-                                        },
-                                        {xtype: "tbspacer", width: 4},
-                                        {xtype: "label", text: "จำนวนเงิน PO : "},
-                                        {
-                                            xtype: "textfield",
-                                            fieldLabel: "จำนวนเงินงวด",
-                                            // readOnly: true,
-                                            // readOnly: Ext.session.dc_center_user == 1 ? false : true,
-                                            id: "f_total_amtPoID",
-                                            name: "f_total_amtPo",
-                                            listeners: {
-                                                afterrender: function () {
-                                                    this.fn = function () {
-                                                        this.setValue(floatRenderer(floatMinus(this.getValue().replace(/,/g, ""), 2)));
-                                                    };
-                                                    this.fn();
-                                                },
-                                                blur: function () {
-                                                    var f_total = parseFloat(this.getValue().replace(/,/g, "") / 1);
-                                                    this.setValue(Ext.floatRenderer(f_total));
-                                                },
-                                                keyup: function () {
-                                                    // Ext.getCmp("f_totalID").setValue(floatRenderer(floatMinus(Ext.getCmp("f_type_amtID").getValue().replace(/,/g, ""))));
-                                                },
-                                            },
-                                            style: {
-                                                labelAlign: "right",
-                                                "font-weight": "bold",
-                                                padding: "1px",
-                                                margin: "1px",
-                                                color: "blue",
-                                                "background-color": "#fff",
-                                                "text-align": "right",
-                                            },
-                                        },
-                                        {xtype: "tbspacer", width: 4},
-                                    ],
-                                },
-                                {
                                     xtype: 'buttongroup', frame: false,
                                     items: [
-                                        {xtype: 'label', text: 'วันที่ตรวจรับ : '},
+                                        {xtype: 'combo', id: 'checklist_date_type', width: 110,
+                                            mode: 'local', triggerAction: 'all', editable: false,
+                                            forceSelection: true, value: 'contract',
+                                            valueField: 'value', displayField: 'text',
+                                            store: new Ext.data.SimpleStore({
+                                                fields: ['value', 'text'],
+                                                data: [['checking', 'วันที่ตรวจรับ'], ['contract', 'วันทำสัญญา']]
+                                            })},
                                         {xtype: 'datefield', id: 'checklist_date_from', width: 110, format: 'd-m-Y'},
                                         {xtype: 'label', text: ' ถึงวันที่ : '},
                                         {xtype: 'datefield', id: 'checklist_date_to', width: 110, format: 'd-m-Y'},
@@ -5604,6 +5539,47 @@ Ext.AppUx = function (app, menu) {
                                         {xtype: "tbspacer", width: 0},
                                     ],
                                 },
+                                {
+                                    xtype: "buttongroup",
+                                    frame: false,
+                                    items: [
+                                        // { xtype: "tbspacer", width: 4 },
+                                        {xtype: "label", text: "จำนวนเงิน PR : "},
+                                        {
+                                            xtype: "textfield",
+                                            fieldLabel: "จำนวนเงินงวด",
+                                            // readOnly: true,
+                                            // readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                                            id: "f_total_amtPrID",
+                                            name: "f_total_amtPr",
+                                            listeners: {
+                                                afterrender: function () {
+                                                    this.fn = function () {
+                                                        this.setValue(floatRenderer(floatMinus(this.getValue().replace(/,/g, ""), 2)));
+                                                    };
+                                                    this.fn();
+                                                },
+                                                blur: function () {
+                                                    var f_total = parseFloat(this.getValue().replace(/,/g, "") / 1);
+                                                    this.setValue(Ext.floatRenderer(f_total));
+                                                },
+                                                keyup: function () {
+                                                    // Ext.getCmp("f_totalID").setValue(floatRenderer(floatMinus(Ext.getCmp("f_type_amtID").getValue().replace(/,/g, ""))));
+                                                },
+                                            },
+                                            style: {
+                                                labelAlign: "right",
+                                                "font-weight": "bold",
+                                                padding: "1px",
+                                                margin: "1px",
+                                                color: "blue",
+                                                "background-color": "#fff",
+                                                "text-align": "right",
+                                            },
+                                        },
+                                        {xtype: "tbspacer", width: 4},
+                                    ],
+                                },
                             ],
                         },
                         {
@@ -5901,6 +5877,46 @@ Ext.AppUx = function (app, menu) {
                                                 {xtype: "label", text: " : รายการที่ยังไม่ได้ระบุ KPI"},
                                             ],
                                         },
+                                    ],
+                                },
+                                {
+                                    xtype: "buttongroup",
+                                    frame: false,
+                                    items: [
+                                        {xtype: "label", text: "จำนวนเงิน PO : "},
+                                        {
+                                            xtype: "textfield",
+                                            fieldLabel: "จำนวนเงินงวด",
+                                            // readOnly: true,
+                                            // readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                                            id: "f_total_amtPoID",
+                                            name: "f_total_amtPo",
+                                            listeners: {
+                                                afterrender: function () {
+                                                    this.fn = function () {
+                                                        this.setValue(floatRenderer(floatMinus(this.getValue().replace(/,/g, ""), 2)));
+                                                    };
+                                                    this.fn();
+                                                },
+                                                blur: function () {
+                                                    var f_total = parseFloat(this.getValue().replace(/,/g, "") / 1);
+                                                    this.setValue(Ext.floatRenderer(f_total));
+                                                },
+                                                keyup: function () {
+                                                    // Ext.getCmp("f_totalID").setValue(floatRenderer(floatMinus(Ext.getCmp("f_type_amtID").getValue().replace(/,/g, ""))));
+                                                },
+                                            },
+                                            style: {
+                                                labelAlign: "right",
+                                                "font-weight": "bold",
+                                                padding: "1px",
+                                                margin: "1px",
+                                                color: "blue",
+                                                "background-color": "#fff",
+                                                "text-align": "right",
+                                            },
+                                        },
+                                        {xtype: "tbspacer", width: 4},
                                     ],
                                 },
                             ],

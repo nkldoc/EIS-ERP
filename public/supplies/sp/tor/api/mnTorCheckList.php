@@ -210,6 +210,8 @@ switch ($mode) {
         }
         $arrParam = array();
         $arrCountParam = array();
+        $isContractDate = ($_REQUEST['date_type'] ?? 'contract') === 'contract';
+        $dateColumn = $isContractDate ? 'checkingContract.d_doc_date' : 'checking.d_checking_date';
         $checkingDateConditions = array();
         foreach (array('date_from', 'date_to') as $dateKey) {
             $dateValue = trim($_REQUEST[$dateKey] ?? '');
@@ -221,8 +223,8 @@ switch ($mode) {
                 exit;
             }
             $checkingDateConditions[] = $dateKey === 'date_from'
-                ? 'checking.d_checking_date >= ?'
-                : 'checking.d_checking_date < DATEADD(day, 1, CAST(? AS date))';
+                ? $dateColumn . ' >= ?'
+                : $dateColumn . ' < DATEADD(day, 1, CAST(? AS date))';
             $arrParam[] = $dateValue;
             $arrCountParam[] = $dateValue;
         }
@@ -232,11 +234,14 @@ switch ($mode) {
             exit;
         }
         if ($checkingDateConditions) {
-            // Both date bounds must match the same inspection record.
-            $wh .= ' AND EXISTS (SELECT 1 FROM NMU_ERP.dbo.sp_check_period_hdr checking
-                INNER JOIN NMU_ERP.dbo.sp_tor_contract checkingContract
-                    ON checkingContract.sp_tor_contract_id = checking.sp_tor_contract_id
-                WHERE checkingContract.sp_tor_id = a.tor_id AND '
+            // Both bounds must match the same record for the selected date source.
+            $dateSource = $isContractDate
+                ? 'NMU_ERP.dbo.sp_tor_contract checkingContract'
+                : 'NMU_ERP.dbo.sp_check_period_hdr checking
+                    INNER JOIN NMU_ERP.dbo.sp_tor_contract checkingContract
+                        ON checkingContract.sp_tor_contract_id = checking.sp_tor_contract_id';
+            $wh .= ' AND EXISTS (SELECT 1 FROM ' . $dateSource
+                . ' WHERE checkingContract.sp_tor_id = a.tor_id AND '
                 . implode(' AND ', $checkingDateConditions) . ')';
         }
         // Use the same NMU creditor master and tax address fields as DcCreditorTax_nmu.
@@ -256,7 +261,16 @@ switch ($mode) {
                 CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_province)),'') IS NOT NULL THEN ' จังหวัด ' + vendor.tax_c_province ELSE '' END,
                 CASE WHEN NULLIF(LTRIM(RTRIM(vendor.tax_c_post_code)),'') IS NOT NULL THEN ' ' + vendor.tax_c_post_code ELSE '' END
             ))) AS creditor_address,
-            vendor.c_tax_number_imp AS vendor_tax_number" : '';
+            vendor.c_tax_number_imp AS vendor_tax_number,
+            (SELECT TOP 1 inspectionUser.c_full_name
+             FROM dbo.sp_check_period_hdr inspection
+             INNER JOIN dbo.sp_tor_contract inspectionContract
+                 ON inspectionContract.sp_tor_contract_id = inspection.sp_tor_contract_id
+             LEFT JOIN dbo.dc_user inspectionUser
+                 ON inspectionUser.dc_user_id = inspection.dc_user_create_id
+             WHERE inspectionContract.sp_tor_id = s.tor_id
+             ORDER BY inspection.d_checking_date DESC, inspection.sp_check_period_hdr_id DESC
+            ) AS inspection_create_name" : '';
         $vendorJoin = $isVendorOperations ? " OUTER APPLY (
             SELECT TOP 1 cr.* FROM dbo.sp_tor_contract ct
             INNER JOIN NMU.dbo.dc_creditor cr ON cr.dc_creditor_id = ct.dc_creditor_id
@@ -624,7 +638,7 @@ switch ($mode) {
             );
             if ($isVendorOperations) {
                 $excelColumns = array('c_name' => 'c_name', 'creditor_name' => 'creditor_name',
-                    'creditor_address' => 'creditor_address', 'vendor_tax_number' => 'เลขภาษี', 'c_create_name' => 'dc_user_name');
+                    'creditor_address' => 'creditor_address', 'vendor_tax_number' => 'เลขภาษี', 'inspection_create_name' => 'dc_user_name');
             }
             $fileName = ($isVendorOperations ? 'vendor_operations_' : 'tor_checklist_') . date('Ymd_His') . '.xls';
             header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
