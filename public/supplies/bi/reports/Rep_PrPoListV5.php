@@ -97,6 +97,13 @@ $po_cross_type = array_values(array_filter($po_rows, function ($r) { return !emp
 
 $f_pr_remaining_total = array_sum(array_column($pr_only, 'f_amt'));
 $f_pr_deducted_total  = array_sum(array_column($pr_with_po, 'f_amt'));
+// [เพิ่ม] มุมมอง col=po: รวมเงินจองจัดสรรงบประมาณ (ขั้น PR) และคงเหลือหลังทำสัญญา (= เงินจอง PR - เงินจองสัญญา)
+// รวมเฉพาะแถวที่มียอดขั้น PR (f_pr_reserve > 0) เพื่อไม่ให้แถวที่ไม่มีข้อมูลขั้น PR ทำให้ยอดคงเหลือเพี้ยน
+$f_po_pr_reserve_total = 0; $f_po_remain_total = 0;
+foreach ($pr_with_po as $_r) {
+    $_pr = floatval($_r['f_pr_reserve'] ?? 0);
+    if ($_pr > 0.005) { $f_po_pr_reserve_total += $_pr; $f_po_remain_total += $_pr - floatval($_r['f_amt'] ?? 0); }
+}
 // [FIX-CHECKSUM] $f_contract_total / $po_own_match ไม่ได้ใช้แสดงผลในหน้านี้แล้ว (ทั้งการ์ดสรุปและ
 // ตารางรายการ PO เปลี่ยนไปใช้ $pr_with_po ทั้งหมด — ดูคอมเมนต์ที่ $rows ด้านล่าง) คงไว้เผื่อ
 // ต้องใช้อ้างอิง/เทียบยอดสัญญาจริงในอนาคต
@@ -195,6 +202,11 @@ $total_count = $rows_count;
 // [เพิ่ม] มุมมอง pr_open มีแต่แถว has_po=0 ทุกแถว คอลัมน์ "หัก ณ จองในสัญญา" จะเป็น 0.00 เสมอ
 // จึงไม่มีประโยชน์ ตัดออกจากตาราง/ export ของมุมมองนี้
 $show_deduct_col = ($col !== "pr_open");
+// ชื่อหัวคอลัมน์ยอดเงินของตาราง PR: มุมมอง col=pr ใช้ชื่อเดียวกับหน้ารายการจองสัญญา (PO)
+// ส่วน pr_open (ยังไม่มี PO) คงชื่อเดิม เพราะยังไม่ได้ทำสัญญา
+$lbl_pr_reserve = ($col === "pr") ? "เงินจองจัดสรรงบประมาณ (บาท)" : "เงินจอง PR (บาท)";
+$lbl_pr_deduct  = ($col === "pr") ? "เงินจองสัญญา (บาท)" : "หัก ณ จองในสัญญา (บาท)";
+$lbl_pr_remain  = ($col === "pr") ? "คงเหลือหลังทำสัญญา (บาท)" : "คงเหลือ PR (บาท)";
 // [เพิ่ม] มุมมองแผน (ตามแผน/นอกแผน/ยังไม่ระบุ) ไม่ต้องโชว์คอลัมน์ยอดเงิน
 //   (เงินจอง PR / หัก ณ จองในสัญญา / คงเหลือ PR) — ถ้าต้องใช้ในอนาคตให้ตั้งเป็น true
 // [เพิ่ม] plan_pr ใช้เลย์เอาต์ตารางแบบหน้า "ตามแผน" (คอลัมน์ "จำนวนเงิน" เดียว) แต่ข้อมูลเป็น PR ทั้งหมด
@@ -203,6 +215,13 @@ $show_amt_cols = !$is_plan && $col !== "plan_pr";
 $show_plan_amt = $is_plan || $col === "plan_pr";
 // จำนวนคอลัมน์รวมของตาราง PR (สำหรับ colspan ของแถว "ไม่พบข้อมูล")
 $pr_col_count  = 11 + ($show_amt_cols ? ($show_deduct_col ? 3 : 2) : ($show_plan_amt ? 1 : 0));
+
+// รหัสแผน: ถ้ามีหลายรหัส (คั่นด้วย , ; หรือขึ้นบรรทัดใหม่) แสดงเรียงแนวตั้งรหัสละบรรทัด
+function planCodeHtml($raw) {
+    $parts = array_values(array_filter(array_map('trim', preg_split('/[,;\r\n]+/', (string)$raw)), function ($p) { return $p !== ''; }));
+    if (!$parts) return '-';
+    return implode('<br>', array_map('htmlspecialchars', $parts));
+}
 
 function thaiDate($d) {
     if (!$d || $d === '0000-00-00') return '-';
@@ -246,6 +265,7 @@ function thaiDate($d) {
         .bg-status-green  { background: #d4edda; color: #155724; }
         .bg-status-orange { background: #fff3cd; color: #856404; }
         .bg-status-gray   { background: #e2e3e5; color: #383d41; }
+        .plan-code-cell { white-space: nowrap; min-width: 190px; line-height: 1.5; }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
         .footer-note { padding: .75rem 1rem; text-align: right; font-size: .8rem; color: #858796; border-top: 1px solid #e3e6f0; }
@@ -342,9 +362,9 @@ function thaiDate($d) {
                         <th>ผู้รับผิดชอบ</th>
                         <th>สายงาน</th>
                         <?php if ($show_amt_cols): /* มุมมองแผนไม่โชว์ 3 คอลัมน์ยอดเงิน — ถ้าต้องใช้ตั้ง $show_amt_cols = true */ ?>
-                        <th class="text-right">เงินจอง PR (บาท)</th>
-                        <?php if ($show_deduct_col): ?><th class="text-right">หัก ณ จองในสัญญา (บาท)</th><?php endif; ?>
-                        <th class="text-right">คงเหลือ PR (บาท)</th>
+                        <th class="text-right"><?= $lbl_pr_reserve ?></th>
+                        <?php if ($show_deduct_col): ?><th class="text-right"><?= $lbl_pr_deduct ?></th><?php endif; ?>
+                        <th class="text-right"><?= $lbl_pr_remain ?></th>
                         <?php elseif ($show_plan_amt): ?>
                         <th class="text-right">จำนวนเงิน (บาท)</th>
                         <?php endif; ?>
@@ -367,7 +387,7 @@ function thaiDate($d) {
                             <td class="text-center text-muted"><?= $i+1 ?></td>
                             <td class="font-weight-bold text-primary"><?= htmlspecialchars($row['c_code'] ?? '-') ?></td>
                             <td><div style="min-width:300px;white-space:normal;word-wrap:break-word;line-height:1.4;"><?= htmlspecialchars($row['c_name'] ?? '-') ?></div></td>
-                            <td style="white-space:nowrap;"><?= htmlspecialchars($row['plan_code'] ?? '') !== '' ? htmlspecialchars($row['plan_code']) : '-' ?></td>
+                            <td class="plan-code-cell"><?= planCodeHtml($row['plan_code'] ?? '') ?></td>
                             <td>
                                 <small class="d-block text-muted"><?= htmlspecialchars($row['event_type'] ?? '-') ?></small>
                                 <?= htmlspecialchars($row['sp_event_detail'] ?? '') ?>
@@ -422,12 +442,15 @@ function thaiDate($d) {
                         <th class="text-center" width="70">ลำดับที่</th>
                         <th>เลขที่ PR</th>
                         <th>ชื่อรายการ</th>
+                        <th style="white-space:nowrap;">รหัสแผน</th>
                         <th>หน่วยงาน</th>
                         <th>สถานะ</th>
                         <th>แหล่งเงิน</th>
                         <th>ผู้รับผิดชอบ</th>
                         <th>สายงาน</th>
+                        <th class="text-right">เงินจองจัดสรรงบประมาณ (บาท)</th>
                         <th class="text-right">เงินจองสัญญา (บาท)</th>
+                        <th class="text-right">คงเหลือหลังทำสัญญา (บาท)</th>
                     </tr>
                 </thead>
                 <tbody id="mainTableBody">
@@ -441,11 +464,14 @@ function thaiDate($d) {
                             // [FIX-CHECKSUM] $rows มาจาก $pr_with_po (Result Set 1) แล้ว จึงอ่าน
                             // c_code/c_name/f_amt (ฟิลด์ฝั่ง PR) แทน po_code/po_name/f_amt_contract เดิม
                             $f_amt = floatval($row['f_amt'] ?? 0);
+                            $f_pr_rsv = floatval($row['f_pr_reserve'] ?? 0);
+                            $has_pr_rsv = $f_pr_rsv > 0.005;
                         ?>
                         <tr>
                             <td class="text-center text-muted"><?= $i+1 ?></td>
                             <td class="font-weight-bold text-danger"><?= htmlspecialchars($row['c_code'] ?? '-') ?></td>
                             <td><div style="min-width:300px;white-space:normal;word-wrap:break-word;line-height:1.4;"><?= htmlspecialchars($row['c_name'] ?? '-') ?></div></td>
+                            <td class="plan-code-cell"><?= planCodeHtml($row['plan_code'] ?? '') ?></td>
                             <td>
                                 <div><?= htmlspecialchars($row['dc_cost_id2'] ?? '-') ?></div>
                                 <small class="text-muted"><?= htmlspecialchars($row['dc_sub_cost'] ?? '') ?></small>
@@ -457,13 +483,23 @@ function thaiDate($d) {
                             </td>
                             <td><?= htmlspecialchars($row['sp_emp'] ?? '-') ?></td>
                             <td><?= htmlspecialchars($row['dc_department'] ?? '-') ?></td>
+                            <td class="text-right font-weight-bold" style="color:#6f42c1;"><?= $has_pr_rsv ? number_format($f_pr_rsv, 2) : '-' ?></td>
                             <td class="text-right font-weight-bold text-danger"><?= number_format($f_amt, 2) ?></td>
+                            <td class="text-right font-weight-bold text-success"><?= $has_pr_rsv ? number_format($f_pr_rsv - $f_amt, 2) : '-' ?></td>
                         </tr>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <tr><td colspan="9" class="text-center py-5 text-muted">ไม่พบข้อมูล</td></tr>
+                        <tr><td colspan="12" class="text-center py-5 text-muted">ไม่พบข้อมูล</td></tr>
                     <?php endif; ?>
                 </tbody>
+                <tfoot>
+                    <tr style="background:#f8f9fc;font-weight:700;">
+                        <td colspan="9" class="text-right">รวม</td>
+                        <td class="text-right" style="color:#6f42c1;"><?= number_format($f_po_pr_reserve_total, 2) ?></td>
+                        <td class="text-right text-danger"><?= number_format($total_amt, 2) ?></td>
+                        <td class="text-right text-success"><?= number_format($f_po_remain_total, 2) ?></td>
+                    </tr>
+                </tfoot>
             </table>
             <?php endif; ?>
         </div>
@@ -494,20 +530,23 @@ function exportToExcel() {
     var numFmt = '#,##0.00';
 
     var prBaseHeaders = ["ลำดับที่","เลขที่ PR","ชื่อรายการ","รหัสแผน","ประเภทความก้าวหน้า","หน่วยงาน","สถานะ","สถานะการจอง","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน"];
+    var lblReserve = <?= json_encode($lbl_pr_reserve, JSON_UNESCAPED_UNICODE) ?>;
+    var lblDeduct  = <?= json_encode($lbl_pr_deduct, JSON_UNESCAPED_UNICODE) ?>;
+    var lblRemain  = <?= json_encode($lbl_pr_remain, JSON_UNESCAPED_UNICODE) ?>;
     var prAmtHeaders  = showDeductCol
-        ? ["เงินจอง PR (บาท)","หัก ณ จองในสัญญา (บาท)","คงเหลือ PR (บาท)"]
-        : ["เงินจอง PR (บาท)","คงเหลือ PR (บาท)"];
+        ? [lblReserve, lblDeduct, lblRemain]
+        : [lblReserve, lblRemain];
     var headers = isPr
         ? (showAmtCols ? prBaseHeaders.concat(prAmtHeaders)
            : (showPlanAmt ? prBaseHeaders.concat(["จำนวนเงิน (บาท)"]) : prBaseHeaders.slice()))
-        : ["ลำดับที่","เลขที่ PR","ชื่อรายการ","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจองสัญญา (บาท)"];
+        : ["ลำดับที่","เลขที่ PR","ชื่อรายการ","รหัสแผน","หน่วยงาน","สถานะ","แหล่งเงิน","ผู้รับผิดชอบ","สายงาน","เงินจองจัดสรรงบประมาณ (บาท)","เงินจองสัญญา (บาท)","คงเหลือหลังทำสัญญา (บาท)"];
 
     var colCount = headers.length;
     // [FIX] ตาราง PR ปกติมี 3 คอลัมน์ยอดเงิน (เงินจอง PR / หัก ณ จองในสัญญา / คงเหลือ PR)
     // มุมมอง pr_open ไม่มี "หัก ณ จองในสัญญา" จึงเหลือ 2 คอลัมน์ยอดเงิน ส่วน PO มี 1 คอลัมน์
     // มุมมองแผน (ตามแผน/นอกแผน/ยังไม่ระบุ) มีคอลัมน์ยอดเงินเดียว = "จำนวนเงิน"
     var amtCols = showAmtCols
-        ? (isPr ? (showDeductCol ? [colCount - 3, colCount - 2, colCount - 1] : [colCount - 2, colCount - 1]) : [colCount - 1])
+        ? (isPr ? (showDeductCol ? [colCount - 3, colCount - 2, colCount - 1] : [colCount - 2, colCount - 1]) : [colCount - 3, colCount - 2, colCount - 1])
         : (showPlanAmt ? [colCount - 1] : []);
 
     function cs(bgHex, fontHex, bold, numFmtCode, h) {
@@ -564,7 +603,9 @@ function exportToExcel() {
     $("#mainTableBody tr:visible").each(function() {
         var row = [];
         $(this).find("td").each(function(i) {
-            var txt = $(this).text().trim().replace(/\s+/g, " ");
+            var $td = $(this).clone();
+            $td.find("br").replaceWith(", "); // รหัสแผนหลายรหัส (แนวตั้งในหน้าจอ) -> คั่นด้วย , ใน Excel
+            var txt = $td.text().trim().replace(/\s+/g, " ");
             if (amtCols.indexOf(i) !== -1) row.push(txt === "-" ? 0 : (parseFloat(txt.replace(/,/g, "")) || 0));
             else row.push(txt);
         });
@@ -595,7 +636,10 @@ function exportToExcel() {
                 else if (i === amtCols[1]) v = <?= (float)$f_pr_deducted_total ?>;                            // หัก ณ จองในสัญญา
                 else v = <?= (float)$f_pr_remaining_total ?>;                                                 // คงเหลือ PR
             } else {
-                v = totalAmt;
+                // PO: [เงินจองจัดสรรงบประมาณ, เงินจองสัญญา, คงเหลือหลังทำสัญญา]
+                if (i === amtCols[0]) v = <?= (float)$f_po_pr_reserve_total ?>;
+                else if (i === amtCols[1]) v = totalAmt;
+                else v = <?= (float)$f_po_remain_total ?>;
             }
             return cell(v, sumBg, sumFc, true, numFmt);
         }
@@ -621,7 +665,7 @@ function exportToExcel() {
     var wch = isPr
         ? (showAmtCols ? prBaseWch.concat(prAmtWch)
            : (showPlanAmt ? prBaseWch.concat([{wch:20}]) : prBaseWch.slice()))
-        : [{wch:5},{wch:18},{wch:55},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:18}];
+        : [{wch:5},{wch:18},{wch:55},{wch:16},{wch:22},{wch:20},{wch:32},{wch:18},{wch:18},{wch:22},{wch:18},{wch:22}];
     ws['!cols'] = wch;
     ws['!freeze'] = {xSplit:0, ySplit:4};
 

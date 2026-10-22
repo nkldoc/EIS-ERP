@@ -121,6 +121,12 @@ function List_QueryParam()
 							,b.c_code
 							,ISNULL(b.plan_status,0) AS plan_status
 							,b.plan_code
+							-- [เพิ่ม] เงินจองจัดสรรงบประมาณ ณ ขั้น PR (i_reserve=1) ของ PR/หมวดงบ/แหล่งเงินเดียวกัน
+							-- ใช้คู่กับ f_amt (ขั้น PO) เพื่อหาคงเหลือหลังทำสัญญา ในหน้า Rep_PrPoListV5 (col=po)
+							,(SELECT ISNULL(SUM(x.f_amt),0) FROM #temp_1 x
+								WHERE x.i_sys = a.i_sys AND x.pr_id = a.pr_id AND x.i_reserve = 1
+									AND x.bg_expense_id = a.bg_expense_id
+									AND x.dc_budget_type_id = a.dc_expense_budget_type_id) AS f_pr_reserve
 							,(SELECT c_name FROM " . DB_NMU_ERP . "sp_type_event ac WHERE ac.sp_type_event_id =
 								(SELECT TOP 1 event_type FROM " . DB_NMU_ERP . "sp_tor_event WHERE sp_tor_id = b.tor_id
 								ORDER BY d_create DESC)) AS event_type
@@ -340,6 +346,7 @@ function List_QueryParam()
 				"sp_event_detail"           => $row["sp_event_detail"],
 				"plan_status"               => (int)($row["plan_status"] ?? 0),
 				"plan_code"                 => $row["plan_code"],
+				"f_pr_reserve"              => (float)($row["f_pr_reserve"] ?? 0),
 				"f_amt"                     => $f_amt,
 				"has_po"                    => $has_po,
 				"children"                  => isset($detailMap[$sp_tor_id]) ? $detailMap[$sp_tor_id] : [],
