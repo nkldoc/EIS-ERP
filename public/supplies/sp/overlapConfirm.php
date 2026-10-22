@@ -121,8 +121,8 @@ class clsPageStatus
     }
 }
 $user_type_audit = $db->GetDataBySQL("select case when count(*) > 0 then 'audit' else null end as is_audit from dc_user_menu  where dc_menu_id = 150741 and dc_user_id = ?", array($_SESSION["user_id"]));
-$pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"]);
-$_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"];
+$pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"] ?? null);
+$_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"] ?? null;
 $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">

@@ -173,6 +173,10 @@ function imp_vat($in, $total, &$errs)
     $nums = array();
     foreach (array("vat_amt", "vat_pct", "wht_amt", "wht_pct", "penalty", "guar_pct", "other") as $k) {
         $raw = imp_str($in[$k] ?? "");
+        // "-" / "–" = ว่าง (ไฟล์ที่ export มาใช้ "-" แทนช่องที่ไม่มีค่า)
+        if (in_array($raw, array("-", "–", "—"), true)) {
+            $raw = "";
+        }
         $nums[$k] = imp_num($raw);
         if ($raw !== "" && ($nums[$k] === null || $nums[$k] < 0)) {
             $errs[] = "ช่อง VAT \"{$k}\" ต้องเป็นตัวเลขไม่ติดลบ";
@@ -277,6 +281,12 @@ function imp_validate($db, $inputRows)
         $rowNo = intval($in["_row"] ?? ($i + 2));
         $errs = array();
         $warns = array();
+        // "-" ในช่องรับของ/อ้างอิง = ว่าง (เช่น สัญญาข้ามปียังไม่มีวันรับของ)
+        foreach (array("rc_code", "rc_erp", "rc_date", "rc_detail", "rc_amt", "pr_id", "po_id", "chk_id", "c_overlap") as $dk) {
+            if (in_array(imp_str($in[$dk] ?? ""), array("-", "–", "—"), true)) {
+                $in[$dk] = "";
+            }
+        }
         $seq = imp_str($in["seq"] ?? "");
         if ($seq === "") {
             $errs[] = "ไม่มีลำดับสัญญา";
@@ -304,7 +314,12 @@ function imp_validate($db, $inputRows)
         // งวด: แถวที่ลำดับสัญญา + งวดที่ เดียวกันคืองวดเดียวกัน (1 งวดมีรายการรับของได้หลายแถว)
         // แถวแรกของงวดเป็นหลัก แถวถัดไปเว้นข้อมูลงวดว่างได้ ถ้ากรอกต้องตรงกับแถวแรก
         $period = imp_str($in["period"] ?? "");
-        if ($period === "" || !ctype_digit($period)) {
+        if ($period === "") {
+            // งวดว่าง: เลขที่สัญญาลงท้าย -N/ปี (เช่น 3C176-13/2567) = งวดที่ N, นอกนั้น (เช่น 079/69) = งวดเดียว = งวด 1
+            $period = preg_match('/-(\d+)\/\d+$/', $h["contract_code"], $pm) ? strval(intval($pm[1])) : "1";
+            $in["period"] = $period;
+        }
+        if (!ctype_digit($period)) {
             $errs[] = "งวดที่ต้องเป็นตัวเลข";
         }
         $pKey = $period !== "" ? $period : "(ว่าง-{$rowNo})";
@@ -404,6 +419,7 @@ function imp_validate($db, $inputRows)
             // ยอดที่คำนวณได้ (แสดงให้ตรวจก่อนบันทึก เทียบกับหน้า "แก้ไข VAT")
             "calc_before" => $money ? $money["before"] : null, "calc_vat" => $money ? $money["vat"] : null,
             "calc_wht" => $money ? $money["wht"] : null, "calc_guar" => $money ? $money["guar"] : null,
+            "calc_penalty" => $money ? $money["penalty"] : null,
             "calc_pay" => $money ? $money["pay"] : null,
             // สถานะจองเงินในระบบงบ (ของฝั่ง ERP เวชภัณฑ์) จาก pr_id/po_id ของงวด + chk_id ของแถวนี้
             "rsv_status" => imp_reserve_status($db, $groups[$seq]["periods"][$pIdx]["ref"]["pr_id"],
@@ -433,8 +449,9 @@ function imp_validate($db, $inputRows)
         // ชื่อโครงการว่าง = ชื่อค่าใช้จ่ายตัดรหัสออก (เหมือนฟอร์ม ST00092)
         $c["c_project_name"] = $h["project"] !== "" ? $h["project"]
             : ($exp ? trim(preg_replace('/^[^:]*:\s*/u', "", $exp["name"])) : "");
-        $c["c_contract_type"] = $h["contract_type"];
-        if (!in_array($h["contract_type"], $typeOk, true)) {
+        // "สัญญาต่อเนื่อง" (สัญญา PO ภายในปี) = ประเภท "สัญญา"
+        $c["c_contract_type"] = $h["contract_type"] === "สัญญาต่อเนื่อง" ? "สัญญา" : $h["contract_type"];
+        if (!in_array($c["c_contract_type"], $typeOk, true)) {
             $cErrs[] = "ประเภทของสัญญาต้องเป็น จัดซื้อจะขาย / ใบสั่งซื้อ / สัญญา";
         }
 
@@ -556,9 +573,8 @@ function imp_validate($db, $inputRows)
         foreach ($headerFunds as $fname => $f) {
             if (round($f["used"], 2) - round($f["amt"], 2) > 0.004) {
                 $cErrs[] = "ยอดงวดของแหล่งเงิน \"{$fname}\" รวม " . number_format($f["used"], 2) . " เกินวงเงิน " . number_format($f["amt"], 2);
-            } elseif (round($f["amt"], 2) - round($f["used"], 2) > 0.004) {
-                $cWarns[] = "ยอดงวดของแหล่งเงิน \"{$fname}\" รวม " . number_format($f["used"], 2) . " ยังไม่ครบวงเงิน " . number_format($f["amt"], 2);
             }
+            // ยอดงวดน้อยกว่าวงเงินทำสัญญา = ปกติ (สัญญาใช้เงินไม่ครบวงเงินได้) ไม่แจ้งเตือน
         }
 
         // เลขใบกันเหลื่อม (c_overlap ของแหล่งเงินที่ 1): ต้องเป็นใบกันของหน่วยงานเวชภัณฑ์ที่มีจริงในระบบงบ

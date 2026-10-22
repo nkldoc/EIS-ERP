@@ -109,7 +109,7 @@ class clsPageStatus {
 
 $st = $_GET["st"] ?? null;
 $_SESSION["st"] = $st ?? null;
-$pg = new clsPageStatus($db, $st ?? $_SESSION["st"]);
+$pg = new clsPageStatus($db, $st ?? $_SESSION["st"] ?? null);
 
 $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
 ?>

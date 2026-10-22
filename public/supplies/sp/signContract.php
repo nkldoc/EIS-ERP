@@ -126,8 +126,8 @@ class clsPageStatus
     }
 }
 
-$pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"]);
-$_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"];
+$pg = new clsPageStatus($db, $_GET["st"] ?? $_SESSION["st"] ?? null);
+$_SESSION["st"] = $_GET["st"] ?? $_SESSION["st"] ?? null;
 $scriptFile = __DIR__ . '/tor/' . $pg->get_js() . '.js';
 $js = $pg->get_js() . ".js?__dc=" . (is_file($scriptFile) ? filemtime($scriptFile) : __VPRODUCT_);
 ?>
