@@ -640,6 +640,21 @@ function winMedSupImportNew() {
                     Ext.Msg.alert("แจ้งเตือน", "ไฟล์ไม่มีข้อมูล (มีแต่แถวชื่อคอลัมน์)");
                     return;
                 }
+                // [ผู้ใช้ขอ] เลขที่สัญญาเดียวกันที่รับของหลายรอบ (คนละใบแจ้งหนี้/เลขรับเข้าคลัง ERP) ไฟล์ที่ export มา
+                // แยกลำดับสัญญาต่างกัน = รวมเป็นสัญญาเดียวกัน (ใช้ลำดับของแถวแรก) 1 สัญญามีรายการรับของหลายแถวได้
+                // ถ้าข้อมูลหัวสัญญา/งวดของแถวไม่ตรงกับแถวแรก เซิร์ฟเวอร์จะแจ้งผิดตามเดิม
+                var codeSeq = {};
+                out.forEach(function (o) {
+                    var code = o.contract_code;
+                    if (code === "" || code == null) {
+                        return;
+                    }
+                    if (codeSeq[code] === undefined) {
+                        codeSeq[code] = o.seq;
+                    } else {
+                        o.seq = codeSeq[code];
+                    }
+                });
                 preview(out);
             };
             reader.readAsArrayBuffer(file);
