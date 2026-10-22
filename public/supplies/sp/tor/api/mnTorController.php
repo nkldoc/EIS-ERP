@@ -4360,6 +4360,7 @@ switch ($mode) {
                         FROM sp_tor_victory a
                         INNER JOIN " . DB_NMU . " dc_creditor b ON a.dc_creditor_id = b.dc_creditor_id AND b.i_enable = 1 AND b.i_delete = 2
                         WHERE a.sp_tor_id = {$_REQUEST['id']}
+                            AND EXISTS (SELECT 1 FROM sp_tor_bidder_dtl bd WHERE bd.sp_tor_bidder_dtl_id = a.sp_tor_bidder_dtl_id) -- ผู้ชนะที่ใบเสนอราคาหายไปแล้ว ห้ามเอามาลงนาม (ยอดจะเป็น 0)
                             AND (SELECT aa.dc_creditor_id FROM sp_tor_contract aa WHERE aa.i_enabled =1 and aa.dc_creditor_id = a.dc_creditor_id AND aa.sp_tor_id = {$_REQUEST['id']}) IS NULL
                             {$con}
                         GROUP BY a.dc_creditor_id";
@@ -5126,6 +5127,7 @@ switch ($mode) {
         $stmt = $db->QueryParam($sql, $arrValue);
         break;
     case "DELETE_SP_TOR_BIDDER_DTL":
+        // ไม่ลบ sp_tor_victory ที่อ้างถึง: ถ้าเสนอราคาใหม่ในรายการเดิม/เจ้าหนี้เดิม UP_SP_TOR_BIDDER_DTL จะ re-point ผู้ชนะไปแถวใหม่ให้เอง
         $sql = "DELETE sp_tor_bidder_dtl
                     WHERE sp_tor_bidder_dtl_id = ? ;";
         $arrValue[] = $_REQUEST['id'] ?? null;
@@ -5247,6 +5249,16 @@ switch ($mode) {
             $stmt = $db->QueryParam($sql, $arrValue);
             $ss_id = $db->Fetch($stmt);
             $re_id = $ss_id["id"];
+
+            // ผู้ชนะ (sp_tor_victory) ของรายการ/เจ้าหนี้เดียวกัน ที่ชี้ไปแถวเสนอราคาที่ถูกลบไปแล้ว (กำพร้า)
+            // -> ย้ายมาชี้แถวใหม่นี้ ไม่งั้นตอนลงนามสัญญา ยอดสัญญา = SUM(bidder x victory) ได้ NULL/0
+            if (!empty($re_id)) {
+                $db->QueryParam("UPDATE v SET v.sp_tor_bidder_dtl_id = ?
+                                 FROM sp_tor_victory v
+                                 WHERE v.sp_tor_id = ? AND v.sp_tor_dtl_id = ? AND v.dc_creditor_id = ? AND v.i_enabled = 1
+                                   AND NOT EXISTS (SELECT 1 FROM sp_tor_bidder_dtl b WHERE b.sp_tor_bidder_dtl_id = v.sp_tor_bidder_dtl_id)",
+                        array($re_id, $fldd["sp_tor_id"], $fldd["sp_tor_dtl_id"], $fldd["dc_creditor_id"]));
+            }
 
             $addField = null;
             $addValue = null;
