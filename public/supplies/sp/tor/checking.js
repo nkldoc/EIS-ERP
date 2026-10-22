@@ -12409,6 +12409,40 @@ Ext.AppUx = function (app, menu) {
                                                         { xtype: "label", text: " : แสดงรายการของตัวเอง" },
                                                 ],
                                         },
+                                        {
+                                                xtype: "button",
+                                                text: "อัปเดตพนักงานเบิกที่หาย",
+                                                icon: "../images/icons/user_edit.png",
+                                                handler: function (button) {
+                                                        var grid = button.findParentByType("grid");
+                                                        var record = grid.getSelectionModel().getSelected();
+                                                        if (!record || !record.get("sp_check_period_hdr_id")) {
+                                                                Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกรายการตรวจรับที่ต้องการอัปเดต");
+                                                                return;
+                                                        }
+                                                        if (String(record.get("withdraw_name") || "").replace(/\s/g, "")) {
+                                                                Ext.Msg.alert("แจ้งเตือน", "รายการนี้มีชื่อพนักงานเบิกอยู่แล้ว");
+                                                                return;
+                                                        }
+                                                        if (!String(record.get("emp_name") || "").replace(/\s/g, "")) {
+                                                                Ext.Msg.alert("แจ้งเตือน", "ไม่พบชื่อพนักงานสายงานสำหรับรายการนี้");
+                                                                return;
+                                                        }
+                                                        button.disable();
+                                                        Ext.Ajax.request({
+                                                                url: "tor/api/mnCheckingController.php",
+                                                                method: "POST",
+                                                                params: { mode: "UPDATE_MISSING_WITHDRAW_EMP", sp_check_period_hdr_id: record.get("sp_check_period_hdr_id") },
+                                                                callback: function (options, success, response) {
+                                                                        button.enable();
+                                                                        var result;
+                                                                        try { result = Ext.decode(response.responseText); } catch (e) { result = {}; }
+                                                                        Ext.Msg.alert("แจ้งเตือน", result.msg || "ไม่สามารถอัปเดตข้อมูลได้ กรุณาลองใหม่");
+                                                                        if (success && result.success) { grid.getStore().reload(); }
+                                                                }
+                                                        });
+                                                }
+                                        },
                                         { xtype: "tbfill" },
                                         {
                                                 xtype: "container",
