@@ -384,6 +384,10 @@ function imp_validate($db, $inputRows)
         } else {
             $pFirst = $groups[$seq]["periods"][$groups[$seq]["pmap"][$pKey]];
             foreach ($periodKeys as $k) {
+                // เลขงวด (doc_ref) ต่างกันในงวดเดียวกันได้ (ใช้ลำดับรับของ 01/02 ต่อใบแจ้งหนี้) - ใช้ของแถวแรก
+                if ($k === "doc_ref") {
+                    continue;
+                }
                 $v = imp_str($in[$k] ?? "");
                 if ($v !== "" && $v !== $pFirst["raw"][$k]) {
                     $errs[] = "ข้อมูลงวดที่ {$period} ไม่ตรงกับแถวแรกของงวดนี้ (แถว {$pFirst["rowNo"]})";
@@ -482,7 +486,9 @@ function imp_validate($db, $inputRows)
         $c["c_project_name"] = $h["project"] !== "" ? $h["project"]
             : ($exp ? trim(preg_replace('/^[^:]*:\s*/u', "", $exp["name"])) : "");
         // "สัญญาต่อเนื่อง" (สัญญา PO ภายในปี) = ประเภท "สัญญา"
-        $c["c_contract_type"] = $h["contract_type"] === "สัญญาต่อเนื่อง" ? "สัญญา" : $h["contract_type"];
+        // "สัญญาจะซื้อจะขาย" / "จะซื้อจะขาย" = ประเภท "จัดซื้อจะขาย" (ชื่อที่ระบบใช้)
+        $typeAlias = array("สัญญาต่อเนื่อง" => "สัญญา", "สัญญาจะซื้อจะขาย" => "จัดซื้อจะขาย", "จะซื้อจะขาย" => "จัดซื้อจะขาย");
+        $c["c_contract_type"] = $typeAlias[$h["contract_type"]] ?? $h["contract_type"];
         if (!in_array($c["c_contract_type"], $typeOk, true)) {
             $cErrs[] = "ประเภทของสัญญาต้องเป็น จัดซื้อจะขาย / ใบสั่งซื้อ / สัญญา";
         }
