@@ -959,6 +959,12 @@ const Uiedit_contractNew = function (rec) {
               } else {
                 var win = bgBagedTypeNew().show();
                 win.items.items[0].getForm().loadRecord(Ext.selectRow);
+                // ซิงค์ "ลักษณะการจ้าง/ของที่ได้มา" ตามค่า "ของที่ได้" (i_working_type) ที่โหลดจากสัญญา
+                var _wt = String(Ext.getCmp("i_working_type").getValue());
+                if (_wt === "1" || _wt === "2") {
+                    Ext.getCmp("period_i_hire_type").setValue(1);
+                    Ext.getCmp("period_i_product_type2").setValue(Number(_wt));
+                }
                 win.show();
               } //else
             }
@@ -3971,6 +3977,12 @@ const Uiedit_contractNew = function (rec) {
                         Ext.getCmp("i_periodID").setValue(RecSet.i_period);
                         Ext.getCmp("i_pr_type2ID").setValue(RecSet.i_pr_type1);
                         Ext.getCmp("i_is_item").setValue(RecSet.i_is_item);
+                        if (RecSet.i_hire_type !== null && RecSet.i_hire_type !== undefined && RecSet.i_hire_type !== "") {
+                            Ext.getCmp("period_i_hire_type").setValue(RecSet.i_hire_type == 1 ? 1 : 0);
+                        }
+                        if (RecSet.i_hire_type == 1) {
+                            Ext.getCmp("period_i_product_type2").setValue(RecSet.i_product_typehdr == null ? 0 : RecSet.i_product_typehdr);
+                        }
                         Ext.getCmp("i_is_lastID").setValue(RecSet.i_is_last);
                         Ext.getCmp("d_doc_datePerID").setValue(RecSet.d_doc_date);
                         Ext.getCmp("d_period_dateID").setValue(RecSet.d_period_date);

@@ -689,6 +689,8 @@ Ext.storeNew3 = new Ext.data.JsonStore({
         {name: "c_arrive_code"},
         {name: "dc_expense_budget_type_txt"},
         {name: "i_is_book"}, // Primary
+        {name: "i_hire_type"},
+        {name: "i_product_typehdr"},
         {
             name: "d_doc_guarantee_ref",
             convert: function (v, rec) {
