@@ -832,7 +832,7 @@ Ext.AppUx = function (app, menu) {
                 items: [{
                         xtype: 'form',
                         bodyStyle: "padding:5px;",
-                        url: "../FileUploadServletJson",
+                        url: "../api/billingUpload.php",
                         fileUpload: true,
                         id: 'frm-showID',
                         labelWidth: 180,
@@ -905,7 +905,7 @@ Ext.AppUx = function (app, menu) {
 //                                collapsible: true,
 //                                autoHeight: true,
                                 height: Ext.getCmp("contenterCenter").getHeight() - 260,
-                                html: '<iframe id="ifpdfID" src="' + window.location.protocol + '//' + window.location.hostname + '/sp_mn/api/upload_ap/' + Ext.selectRow.get('upload_name') + '?T=Tap_' + Math.floor(Math.random() * 100) + '" frameborder="0" width="100%" height="100%"></iframe>',
+                                html: '<iframe id="ifpdfID" src="' + (Ext.isEmpty(Ext.selectRow.get('upload_name')) ? 'about:blank' : window.location.protocol + '//' + window.location.hostname + '/sp_mn/api/upload_ap/' + encodeURIComponent(Ext.selectRow.get('upload_name')) + '?T=Tap_' + Math.floor(Math.random() * 100)) + '" frameborder="0" width="100%" height="100%"></iframe>',
 
                             }],
                         listeners: {
@@ -970,7 +970,7 @@ Ext.AppUx = function (app, menu) {
                                 Ext.MessageBox.alert("Failed", "<span style='white-space: nowrap;'>กรุณกรอกข้อมูลให้ถูกต้อง</span>");
                                 return false;
                             }
-                            const myForm = document.getElementById('ext-gen69');  // Our HTML form's ID
+                            const myForm = Ext.getCmp('frm-showID').getForm().getEl().dom;
                             const myFile = document.getElementById('upload_pdf1-file');  // Our HTML files' ID 
 //                            console.log(myFile);
 //                            return false;
@@ -979,6 +979,15 @@ Ext.AppUx = function (app, menu) {
                                 const files = myFile.files;
                                 const formData = new FormData();
                                 const file = files[0]; 
+                                if (!file || file.size === 0) {
+                                    Ext.MessageBox.alert("อัพโหลดไม่สำเร็จ", "กรุณาเลือกไฟล์ PDF ที่มีข้อมูล");
+                                    return false;
+                                }
+                                if (file.size > 1073741824) {
+                                    Ext.MessageBox.alert("อัพโหลดไม่สำเร็จ", "รองรับไฟล์ PDF ขนาดสูงสุด 1 GB (1,024 MB)");
+                                    return false;
+                                }
+                                const billingId = Ext.selectRow.get('id');
                                 const str = Ext.getCmp("c_codefID").getValue();  
                                 let mainPart = str;
                                 let suffix = ""; 
@@ -1006,7 +1015,8 @@ Ext.AppUx = function (app, menu) {
                                 formData.append('dir', dir);
 //                                formData.append('c_code_inv', fileNameDoc);
                                 const xhr = new XMLHttpRequest();
-                                xhr.open('POST', '../FileUploadServletJson', true);
+                                xhr.open('POST', '../api/billingUpload.php', true);
+                                xhr.timeout = 3600000; // Allow up to one hour for a 1 GiB upload.
                                 Ext.MessageBox.show({
                                     title: 'โปรแกรมทำงานอยู่',
                                     msg: 'กำลังประมวลผล กรุณารอสักครู่...',
@@ -1019,13 +1029,49 @@ Ext.AppUx = function (app, menu) {
                                     icon: Ext.MessageBox.INFO, // แสดงไอคอนข้อมูล
                                     animateTarget: 'progresElID'
                                 });
+                                function showUploadError(message) {
+                                    Ext.MessageBox.hide();
+                                    Ext.MessageBox.alert("อัพโหลดไม่สำเร็จ", message);
+                                }
                                 xhr.onload = function () {
-                                    var jsonData = Ext.util.JSON.decode(xhr.response); //decode json
-                                    if (xhr.status == 200) {
-                                        Ext.updateStatu(fileNameDoc, Ext.selectRow.get('id'));
-                                    } else {
-                                        alert('Upload error. Try again.');
+                                    if (xhr.status === 413) {
+                                        showUploadError("ไฟล์มีขนาดเกินที่เซิร์ฟเวอร์อนุญาต กรุณาลดขนาด PDF หรือติดต่อผู้ดูแลระบบเพื่อปรับขนาดอัพโหลด");
+                                        return;
                                     }
+                                    if (xhr.status < 200 || xhr.status >= 300) {
+                                        var uploadError = null;
+                                        try {
+                                            uploadError = Ext.util.JSON.decode(xhr.responseText);
+                                        } catch (error) { /* IIS may return HTML instead of JSON. */ }
+                                        if (uploadError && ['STORAGE_UNAVAILABLE', 'STORAGE_WRITE_FAILED'].indexOf(uploadError.errorCode) !== -1) {
+                                            showUploadError("เซิร์ฟเวอร์ไม่สามารถเขียนไฟล์ในโฟลเดอร์จัดเก็บได้ กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบสิทธิ์และพื้นที่ว่าง");
+                                            return;
+                                        }
+                                        showUploadError("เซิร์ฟเวอร์ปฏิเสธการอัพโหลด (HTTP " + xhr.status + ") กรุณาลองใหม่อีกครั้ง");
+                                        return;
+                                    }
+                                    var jsonData;
+                                    try {
+                                        jsonData = Ext.util.JSON.decode(xhr.responseText);
+                                    } catch (error) {
+                                        showUploadError("เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง");
+                                        return;
+                                    }
+                                    if (!jsonData || jsonData.success === false ||
+                                            (jsonData.success !== true && jsonData.status !== 'success')) {
+                                        showUploadError("เซิร์ฟเวอร์ไม่ยืนยันการอัพโหลด กรุณาลองใหม่อีกครั้ง");
+                                        return;
+                                    }
+                                    Ext.updateStatu(fileNameDoc, billingId);
+                                };
+                                xhr.onerror = function () {
+                                    showUploadError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ กรุณาตรวจสอบเครือข่ายแล้วลองใหม่");
+                                };
+                                xhr.onabort = function () {
+                                    showUploadError("การอัพโหลดถูกยกเลิก กรุณาลองใหม่อีกครั้ง");
+                                };
+                                xhr.ontimeout = function () {
+                                    showUploadError("เซิร์ฟเวอร์ใช้เวลานานเกินกำหนด กรุณาตรวจสอบรายการก่อนลองอัพโหลดอีกครั้ง");
                                 };
                                 xhr.send(formData);
                             }; //End onsubmit
