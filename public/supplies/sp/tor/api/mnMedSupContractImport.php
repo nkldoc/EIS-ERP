@@ -78,6 +78,38 @@ function imp_reserve_status($db, $prId, $poId, $chkId)
     }
     $rows = $cache[$prId];
     if (empty($rows)) {
+        // ไม่มีในการจองปกติ (bg_reserve_money) - เช็คต่อที่ใบกันเหลื่อม (bg_reserve_overlap) ของ ERP เวชภัณฑ์
+        // ซึ่งเก็บ pr_id/po_id/chk_id เดียวกัน i_reserve: 1 = PR, 2 = สัญญา, 3 = ตรวจรับ
+        static $ovCache = array();
+        if (!isset($ovCache[$prId])) {
+            $ov = array();
+            $stmtOv = $db->QueryParam(
+                "select c_code_overlap, i_reserve, po_id, chk_id, f_amt from " . DB_NMU_EIS . "bg_reserve_overlap
+                  where i_sys = ? and i_enable = 1 and pr_id = ?",
+                array(MEDSUP_ERP_I_SYS, $prId)
+            );
+            while ($stmtOv && ($r = $db->Fetch($stmtOv))) {
+                $ov[] = array("code" => imp_str($r["c_code_overlap"]), "st" => intval($r["i_reserve"]), "po" => strval(intval($r["po_id"])), "amt" => floatval($r["f_amt"]));
+            }
+            $ovCache[$prId] = $ov;
+        }
+        if (!empty($ovCache[$prId])) {
+            $ovPo = ctype_digit($poId) ? strval(intval($poId)) : null;
+            $ovCodes = array();
+            $ovAmt = 0;
+            $ovStage = 0;
+            foreach ($ovCache[$prId] as $r) {
+                if ($ovPo === null || $r["po"] === $ovPo) {
+                    $ovCodes[$r["code"]] = true;
+                    $ovAmt += $r["amt"];
+                    $ovStage = max($ovStage, $r["st"]);
+                }
+            }
+            if (!empty($ovCodes)) {
+                $stageTxt = array(1 => "ขั้น PR", 2 => "ขั้นสัญญา", 3 => "ขั้นตรวจรับ");
+                return "กันเหลื่อมแล้ว " . ($stageTxt[$ovStage] ?? "") . " " . number_format($ovAmt, 2) . " (ใบกันเหลื่อม " . implode(", ", array_keys($ovCodes)) . ")";
+            }
+        }
         return "ไม่พบการจองในระบบงบ";
     }
     $poKey = ctype_digit($poId) ? strval(intval($poId)) : null;
