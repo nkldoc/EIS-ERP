@@ -49,12 +49,39 @@ if ($signature !== '%PDF-') {
 }
 // Match the existing /sp_mn/api/upload_ap/ preview location; ignore client dir.
 $directory = 'D:/php_supplies/api/upload_ap';
-if (!is_dir($directory) || !is_writable($directory)) {
-    error_log('Billing upload destination is unavailable.');
-    billingUploadReply(500, 'Upload storage is unavailable.', null, 'STORAGE_UNAVAILABLE');
+// Check the actual operation: a cached permission probe is not proof that
+// the IIS/PHP request can write this file (or overwrite an existing file).
+$writeWarning = '';
+set_error_handler(function ($severity, $message) use (&$writeWarning) {
+    $writeWarning .= $message . "\n";
+    return true;
+});
+try {
+    clearstatcache(true, $directory);
+    $saved = move_uploaded_file($temp, $directory . '/' . $name);
+} finally {
+    restore_error_handler();
 }
-if (!move_uploaded_file($temp, $directory . '/' . $name)) {
-    error_log('Billing upload could not save the PDF.');
-    billingUploadReply(500, 'Could not save PDF.', null, 'STORAGE_WRITE_FAILED');
+if (!$saved) {
+    $errorCode = 'STORAGE_WRITE_FAILED';
+    if (stripos($writeWarning, 'open_basedir') !== false) {
+        $errorCode = 'STORAGE_PATH_RESTRICTED';
+    } elseif (stripos($writeWarning, 'Permission denied') !== false || stripos($writeWarning, 'Access is denied') !== false) {
+        $errorCode = 'STORAGE_ACCESS_DENIED';
+    } elseif (stripos($writeWarning, 'No such file') !== false) {
+        $errorCode = 'STORAGE_PATH_NOT_FOUND';
+    }
+    $entry = date('c') . ' ' . json_encode([
+        'code' => $errorCode,
+        'destination' => $directory,
+        'warning' => trim($writeWarning),
+        'php_ini' => php_ini_loaded_file(),
+        'open_basedir' => ini_get('open_basedir')
+    ], JSON_UNESCAPED_SLASHES) . PHP_EOL;
+    error_log($entry);
+    // This log is outside the public document root; default PHP logging remains
+    // available even if the application log directory is not writable.
+    @file_put_contents(dirname(__DIR__, 4) . '/storage/logs/billing-upload.log', $entry, FILE_APPEND | LOCK_EX);
+    billingUploadReply(500, 'Could not save PDF. Reference: ' . $errorCode, null, $errorCode);
 }
 billingUploadReply(200, 'File uploaded successfully.', $name);
