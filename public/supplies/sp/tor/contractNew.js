@@ -3946,6 +3946,13 @@ const Uiedit_contractNew = function (rec) {
                         // สถานะ 3: ออกเลขตรวจรับแล้ว (sp_check_period = c_code) -> แก้ไขไม่ได้ แสดงรายละเอียดให้ดูเฉย ๆ (ไว้แจ้ง admin)
                         if (![null, "", undefined].includes(record.data.sp_check_period)) {
                             var _r = record.data;
+                            // งวดที่ล็อกแล้วไม่โหลดฟอร์ม แต่แสดงลักษณะการจ้าง/ของที่ได้มาของงวดนี้ในฟอร์มให้เห็น
+                            if (_r.i_hire_type !== null && _r.i_hire_type !== undefined && _r.i_hire_type !== "") {
+                                Ext.getCmp("period_i_hire_type").setValue(_r.i_hire_type == 1 ? 1 : 0);
+                                if (_r.i_hire_type == 1) {
+                                    Ext.getCmp("period_i_product_type2").setValue(_r.i_product_typehdr == null ? 0 : _r.i_product_typehdr);
+                                }
+                            }
                             Ext.Msg.show({
                                 title: "รายละเอียดงวดงาน (ออกเลขตรวจรับแล้ว — แก้ไขไม่ได้)",
                                 msg:
@@ -3955,6 +3962,7 @@ const Uiedit_contractNew = function (rec) {
                                     "<tr><td><b>วันที่เริ่มนับการส่งของในงวด</b></td><td>: " + shortThaiDate(_r.d_doc_date) + "</td></tr>" +
                                     "<tr><td><b>วันที่กำหนดส่งในงวดงาน</b></td><td>: " + shortThaiDate(_r.d_period_date) + "</td></tr>" +
                                     "<tr><td><b>จำนวนเงินงวด</b></td><td>: " + floatRenderer(_r.f_total_amt) + " บาท</td></tr>" +
+                                    "<tr><td><b>ของที่ได้มา</b></td><td>: " + ({0: "ไม่มีของ", 1: "วัสดุทั่วไป", 2: "ครุภัณฑ์"}[_r.i_product_typehdr] || "-") + "</td></tr>" +
                                     "<tr><td><b>เลขรับของ</b></td><td>: " + (_r.c_arrive_code || "-") + "</td></tr>" +
                                     "<tr><td><b>เลขตรวจรับ</b></td><td>: " + (_r.sp_check_period || "-") + "</td></tr>" +
                                     "<tr><td><b>ID (แจ้ง admin)</b></td><td>: " + _r.id + "</td></tr>" +
