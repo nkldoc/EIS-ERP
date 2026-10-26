@@ -1,4 +1,4 @@
-/* Read-only overview for the selected contract. */
+/* Overview and authorized period status actions for the selected contract. */
 (function () {
     function encode(value) {
         return Ext.util.Format.htmlEncode(value === null || value === undefined || value === '' ? '-' : String(value));
@@ -227,6 +227,8 @@
                 '<span class="period-hide-label">(ซ่อนรายละเอียด)</span></summary><div style="padding:12px">' +
                 '<button type="button" class="contract-period-checks" data-period-id="' + encode(period.sp_tor_hdr_period_id)
                 + '" style="padding:7px 14px;margin-bottom:8px;border:1px solid #15428b;background:#eaf1f9;color:#15428b;font-weight:bold;cursor:pointer">ดูตรวจรับของงวดนี้</button>' +
+                (data.can_admin_edit && Number(period.i_enabled) === 2
+                    ? '<button type="button" class="contract-period-reactivate" data-period-id="' + encode(period.sp_tor_hdr_period_id) + '" style="padding:7px 14px;margin:0 0 8px 8px;border:1px solid #065f46;background:#ecfdf5;color:#065f46;font-weight:bold;cursor:pointer">กลับมาใช้งาน</button>' : '') +
                 fundBadge('การใช้เงินงวดที่ ' + period.i_period, period, linkedContract) +
                 details([['เลขอ้างอิงงวด', period.c_contract_code], ['สถานะงวด', periodStatus(period.i_enabled)]]) + periodDetails(period, rows) +
                 section('รายการในงวด', table(items, [['c_name', 'ชื่อรายการ'], ['i_qty', 'จำนวน'], ['f_net_unit_price', 'ราคาต่อหน่วย', 'money'],
@@ -440,12 +442,47 @@
                 var contractPanel = tabs.items.get(2);
                 contractPanel.overviewData = data;
                 contractPanel.overviewHtml = contractHtml;
-                contractPanel.update(contractHtml + renderPeriods(data, '1'));
+                contractPanel.periodFilter = contractPanel.periodFilter || '1';
+                contractPanel.update(contractHtml + renderPeriods(data, contractPanel.periodFilter));
                 if (!contractPanel.overviewEventsBound) {
                 contractPanel.overviewEventsBound = true;
                 contractPanel.body.on('change', function (event, select) {
+                    contractPanel.periodFilter = select.value;
                     contractPanel.update(contractPanel.overviewHtml + renderPeriods(contractPanel.overviewData, select.value));
                 }, null, {delegate: '.contract-period-filter'});
+                contractPanel.body.on('click', function (event, button) {
+                    event.stopEvent();
+                    if (!contractPanel.overviewData.can_admin_edit || button.disabled) return;
+                    var periodId = Number(button.getAttribute('data-period-id'));
+                    var period = children(contractPanel.overviewData.periods, 'sp_tor_hdr_period_id', periodId)[0];
+                    if (!period || Number(period.i_enabled) !== 2) return;
+                    Ext.Msg.prompt('กลับมาใช้งานงวดที่ ' + period.i_period, 'ระบุเหตุผลในการกลับมาใช้งานงวดนี้', function (answer, reason) {
+                        if (answer !== 'ok' || win.isDestroyed) return;
+                        reason = String(reason || '').replace(/^\s+|\s+$/g, '');
+                        if (!reason) return Ext.Msg.alert('แจ้งเตือน', 'กรุณาระบุเหตุผลในการแก้ไข');
+                        button.disabled = true;
+                        win.getEl().mask('กำลังบันทึกสถานะงวด...');
+                        Ext.Ajax.request({url: 'tor/api/mnCheckingController.php', method: 'POST', params: {
+                            mode: 'UPDATE_CHECKING_RELATIONS', remarks: reason,
+                            jsonData: Ext.encode([{table_name: 'sp_tor_hdr_period', row_id: periodId,
+                                field_name: 'i_enabled', old_value: 2, new_value: 1}])
+                        }, callback: function (request, success, response) {
+                            if (win.isDestroyed) return;
+                            win.getEl().unmask();
+                            button.disabled = false;
+                            var result;
+                            try { result = Ext.decode(response.responseText); } catch (ignore) { result = null; }
+                            if (!success || !result || !result.success) {
+                                Ext.Msg.alert('บันทึกไม่สำเร็จ', result && result.msg ? result.msg : 'เกิดข้อผิดพลาด กรุณาลองอีกครั้ง');
+                                return;
+                            }
+                            contractPanel.periodFilter = '1';
+                            reloadOverview();
+                            if (options.onUpdated) options.onUpdated();
+                            Ext.Msg.alert('บันทึกสำเร็จ', result.msg || 'เปลี่ยนสถานะงวดกลับมาใช้งานแล้ว');
+                        }});
+                    });
+                }, null, {delegate: '.contract-period-reactivate'});
                 contractPanel.body.on('click', function (event, button) {
                     var expand = button.getAttribute('data-expand') === 'true';
                     var nodes = contractPanel.body.dom.querySelectorAll('.contract-period-detail');
