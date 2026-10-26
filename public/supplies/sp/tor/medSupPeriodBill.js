@@ -1545,7 +1545,13 @@ function winMedSupPeriodBill(rec) {
                                     for (var i = 0, l = records.length; i < l; i++) {
                                         Ext.objLine = i + 1;
                                         Ext.fnAddMedSupItems(Ext.objLine);
-                                        Ext.getCmp("c_doc_refID[" + Ext.objLine + "]").setValue(records[i].get('c_doc_ref'));
+                                        // งวดที่นำเข้าจากไฟล์อาจไม่มีเลขงวด - ว่าง = ใช้เลขงวดอัตโนมัติตามลำดับงวด (01, 02, 03, ...)
+                                        var docRef = records[i].get("c_doc_ref");
+                                        if (Ext.isEmpty(docRef)) {
+                                            var pNo = parseInt(records[i].get("i_period"), 10) || Ext.objLine;
+                                            docRef = (pNo < 10 ? "0" : "") + pNo;
+                                        }
+                                        Ext.getCmp("c_doc_refID[" + Ext.objLine + "]").setValue(docRef);
                                         Ext.getCmp("d_doc_dateSubID[" + Ext.objLine + "]").setValue(records[i].get('d_doc_dateSub'));
                                         Ext.getCmp("c_detailID[" + Ext.objLine + "]").setValue(records[i].get('c_detail'));
                                         // ทับค่าเลขงวด/id ที่ auto-match ไว้ ด้วยค่าที่เคยบันทึกจริง
