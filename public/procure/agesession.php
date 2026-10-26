@@ -1,23 +1,10 @@
 <?php
-session_start();
-
-$timeout = 1800; // 30 นาที (หน่วยเป็นวินาที)
-
-if (isset($_SESSION['created'])) {
-    if (time() - $_SESSION['created'] > $timeout) {
-        // Session หมดอายุ
-        session_unset();     // ล้างค่า session
-        session_destroy();   // ทำลาย session
-        echo "Session expired. Please log in again.";
-        exit;
-    }
-} else {
-    // ตั้งค่าเวลาเริ่มต้น
-    $_SESSION['created'] = time();
+require_once __DIR__ . '/conf/config.php';
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+if (empty($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'code' => 'SESSION_EXPIRED']);
+    exit;
 }
-
-// อัปเดตเวลาเพื่อรีเฟรชอายุ session ทุกครั้งที่โหลดหน้า
-$_SESSION['created'] = time();
-
-echo "Session active. Remaining time: " . ($timeout - (time() - $_SESSION['created'])) . " seconds.";
-?>
+echo json_encode(['success' => true, 'remaining_seconds' => $timeout]);

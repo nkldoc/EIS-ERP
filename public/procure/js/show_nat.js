@@ -2425,53 +2425,43 @@ Ext.onReady(function () {
         },
     });
     function initSessionTimer() {
-        // Session ของ PHP มีอายุ 2 ชั่วโมง (7200 วินาที)
-        // เราจะแจ้งเตือนก่อนหมดเวลา 1 นาที (เหลือ 60 วินาทีสุดท้าย)
-        var sessionTimeoutSec = 7200;
-        var warningBeforeSec = 60;
-        var checkInterval = (sessionTimeoutSec - warningBeforeSec) * 1000; // แปลงเป็น มิลลิวินาที
-
-        var sessionAlertTimer;
-        function startTimer() {
-            // ล้าง Timer เก่าออกก่อนถ้ามี
-            if (sessionAlertTimer)
-                clearTimeout(sessionAlertTimer);
-            sessionAlertTimer = setTimeout(function () {
-                // เมื่อถึงเวลาเตือน แสดง Ext.Msg.confirm แบบ Realtime
-                Ext.Msg.confirm(
-                        'แจ้งเตือนเซสชั่น',
-                        'เซสชั่นของคุณกำลังจะหมดอายุในอีก 1 นาที คุณต้องการทำงานต่อหรือไม่?',
-                        function (btn) {
-                            if (btn === 'yes') {
-                                // ถ้ากด ใช่ -> ส่ง Ajax ไปบอก Server ให้ต่ออายุ (Keep-Alive)
-                                Ext.Ajax.request({
-                                    url: './agesession.php',
-                                    success: function (res) {
-                                        // ถ้าต่ออายุสำเร็จ ให้เริ่มนับเวลาใหม่
-                                        startTimer();
-                                    },
-                                    failure: function () {
-                                        Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถต่อเซสชั่นได้ กรุณารีเฟรชหน้าจอ');
-                                    }
-                                });
-                            } else {
-                                // ถ้ากด ไม่ หรือ ปล่อยทิ้งไว้จนหมดเวลา -> ส่งไปหน้า Logout
-                                window.location.href = './access/logout.php';
-                            }
-                        }
-                );
-            }, checkInterval);
+        var lastInput = Date.now();
+        var lastRenewal = Date.now();
+        var pending = false;
+        var warningShown = false;
+        function renew() {
+            if (pending) return;
+            pending = true;
+            Ext.Ajax.request({
+                url: './agesession.php',
+                success: function (res) {
+                    pending = false;
+                    var data;
+                    try { data = Ext.util.JSON.decode(res.responseText); } catch (e) { return; }
+                    if (data.success) lastRenewal = Date.now();
+                },
+                failure: function () { pending = false; }
+            });
         }
-
-        // เริ่มทำงานครั้งแรก
-        startTimer();
-        // (Option เสริม) ถ้าผู้ใช้มีการคลิกหรือขยับเมาส์บนหน้าเว็บ ให้รีเซ็ตเวลาอัตโนมัติได้เช่นกัน
-        /*
-         Ext.getBody().on('click', function() {
-         // คุณอาจจะส่ง Ajax ไป refresh session ที่ฝั่ง server ด้วยหากต้องการแบบ active จริงๆ
-         startTimer();
-         });
-         */
+        // Real input renews an open form; background polling does not.
+        function activity() {
+            lastInput = Date.now();
+            if (lastInput - lastRenewal >= 60000) renew();
+        }
+        ['mousedown', 'keydown', 'touchstart', 'wheel'].forEach(function (event) {
+            document.addEventListener(event, activity, true);
+        });
+        setInterval(function () {
+            if (Date.now() - lastInput < 60000 && Date.now() - lastRenewal >= 60000) renew();
+            if (!warningShown && Date.now() - lastInput >= 7140000) {
+                warningShown = true;
+                Ext.Msg.confirm('\u0e40\u0e0b\u0e2a\u0e0a\u0e31\u0e19', '\u0e15\u0e49\u0e2d\u0e07\u0e01\u0e32\u0e23\u0e17\u0e33\u0e07\u0e32\u0e19\u0e15\u0e48\u0e2d\u0e2b\u0e23\u0e37\u0e2d\u0e44\u0e21\u0e48?', function (btn) {
+                    warningShown = false;
+                    if (btn === 'yes') { lastInput = Date.now(); renew(); }
+                    else window.location.href = './access/logout.php';
+                });
+            }
+        }, 15000);
     }
 
     function setAfterLoad() {
