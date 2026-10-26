@@ -832,7 +832,7 @@ Ext.AppUx = function (app, menu) {
                 items: [{
                         xtype: 'form',
                         bodyStyle: "padding:5px;",
-                        url: "../FileUploadServletJson",
+                        url: "../api/billingUpload.php",
                         fileUpload: true,
                         id: 'frm-showID',
                         labelWidth: 180,
@@ -1015,7 +1015,7 @@ Ext.AppUx = function (app, menu) {
                                 formData.append('dir', dir);
 //                                formData.append('c_code_inv', fileNameDoc);
                                 const xhr = new XMLHttpRequest();
-                                xhr.open('POST', '../FileUploadServletJson', true);
+                                xhr.open('POST', '../api/billingUpload.php', true);
                                 xhr.timeout = 3600000; // Allow up to one hour for a 1 GiB upload.
                                 Ext.MessageBox.show({
                                     title: 'โปรแกรมทำงานอยู่',
@@ -1039,6 +1039,14 @@ Ext.AppUx = function (app, menu) {
                                         return;
                                     }
                                     if (xhr.status < 200 || xhr.status >= 300) {
+                                        var uploadError = null;
+                                        try {
+                                            uploadError = Ext.util.JSON.decode(xhr.responseText);
+                                        } catch (error) { /* IIS may return HTML instead of JSON. */ }
+                                        if (uploadError && ['STORAGE_UNAVAILABLE', 'STORAGE_WRITE_FAILED'].indexOf(uploadError.errorCode) !== -1) {
+                                            showUploadError("เซิร์ฟเวอร์ไม่สามารถเขียนไฟล์ในโฟลเดอร์จัดเก็บได้ กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบสิทธิ์และพื้นที่ว่าง");
+                                            return;
+                                        }
                                         showUploadError("เซิร์ฟเวอร์ปฏิเสธการอัพโหลด (HTTP " + xhr.status + ") กรุณาลองใหม่อีกครั้ง");
                                         return;
                                     }

@@ -1,5 +1,34 @@
 # Billing PDF upload: dev validation and production release
 
+## Current implementation: PHP upload endpoint
+
+The live servlet URL was verified to return IIS 404.0 even for GET with no
+request body. The local Tomcat webapps directory has no procure deployment.
+The billing page now posts to `/procure/api/billingUpload.php` instead. The PHP
+handler requires a procure login, validates filename and PDF signature, enforces
+1 GiB and writes only to `D:/php_supplies/api/upload_ap`; client `dir` is ignored.
+The existing separate billing-status update remains in place after successful
+storage. The Java changes described below are no longer required for this page.
+
+Deploy `api/billingUpload.php`, `api/.user.ini`, `web.config` and the changed JS
+together. IIS limit now targets `api/billingUpload.php`, not the servlet URL.
+PHP configuration sets upload_max_filesize=1024M, post_max_size=1025M and input/
+execution timeouts=3600. PHP may cache .user.ini for five minutes; recycle the
+affected application pool if immediate activation is required. Confirm the IIS
+FastCGI activity/request timeout also permits the intended upload duration.
+The IIS identity needs write permission on the fixed destination and PHP temp
+directory. Preserve existing permissions; do not grant general public access.
+
+For the administrative commands below, substitute
+`ActualSiteName/procure/api/billingUpload.php` for the old servlet endpoint.
+Test POST rather than GET: an inherited rule redirects GET URLs ending in .php.
+An unauthenticated POST must return JSON HTTP 401. Then test with a logged-in
+session using the original PDF, verify saved bytes and persisted billing status,
+and test the 1 GiB boundary before approving production.
+
+The following servlet investigation is retained as release context; the current
+PHP implementation and settings above supersede its deployment instructions.
+
 ## Scope and current limits
 
 Page: `/procure/#sp/spBillingApproved`.
