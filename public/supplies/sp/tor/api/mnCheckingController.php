@@ -1389,7 +1389,28 @@ switch ($mode) {
                 }
                 $wh .= " AND  f.i_product_type  = " . $i_product_type;
             }
-            if ($_REQUEST["i_status"] > 0) {
+            $status = intval($_REQUEST["i_status"] ?? 0);
+            if ($status === 9 || $status === 10) {
+                // Match the registration action shown by checking.js.
+                $registerStatus = ($status === 9) ? 2 : 0;
+                $wh .= " AND ISNULL(cc.i_register, 0) = " . $registerStatus . "
+                    AND f.i_product_type = 2
+                    AND cc.c_checking_code IS NOT NULL
+                    AND EXISTS (
+                        SELECT 1
+                        FROM sp_tor_hdr_period register_period
+                        INNER JOIN sp_tor_contract register_contract
+                            ON register_contract.sp_tor_contract_id = register_period.sp_tor_contract_id
+                        WHERE register_period.sp_tor_hdr_period_id = cc.sp_tor_hdr_period_id
+                            AND ISNULL(register_contract.dc_expense_budget_type2_id, 0) = 0
+                            AND ISNULL(register_contract.dc_expense_budget_type3_id, 0) = 0
+                            AND register_period.i_enabled = 1
+                            AND register_contract.i_enabled = 1
+                            AND register_period.i_is_last = 1
+                        GROUP BY register_period.sp_tor_contract_id, register_period.sp_tor_hdr_period_id
+                        HAVING COUNT(*) = 1
+                    )";
+            } elseif ($status > 0) {
                 $wh .= " AND CASE
             WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr cancel_po WHERE cancel_po.po_working_hdr_id=cc.po_working_hdr_id AND cancel_po.i_enable=2) THEN 6
             WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr dispute_po WHERE dispute_po.po_working_hdr_id=cc.po_working_hdr_id AND dispute_po.i_enable=1 AND dispute_po.i_status_last=3) THEN 7
@@ -1399,7 +1420,7 @@ switch ($mode) {
             WHEN cc.i_status_billing IS NULL AND cc.i_status_checking = 1 AND cc.c_code IS NOT NULL AND ccc.c_code IS NOT NULL THEN 3
             WHEN cc.i_status_billing = 4 AND cc.i_status_checking = 1 AND cc.c_code IS NOT NULL AND ccc.c_code IS NOT NULL AND cc.po_working_hdr_id IS NULL THEN 4
             WHEN cc.i_status_billing = 4 AND cc.i_status_checking = 1 AND cc.c_code IS NOT NULL AND ccc.c_code IS NOT NULL AND cc.po_working_hdr_id IS NOT NULL THEN 5
-            ELSE 0  END = " . $_REQUEST["i_status"];
+            ELSE 0  END = " . $status;
             }
         }
 
@@ -1601,8 +1622,8 @@ switch ($mode) {
         $stmt = $db->QueryParam($sqlMain, $arrParam);
         $i = $start + 1;
         $i_chk_bgTxt = null;
-        $onePeriodOneBgBudget = false;
         while ($row = $db->Fetch($stmt)) {
+            $onePeriodOneBgBudget = false;
             $sqlOne = "SELECT h.sp_tor_hdr_period_id,h.sp_tor_contract_id, COUNT(*) AS total_records
                     FROM sp_tor_hdr_period h
                     INNER JOIN sp_tor_contract c ON c.sp_tor_contract_id = h.sp_tor_contract_id
