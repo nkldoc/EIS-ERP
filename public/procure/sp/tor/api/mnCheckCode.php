@@ -154,9 +154,20 @@ switch ($mode){
             $arrValue[] =  $_REQUEST['dc_cost_id'];
             // $arrValue[] =  date("y");
             // $arrValue[] =  date("m");
-            $year_th = ($_REQUEST['i_budget_year'] + 543) % 100;
-            $arrValue[] = $year_th ;
-            $arrValue[] = date("m", strtotime($_REQUEST['d_checking_date']));
+            // AP uses the inspection date; the fiscal year starts in October.
+            $checkingDateText = $_REQUEST['d_checking_date'] ?? '';
+            $checkingDate = is_string($checkingDateText)
+                ? DateTime::createFromFormat('!Y-m-d', $checkingDateText) : false;
+            if (!$checkingDate || $checkingDate->format('Y-m-d') !== $checkingDateText) {
+                $db->RollBackTran();
+                echo json_encode(array("reval" => 1, "success" => "Error", "msg" => "วันที่ตรวจรับไม่ถูกต้อง"));
+                exit;
+            }
+            $checkingMonth = (int) $checkingDate->format('n');
+            $fiscalYear = (int) $checkingDate->format('Y') + ($checkingMonth >= 10 ? 1 : 0);
+            $year_th = ($fiscalYear + 543) % 100;
+            $arrValue[] = $year_th;
+            $arrValue[] = $checkingDate->format('m');
             // $arrValue[] =  $_REQUEST['dc_cost_origin_id'];
             $arrValue[] =  $_SESSION['user_id']; 
             $arrValue[] =  $_REQUEST["sp_check_period_hdr_id"];
