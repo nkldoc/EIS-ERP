@@ -4766,6 +4766,7 @@ Ext.AppUx = function (app, menu) {
     idProperty: "id",
     totalProperty: "totalCount",
     fields: [
+      { name: "d_start_date", type: "string" },
       {
         name: "no",
       },

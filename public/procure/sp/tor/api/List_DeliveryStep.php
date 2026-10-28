@@ -821,6 +821,7 @@ if ($_REQUEST["type"] == "deliveries") {
                 , s.i_yyyy as i_year
                 , convert(varchar, a.d_due_date, 120) as d_due_date
                 , convert(varchar, a.d_doc_date, 120) as d_doc_date
+                , convert(varchar, c.d_start_date, 120) as d_start_date
                 , (select top 1 inv_name FROM NMU.dbo.dc_creditor where dc_creditor_id=a.dc_creditor_id)  as dc_creditor_idTxt
                 , (select top 1 c_name from dc_cost where dc_cost_id=s.dc_cost_id)  as dc_cost_idTxt
                   --- dc_expense_budget_type_id po_expense_id
@@ -939,6 +940,7 @@ if ($_REQUEST["type"] == "deliveries") {
             "dc_user_update_id" => $row["c_update_name"],
             "dc_user_update_cost_id" => $row["c_cost_update_name"],
             "d_update" => $date->extDateBuddha($row["d_update"]),
+            "d_start_date" => empty($row["d_start_date"]) ? "" : $date->extDateBuddha($row["d_start_date"]),
             "start_date" => $date->extDateBuddha($row["start_date"]),
             "end_date" => $date->extDateBuddha($row["end_date"]),
             "c_comment" => $row["c_comment"],
