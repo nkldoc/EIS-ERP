@@ -823,6 +823,38 @@ const Uiedit_contract = function (rec) {
                               // return;
                             },
                           },
+                          {
+                            text: "\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01 / \u0e44\u0e21\u0e48\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19",
+                            iconCls: "icon-delete",
+                            handler: function (button) {
+                              Ext.Msg.confirm("\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01 / \u0e44\u0e21\u0e48\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19", "\u0e22\u0e37\u0e19\u0e22\u0e31\u0e19\u0e22\u0e01\u0e40\u0e25\u0e34\u0e01\u0e41\u0e25\u0e30\u0e44\u0e21\u0e48\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19\u0e2a\u0e31\u0e0d\u0e0d\u0e32\u0e19\u0e35\u0e49?", function (answer) {
+                                if (answer !== "yes") return;
+                                button.disable();
+                                Ext.Ajax.request({
+                                  url: "tor/api/mnEditContract.php",
+                                  method: "POST",
+                                  params: { mode: "DISABLE_PROJECT_CONTRACT", sp_tor_contract_id: rec.get("sp_tor_contract_id") },
+                                  success: function (response) {
+                                    var result;
+                                    try { result = Ext.decode(response.responseText); } catch (error) { result = { success: false }; }
+                                    if (!result.success) {
+                                      button.enable();
+                                      Ext.Msg.alert("Error", result.msg || "Unable to cancel the contract.");
+                                      return;
+                                    }
+                                    Ext.storeDtl.reload();
+                                    if (Ext.storeProject) Ext.storeProject.reload();
+                                    var editor = Ext.getCmp("winMain1");
+                                    if (editor) editor.close();
+                                  },
+                                  failure: function () {
+                                    button.enable();
+                                    Ext.Msg.alert("Error", "Unable to cancel the contract.");
+                                  }
+                                });
+                              });
+                            }
+                          },
                         ],
                       },
                     ],

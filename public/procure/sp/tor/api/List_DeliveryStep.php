@@ -784,7 +784,7 @@ if ($_REQUEST["type"] == "deliveries") {
                     INNER JOIN NMU.dbo.dc_creditor b ON a.dc_creditor_id = b.dc_creditor_id 
 					inner join dbo.sp_tor cc on cc.tor_id = a.sp_tor_id
                                         INNER JOIN dbo.sp_emp bb on bb.sp_emp_id = cc.sp_emp_id {$ses}
-                    WHERE cc.i_type_bg in (2) and a.i_contract_status > 0 {$wh}"; //
+                    WHERE cc.i_type_bg in (2) and a.i_contract_status > 0 and a.i_enabled = 1 and cc.i_enabled = 1 {$wh}"; //
     //    echo $sqlTempTable;
     //    exit;   
     $arrParam[] = $start;

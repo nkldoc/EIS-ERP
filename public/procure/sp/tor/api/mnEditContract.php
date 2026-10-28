@@ -26,7 +26,7 @@ $db->BeginTran();
 
 // Users who can see the record may edit it, including after child POs exist.
 // Match List_DeliveryStep.php visibility: all records, department, or employee.
-if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
+if (in_array($mode, array('CHECK_PROJECT_EDIT', 'Edit_contrct', 'DISABLE_PROJECT_CONTRACT'), true)) {
     $accessStmt = $db->QueryParam(
         "SELECT CONVERT(VARCHAR, c.d_start_date, 120) AS saved_start_date, c.sp_tor_id, employee.dc_department_id AS visible_department_id, employee.sp_emp_id AS visible_employee_id,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost_id) AS responsible_name,
@@ -69,6 +69,14 @@ if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
 
 
  switch ($mode) {
+    case "DISABLE_PROJECT_CONTRACT":
+        $auditValues = array($_SESSION['user_id'], $_SESSION['dc_cost_id'], date('Y-m-d H:i:s'));
+        $sql = "UPDATE dbo.sp_tor_contract SET i_enabled = 2, dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = ? WHERE sp_tor_contract_id = ? AND sp_tor_id = ?";
+        $stmt = $db->QueryParam($sql, array_merge($auditValues, array((int) $_REQUEST['sp_tor_contract_id'], (int) $access['sp_tor_id'])));
+        $sql2 = "UPDATE dbo.sp_tor SET i_enabled = 2, dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = ? WHERE tor_id = ?";
+        $stmt2 = $stmt && $db->QueryParam($sql2, array_merge($auditValues, array((int) $access['sp_tor_id'])));
+        break;
+
     case "Edit_contrct":
         $arrParam = array();
         $arrValue = array();
