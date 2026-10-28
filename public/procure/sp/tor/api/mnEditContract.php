@@ -28,7 +28,7 @@ $db->BeginTran();
 // Match List_DeliveryStep.php visibility: all records, department, or employee.
 if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
     $accessStmt = $db->QueryParam(
-        "SELECT c.sp_tor_id, employee.dc_department_id AS visible_department_id, employee.sp_emp_id AS visible_employee_id,
+        "SELECT CONVERT(VARCHAR, c.d_start_date, 120) AS saved_start_date, c.sp_tor_id, employee.dc_department_id AS visible_department_id, employee.sp_emp_id AS visible_employee_id,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost_id) AS responsible_name,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost2_id) AS owner_name
          FROM sp_tor_contract c WITH (UPDLOCK, HOLDLOCK)
@@ -53,6 +53,7 @@ if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
         $db->RollBackTran();
         echo json_encode(array('success' => (bool) $allowed, 'can_edit' => (bool) $allowed,
             'responsible_name' => $access['responsible_name'] ?? '', 'owner_name' => $access['owner_name'] ?? '',
+            'd_start_date' => $allowed && !empty($access['saved_start_date']) ? $date->extDateBuddha($access['saved_start_date']) : '',
             'msg' => 'คุณไม่มีสิทธิ์เห็นรายการนี้'));
         exit;
     }

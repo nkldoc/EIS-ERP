@@ -7720,7 +7720,13 @@ Ext.AppUx = function (app, menu) {
                     Ext.getCmp("winChequeEditID").items.items[0].getForm().loadRecord(Ext.selectRow);
                     Ext.getCmp("editProjectCostID").setValue(Ext.selectRow.get("dc_cost_id"));
                     Ext.getCmp("editProjectOwnerCostID").setValue(Ext.selectRow.get("dc_cost2_id"));
-                    Ext.getCmp("construction_start_dateID").setValue(Ext.selectRow.get("d_start_date") || Ext.selectRow.json.d_start_date || "");
+                    // Prefer the saved value fetched for this contract when the editor opens.
+                    var savedContract = Ext.selectRow.projectEditAccess;
+                    Ext.getCmp("construction_start_dateID").setValue(
+                      savedContract && Object.prototype.hasOwnProperty.call(savedContract, "d_start_date")
+                        ? savedContract.d_start_date
+                        : (Ext.selectRow.get("d_start_date") || Ext.selectRow.json.d_start_date || "")
+                    );
                     // Ext.getCmp("winMain1").getEl().unmask();
                   });
                 }
