@@ -424,6 +424,37 @@ if ($_REQUEST["type"] == "dc_cost_all") {
             ${$root}[] = $temp;
         }
     }
+} else if ($_REQUEST["type"] == "overlap_remain") {
+    // เลขใบกัน + ยอดใช้ไปแล้ว + คงเหลือ ใช้แสดงใน alert เมื่อ API จองเงินตอบ Not enough money (ค้นด้วยเลขใบกัน c_booking)
+    $sqlMain = "SET NOCOUNT ON
+                SELECT TOP 1
+                    a.c_code_ref,
+                    a.f_total AS f_overlap,
+                    (SELECT ISNULL(SUM(ISNULL(f_amt, 0.00)), 0.00) FROM " . DB_NMU_EIS . "vw_bg_reserve_overlap aa
+                     WHERE aa.i_reserve = 2 AND aa.c_code_overlap = a.c_code_ref) AS f_reserve_pr,
+                    (SELECT ISNULL(SUM(ISNULL(f_amt, 0.00)), 0.00) FROM " . DB_NMU_EIS . "vw_bg_reserve_overlap aa
+                     WHERE aa.i_reserve = 3 AND ISNULL(aa.i_finish, 0) = 0 AND aa.c_code_overlap = a.c_code_ref) AS f_reserve_income,
+                    ISNULL((SELECT SUM(ISNULL(b.f_total, 0) - ISNULL(ret.f_return, 0))
+                            FROM " . DB_NMU_EIS . "po_working_hdr h
+                            INNER JOIN " . DB_NMU_EIS . "po_working_dtl b ON h.po_working_hdr_id = b.po_working_hdr_id
+                            LEFT JOIN (SELECT po_working_hdr_id, SUM(ISNULL(f_return, 0)) AS f_return
+                                       FROM " . DB_NMU_EIS . "po_return WHERE i_enable = 1
+                                       GROUP BY po_working_hdr_id) ret ON h.po_working_hdr_id = ret.po_working_hdr_id
+                            WHERE h.i_enable = 1 AND b.c_booking = a.c_code_ref), 0) AS f_working
+                FROM " . DB_NMU_EIS . "vw_bg_budget_overlap a
+                WHERE a.c_code_ref = ?";
+    $stmt = $db->QueryParam($sqlMain, array(trim($_REQUEST["c_booking"])));
+    if ($stmt) {
+        while ($row = $db->Fetch($stmt)) {
+            $used = floatval($row["f_reserve_pr"]) + floatval($row["f_reserve_income"]) + floatval($row["f_working"]);
+            ${$root}[] = array(
+                "c_booking" => $row["c_code_ref"],
+                "f_overlap" => floatval($row["f_overlap"]),
+                "f_used" => $used,
+                "f_remain" => floatval($row["f_overlap"]) - $used,
+            );
+        }
+    }
 } else if ($_REQUEST["type"] == "dc_cost2") {
     $sqlMain = "
 		SELECT * FROM " . DB_CENTER . "dc_cost

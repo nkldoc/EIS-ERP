@@ -1,3 +1,29 @@
+// alert กรณี API จองเงินตอบ Not enough money: แสดงเลขใบกันและเงินคงเหลือ (ขอข้อมูลแบบ sync เพราะใช้แทน string ใน alert เดิม)
+Ext.overlapNotEnoughMsg = function () {
+    var base = "เงินใบกันไม่เพียงพอ";
+    var code = "";
+    try {
+        var cb2 = Ext.getCmp("use_contract_overlap2ID");
+        var cb = Ext.getCmp("c_bookingID");
+        if (Ext.selectRow && cb2 && cb2.getValue && cb2.getValue() === true) code = Ext.selectRow.get("c_overlap2") || "";
+        if (!code && cb) code = cb.lastSelectionText || "";
+        if (!code && Ext.selectRow) code = Ext.selectRow.get("c_overlap") || "";
+        if (!code) return base + " กรุณาติดต่อฝ่ายการคลัง";
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "api/All_PoWorkingImpHdr.php?type=overlap_remain&c_booking=" + encodeURIComponent(code), false);
+        xhr.send(null);
+        var rows = (Ext.util.JSON.decode(xhr.responseText).data || []);
+        var fmt = function (v) { return Ext.util.Format.number(v, "0,000.00") + " บาท"; };
+        if (!rows.length) return base + "<br>เลขใบกัน : " + code + "<br>ไม่พบข้อมูลใบกัน<br>กรุณาติดต่อฝ่ายการคลัง";
+        var msg = base + "<br>เลขใบกัน : " + code + "<br>ยอดใบกัน : " + fmt(rows[0].f_overlap) + "<br>ใช้ไปแล้ว : " + fmt(rows[0].f_used) + "<br>เงินคงเหลือ : " + fmt(rows[0].f_remain);
+        var reqCmp = Ext.getCmp("f_totalID");
+        var reqAmt = reqCmp ? parseFloat(String(reqCmp.getValue()).replace(/,/g, "")) : NaN;
+        if (reqAmt > 0) msg += "<br>ยอดที่ขอ : " + fmt(reqAmt);
+        return msg + "<br>กรุณาติดต่อฝ่ายการคลัง";
+    } catch (e) {
+        return base + (code ? "<br>เลขใบกัน : " + code : "") + "<br>กรุณาติดต่อฝ่ายการคลัง";
+    }
+};
 
 Ext.isBook = null;
         Ext.isOverlap = null;
@@ -5976,7 +6002,7 @@ Ext.isBook = null;
                                                                                                                                                                                 Ext.upMoneyCheckingId(jsonData.bg_reserve_money_id);
                                                                                                                                                                                 });
                                                                                                                                                                                 } else {
-                                                                                                                                                                                Ext.MessageBox.alert("Failed", "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg);
+                                                                                                                                                                                Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg() : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg));
                                                                                                                                                                                 }
                                                                                                                                                                                 return false;
                                                                                                                                                                                 },
@@ -6239,7 +6265,7 @@ Ext.isBook = null;
                                                                                                                                                                                         Ext.MessageBox.alert("แจ้งเตือน", "ยอดเงินใบไม่เพียงพอ ติดต่องบประมาณ");
                                                                                                                                                                                 } else {
                                                                                                                                                                                 Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                                                                                                                                                                                        Ext.MessageBox.alert("Failed", "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg);
+                                                                                                                                                                                        Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg() : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg));
                                                                                                                                                                                 }
 
                                                                                                                                                                                 return false;
@@ -6293,7 +6319,7 @@ Ext.isBook = null;
                                                                                                                                                                                         if (jsonData.success) {
                                                                                                                                                                                 Ext.upMoneyId(Ext.perioidHdr.get("id"), 1, f, jsonData.bg_request_money_income_id);
                                                                                                                                                                                 } else {
-                                                                                                                                                                                Ext.MessageBox.alert("Failed", "ข้อมูลผิดพลาด ติดต่อ admin<br>" + jsonData.msg);
+                                                                                                                                                                                Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg() : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg));
                                                                                                                                                                                 }
                                                                                                                                                                                 },
                                                                                                                                                                                 failure: function (result, request) {
