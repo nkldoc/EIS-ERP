@@ -24,12 +24,17 @@ $stmt3 = true;
 $stmt4 = true;
 $db->BeginTran();
 
+// Count the same active child orders as List_Project.php. Its synthetic total row
+// (no=9999, including an empty 0.00 total) is not a PO and never restricts editing.
+// Edit-history count and contract dates do not restrict the owner before a child PO exists.
 // Use persisted ownership and child orders, never client-supplied department IDs.
 if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
     $accessStmt = $db->QueryParam(
         "SELECT c.sp_tor_id, t.dc_user_create_id, t.dc_cost2_id,
             (SELECT COUNT(*) FROM sp_tor_contract child WITH (UPDLOCK, HOLDLOCK)
-             WHERE child.parent_id = c.sp_tor_contract_id AND child.i_enabled = 1) AS child_count,
+             INNER JOIN sp_tor child_tor WITH (UPDLOCK, HOLDLOCK) ON child_tor.tor_id = child.sp_tor_id
+             WHERE child.parent_id = c.sp_tor_contract_id AND child.i_enabled = 1
+               AND child_tor.i_enabled = 1) AS child_count,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost_id) AS responsible_name,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost2_id) AS owner_name
          FROM sp_tor_contract c WITH (UPDLOCK, HOLDLOCK)
