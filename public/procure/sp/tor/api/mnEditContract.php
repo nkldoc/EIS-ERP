@@ -24,17 +24,11 @@ $stmt3 = true;
 $stmt4 = true;
 $db->BeginTran();
 
-// Count the same active child orders as List_Project.php. Its synthetic total row
-// (no=9999, including an empty 0.00 total) is not a PO and never restricts editing.
-// Edit-history count and contract dates do not restrict the owner before a child PO exists.
-// Use persisted ownership and child orders, never client-supplied department IDs.
+// Owners may edit at any time, including after child POs have been added.
+// Resolve ownership from persisted data rather than submitted department IDs.
 if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
     $accessStmt = $db->QueryParam(
         "SELECT c.sp_tor_id, t.dc_user_create_id, t.dc_cost2_id,
-            (SELECT COUNT(*) FROM sp_tor_contract child WITH (UPDLOCK, HOLDLOCK)
-             INNER JOIN sp_tor child_tor WITH (UPDLOCK, HOLDLOCK) ON child_tor.tor_id = child.sp_tor_id
-             WHERE child.parent_id = c.sp_tor_contract_id AND child.i_enabled = 1
-               AND child_tor.i_enabled = 1) AS child_count,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost_id) AS responsible_name,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost2_id) AS owner_name
          FROM sp_tor_contract c WITH (UPDLOCK, HOLDLOCK)
@@ -47,12 +41,12 @@ if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
     $owner = $access && !empty($_SESSION['user_id']) &&
         ((int) $access['dc_user_create_id'] === (int) $_SESSION['user_id'] ||
          ((int) $access['dc_cost2_id'] > 0 && (int) $access['dc_cost2_id'] === (int) ($_SESSION['dc_cost_id'] ?? 0)));
-    $allowed = $access && !empty($_SESSION['user_id']) && ($admin || ($owner && (int) $access['child_count'] === 0));
+    $allowed = $access && !empty($_SESSION['user_id']) && ($admin || $owner);
     if ($mode === 'CHECK_PROJECT_EDIT' || !$allowed) {
         $db->RollBackTran();
         echo json_encode(array('success' => (bool) $allowed, 'can_edit' => (bool) $allowed,
             'responsible_name' => $access['responsible_name'] ?? '', 'owner_name' => $access['owner_name'] ?? '',
-            'msg' => 'แก้ไขได้เฉพาะเจ้าของเรื่อง และยังไม่มี PO ย่อย'));
+            'msg' => 'แก้ไขได้เฉพาะเจ้าของเรื่องหรือผู้ดูแลระบบ'));
         exit;
     }
     // Bind all updates and history to the contract actually checked above.
