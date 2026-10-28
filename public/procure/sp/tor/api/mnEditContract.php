@@ -30,12 +30,14 @@ $db->BeginTran();
     case "Edit_contrct":
         $arrParam = array();
         $arrValue = array();
+        $addField = "";
+        $addValue = "";
         $COUNT_EDIT = $db->GetDataBySQL("select COUNT(sp_tor_id) as sp_tor_id  from sp_tor_contract_edit where i_enabled = 1  and sp_tor_id = {$_REQUEST['sp_tor_id']} group by sp_tor_id  ", array($_REQUEST["sp_tor_id"]));
         $stmt3 = $db->QueryParam("select  
         CONVERT(VARCHAR, d_doc_date, 120) AS d_doc_date 
         ,CONVERT(VARCHAR, d_due_date, 120) AS d_due_date 
         , f_total_amt  
-        from sp_tor_contract where  sp_tor_contract_id = {$_REQUEST['sp_tor_contract_id']} ;", array($_REQUEST["sp_tor_contract_id"]));
+        from sp_tor_contract where sp_tor_contract_id = ?;", array($_REQUEST["sp_tor_contract_id"]));
         $row = $db->Fetch($stmt3);
         $arrParam["sp_tor_id"] = $_REQUEST["sp_tor_id"];
         $arrParam["sp_tor_contract_id"] = $_REQUEST["sp_tor_contract_id"];
@@ -66,11 +68,21 @@ $db->BeginTran();
         unset($arrParam);      
         unset($addField);      
         unset($arrValue);      
-        $arrValue = null;      
+        $arrValue = array();
+        $addField = "";
 
         $arrParam['d_doc_date'] = !empty($_REQUEST['d_doc_date']) ? $date->bc_to_ad($_REQUEST['d_doc_date']) : null;
         $arrParam['d_due_date'] = !empty($_REQUEST['d_due_date']) ? $date->bc_to_ad($_REQUEST['d_due_date']) : null;
         $arrParam["f_total_amt"] = str_replace(",", "", $_REQUEST["f_total_amt"]);
+
+        // The ongoing-project editor submits these additional contract fields.
+        if (!empty($_REQUEST['edit_project_details'])) {
+            $arrParam['c_name'] = $_REQUEST['c_name'];
+            $arrParam['d_start_date'] = !empty($_REQUEST['d_start_date']) ? $date->bc_to_ad($_REQUEST['d_start_date']) : null;
+            $arrParam['dc_cost_id'] = $_REQUEST['dc_cost_id'];
+            $arrParam['dc_expense_budget_type_id'] = $_REQUEST['dc_expense_budget_type_id'];
+            $arrParam['i_type_guarantee'] = $_REQUEST['i_type_guarantee'];
+        }
 
         $arrParam["dc_user_update_id"] = $_SESSION["user_id"];
         $arrParam["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"];
@@ -82,6 +94,13 @@ $db->BeginTran();
         $arrValue[]  = $_REQUEST['sp_tor_contract_id'];
         $sql2 = "UPDATE sp_tor_contract SET " . substr($addField, 1) . " WHERE sp_tor_contract_id =  ?";
         $stmt2 = $db->QueryParam($sql2, $arrValue);
+        if (!empty($_REQUEST['edit_project_details'])) {
+            $stmt4 = $db->QueryParam(
+                "UPDATE sp_tor SET c_name = ?, dc_cost_id = ?, dc_cost2_id = ?, po_expense_id = ?, dc_expense_budget_type_id = ?, tor_type_id = ?, dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = ? WHERE tor_id = ? AND tor_id = (SELECT sp_tor_id FROM sp_tor_contract WHERE sp_tor_contract_id = ?)",
+                array($_REQUEST['c_name'], $_REQUEST['dc_cost_id'], $_REQUEST['dc_cost2_id'], $_REQUEST['po_expense_id'], $_REQUEST['dc_expense_budget_type_id'], $_REQUEST['stor_type_id'], $_SESSION['user_id'], $_SESSION['dc_cost_id'], date('Y-m-d H:i:s'), $_REQUEST['sp_tor_id'], $_REQUEST['sp_tor_contract_id'])
+            );
+        }
+
 
         break;
     case "DELETE_EDIT_CONTRACT": 
@@ -95,10 +114,10 @@ $db->BeginTran();
  }
 if ($stmt && $stmt2 && $stmt3 && $stmt4) {
     $db->CommitTran();
-    $re = array("reval" => 0, "success" => "Success", "msg" => "บันทึกเรียบร้อยแล้ว", "id" => $re_id);
+    $re = array("reval" => 0, "success" => true, "msg" => "บันทึกเรียบร้อยแล้ว", "id" => $re_id);
 } else {
     $db->RollBackTran();
-    $re = array("reval" => 1, "success" => "Error", "msg" => "check statement : {$sql}");
+    $re = array("reval" => 1, "success" => false, "msg" => "check statement : {$sql}");
 }
 
 echo json_encode($re);

@@ -280,8 +280,9 @@ const Uiedit_contract = function (rec) {
     fieldLabel: "หน่วยงานที่รับผิดชอบ",
     valueField: "id",
     displayField: "c_name",
+    id: "editProjectCostID",
     hiddenName: "dc_cost_id",
-    name: "c_cost_name",
+    name: "dc_cost_idTxt",
     triggerAction: "all",
     forceSelection: true,
     selectOnFocus: true,
@@ -511,8 +512,9 @@ const Uiedit_contract = function (rec) {
                             fieldLabel: "หน่วยงานเจ้าของเรื่อง",
                             valueField: "id",
                             displayField: "c_name",
+                            id: "editProjectOwnerCostID",
                             hiddenName: "dc_cost2_id",
-                            name: "c_cost_name",
+                            name: "dc_cost2_idTxt",
                             triggerAction: "all",
                             forceSelection: true,
                             selectOnFocus: true,
@@ -669,7 +671,7 @@ const Uiedit_contract = function (rec) {
                                 this.store.load({
                                   callback: function (record, operation, success) {
                                     if (success) {
-                                      Ext.getCmp("stor_type_idID").setValue(this.data.items[0].get("c_name"));
+                                      Ext.getCmp("stor_type_idID").setValue(rec.get("tor_type_id"));
                                     }
                                   },
                                 });
@@ -782,6 +784,11 @@ const Uiedit_contract = function (rec) {
                                 console.log(form);
                                 form.submit({
                                   waitMsg: "Saving Data...",
+                                  params: { edit_project_details: 1 },
+                                  clientValidation: false,
+                                  failure: function (form, action) {
+                                    Ext.Msg.alert("\u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19", (action.result && action.result.msg) || "Save failed. Please try again.");
+                                  },
                                   success: function (form, action) {
                                     Ext.storeDtl.reload();
                                     Ext.storeedit.reload();
@@ -791,8 +798,10 @@ const Uiedit_contract = function (rec) {
                                 });
                               };
                               var form = Ext.getCmp("form_edit_contract").getForm();
-                              // if (form.isValid()) {
-                              // }
+                              if (!Ext.getCmp("d_doc_dateID").isValid() || !Ext.getCmp("construction_start_dateID").isValid() || !Ext.getCmp("d_due_dateID").isValid()) {
+                                Ext.Msg.alert("\u0e41\u0e08\u0e49\u0e07\u0e40\u0e15\u0e37\u0e2d\u0e19", "Please check the contract dates.");
+                                return;
+                              }
                               if (Ext.getCmp("c_commentID").getValue() == "") {
                                 msg += "กรุณาระบุเหตุผล ";
                               }
@@ -867,9 +876,8 @@ const Uiedit_contract = function (rec) {
                         items: [
                           {
                             xtype: "datefield",
-                            name: "construction_start_date",
+                            name: "d_start_date",
                             id: "construction_start_dateID",
-                            value: new Date().format("d-m-Y"),
                             readOnly: Ext.session.dc_center_user == 1 ? false : true,
                             validator: function (val) {
                               if (!Ext.isEmpty(val)) {
@@ -7673,6 +7681,9 @@ Ext.AppUx = function (app, menu) {
                   Ext.each(Ext.storeedit, function (value, item) {
                     Uiedit_contract(Ext.selectRow);
                     Ext.getCmp("winChequeEditID").items.items[0].getForm().loadRecord(Ext.selectRow);
+                    Ext.getCmp("editProjectCostID").setValue(Ext.selectRow.get("dc_cost_id"));
+                    Ext.getCmp("editProjectOwnerCostID").setValue(Ext.selectRow.get("dc_cost2_id"));
+                    Ext.getCmp("construction_start_dateID").setValue(Ext.selectRow.get("d_start_date") || Ext.selectRow.json.d_start_date || "");
                     // Ext.getCmp("winMain1").getEl().unmask();
                   });
                 }
