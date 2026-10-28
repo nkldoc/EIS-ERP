@@ -191,6 +191,11 @@ Ext.storeedit = new Ext.data.JsonStore({
   ],
 });
 const Uiedit_contract = function (rec) {
+  var projectDepartmentStore = new Ext.data.JsonStore({
+    url: "api/All_PoWorkingImpHdr.php", baseParams: { type: "dc_cost_all" },
+    root: "data", idProperty: "id", fields: ["id", "c_name"]
+  });
+
   const delete_edit_contract = function (rec) {
     var win = new Ext.Window({
       id: "win-msg-delete",
@@ -274,8 +279,8 @@ const Uiedit_contract = function (rec) {
   var disp = false ? "displayfield" : "textfield";
   var comboCost = new Ext.form.ComboBox({
     mode: "local",
-    readOnly: Ext.session.dc_center_user == 1 ? false : true,
-    store: Ext.dc_cost,
+    readOnly: false,
+    store: projectDepartmentStore,
     anchor: "80%",
     fieldLabel: "หน่วยงานที่รับผิดชอบ",
     valueField: "id",
@@ -504,10 +509,10 @@ const Uiedit_contract = function (rec) {
                           comboCost,
                           new Ext.form.ComboBox({
                             mode: "local",
-                            store: Ext.dc_cost,
+                            store: projectDepartmentStore,
                             maxHeight: 200, // ความสูงสูงสุดของรายการใน Dropdown
                             anchor: "80%",
-                            readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                            readOnly: false,
                             value: Ext.costID,
                             fieldLabel: "หน่วยงานเจ้าของเรื่อง",
                             valueField: "id",
@@ -567,7 +572,7 @@ const Uiedit_contract = function (rec) {
                             selectOnFocus: true,
                             width: 400, // ความกว้างของ ComboBox
                             listWidth: 500, // ความกว้างของ Dropdown
-                            readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                            readOnly: false,
                             fieldLabel: "รายการย่อย",
                             width: 200,
                             typeAhead: false,
@@ -606,7 +611,7 @@ const Uiedit_contract = function (rec) {
                             name: "dc_expense_budget_type_idTxt",
                             hiddenName: "dc_expense_budget_type_id",
                             id: "dc_expense_budget_type_hdr_id1",
-                            readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                            readOnly: false,
                             valueField: "id",
                             displayField: "c_name",
                             triggerAction: "all",
@@ -747,7 +752,7 @@ const Uiedit_contract = function (rec) {
                             xtype: "radiogroup",
                             columns: [98, 98],
                             hidden: Ext.session.dc_center_user == 1 ? false : true,
-                            readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                            readOnly: false,
                             fieldLabel: "ใช้เงินจาก",
                             id: "i_type_updateID",
                             name: "i_type_update",
@@ -845,7 +850,7 @@ const Uiedit_contract = function (rec) {
                             xtype: "datefield",
                             name: "d_doc_date",
                             id: "d_doc_dateID",
-                            readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                            readOnly: false,
                             validator: function (val) {
                               if (!Ext.isEmpty(val)) {
                                 return true;
@@ -878,7 +883,7 @@ const Uiedit_contract = function (rec) {
                             xtype: "datefield",
                             name: "d_start_date",
                             id: "construction_start_dateID",
-                            readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                            readOnly: false,
                             validator: function (val) {
                               if (!Ext.isEmpty(val)) {
                                 return true;
@@ -903,7 +908,7 @@ const Uiedit_contract = function (rec) {
                             xtype: "datefield",
                             name: "d_due_date",
                             id: "d_due_dateID",
-                            readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                            readOnly: false,
                             validator: function (val) {
                               if (!Ext.isEmpty(val)) {
                                 return true;
@@ -922,7 +927,7 @@ const Uiedit_contract = function (rec) {
                         xtype: "textfield",
                         fieldLabel: "จำนวนเงิน",
                         // readOnly: true,
-                        readOnly: Ext.session.dc_center_user == 1 ? false : true,
+                        readOnly: false,
                         name: "f_total_amt",
                         id: "f_totalID",
                         listeners: {
@@ -1242,6 +1247,20 @@ const Uiedit_contract = function (rec) {
       },
     },
   }).show();
+  projectDepartmentStore.load({ callback: function () {
+    var access = rec.projectEditAccess || {};
+    Ext.each([
+      ["editProjectCostID", "dc_cost_id", access.responsible_name || rec.get("dc_cost_idTxt")],
+      ["editProjectOwnerCostID", "dc_cost2_id", access.owner_name || rec.get("dc_cost2_idTxt")]
+    ], function (entry) {
+      var id = String(rec.get(entry[1]));
+      if (projectDepartmentStore.findExact("id", id) < 0 && entry[2]) {
+        projectDepartmentStore.add(new projectDepartmentStore.recordType({ id: id, c_name: entry[2] }, id));
+      }
+      var departmentCombo = Ext.getCmp(entry[0]);
+      if (departmentCombo) departmentCombo.setValue(id);
+    });
+  }});
 };
 const DeleteTor_dtl = function (record) {
   var win = new Ext.Window({
@@ -7670,6 +7689,23 @@ Ext.AppUx = function (app, menu) {
       });
     } else if (statusx === "load") {
     } else if (statusx === "edit_contract") {
+      if (!Ext.projectEditChecked) {
+        var selectedContract = Ext.selectRow;
+        Ext.Ajax.request({
+          url: "tor/api/mnEditContract.php", method: "POST",
+          params: { mode: "CHECK_PROJECT_EDIT", sp_tor_contract_id: selectedContract.get("sp_tor_contract_id") },
+          success: function (response) {
+            var result = Ext.decode(response.responseText);
+            if (!result.can_edit) { Ext.Msg.alert("Permission", result.msg); return; }
+            Ext.selectRow = selectedContract;
+            selectedContract.projectEditAccess = result;
+            Ext.projectEditChecked = true;
+            try { Ext.loadStore("edit_contract", true); } finally { Ext.projectEditChecked = false; }
+          },
+          failure: function () { Ext.Msg.alert("Error", "Unable to verify contract edit permission."); }
+        });
+        return;
+      }
       // Ext.getCmp("winMain1").getEl().mask("Please wait...", "x-mask-loading");
       Ext.guarantee.reload({
         callback: function (recordx, operation, success) {

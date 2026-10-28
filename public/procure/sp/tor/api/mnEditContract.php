@@ -24,6 +24,41 @@ $stmt3 = true;
 $stmt4 = true;
 $db->BeginTran();
 
+// Use persisted ownership and child orders, never client-supplied department IDs.
+if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
+    $accessStmt = $db->QueryParam(
+        "SELECT c.sp_tor_id, t.dc_user_create_id, t.dc_cost2_id,
+            (SELECT COUNT(*) FROM sp_tor_contract child WITH (UPDLOCK, HOLDLOCK)
+             WHERE child.parent_id = c.sp_tor_contract_id AND child.i_enabled = 1) AS child_count,
+            (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost_id) AS responsible_name,
+            (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost2_id) AS owner_name
+         FROM sp_tor_contract c WITH (UPDLOCK, HOLDLOCK)
+         INNER JOIN sp_tor t ON t.tor_id = c.sp_tor_id
+         WHERE c.sp_tor_contract_id = ? AND c.i_enabled = 1",
+        array((int) ($_REQUEST['sp_tor_contract_id'] ?? 0))
+    );
+    $access = $accessStmt ? $db->Fetch($accessStmt) : null;
+    $admin = (int) ($_SESSION['dc_center_user'] ?? 0) === 1;
+    $owner = $access && !empty($_SESSION['user_id']) &&
+        ((int) $access['dc_user_create_id'] === (int) $_SESSION['user_id'] ||
+         ((int) $access['dc_cost2_id'] > 0 && (int) $access['dc_cost2_id'] === (int) ($_SESSION['dc_cost_id'] ?? 0)));
+    $allowed = $access && !empty($_SESSION['user_id']) && ($admin || ($owner && (int) $access['child_count'] === 0));
+    if ($mode === 'CHECK_PROJECT_EDIT' || !$allowed) {
+        $db->RollBackTran();
+        echo json_encode(array('success' => (bool) $allowed, 'can_edit' => (bool) $allowed,
+            'responsible_name' => $access['responsible_name'] ?? '', 'owner_name' => $access['owner_name'] ?? '',
+            'msg' => 'แก้ไขได้เฉพาะเจ้าของเรื่อง และยังไม่มี PO ย่อย'));
+        exit;
+    }
+    // Bind all updates and history to the contract actually checked above.
+    $_REQUEST['sp_tor_id'] = $access['sp_tor_id'];
+    if (!$admin) {
+        $_REQUEST['edit_project_details'] = 1;
+        $_REQUEST['i_type_update'] = 1;
+    }
+}
+
+
 
 
  switch ($mode) {
@@ -32,7 +67,7 @@ $db->BeginTran();
         $arrValue = array();
         $addField = "";
         $addValue = "";
-        $COUNT_EDIT = $db->GetDataBySQL("select COUNT(sp_tor_id) as sp_tor_id  from sp_tor_contract_edit where i_enabled = 1  and sp_tor_id = {$_REQUEST['sp_tor_id']} group by sp_tor_id  ", array($_REQUEST["sp_tor_id"]));
+        $COUNT_EDIT = $db->GetDataBySQL("select COUNT(sp_tor_id) as sp_tor_id  from sp_tor_contract_edit where i_enabled = 1 and sp_tor_id = ? group by sp_tor_id  ", array($_REQUEST["sp_tor_id"]));
         $stmt3 = $db->QueryParam("select  
         CONVERT(VARCHAR, d_doc_date, 120) AS d_doc_date 
         ,CONVERT(VARCHAR, d_due_date, 120) AS d_due_date 
