@@ -24,29 +24,36 @@ $stmt3 = true;
 $stmt4 = true;
 $db->BeginTran();
 
-// Owners may edit at any time, including after child POs have been added.
-// Resolve ownership from persisted data rather than submitted department IDs.
+// Users who can see the record may edit it, including after child POs exist.
+// Match List_DeliveryStep.php visibility: all records, department, or employee.
 if ($mode === 'CHECK_PROJECT_EDIT' || $mode === 'Edit_contrct') {
     $accessStmt = $db->QueryParam(
-        "SELECT c.sp_tor_id, t.dc_user_create_id, t.dc_cost2_id,
+        "SELECT c.sp_tor_id, employee.dc_department_id AS visible_department_id, employee.sp_emp_id AS visible_employee_id,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost_id) AS responsible_name,
             (SELECT TOP 1 c_name FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = t.dc_cost2_id) AS owner_name
          FROM sp_tor_contract c WITH (UPDLOCK, HOLDLOCK)
          INNER JOIN sp_tor t ON t.tor_id = c.sp_tor_id
+         INNER JOIN sp_emp employee ON employee.sp_emp_id = t.sp_emp_id
+         INNER JOIN NMU.dbo.dc_creditor creditor ON creditor.dc_creditor_id = c.dc_creditor_id
          WHERE c.sp_tor_contract_id = ? AND c.i_enabled = 1",
         array((int) ($_REQUEST['sp_tor_contract_id'] ?? 0))
     );
     $access = $accessStmt ? $db->Fetch($accessStmt) : null;
     $admin = (int) ($_SESSION['dc_center_user'] ?? 0) === 1;
-    $owner = $access && !empty($_SESSION['user_id']) &&
-        ((int) $access['dc_user_create_id'] === (int) $_SESSION['user_id'] ||
-         ((int) $access['dc_cost2_id'] > 0 && (int) $access['dc_cost2_id'] === (int) ($_SESSION['dc_cost_id'] ?? 0)));
-    $allowed = $access && !empty($_SESSION['user_id']) && ($admin || $owner);
+    $visibilityLevel = (int) ($_SESSION['i_level'] ?? 0);
+    $visible = $access && (
+        $visibilityLevel === 1 ||
+        ($visibilityLevel === 2 && (int) ($_SESSION['dc_department_id'] ?? 0) > 0 &&
+            (int) $access['visible_department_id'] === (int) $_SESSION['dc_department_id']) ||
+        ($visibilityLevel === 3 && (int) ($_SESSION['sp_emp_id'] ?? 0) > 0 &&
+            (int) $access['visible_employee_id'] === (int) $_SESSION['sp_emp_id'])
+    );
+    $allowed = !empty($_SESSION['user_id']) && $visible;
     if ($mode === 'CHECK_PROJECT_EDIT' || !$allowed) {
         $db->RollBackTran();
         echo json_encode(array('success' => (bool) $allowed, 'can_edit' => (bool) $allowed,
             'responsible_name' => $access['responsible_name'] ?? '', 'owner_name' => $access['owner_name'] ?? '',
-            'msg' => 'แก้ไขได้เฉพาะเจ้าของเรื่องหรือผู้ดูแลระบบ'));
+            'msg' => 'คุณไม่มีสิทธิ์เห็นรายการนี้'));
         exit;
     }
     // Bind all updates and history to the contract actually checked above.
