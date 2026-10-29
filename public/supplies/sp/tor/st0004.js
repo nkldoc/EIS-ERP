@@ -5487,9 +5487,7 @@ Ext.AppUx = function (app, menu) {
                     
                   if (Ext.selectRow.data.sp_bg_edit == 1 && Ext.selectRow.data.c_comment_edit1==null) { 
                     Ext.MessageBox.alert("แจ้งเตือน", "อยู่ระหว่างการแก้ไขแหล่งเงินไม่สามารถแก้ไขรายการได้ 1");
-                  } else if (Ext.selectRow.data.sp_bg_edit == 2) {
-                    Ext.MessageBox.alert("แจ้งเตือน", "รายการนี้ได้รับการแก้ไขแล้วไม่สามารถส่งซ้ำได้");
-                  } else { /// 11 ส่งกลับมาแก้ไข else แก้ไขได้
+                  } else { // แก้ไขแล้วส่งขอแก้ซ้ำได้ เผื่อสื่อสารกันไม่ตรง
                       
                     UiEditBudget();
                   }
