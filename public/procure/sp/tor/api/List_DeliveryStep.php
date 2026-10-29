@@ -734,11 +734,17 @@ if ($_REQUEST["type"] == "deliveries") {
     echo json_encode(array("debug" => true, "totalCount" => $totalCount, $root => ${$root}));
 } else if ($_REQUEST["type"] == "project") {
     $act = $_REQUEST["act"] ?? null;
+    $i_enabled = $_REQUEST["i_enabled"] ?? null;
     $wh = null;
 
     if ($act == "SEARCH") {
         $wh .= ($_REQUEST['c_code'] != "") ? " and a.c_code LIKE '%" . $_REQUEST['c_code'] . "%'" : "";
         $wh .= ($_REQUEST['c_name'] != "") ? " and b.c_name LIKE '%" . $_REQUEST['c_name'] . "%'" : "";
+    }
+    if ((string) $i_enabled === "2") {
+        $wh .= " and (a.i_enabled = 2 or cc.i_enabled = 2)";
+    } else {
+        $wh .= " and a.i_enabled = 1 and cc.i_enabled = 1";
     }
     // $ses = ($_SESSION['user_id'] == 1) ? "" : " and bb.dc_department_id = " . $_SESSION['dc_department_id'];
     $arrParam = array();
@@ -784,7 +790,7 @@ if ($_REQUEST["type"] == "deliveries") {
                     INNER JOIN NMU.dbo.dc_creditor b ON a.dc_creditor_id = b.dc_creditor_id 
 					inner join dbo.sp_tor cc on cc.tor_id = a.sp_tor_id
                                         INNER JOIN dbo.sp_emp bb on bb.sp_emp_id = cc.sp_emp_id {$ses}
-                    WHERE cc.i_type_bg in (2) and a.i_contract_status > 0 and a.i_enabled = 1 and cc.i_enabled = 1 {$wh}"; //
+                    WHERE cc.i_type_bg in (2) and a.i_contract_status > 0 {$wh}"; //
     //    echo $sqlTempTable;
     //    exit;   
     $arrParam[] = $start;
@@ -864,7 +870,7 @@ if ($_REQUEST["type"] == "deliveries") {
             "
         . " from ({$sqlTempTable}) a "
         . " inner join dbo.sp_tor s on s.tor_id = a.sp_tor_id"
-        . " inner join dbo.sp_tor_contract c on c.sp_tor_id = a.sp_tor_id"
+        . " inner join dbo.sp_tor_contract c on c.sp_tor_contract_id = a.sp_tor_contract_id"
         . " WHERE row > ? and row <= ?";
     //     echo $sqlMain . '/*';
     //    print_r($arrParam);
