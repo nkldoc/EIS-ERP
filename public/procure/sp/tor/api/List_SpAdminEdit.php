@@ -316,8 +316,8 @@ if ($type == "po_working_dtl1") {
             "bg_expense_id3_po"                 => $row["bg_expense_id3_po"] > 0 ? $row["bg_expense_id3_po"] : null,
 
             "dc_expense_budget_type_id_po"     => $row["dc_expense_budget_type_id_po"] > 0 ? $row["dc_expense_budget_type_id_po"] : null,
-            "dc_expense_budget_type2_id_po"    => $row["dc_expense_budget_type2_id_po"] > 0 ? $row["dc_expense_budget_type2_id_po"] : null,
-            "dc_expense_budget_type3_id_po"    => $row["dc_expense_budget_type3_id_po"] > 0 ? $row["dc_expense_budget_type3_id_po"] : null,
+            "dc_expense_budget_type2_id_po"    => $row["dc_expense_budget_type_id2_po"] > 0 ? $row["dc_expense_budget_type_id2_po"] : null,
+            "dc_expense_budget_type3_id_po"    => $row["dc_expense_budget_type_id3_po"] > 0 ? $row["dc_expense_budget_type_id3_po"] : null,
 
             "po_expense_dtl_id"             => $row["po_expense_dtl_id"],
             "dc_creditor_victory"           => $row["dc_creditor_victory"],

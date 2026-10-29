@@ -7300,7 +7300,7 @@ Ext.AppUx = function (app, menu) {
       title: "ค้นหารายการ",
       width: 700,
       id: "winSearchFrm",
-      height: 150,
+      height: 180,
       layout: "fit",
       //                     modal: true,
       plain: true,
@@ -7341,6 +7341,33 @@ Ext.AppUx = function (app, menu) {
                 },
               ],
             },
+            {
+              columnWidth: 0.5,
+              layout: "form",
+              border: false,
+              items: [
+                {
+                  xtype: "radiogroup",
+                  fieldLabel: "สถานะ",
+                  id: "searchEnabledID",
+                  columns: 2,
+                  items: [
+                    {
+                      boxLabel: "ใช้งาน",
+                      name: "i_enabled",
+                      inputValue: 1,
+                      checked: true,
+                    },
+                    {
+                      boxLabel: "ไม่ใช้งาน",
+                      name: "i_enabled",
+                      inputValue: 2,
+                      checked: false,
+                    },
+                  ],
+                },
+              ],
+            },
           ],
           buttonAlign: "left",
           buttons: [
@@ -7354,7 +7381,10 @@ Ext.AppUx = function (app, menu) {
 
                 Ext.storeDtl.setBaseParam("c_code", Ext.getCmp("sc_codeID").getValue());
                 Ext.storeDtl.setBaseParam("c_name", Ext.getCmp("sc_nameID").getValue());
-                // Ext.storeDtl.setBaseParam("i_enabled", Ext.getCmp("searchEnabledID").getValue().inputValue);
+                Ext.storeDtl.setBaseParam(
+                  "i_enabled",
+                  Ext.getCmp("searchEnabledID").getValue().i_enabled || 0
+                );
                 // Ext.storeDtl.setBaseParam("i_post", Ext.getCmp("searchPostID").getValue().inputValue);
 
                 Ext.storeDtl.load();
