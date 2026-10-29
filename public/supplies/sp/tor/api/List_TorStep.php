@@ -1544,6 +1544,9 @@ if ($type == "ownnerPr") {
         -- ยังไม่ได้กดส่งคืนจากฝ่ายจัดสรร = อยู่ระหว่างแก้ไข (1) แม้จะบันทึกแก้ไขแล้วก็ตาม
         , case when exists (select 1 from sp_tor_bg_log where s.tor_id = sp_tor_id and i_edit = 1 and isnull(c_comment_edit1,'') = '') then 1
                else (select top 1 i_edit from sp_tor_bg_log where s.tor_id = sp_tor_id  ORDER BY d_create  desc ) end as sp_bg_edit
+        -- ฝ่ายจัดสรรส่งคืนพร้อมแก้ไขแล้ว รอผู้ขอกดยืนยัน (i_status = 4)
+        , case when not exists (select 1 from sp_tor_bg_log where s.tor_id = sp_tor_id and i_edit = 1 and isnull(c_comment_edit1,'') = '')
+               and exists (select 1 from sp_tor_bg_log where s.tor_id = sp_tor_id and i_edit = 2 and i_status = 4) then 1 else 0 end as bg_edit_ack
         , isnull((select top 1 sp_cate_id from NMU_ERP.dbo.[view_sp_tor_work_socore] where sp_tor_id=a.tor_id order by sp_cate_id desc),0) as sp_cate_id
         , (SELECT c_name FROM NMU.dbo.dc_creditor aa WHERE aa.dc_creditor_id =v.dc_creditor_id) AS winner
         "
@@ -1707,6 +1710,7 @@ if ($type == "ownnerPr") {
             "i_type_bgTxt" => $i_type_bgTxt,
             "i_step" => intval($row["i_step"]),
             "sp_bg_edit" => intval($row["sp_bg_edit"]),
+            "bg_edit_ack" => intval($row["bg_edit_ack"]),
             "i_edit" => intval($row["i_edit"]),
             "c_nameStatus" => $sp ?? $row["c_name"], //
             "sp_tor_delete" => $row["sp_tor_delete"],

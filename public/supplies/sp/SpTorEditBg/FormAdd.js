@@ -45,6 +45,27 @@ function getOriginalBg(i) {
         f_amt: String(row["f_type_amt" + i] || 0).replace(/,/g, "") / 1,
     };
 }
+// เติมค่าที่ผู้ใช้ขอแก้ (ฝั่งขวา) ลงช่องจัดสรร (ฝั่งซ้าย) ให้พัสดุตรวจแล้วกดบันทึก ถ้ายังไม่เคยบันทึกแก้ไข
+function prefillRequestedBg() {
+    var row = Ext.select_row;
+    for (var i = 1; i <= (row.i_amount_bg || 1); i++) {
+        if (row["sp_bg_edit" + i] != 1) {
+            continue;
+        }
+        var dc = row["dc_expense_budget_type_edit_id" + i];
+        var po = row["po_expense_edit_id" + i];
+        var amt = row["f_total_amt_edit" + i];
+        if (!Ext.isEmpty(dc)) {
+            Ext.getCmp("dc_expense_budget_type_id" + i).setValue(dc);
+        }
+        if (!Ext.isEmpty(po)) {
+            Ext.getCmp("po_expense_id" + i).setValue(po);
+        }
+        if (!Ext.isEmpty(amt)) {
+            Ext.getCmp("f_type_amt" + i).setValue(amt);
+        }
+    }
+}
 // เปิด/ปิด การแก้ไขช่องด้านซ้าย (ค่าที่จัดสรร) ของแหล่งเงินที่ i
 function setEditableBg(i, editable) {
     Ext.each(["dc_expense_budget_type_id" + i, "po_expense_id" + i, "f_type_amt" + i], function (cmpId) {
@@ -114,187 +135,88 @@ function genBooklink(v, i) {
             "bg_reserve_money_id/" +
             bg_reserve_money_id +
             "/i_enable/2";
-    Ext.Ajax.request({
-        url: link2,
-        method: "GET", //POST
-        disableCaching: false,
-        success: function (result, request) {
-            // Ext.getCmp("form-widgets").getEl().unmask();
-            var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-            var cheVal = String(v).replace(/,/g, "") / 1; // จำนวนเงินที่จะจองใหม่
-            if (jsonData.totalCount > 0) {
-                var f_amt = 0;
-                if (i_type_pr == 1) {
-                    f_amt = parseFloat(jsonData.data[0].f_total_plan);
-                } else {
-                    f_amt = parseFloat(jsonData.data[0].f_total_dtl);
-                }
-                // เงินที่จองเดิมจะถูกคืนเข้าแหล่งเงินเดิม จึงนำมารวมได้เฉพาะกรณีจองแหล่งเงิน/รายการย่อย/ประเภทการจองเดิม
-                var isSameBg = original.dc_expense_budget_type == dc_expense_budget_type &&
-                        original.po_expense_id == po_expense_id &&
-                        original.i_pr_type == i_type_pr;
-                var f_type_amt_res = f_amt + (isSameBg ? original.f_amt : 0);
-                if (f_type_amt_res >= cheVal) {
-                    var f_amt_sum = f_type_amt_res - cheVal;
-                  
-                    var c_name_dc_expense_budget_type = getStoreItems(Ext.dc_expense_budget_type, dc_expense_budget_type, "c_name");
-                    var c_name_po_expense_id = getStoreItems(Ext.bg_expense, po_expense_id, "c_name");
-                    Ext.getCmp("form-widgets").getEl().unmask();
-                    Ext.Msg.show({
-                        title: "แจ้งเตือน!",
-                        msg: "ยืนยันการจองเงิน แหล่งเงิน : " + c_name_dc_expense_budget_type + "\n",
-                        width: 400,
-                        // icon: Ext.MessageBox.QUESTION,
-                        buttons: Ext.MessageBox.YESNO,
-                        fn: function (btn, text) {
-                            if (btn === "yes") {
-                                Ext.getCmp("form-widgets").getEl().mask("Please wait...", "x-mask-loading");
-                                //ยกเลิก PR
-                                Ext.Ajax.request({
-                                    url: link3,
-                                    method: "GET", //POST
-                                    disableCaching: false,
-                                    success: function (result, request) {
-                                        var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-                                        //จอง PR
-                                        Ext.Ajax.request({
-                                            url: link,
-                                            method: "GET", //POST
-                                            disableCaching: false,
-                                            success: function (result, request) {
-                                                var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-                                                if (jsonData.success) {
-                                                    // บันทึกลง PR inset ตัวเก่า
-                                                    Ext.Ajax.request({
-                                                        url: "tor/api/mnTorController.php",
-                                                        method: "POST",
-                                                        params: {
-                                                            mode: "ConFirm_Edit_bg",
-                                                            id: Ext.select_row.id,
-                                                            i_pr_type: i_type_pr,
-                                                            type: i,
-                                                            i_yyyy: i_yyyy,
-                                                            dc_expense_budget_type: dc_expense_budget_type,
-                                                            po_expense_id: po_expense_id,
-                                                            f_total: cheVal,
-                                                            bg_reserve_money_id: bg_reserve_money_id,
-                                                            i_edit: 2,
-                                                            i_edit_tor: 5,
-                                                            i_status: 2,
-                                                            i_amount_bg: i_amount_bg,
-                                                            // ค่าเดิมก่อนแก้ไข เก็บลง sp_tor_bg_log
-                                                            dc_expense_budget_type_id_edit: original.dc_expense_budget_type,
-                                                            po_expense_id_edit: original.po_expense_id,
-                                                            bg_reserve_money_edit: bg_reserve_money_id,
-                                                            f_type_amt: original.f_amt,
-                                                            i_pr_type_edit: original.i_pr_type,
-                                                            buy: 2,
-
-                                                        },
-                                                        success: function (result, request) {
-                                                            var resSave = Ext.util.JSON.decode(result.responseText);
-                                                            Ext.getCmp("form-widgets").getEl().unmask();
-                                                            if (resSave.reval != 0) {
-                                                                setDisabled_button(i, 1);
-                                                                Ext.MessageBox.alert("Failed", resSave.msg);
-                                                                return;
-                                                            }
-                                                            // บันทึกแล้ว ล็อกช่องไว้ รอพัสดุกด "ส่งคืน" ให้ผู้ขอ
-                                                            Ext.select_row["sp_bg_edit" + i] = 2;
-                                                            setEditableBg(i, false);
-                                                            Ext.MessageBox.alert("Success", "บันทึกรายการแก้ไขเรียบร้อยแล้ว<br>กรุณากดปุ่ม \"ส่งคืน\" เพื่อส่งรายการคืนผู้ขอแก้ไข", function () {
-                                                                var alert_text = "มีการยืนยันการแก้ไขแหล่งเงิน " + "\n";
-                                                                alert_text += "วันเวลา : " + new Date().toLocaleString("en-ZA") + "\n";
-                                                                alert_text += "PR : " + Ext.select_row.c_code + "\n";
-                                                                alert_text += "แหล่งเงินจัดสรร : " + getStoreItems(Ext.dc_expense_budget_type, original.dc_expense_budget_type, "c_name") + "\n";
-                                                                alert_text += "แหล่งเงินแก้ไข : " + c_name_dc_expense_budget_type + "\n";
-                                                                alert_text += "หมวดค่าใช้จ่ายจัดสรร : " + getStoreItems(Ext.bg_expense, original.po_expense_id, "c_name") + "\n";
-                                                                alert_text += "หมวดค่าใช้จ่ายแก้ไข : " + c_name_po_expense_id + "\n";
-                                                                alert_text += "จำนวนเงินจัดสรร : " + floatRenderer(floatMinus(String(f_total_amt).replace(/,/g, ""), 2)) + "\n";
-                                                                alert_text += "จำนวนเงินแก้ไข : " + floatRenderer(floatMinus(String(v).replace(/,/g, ""), 2)) + "\n";
-                                                                alert_text += "เงินคงเหลือหลังจอง : " + floatRenderer(floatMinus(String(f_amt_sum).replace(/,/g, ""), 2)) + "\n";
-                                                                // alert_text += "เหตุผล : " + Ext.getCmp("reason_Edit_bgID").getValue() + "\n";
-                                                                alert_text += "ชื่อผู้ดำเนินรายการ : " + Ext.session.user_name + "\n";
-                                                                alert_text += "ชื่อรายการ : " + Ext.select_row.c_name + "\n";
-                                                                // alert_text += "จำนวนเงิน : " + floatRenderer(floatMinus(String(Ext.selectRow.get("f_total_amt")).replace(/,/g, ""), 2)) + "\n";
-                                                                Ext.Ajax.request({
-                                                                    url: Ext.session.Notif_line,
-                                                                    method: "POST",
-                                                                    params: {
-                                                                        msg: alert_text,
-                                                                        mode: 3
-                                                                    },
-                                                                });
-                                                                Ext.store.load({
-                                                                    callback: function (_records, _operation, _success) {
-                                                                        Ext.storeDtl.reload({
-                                                                            callback: function (record, operation, success) {
-                                                                                if (success) {
-                                                                                    // Ext.bgMode.isbook = true; 
-                                                                                    // Ext.getCmp("form-widgets").getEl().unmask();
-                                                                                    purchase2(Ext.select_row.id, jsonData.bg_reserve_money_id, ii);
-                                                                                    // Ext.getCmp("po_expense_hdr_idID").setReadOnly(true);
-                                                                                    // setDisabled_button(i, 2);
-                                                                                    // Ext.getCmp("tabpanel1").getStore().reload();
-                                                                                }
-                                                                            },
-                                                                        });
-                                                                    },
-                                                                });
-                                                                // setDisabled_button(i, 2);
-                                                                null
-                                                            });
-                                                        },
-                                                        failure: function (result, request) {
-                                                            setDisabled_button(i, 1);
-                                                            Ext.MessageBox.alert("Failed", result.responseText); // connect error
-                                                        },
-                                                    }) // บันทึกลง PR
-              
-                                                } else {
-                                                    setDisabled_button(i, 1);
-                                                    Ext.MessageBox.alert("Failed", jsonData.msg); // alert massage error
-                                                }
-                                            },
-                                            failure: function (result, request) {
-                                                setDisabled_button(i, 1);
-                                                Ext.MessageBox.alert("Failed", result.responseText); // connect error
-                                            },
-                                        }); //จอง PR
-                                        // }else{
-                                        //   Ext.MessageBox.alert("Failed", result.responseText); // connect error
-                                        // }
-                                    },
-                                    failure: function (result, request) {
-                                        setDisabled_button(i, 1);
-                                        Ext.MessageBox.alert("Failed", result.responseText); // connect error
-                                    }
-                                }) //ยกเลิก PR               
-                                Ext.storeDtl.reload({callback: function (record, operation, success) {}});
- 
-                            } else {
-                                setDisabled_button(i, 1);
-                                null;
-                            }
-                        },
-                    });
-                } else {
-                    setDisabled_button(i, 1);
-                    Ext.getCmp("form-widgets").getEl().unmask();
-                    Ext.MessageBox.alert("Success", "เงินไม่พอที่จะจอง กรุณาติดต่อฝ่ายคลังงบประมาณ", function () {
-                        // Ext.getCmp("form-widgets").getEl().mask("Please wait...", "x-mask-loading");
-                    });
-                }
-            } else {
+    // บันทึกรายการแก้ไขเท่านั้น ไม่จอง/ยกเลิกจองเงินใหม่ (ผู้ขอจองเงินไว้แล้ว)
+    var cheVal = String(v).replace(/,/g, "") / 1;
+    var c_name_dc_expense_budget_type = getStoreItems(Ext.dc_expense_budget_type, dc_expense_budget_type, "c_name");
+    var c_name_po_expense_id = getStoreItems(Ext.bg_expense, po_expense_id, "c_name");
+    Ext.getCmp("form-widgets").getEl().unmask();
+    Ext.Msg.show({
+        title: "แจ้งเตือน!",
+        msg: "ยืนยันการบันทึกรายการแก้ไข<br>แหล่งเงิน : " + c_name_dc_expense_budget_type + "<br>รายการย่อย : " + c_name_po_expense_id,
+        width: 450,
+        buttons: Ext.MessageBox.YESNO,
+        fn: function (btn) {
+            if (btn !== "yes") {
                 setDisabled_button(i, 1);
-                Ext.getCmp("form-widgets").getEl().unmask();
-                Ext.MessageBox.alert("แจ้งเตือน", "ไม่พบงบประมาณของแหล่งเงิน/รายการย่อยที่เลือก กรุณาติดต่อฝ่ายคลังงบประมาณ");
+                return;
             }
-        },
-        failure: function (result, request) {
-            setDisabled_button(i, 1);
-            Ext.getCmp("form-widgets").getEl().unmask();
-            Ext.MessageBox.alert("Failed", result.responseText); // connect error
+            Ext.getCmp("form-widgets").getEl().mask("Please wait...", "x-mask-loading");
+            Ext.Ajax.request({
+                url: "tor/api/mnTorController.php",
+                method: "POST",
+                params: {
+                    mode: "ConFirm_Edit_bg",
+                    id: Ext.select_row.id,
+                    i_pr_type: i_type_pr,
+                    type: i,
+                    i_yyyy: i_yyyy,
+                    dc_expense_budget_type: dc_expense_budget_type,
+                    po_expense_id: po_expense_id,
+                    f_total: cheVal,
+                    bg_reserve_money_id: bg_reserve_money_id,
+                    i_edit: 2,
+                    i_edit_tor: 5,
+                    i_status: 2,
+                    i_amount_bg: i_amount_bg,
+                    // ค่าเดิมก่อนแก้ไข เก็บลง sp_tor_bg_log
+                    dc_expense_budget_type_id_edit: original.dc_expense_budget_type,
+                    po_expense_id_edit: original.po_expense_id,
+                    bg_reserve_money_edit: bg_reserve_money_id,
+                    f_type_amt: original.f_amt,
+                    i_pr_type_edit: original.i_pr_type,
+                    buy: 2,
+                },
+                success: function (result) {
+                    var resSave = Ext.util.JSON.decode(result.responseText);
+                    Ext.getCmp("form-widgets").getEl().unmask();
+                    if (resSave.reval != 0) {
+                        setDisabled_button(i, 1);
+                        Ext.MessageBox.alert("Failed", resSave.msg);
+                        return;
+                    }
+                    // บันทึกแล้ว ล็อกช่องไว้ รอพัสดุกด "ส่งคืน" ให้ผู้ขอ
+                    Ext.select_row["sp_bg_edit" + i] = 2;
+                    setEditableBg(i, false);
+                    Ext.MessageBox.alert("Success", "บันทึกรายการแก้ไขเรียบร้อยแล้ว<br>กรุณากดปุ่ม \"ส่งคืน\" เพื่อส่งรายการคืนผู้ขอแก้ไข", function () {
+                        var alert_text = "มีการยืนยันการแก้ไขแหล่งเงิน " + "\n";
+                        alert_text += "วันเวลา : " + new Date().toLocaleString("en-ZA") + "\n";
+                        alert_text += "PR : " + Ext.select_row.c_code + "\n";
+                        alert_text += "แหล่งเงินจัดสรร : " + getStoreItems(Ext.dc_expense_budget_type, original.dc_expense_budget_type, "c_name") + "\n";
+                        alert_text += "แหล่งเงินแก้ไข : " + c_name_dc_expense_budget_type + "\n";
+                        alert_text += "หมวดค่าใช้จ่ายจัดสรร : " + getStoreItems(Ext.bg_expense, original.po_expense_id, "c_name") + "\n";
+                        alert_text += "หมวดค่าใช้จ่ายแก้ไข : " + c_name_po_expense_id + "\n";
+                        alert_text += "จำนวนเงินจัดสรร : " + floatRenderer(floatMinus(String(f_total_amt).replace(/,/g, ""), 2)) + "\n";
+                        alert_text += "จำนวนเงินแก้ไข : " + floatRenderer(floatMinus(String(v).replace(/,/g, ""), 2)) + "\n";
+                        alert_text += "ชื่อผู้ดำเนินรายการ : " + Ext.session.user_name + "\n";
+                        alert_text += "ชื่อรายการ : " + Ext.select_row.c_name + "\n";
+                        Ext.Ajax.request({
+                            url: Ext.session.Notif_line,
+                            method: "POST",
+                            params: {msg: alert_text, mode: 3},
+                        });
+                        Ext.store.load({
+                            callback: function () {
+                                Ext.storeDtl.reload();
+                            },
+                        });
+                    });
+                },
+                failure: function (result) {
+                    Ext.getCmp("form-widgets").getEl().unmask();
+                    setDisabled_button(i, 1);
+                    Ext.MessageBox.alert("Failed", result.responseText);
+                },
+            });
         },
     });
 

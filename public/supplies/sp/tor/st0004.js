@@ -51,6 +51,9 @@ Ext.fnCloseBgEdit = function (record) {
                                     win.destroy();
                                     if (Ext.storeDtl) {
                                         Ext.storeDtl.reload();
+                                        if (onDone) {
+                                            onDone();
+                                        }
                                     }
                                 });
                             } else {
@@ -68,6 +71,83 @@ Ext.fnCloseBgEdit = function (record) {
         ],
     });
     win.show();
+};
+
+// [เพิ่ม] ฝ่ายจัดสรรส่งคืนพร้อมแก้ไขงบประมาณแล้ว -> ดับเบิลคลิกรายการแล้วเด้งให้ผู้ขอดูรายการก่อน/หลังแก้ไข แล้วกดยืนยันครั้งเดียว (ไม่ต้องปิดคำขอเอง)
+Ext.fnBgEditAck = function (record, onDone) {
+    var torId = record.get("id");
+    var money = function (v) {
+        return Ext.util.Format.number(v || 0, "0,000.00");
+    };
+    var prType = function (v) {
+        return v == 1 ? "จองแบบแผน" : v == 2 ? "จองแบบงวด" : "-";
+    };
+    var esc = Ext.util.Format.htmlEncode;
+    var cell = function (before, after) {
+        var changed = before != after;
+        return "<td style='padding:4px 8px;border:1px solid #ccc;'>" + esc(before) + "</td>" +
+            "<td style='padding:4px 8px;border:1px solid #ccc;" + (changed ? "background:#fff3cd;font-weight:bold;" : "") + "'>" + esc(after) + "</td>";
+    };
+    Ext.Ajax.request({
+        url: "tor/api/mnCancelEditBg.php",
+        method: "POST",
+        params: { mode: "ackInfo", id: torId },
+        success: function (result) {
+            var res = Ext.util.JSON.decode(result.responseText);
+            if (!res.items || res.items.length == 0) {
+                return;
+            }
+            var html = "<div style='margin-bottom:6px;'>PR <b>" + esc(res.c_code || record.get("c_code") || "") + "</b> ฝ่ายจัดสรรงบประมาณแก้ไขรายการดังนี้ กรุณาตรวจสอบก่อนกดยืนยัน</div>";
+            Ext.each(res.items, function (it) {
+                html += "<table style='border-collapse:collapse;margin-bottom:8px;width:100%;'>" +
+                    "<tr style='background:#e6eef8;'><th style='padding:4px 8px;border:1px solid #ccc;width:22%;'>แหล่งเงินที่ " + it.no + "</th>" +
+                    "<th style='padding:4px 8px;border:1px solid #ccc;'>ก่อนแก้ไข</th><th style='padding:4px 8px;border:1px solid #ccc;'>หลังแก้ไข</th></tr>" +
+                    "<tr><td style='padding:4px 8px;border:1px solid #ccc;'>แหล่งเงิน</td>" + cell(it.before.budget, it.after.budget) + "</tr>" +
+                    "<tr><td style='padding:4px 8px;border:1px solid #ccc;'>รายการย่อย</td>" + cell(it.before.expense, it.after.expense) + "</tr>" +
+                    "<tr><td style='padding:4px 8px;border:1px solid #ccc;'>จำนวนเงิน</td>" + cell(money(it.before.amt), money(it.after.amt)) + "</tr>" +
+                    "<tr><td style='padding:4px 8px;border:1px solid #ccc;'>ประเภทการจอง</td>" + cell(prType(it.before.pr_type), prType(it.after.pr_type)) + "</tr>" +
+                    "</table>";
+            });
+            var win = new Ext.Window({
+                title: "ยืนยันการแก้ไขจากฝ่ายจัดสรร",
+                modal: true,
+                resizable: false,
+                width: 620,
+                autoHeight: true,
+                bodyStyle: "padding:10px;background:#fff;",
+                html: html,
+                buttons: [
+                    {
+                        text: "ยืนยัน",
+                        iconCls: "icon-save",
+                        handler: function () {
+                            win.getEl().mask("Please wait...", "x-mask-loading");
+                            Ext.Ajax.request({
+                                url: "tor/api/mnCancelEditBg.php",
+                                method: "POST",
+                                params: { mode: "ack", id: torId },
+                                success: function (r) {
+                                    win.getEl().unmask();
+                                    var j = Ext.util.JSON.decode(r.responseText);
+                                    if (j.reval === 0) {
+                                        win.destroy();
+                                        Ext.storeDtl.reload();
+                                    } else {
+                                        Ext.Msg.alert("ผิดพลาด", j.msg || "ยืนยันไม่สำเร็จ");
+                                    }
+                                },
+                                failure: function (r) {
+                                    win.getEl().unmask();
+                                    Ext.Msg.alert("ผิดพลาด", r.responseText);
+                                },
+                            });
+                        },
+                    },
+                ],
+            });
+            win.show();
+        },
+    });
 };
 
 Ext.workScore = function () {
@@ -1622,6 +1702,9 @@ Ext.AppUx = function (app, menu) {
       },
       {
         name: "sp_bg_edit",
+      },
+      {
+        name: "bg_edit_ack",
       },
       {
         name: "dc_sub_cost_id",
@@ -5344,6 +5427,13 @@ Ext.AppUx = function (app, menu) {
         listeners: {
           dblclick: function (dataview, index, item, e) {
             Ext.buAct = "update";
+            if (!Ext.isEmpty(Ext.selectRow) && Ext.selectRow.get("bg_edit_ack") == 1) {
+              Ext.fnBgEditAck(Ext.selectRow, function () {
+                Ext.buAct = "update";
+                Ext.loadStore("edit", true);
+              });
+              return;
+            }
             Ext.loadStore("edit", true); // app,data.load
           },
           viewready: function (g) {

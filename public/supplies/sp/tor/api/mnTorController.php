@@ -8847,9 +8847,12 @@ switch ($mode) {
         $data["d_update"] = date("Y-m-d H:i:s");
         $data["dc_user_update_id"] = $_SESSION['user_id'];
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"];
-        $data["plan_status"] = $_REQUEST['plan_status'] ?? null;   // เพิ่มบรรทัดนี้
-        $data["plan_code"] = $_REQUEST['plan_code'] ?? null;         // เพิ่มบรรทัดนี้
-        $data["plan_seq"] = $_REQUEST['plan_seq'] ?? null;
+        // เขียนเฉพาะที่หน้าส่งมา ไม่งั้นการแก้ไขแหล่งเงินจะทับสถานะโครงการ/รหัสแผนเป็น NULL
+        foreach (array("plan_status", "plan_code", "plan_seq") as $planFld) {
+            if (isset($_REQUEST[$planFld])) {
+                $data[$planFld] = $_REQUEST[$planFld];
+            }
+        }
         if (isset($_REQUEST['c_remake'])) {
             $data["c_remake"] = $_REQUEST['c_remake'];   // เซฟหมายเหตุตอนจองเงิน
         }

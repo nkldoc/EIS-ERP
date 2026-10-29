@@ -83,7 +83,77 @@ function checkItemsToTranf($check_id, $data = array()) {
 //Preparing
 ///
 switch ($mode) {
+   case "ackInfo":
+    // รายการก่อน/หลังแก้ไข เพื่อแสดงให้ผู้ขอตรวจสอบก่อนกดยืนยัน (ก่อน = ค่าเดิมที่เก็บใน log, หลัง = ค่าปัจจุบันใน sp_tor)
+    $stmtInfo = $db->QueryParam("SELECT t.c_code, t.po_expense_id, t.i_pr_type1, t.i_pr_type2, t.i_pr_type3
+            , t.dc_expense_budget_type_id AS dc1, t.dc_expense_budget_type2_id AS dc2, t.dc_expense_budget_type3_id AS dc3
+            , t.f_type_amt AS amt1, t.f_type2_amt AS amt2, t.f_type3_amt AS amt3
+            FROM dbo.sp_tor t WHERE t.tor_id = ?", array($_POST["id"]));
+    $cur = $db->Fetch($stmtInfo);
+    $nameBudget = function ($id) use ($db) {
+        if (!$id) {
+            return "";
+        }
+        $s = $db->QueryParam("SELECT TOP 1 c_name FROM dbo.dc_expense_budget_type WHERE dc_expense_budget_type_id = ?", array($id));
+        $r = $db->Fetch($s);
+        return $r ? $r["c_name"] : "";
+    };
+    $nameExpense = function ($id) use ($db) {
+        if (!$id) {
+            return "";
+        }
+        $s = $db->QueryParam("SELECT TOP 1 c_code, c_name FROM NMU.dbo.bg_expense WHERE bg_expense_id = ?", array($id));
+        $r = $db->Fetch($s);
+        return $r ? trim($r["c_code"] . " : " . $r["c_name"]) : "";
+    };
+    $stmtLog = $db->QueryParam("SELECT i_number_bg, dc_expense_budget_type_id, po_expense_id, f_total_amt, i_pr_type
+            FROM dbo.sp_tor_bg_log
+            WHERE sp_tor_id = ? AND i_edit = 2 AND i_status = 4
+            ORDER BY i_number_bg, sp_tor_bg_log_id", array($_POST["id"]));
+    $items = array();
+    while ($l = $db->Fetch($stmtLog)) {
+        $n = intval($l["i_number_bg"]);
+        $items[$n] = array(
+            "no" => $n,
+            "before" => array(
+                "budget" => $nameBudget($l["dc_expense_budget_type_id"]),
+                "expense" => $nameExpense($l["po_expense_id"]),
+                "amt" => floatval($l["f_total_amt"]),
+                "pr_type" => intval($l["i_pr_type"]),
+            ),
+            "after" => array(
+                "budget" => $nameBudget($cur["dc" . $n]),
+                "expense" => $nameExpense($cur["po_expense_id"]),
+                "amt" => floatval($cur["amt" . $n]),
+                "pr_type" => intval($cur["i_pr_type" . $n]),
+            ),
+        );
+    }
+    $extra = array("c_code" => $cur["c_code"] ?? "", "items" => array_values($items));
+    $stmt = true;
+    break;
+   case "ack":
+    // ผู้ขอกดยืนยันการแก้ไขจากฝ่ายจัดสรรแล้ว (i_status 4 -> 5)
+    $stmt = $db->QueryParam("UPDATE dbo.sp_tor_bg_log
+            SET i_status = 5, dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = ?
+            WHERE sp_tor_id = ? AND i_edit = 2 AND i_status = 4"
+            , array($_SESSION["user_id"], $_SESSION["dc_cost_id"] ?? null, date("Y-m-d H:i:s"), $_POST["id"]));
+    break;
    case "return":
+
+    // แถวที่ฝ่ายจัดสรรบันทึกแก้ไขหลังคำขอล่าสุด (i_status 2 -> 4) = ส่งคืนแล้ว รอผู้ขอกดยืนยันการแก้ไข
+    $sqlMark = "UPDATE l SET i_status = 4
+                FROM dbo.sp_tor_bg_log l
+                WHERE l.sp_tor_id = ?
+                  AND l.i_edit = 2
+                  AND l.i_status = 2
+                  AND l.sp_tor_bg_log_id > (SELECT ISNULL(MAX(r.sp_tor_bg_log_id), 0)
+                                            FROM dbo.sp_tor_bg_log r
+                                            WHERE r.sp_tor_id = l.sp_tor_id
+                                              AND r.i_edit = 1
+                                              AND ISNULL(r.c_comment_edit1, '') = ''
+                                              AND r.sp_tor_bg_log_id < l.sp_tor_bg_log_id)";
+    $stmtMark = $db->QueryParam($sqlMark, array($_POST["id"]));
 
     // ปิดเฉพาะรายการขอแก้ไขที่ค้างอยู่ (i_edit = 1) ไม่ทับแถวที่บันทึกแก้ไขแล้ว (i_edit = 2)
     $arrParam = array();
@@ -109,6 +179,9 @@ switch ($mode) {
 if ($stmt && $stmt2 && $stmt3 && $stmt4) { 
     $db->CommitTran();
     $re = array("reval" => 0, "success" => "Success", "msg" => "บันทึกเรียบร้อยแล้ว", "id" => $id);
+    if (!empty($extra)) {
+        $re = array_merge($re, $extra);
+    }
 } else {
     $db->RollBackTran();
     $re = array("reval" => 1, "success" => "Error", "msg" => "check statement : ");

@@ -203,6 +203,7 @@ Ext.onReady(function () {
       Ext.getCmp("contenterCenter").setActiveTab(frmAdd);
       Ext.getCmp("role-form-mode").setValue("EDIT");
       Ext.getCmp("form-widgets").getForm().loadRecord(record);
+      prefillRequestedBg();
       console.log("edit ",record);
       // Ext.storeDtl
       Ext.getCmp("f_total").fn();
