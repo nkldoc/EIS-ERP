@@ -8,7 +8,12 @@ Ext.overlapNotEnoughMsg = function () {
         if (Ext.selectRow && cb2 && cb2.getValue && cb2.getValue() === true) code = Ext.selectRow.get("c_overlap2") || "";
         if (!code && cb) code = cb.lastSelectionText || "";
         if (!code && Ext.selectRow) code = Ext.selectRow.get("c_overlap") || "";
-        if (!code) return base + " กรุณาติดต่อฝ่ายการคลัง";
+        if (!code) {
+            // ไม่มีเลขใบกัน = จองจากงบปีปัจจุบัน ไม่ใช่ใบกัน
+            var rc = Ext.getCmp("f_totalID");
+            var ra = rc ? parseFloat(String(rc.getValue()).replace(/,/g, "")) : NaN;
+            return "เงินงบประมาณไม่เพียงพอ" + (ra > 0 ? "<br>ยอดที่ขอ : " + Ext.util.Format.number(ra, "0,000.00") + " บาท" : "") + "<br>กรุณาติดต่อฝ่ายการคลัง";
+        }
         var xhr = new XMLHttpRequest();
         xhr.open("GET", "api/All_PoWorkingImpHdr.php?type=overlap_remain&c_booking=" + encodeURIComponent(code), false);
         xhr.send(null);
