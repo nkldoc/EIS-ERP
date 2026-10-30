@@ -174,6 +174,7 @@ if ($type == "WITHDRAW") {
     $sqlMain = "select a.*
                         , s.c_code
                         , s.sp_check_period_hdr_id
+                        , s.sp_tor_hdr_period_id
                         , s.c_arrive_code
                         , s.sp_bg_billing_dtl_id
                         , s.c_doc_ref
@@ -220,6 +221,7 @@ if ($type == "WITHDRAW") {
             "no" => $i++,
             "id" => intval($row["sp_check_period_hdr_id"]),
             "sp_check_period_hdr_id" => intval($row["sp_check_period_hdr_id"]),
+            "sp_tor_hdr_period_id" => intval($row["sp_tor_hdr_period_id"]),
             "sp_bg_billing_dtl_id" => intval($row["sp_bg_billing_dtl_id"]),
             "i_step" => intval($row["i_step"]),
             "i_is_waiting" => intval($row["i_is_waiting"]),
@@ -280,6 +282,7 @@ if ($type == "WITHDRAW") {
     $sqlMain = "select a.*
                         , s.c_code
                         , s.sp_check_period_hdr_id
+                        , s.sp_tor_hdr_period_id
                         , s.c_arrive_code
                         , s.sp_bg_billing_dtl_id
                         , s.c_doc_ref
@@ -329,6 +332,7 @@ if ($type == "WITHDRAW") {
             "no" => $i++,
             "id" => intval($row["sp_check_period_hdr_id"]),
             "sp_check_period_hdr_id" => intval($row["sp_check_period_hdr_id"]),
+            "sp_tor_hdr_period_id" => intval($row["sp_tor_hdr_period_id"]),
             "sp_bg_billing_dtl_id" => intval($row["sp_bg_billing_dtl_id"]),
             "i_step" => intval($row["i_step"]),
             "i_is_waiting" => intval($row["i_is_waiting"]),
@@ -416,6 +420,7 @@ if ($type == "WITHDRAW") {
     $sqlMain = "select a.*
                         , s.c_code
                         , s.sp_check_period_hdr_id
+                        , s.sp_tor_hdr_period_id
                         , s.c_arrive_code
                         , s.sp_bg_billing_dtl_id
                         , s.i_step
@@ -479,6 +484,7 @@ if ($type == "WITHDRAW") {
             "no" => $i++,
             "id" => intval($row["sp_check_period_hdr_id"]),
             "sp_check_period_hdr_id" => intval($row["sp_check_period_hdr_id"]),
+            "sp_tor_hdr_period_id" => intval($row["sp_tor_hdr_period_id"]),
             "sp_bg_billing_dtl_id" => intval($row["sp_bg_billing_dtl_id"]),
             "i_step" => intval($row["i_step"]),
             "i_is_waiting" => intval($row["i_is_waiting"]),

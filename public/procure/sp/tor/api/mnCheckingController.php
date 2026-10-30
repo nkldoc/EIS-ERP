@@ -3785,12 +3785,17 @@ switch ($mode) {
             $info[2] = $_SESSION['dc_cost_id'];
             $info[3] = date('Y-m-d H:i:s'); // วันที่และเวลา ปัจจุบัน
         }
-        if ($_REQUEST && !empty($_REQUEST['sp_tor_hdr_period_id'])) {
+        if ($_REQUEST && !empty($_REQUEST['sp_check_period_hdr_id'])) {
 
-            $id = $_REQUEST['sp_check_period_hdr_id'];
+            $id = (int) $_REQUEST['sp_check_period_hdr_id'];
 //            $jsons = $_REQUEST["c_doc_ref"];
 //            $array = json_decode($jsons);
-            $val = $_REQUEST["c_doc_ref"];
+            $val = trim((string) ($_REQUEST["c_doc_ref"] ?? ''));
+            if ($id <= 0 || $val === '') {
+                $db->RollBackTran();
+                echo json_encode(array("reval" => 1, "success" => "Error", "msg" => "ข้อมูลเลขเอกสาร/วางบิลไม่ครบถ้วน"));
+                exit();
+            }
             $sql1 = "UPDATE dbo.sp_check_period_hdr SET c_doc_ref = ?  , c_billing_code = ? "
                     . " , dc_user_update_id =? "
                     . " , dc_user_update_cost_id =? "
@@ -3805,6 +3810,10 @@ switch ($mode) {
             $arrValue1 = array($val, $val, $info[1], $info[2], $info[3], $id, $val, $info[1], $info[2], $info[3], $id);
 //           echo $db->debugSql($sql1,$arrValue1); exit();
             $stmt1 = $db->QueryParam($sql1, $arrValue1);
+        } else {
+            $db->RollBackTran();
+            echo json_encode(array("reval" => 1, "success" => "Error", "msg" => "ไม่พบรหัสรายการวางบิล"));
+            exit();
         }
 
         if (!$stmt1 || !$stmt2 || !$stmt3 || !$stmt4) {

@@ -22,6 +22,13 @@ Ext.onReady(function () {
         tree.root.expand();
         var panel = new Workspace({renderTo:'workspace', width:900, height:540});
         var home = panel.openPage('bi/dashBoard.php');
+        var alertTab = panel.openPage('bi/contract-alert-dashboard.html');
+        var alertFrame = alertTab.body.dom.querySelector('iframe');
+        var alertTabCount = panel.items.getCount();
+        panel.openPage('bi/contract-alert-dashboard.html', 'แจ้งเตือนรายการซื้อจ้าง');
+        check(panel.items.getCount() === alertTabCount && panel.getActiveTab() === alertTab, 'contract alerts reuse one dedicated tab');
+        check(alertTab.title === 'แจ้งเตือนรายการซื้อจ้าง' && alertTab.body.dom.querySelector('iframe') === alertFrame, 'contract alert tab keeps its page and title');
+        panel.remove(alertTab, true);
         var first = panel.openPage('sp/find.php?st=ST9000', 'ค้นหา PR');
         var frame = first.body.dom.querySelector('iframe');
         frame.dataset.unsaved = 'kept';

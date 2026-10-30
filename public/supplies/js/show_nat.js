@@ -1741,27 +1741,6 @@ Ext.onReady(function () {
         tooltip: 'เปิดสมุดโน้ต (Text Memories)',
         handler: function () { Ext.openSuppliesNotebook(); }
     });
-    function openContractAlertShortcut(win, visited) {
-        visited = visited || [];
-        if (!win || visited.indexOf(win) !== -1) return false;
-        visited.push(win);
-        var frames = [];
-        try {
-            var shortcut = win.document.getElementById('work-contract-alert-win-shortcut');
-            if (shortcut) {
-                shortcut.click();
-                return true;
-            }
-            if (win.parent && win.parent !== win && openContractAlertShortcut(win.parent, visited)) return true;
-            frames = win.frames;
-        } catch (e) {}
-        for (var i = 0; i < frames.length; i++) {
-            try {
-                if (openContractAlertShortcut(frames[i], visited)) return true;
-            } catch (e) {}
-        }
-        return false;
-    }
     Ext.contractAlertToolbarButton = new Ext.Button({
         text: 'แจ้งเตือนรายการซื้อจ้าง',
         iconCls: 'supplies-icon-alert',
@@ -1769,40 +1748,11 @@ Ext.onReady(function () {
         tooltip: 'เปิดรายการแจ้งเตือนสัญญาและการรับประกัน',
         handler: function () {
             var workspace = Ext.getCmp('content-panel');
-            if (workspace && workspace.openPage && !window.SUPPLIES_EXTERNAL_UNIT) {
-                workspace.openPage('bi/dashBoard.php');
-                var showHomeAlerts = function (attempt) {
-                    if (openContractAlertShortcut(window, [])) return;
-                    if (attempt < 10) window.setTimeout(function () { showHomeAlerts(attempt + 1); }, 300);
-                };
-                window.setTimeout(function () { showHomeAlerts(0); }, 400);
+            if (workspace && workspace.openPage) {
+                workspace.openPage('bi/contract-alert-dashboard.html', 'แจ้งเตือนรายการซื้อจ้าง');
                 return;
             }
-            if (!openContractAlertShortcut(window, [])) {
-                var alertWindow = Ext.getCmp('win-contract-alert-toolbar');
-                if (alertWindow) {
-                    alertWindow.show();
-                    alertWindow.toFront();
-                    return;
-                }
-                new Ext.Window({
-                    id: 'win-contract-alert-toolbar',
-                    title: 'แจ้งเตือนสัญญาและวันรับประกัน',
-                    width: Math.max(800, Math.min(1500, window.innerWidth - 80)),
-                    height: Math.max(600, window.innerHeight - 100),
-                    modal: false,
-                    layout: 'fit',
-                    items: [{
-                        xtype: 'box',
-                        autoEl: {
-                            tag: 'iframe',
-                            src: '/supplies/bi/contract-alert-dashboard.html?_dc=' + Math.floor(Math.random() * 1000000000),
-                            frameborder: '0',
-                            style: 'width:100%;height:100%;border:0'
-                        }
-                    }]
-                }).show();
-            }
+            window.open('/supplies/bi/contract-alert-dashboard.html', '_blank', 'noopener');
         }
     });
     function safeShowNotifyList() {

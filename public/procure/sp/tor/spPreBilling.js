@@ -566,9 +566,16 @@ Ext.AppUx = function (app, menu) {
         handler: function() {
                 // ตัวอย่าง Logic การดึงค่าจากช่อง Textfield ข้างๆ มาใช้งาน
                 var codeValue = this.previousSibling().getValue();
+                var selectedRow = Ext.selectRow;
+                var checkPeriodId = selectedRow && (selectedRow.get('sp_check_period_hdr_id') || selectedRow.get('id'));
+                var torPeriodId = selectedRow && selectedRow.get('sp_tor_hdr_period_id');
                 
                 if(!codeValue) {
                     Ext.Msg.alert('แจ้งเตือน', 'กรุณากรอกเลขที่ตรวจรับก่อนบันทึก');
+                    return;
+                }
+                if(!checkPeriodId) {
+                    Ext.Msg.alert('แจ้งเตือน', 'ไม่พบรหัสรายการวางบิล กรุณาโหลดรายการใหม่แล้วลองอีกครั้ง');
                     return;
                 }
  
@@ -581,11 +588,11 @@ Ext.AppUx = function (app, menu) {
                             params: {
                                 mode: 'updateBillingDocRef',
                                 c_doc_ref:codeValue,
-                                sp_tor_id: Ext.selectRow.get('sp_tor_id'),
-                                sp_tor_contract_id: Ext.selectRow.get('sp_tor_contract_id'),
-                                sp_check_period_hdr_id: Ext.selectRow.get('sp_check_period_hdr_id'),
-                                sp_tor_hdr_period_id: Ext.selectRow.get('sp_tor_hdr_period_id'),
-                                sp_tor_hdr_period_ids: JSON.stringify([Ext.selectRow.get('sp_tor_hdr_period_id')]),
+                                sp_tor_id: selectedRow.get('sp_tor_id'),
+                                sp_tor_contract_id: selectedRow.get('sp_tor_contract_id'),
+                                sp_check_period_hdr_id: checkPeriodId,
+                                sp_tor_hdr_period_id: torPeriodId || '',
+                                sp_tor_hdr_period_ids: torPeriodId ? JSON.stringify([torPeriodId]) : '[]',
                                 c_doc_refs: JSON.stringify(codeValue)
                             },
                             success: function(response) {
@@ -1853,4 +1860,4 @@ Ext.AppUx = function (app, menu) {
             Ext.Msg.alert("แจ้งเตือน", msg);
         }
     };
-}; 
+};

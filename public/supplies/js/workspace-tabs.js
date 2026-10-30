@@ -60,6 +60,7 @@
         pageInfo: function (route) {
             var known = {
                 'bi/dashBoard.php': 'หน้าแรก',
+                'bi/contract-alert-dashboard.html': 'แจ้งเตือนรายการซื้อจ้าง',
                 'sp/CheckList.php': 'รายการ PR',
                 'ai/index.html': 'AI ถามตอบ',
                 'sp/info.php': 'ข้อมูลส่วนตัว',
