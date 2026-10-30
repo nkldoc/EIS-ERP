@@ -1,3 +1,7 @@
+// ปัดเศษ 4 ทิ้ง 5 ขึ้น (ทศนิยม 2 ตำแหน่ง) กัน floating point เช่น 1091.215 -> 1091.22
+function roundHalfUp2(v) {
+    return Math.round(parseFloat((v * 100).toPrecision(12))) / 100;
+}
 // alert กรณี API จองเงินตอบ Not enough money: แสดงเลขใบกัน ยอดใบกัน ใช้ไปแล้ว คงเหลือ ยอดที่ขอ (ขอข้อมูลแบบ sync เพราะใช้แทน string ใน alert เดิม)
 Ext.overlapNotEnoughMsg = function () {
     var base = "เงินใบกันไม่เพียงพอ";
@@ -2164,7 +2168,7 @@ Ext.uiConfirmVat = (rec) => {
                                                                                         Ext.getCmp("f_inv_vat").setValue(floatRenderer(floatMinus(f_inv_vat.toFixed(2), 2)));
                                                                                         if (Ext.getCmp("f_tax_personal_rate").getValue() != "") {
                                                                                                 var f_tax_personal = Ext.getCmp("f_inv").getValue().replace(/,/g, "") * 0.01;
-                                                                                                f_tax_personal = Math.round(f_tax_personal * 100) / 100;
+                                                                                                f_tax_personal = roundHalfUp2(f_tax_personal);
                                                                                                 Ext.getCmp("f_tax_personalID2").setValue(floatRenderer(floatMinus(f_tax_personal.toFixed(2), 2)));
                                                                                         }
                                                                                         f_per_pay_sum();
@@ -2228,7 +2232,7 @@ Ext.uiConfirmVat = (rec) => {
                                                                                         }
                                                                                         if (Ext.getCmp("f_tax_personal_rate").getValue() != "") {
                                                                                                 var f_tax_personal = Ext.getCmp("f_inv").getValue().replace(/,/g, "") * 0.01;
-                                                                                                f_tax_personal = Math.round(f_tax_personal * 100) / 100;
+                                                                                                f_tax_personal = roundHalfUp2(f_tax_personal);
                                                                                                 Ext.getCmp("f_tax_personalID2").setValue(floatRenderer(floatMinus(f_tax_personal.toFixed(2), 2)));
                                                                                         }
                                                                                         f_per_pay_sum();
@@ -2424,7 +2428,7 @@ Ext.uiConfirmVat = (rec) => {
                                                                                                 Ext.getCmp("f_tax_personalID2").setReadOnly(false);
                                                                                                 Ext.getCmp("f_tax_personalID2").el.setStyle("background", "#fff");
                                                                                                 var f_tax_personal = Ext.getCmp("f_inv").getValue().replace(/,/g, "") * 0.01;
-                                                                                                f_tax_personal = Math.round(f_tax_personal * 100) / 100;
+                                                                                                f_tax_personal = roundHalfUp2(f_tax_personal);
                                                                                                 Ext.getCmp("f_tax_personalID2").setValue(floatRenderer(floatMinus(f_tax_personal.toFixed(2), 2)));
                                                                                                 f_per_pay_sum();
                                                                                         } else {
@@ -15645,7 +15649,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                                 Ext.getCmp("f_inv_vat").setValue(floatRenderer(floatMinus(f_inv_vat.toFixed(2), 2)));
                                                                                                                                                                 if (Ext.getCmp("f_tax_personal_rate").getValue() != "") {
                                                                                                                                                                         var f_tax_personal = Ext.getCmp("f_inv").getValue().replace(/,/g, "") * 0.01;
-                                                                                                                                                                        f_tax_personal = Math.round(f_tax_personal * 100) / 100;
+                                                                                                                                                                        f_tax_personal = roundHalfUp2(f_tax_personal);
                                                                                                                                                                         Ext.getCmp("f_tax_personalID2").setValue(floatRenderer(floatMinus(f_tax_personal.toFixed(2), 2)));
                                                                                                                                                                 }
                                                                                                                                                                 f_per_pay_sum();
@@ -15718,7 +15722,7 @@ Ext.AppUx = function (app, menu) {
 
                                                                                                                                                                 if (Ext.getCmp("f_tax_personal_rate").getValue() != "") {
                                                                                                                                                                         var invValNum = parseFloat(Ext.getCmp("f_inv").getValue().toString().replace(/,/g, "")) || 0;
-                                                                                                                                                                        var f_tax_personal = Math.round((invValNum * 0.01) * 100) / 100;
+                                                                                                                                                                        var f_tax_personal = roundHalfUp2(invValNum * 0.01);
                                                                                                                                                                         Ext.getCmp("f_tax_personalID2").setValue(floatRenderer(floatMinus(f_tax_personal.toFixed(2), 2)));
                                                                                                                                                                 }
 
@@ -15915,7 +15919,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                                         Ext.getCmp("f_tax_personalID2").setReadOnly(false);
                                                                                                                                                                         Ext.getCmp("f_tax_personalID2").el.setStyle("background", "#fff");
                                                                                                                                                                         var f_tax_personal = Ext.getCmp("f_inv").getValue().replace(/,/g, "") * 0.01;
-                                                                                                                                                                        f_tax_personal = Math.round(f_tax_personal * 100) / 100;
+                                                                                                                                                                        f_tax_personal = roundHalfUp2(f_tax_personal);
                                                                                                                                                                         Ext.getCmp("f_tax_personalID2").setValue(floatRenderer(floatMinus(f_tax_personal.toFixed(2), 2)));
                                                                                                                                                                         f_per_pay_sum();
                                                                                                                                                                 } else {
