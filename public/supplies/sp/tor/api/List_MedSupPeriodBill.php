@@ -516,6 +516,7 @@ if ($type == "medsup_period_bill") {
                     -- SAVE_CHECKING/ISSUE_AP)
                     , max(case when chk.c_disburse_detail is not null and ltrim(rtrim(chk.c_disburse_detail)) <> '' then 1 else 0 end) as i_checking_ready
                     , max(chk.c_disburse_detail) as c_disburse_detail
+                    , max(chk.sp_tor_period_bill_checking_id) as chk_id
                     -- เลขที่ใบขอเบิก (D...) ที่ EIS ออกให้ - EIS เขียนกลับตอนบันทึกใบเบิก (po/api/mn_poReg.php)
                     -- ต้องมีคอลัมน์จาก dc/scriptBaseUpdate/sp_tor_period_bill_checking_withdraw.sql
                     , {$wdCodeRefSql} as c_code_ref
@@ -570,6 +571,7 @@ if ($type == "medsup_period_bill") {
             "d_ir_issue" => empty($row["d_ir_issue"]) ? "" : $date->extDateBuddha($row["d_ir_issue"]),
             "c_create_name" => $row["c_create_name"],
             "i_checking_ready" => intval($row["i_checking_ready"]),
+            "chk_id" => intval($row["chk_id"]), // sp_tor_period_bill_checking_id - ใช้เปิดใบขอเบิก (ร่าง) PDF ของ EIS
             "c_code_ref" => $row["c_code_ref"],
             "po_working_hdr_id" => intval($row["po_working_hdr_id"]),
             // แสดงเลข AP จริงถ้าออกไปแล้ว (แถวนี้ไม่ได้ถูกกรองออกจากกริดอีกต่อไปหลังออก

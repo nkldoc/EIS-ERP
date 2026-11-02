@@ -72,7 +72,7 @@ Ext.storeAcceptMedSupList = new Ext.data.JsonStore({
     fields: [
         "id", "c_ir_code", "sp_tor_period_bill_id", "c_contract_code", "c_project_name", "c_expense_name",
         "i_period", "i_budget_year", "c_ap_dept_type", "n_lines", "c_detail", "f_total_amt", "d_receive_date_last", "d_ir_issue",
-        "c_create_name", "c_ap_code", "d_ap_issue", "i_checking_ready", "c_code_ref", "po_working_hdr_id",
+        "c_create_name", "c_ap_code", "d_ap_issue", "i_checking_ready", "chk_id", "c_code_ref", "po_working_hdr_id",
         "c_overlap", "i_budget_year_overlap", "c_overlap2", "i_budget_year_overlap2", "c_overlap3", "i_budget_year_overlap3",
     ],
 });
@@ -200,6 +200,35 @@ function winAcceptMedSupDetail(rec) {
 // ต้นฉบับ เปิดเป็นแท็บเต็มจอ (เพิ่มเข้า contenterCenter ตรงๆ ไม่ใช่ modal window)
 // ตามที่ขอ - ต้องกรอก "รายการส่งเบิก" ให้ครบก่อนถึงจะออกเลข AP ให้เลข IR นี้ได้
 // (บังคับจริงฝั่งเซิร์ฟเวอร์ที่ mode SAVE_CHECKING/ISSUE_AP)
+// ใบขอเบิก (ร่าง) - เปิด PDF จาก EIS (po/pdf/PDF_PoWorking.php) แบบเดียวกับ ST0013 แต่ส่ง medsup_ir=1
+// ให้ EIS อ่านข้อมูลจากรายละเอียดตรวจรับเวชภัณฑ์ (id = sp_tor_period_bill_checking_id) แทน sp_check_period_hdr
+function winDraftWithdrawPdf(rec) {
+    var url = Ext.session.NMU_EIS_HOST + "/po/pdf/PDF_PoWorking.php/" + rec.get("c_ir_code") + ".pdf";
+    if (window.location.protocol === "https:") {
+        url = url.replace(/^http:\/\//i, "https://");
+    }
+    url += "?id=" + rec.get("chk_id") + "&medsup_ir=1&preview_D_AP=1&dc_cost_acc_id_D_AP=77";
+    var loader = '<div id="loader_display_draft" style="display: flex; padding: 15px 15px; font-size:14px;"><p>กำลังโหลดใบขอเบิก (ร่าง) กรุณารอสักครู่...</p></div>';
+    new Ext.Window({
+        id: "winDraftWithdrawPdf",
+        title: "ใบขอเบิก (ร่าง) " + rec.get("c_ir_code"),
+        modal: true,
+        maximized: true,
+        closable: true,
+        html: loader + '<iframe name="draftpdf" src="' + url + '" style="width:100%; height:100%; border-style:hidden;"></iframe>',
+        buttonAlign: "left",
+        buttons: [
+            {text: "ย้อนกลับ", handler: function () { Ext.getCmp("winDraftWithdrawPdf").destroy(); }},
+        ],
+        listeners: {
+            afterrender: function () {
+                var el = document.getElementById("loader_display_draft");
+                $("iframe[name=draftpdf]").load(function () { if (el) { el.remove(); } });
+            },
+        },
+    }).show();
+}
+
 function winCheckingDetailTab(rec) {
     var tabId = "checkingTab-" + rec.get("c_ir_code");
     var center = Ext.getCmp("contenterCenter");
@@ -1078,6 +1107,16 @@ Ext.AppUx = function (app, menu) {
             var colmnn = [
                 checkboxSm,
                 new Ext.grid.RowNumberer({header: "ที่", width: 40}),
+                {
+                    // ใบขอเบิก (ร่าง) PDF จาก EIS - ใช้ข้อมูลตรวจรับที่บันทึกไว้ (ต้องบันทึกรายละเอียดตรวจรับก่อน) ไม่ต้องรอออกเลข AP
+                    header: "ใบขอเบิก (ร่าง)", id: "draftPdfID", dataIndex: "chk_id", width: 120, align: "center",
+                    renderer: function (v, meta, rec) {
+                        if (rec.get("chk_id") && rec.get("i_checking_ready")) {
+                            return "<button style='display: flex; font-size:11px; height: 18px; padding: 0px; cursor:pointer;'><img src='../images/icons/page_white_acrobat.png' style='margin-right:1px;'/><b style='color: blue;'>&nbsp;ใบขอเบิก (ร่าง)&nbsp;</b></button>";
+                        }
+                        return '<span style="color:#999;" title="ต้องบันทึกรายละเอียดตรวจรับก่อน">ยังไม่บันทึกตรวจรับ</span>';
+                    }
+                },
                 {header: "เลขที่สัญญา", dataIndex: "c_contract_code", width: 110},
                 {header: "เลขรับของ (IR)", dataIndex: "c_ir_code", width: 110},
                 {header: "ประเภท", dataIndex: "c_ap_dept_type", width: 70, align: "center"},
@@ -1144,6 +1183,11 @@ Ext.AppUx = function (app, menu) {
                         this.on("cellclick", function (grid, rowIndex, columnIndex) {
                             if (columnIndex === grid.getColumnModel().getIndexById("checkingReadyID")) {
                                 winCheckingDetailTab(grid.getStore().getAt(rowIndex));
+                            } else if (columnIndex === grid.getColumnModel().getIndexById("draftPdfID")) {
+                                var draftRec = grid.getStore().getAt(rowIndex);
+                                if (draftRec.get("chk_id") && draftRec.get("i_checking_ready")) {
+                                    winDraftWithdrawPdf(draftRec);
+                                }
                             }
                         });
                         // คลิกขวาที่แถว - ก๊อปเลขรับของ (IR) / เลข AP ของแถวนั้นไปคลิปบอร์ด
