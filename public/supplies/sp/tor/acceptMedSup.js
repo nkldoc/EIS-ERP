@@ -63,7 +63,7 @@ Ext.fnCopyToClipboard = function (text) {
 
 Ext.storeAcceptMedSupList = new Ext.data.JsonStore({
     autoDestroy: false,
-    autoLoad: true,
+    autoLoad: false,
     url: "tor/api/List_MedSupPeriodBill.php",
     baseParams: {type: "medsup_ir_pending_ap"},
     root: "data",
@@ -72,7 +72,7 @@ Ext.storeAcceptMedSupList = new Ext.data.JsonStore({
     fields: [
         "id", "c_ir_code", "sp_tor_period_bill_id", "c_contract_code", "c_project_name", "c_expense_name",
         "i_period", "i_budget_year", "c_ap_dept_type", "n_lines", "c_detail", "f_total_amt", "d_receive_date_last", "d_ir_issue",
-        "c_create_name", "c_ap_code", "d_ap_issue", "i_checking_ready",
+        "c_create_name", "c_ap_code", "d_ap_issue", "i_checking_ready", "c_code_ref", "po_working_hdr_id",
         "c_overlap", "i_budget_year_overlap", "c_overlap2", "i_budget_year_overlap2", "c_overlap3", "i_budget_year_overlap3",
     ],
 });
@@ -138,6 +138,13 @@ function yearThAccept() {
         y++;
     }
     return years;
+}
+
+// ปีงบประมาณปัจจุบัน (พ.ศ.) - เริ่ม 1 ตุลาคม (เดือน ต.ค.-ธ.ค. นับเป็นปีงบถัดไป) ใช้เป็นค่าเริ่มต้น
+// ของตัวกรอง "ปีงบประมาณ"
+function currentFiscalYearTh() {
+    var d = new Date();
+    return d.getFullYear() + (d.getMonth() >= 9 ? 1 : 0) + 543;
 }
 
 // เมนูนี้ทั้งหน้าเป็นของฝ่ายเวชภัณฑ์การแพทย์โดยเฉพาะ (dc_cost_id=82) เหมือนเมนู
@@ -332,7 +339,11 @@ function winCheckingDetailTab(rec) {
     }
 
     var d_doc_completeFld = new Ext.form.DateField({fieldLabel: "วันที่รับของเอกสารสมบูรณ์", width: 200});
-    var d_checkingFld = new Ext.form.DateField({fieldLabel: "วันที่บันทึกการตรวจรับ", width: 200, allowBlank: false});
+    // ห้ามเกินวันที่ปัจจุบัน - EIS (หน้าบันทึกใบขอเบิก) ไม่ให้บันทึกถ้าวันที่ตรวจรับเป็นวันในอนาคต
+    var d_checkingFld = new Ext.form.DateField({
+        fieldLabel: "วันที่บันทึกการตรวจรับ", width: 200, allowBlank: false,
+        maxValue: new Date(), maxText: "วันที่ตรวจรับต้องไม่เกินวันที่ปัจจุบัน",
+    });
     var c_egp_noFld = new Ext.form.TextField({fieldLabel: "เลขที่ EGP", width: 200, allowBlank: false});
     var c_disburse_detailFld = new Ext.form.TextArea({
         fieldLabel: "รายการส่งเบิก",
@@ -429,7 +440,8 @@ function winCheckingDetailTab(rec) {
         mode: "local", triggerAction: "all", forceSelection: true, editable: false,
         store: new Ext.data.ArrayStore({fields: ["v", "t"], data: i_budget_year_refData}),
         valueField: "v", displayField: "t",
-        value: rec.get("i_budget_year"),
+        // ใช้ใบกันเหลื่อม = ปีงบประมาณของเอกสารเป็นปีปัจจุบัน (ปีที่ใช้เงินคือปีของใบกัน ดูช่อง "ใช้เงินปีงบประมาณ")
+        value: isOverlap ? currentFiscalYearTh() : rec.get("i_budget_year"),
     });
     var c_item_nameFld = new Ext.form.TextField({fieldLabel: "รายการย่อย", width: 420, value: rec.get("c_expense_name")});
     var dc_cost_responsible_idFld = new Ext.form.ComboBox({
@@ -915,7 +927,7 @@ Ext.AppUx = function (app, menu) {
     var searchYearCombo = new Ext.form.ComboBox({
         width: 160, mode: "local", triggerAction: "all", forceSelection: true, editable: false,
         store: new Ext.data.ArrayStore({fields: ["v", "t"], data: yearOptionsAccept}),
-        valueField: "v", displayField: "t", value: "",
+        valueField: "v", displayField: "t", value: currentFiscalYearTh(),
     });
     var searchYearUseCombo = new Ext.form.ComboBox({
         width: 160, mode: "local", triggerAction: "all", forceSelection: true, editable: false,
@@ -974,13 +986,15 @@ Ext.AppUx = function (app, menu) {
         searchFundCombo.setValue("");
         searchReadyCombo.setValue("");
         searchDeptCombo.setValue("");
-        searchYearCombo.setValue("");
+        searchYearCombo.setValue(currentFiscalYearTh());
         searchYearUseCombo.setValue("");
         searchContractTypeCombo.setValue("");
         searchReservedCombo.setValue("");
         searchOwnChk.setValue(false);
         doSearch();
     }
+    // โหลดครั้งแรกพร้อมตัวกรองปีงบประมาณปัจจุบัน (store ตั้ง autoLoad: false ไว้)
+    doSearch();
 
     // กล่องซ้าย: "ระบุเงื่อนไขในการค้นหาข้อมูล" - ระยะห่างระหว่าง 2 กล่องใช้คอลัมน์ว่าง
     // คั่นกลางจริงๆ (ดู FilterBar ด้านล่าง) ไม่ใช่ CSS margin ที่ลองมาก่อนแล้วไม่ได้ผลจริง
@@ -1068,6 +1082,19 @@ Ext.AppUx = function (app, menu) {
                 {header: "เลขรับของ (IR)", dataIndex: "c_ir_code", width: 110},
                 {header: "ประเภท", dataIndex: "c_ap_dept_type", width: 70, align: "center"},
                 {
+                    // เลขที่ใบกันเหลื่อมของงวดนี้ (ว่าง = ปีต่อปี) ที่บันทึกไว้ที่ ST00092
+                    header: "เลขที่ใบกันเหลื่อม", dataIndex: "c_overlap", width: 150,
+                    renderer: function (v, meta, rec) {
+                        var codes = [];
+                        Ext.each(["c_overlap", "c_overlap2", "c_overlap3"], function (f) {
+                            if (rec.get(f)) {
+                                codes.push(Ext.util.Format.htmlEncode(rec.get(f)));
+                            }
+                        });
+                        return codes.length ? codes.join("<br/>") : '<span style="color:#999;">-</span>';
+                    }
+                },
+                {
                     id: "checkingReadyID", header: "สถานะตรวจรับ", dataIndex: "i_checking_ready", width: 130, align: "center",
                     renderer: function (v) {
                         return v
@@ -1076,6 +1103,21 @@ Ext.AppUx = function (app, menu) {
                     }
                 },
                 {header: "เลข AP", dataIndex: "c_ap_code", width: 100},
+                {
+                    // เลขที่ใบเบิก (D...) ที่ EIS ออกให้แล้ว (EIS เขียนกลับตอนบันทึกใบเบิก) - ไม่มี = ยังไม่ได้ออกใบเบิก
+                    header: "ใบเบิก (EIS)", dataIndex: "c_code_ref", width: 120, align: "center",
+                    renderer: function (v, meta, rec) {
+                        if (v) {
+                            return '<span style="color:#080;font-weight:bold;" title="ออกใบเบิกใน EIS แล้ว">&#10003; ' + Ext.util.Format.htmlEncode(v) + '</span>';
+                        }
+                        if (rec.get("po_working_hdr_id")) {
+                            return '<span style="color:#080;font-weight:bold;" title="ออกใบเบิกใน EIS แล้ว">&#10003; ออกแล้ว</span>';
+                        }
+                        return rec.get("c_ap_code")
+                            ? '<span style="color:#c60;" title="ออกเลข AP แล้ว รอออกใบเบิกที่ EIS (บันทึกใบขอเบิก)">รอออกใบเบิก</span>'
+                            : '<span style="color:#999;">-</span>';
+                    }
+                },
                 {header: "จำนวนเงิน", dataIndex: "f_total_amt", width: 100, align: "right"},
                 {header: "ชื่อโครงการ/รายการ", dataIndex: "c_project_name", width: 220},
                 {header: "รายละเอียด", dataIndex: "c_detail", width: 90, align: "center"},

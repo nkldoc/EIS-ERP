@@ -135,8 +135,12 @@ function imp_reserve_status($db, $prId, $poId, $chkId)
             $chkN++;
         }
     }
+    // po_id ขึ้นต้น 9999 = สัญญาจำลองที่ไม่มีใน sp_tor_contract จึงไม่มีการจองขั้นสัญญาให้เทียบ ดูได้แค่ขั้น PR
+    $isSimPo = $poKey !== null && intval($poKey) >= 99990000;
     if ($conN > 0) {
         $txt = "จองขั้นสัญญาแล้ว " . number_format($con, 2);
+    } elseif ($pr > 0 && $isSimPo) {
+        $txt = "จองขั้น PR แล้ว " . number_format($pr, 2) . " (สัญญาจำลอง - ไม่มีขั้นสัญญาให้จอง)";
     } elseif ($pr > 0) {
         $txt = "จองขั้น PR แล้ว " . number_format($pr, 2) . " (ยังไม่จองขั้นสัญญา" . ($conOther > 0 ? " - po_id ไม่ตรงกับที่จองไว้" : "") . ")";
     } else {
@@ -154,7 +158,7 @@ function imp_num($v)
     return ($s === "" || !is_numeric($s)) ? null : round(floatval($s), 2);
 }
 
-// วันที่รูปแบบ วว-ดด-ปปปป หรือ วว/ดด/ปปปป (ปี พ.ศ. หรือ ค.ศ. ก็ได้) -> "Y-m-d" (ค.ศ.)
+// วันที่รูปแบบ วว-ดด-ปปปป, วว/ดด/ปปปป หรือ ปปปป-ดด-วว (ปี พ.ศ. หรือ ค.ศ. ก็ได้) -> "Y-m-d" (ค.ศ.)
 // คืน false ถ้ารูปแบบผิด, null ถ้าว่าง
 function imp_date($v)
 {
@@ -162,12 +166,18 @@ function imp_date($v)
     if ($s === "") {
         return null;
     }
-    if (!preg_match('/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/', $s, $m)) {
+    if (preg_match('/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?:[ T].*)?$/', $s, $m)) {
+        // ปปปป-ดด-วว (ไฟล์ที่ export จาก ERP เวชภัณฑ์ เก็บวันที่เป็นข้อความรูปแบบนี้)
+        $d = intval($m[3]);
+        $mo = intval($m[2]);
+        $y = intval($m[1]);
+    } elseif (preg_match('/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/', $s, $m)) {
+        $d = intval($m[1]);
+        $mo = intval($m[2]);
+        $y = intval($m[3]);
+    } else {
         return false;
     }
-    $d = intval($m[1]);
-    $mo = intval($m[2]);
-    $y = intval($m[3]);
     if ($y > 2400) {
         $y -= 543;
     }

@@ -156,8 +156,38 @@ Ext.fnImportRsvNotFound = function (v) {
     return /^ไม่พบการจอง/.test(v || "");
 };
 Ext.fnImportRsvNotFoundText = function (r) {
-    return "เลข pr_id " + (r.pr_id || "-") + " และเลข po_id " + (r.po_id || "-") + " นี้ยังไม่ได้จองเงินมา";
+    var simPo = /^\d+$/.test(String(r.po_id || "")) && parseInt(r.po_id, 10) >= 99990000; // po_id 9999xxxx = สัญญาจำลอง ไม่มีใน sp_tor_contract
+    return "เลข pr_id " + (r.pr_id || "-") + " และเลข po_id " + (r.po_id || "-") + (simPo ? " (สัญญาจำลอง)" : "") + " นี้ยังไม่ได้จองเงินมา";
 };
+// โหลด xlsx-js-style (ใส่สี/ตัวหนาได้) - ใช้ตอนสร้างไฟล์ส่งคืนผู้ใช้ ; ตัวนี้แทน window.XLSX เดิมได้ (API เดียวกัน)
+Ext.fnLoadSheetJsStyled = function (cb) {
+    if (window.XLSX && window.XLSX.style_version) {
+        cb();
+        return;
+    }
+    var s = document.createElement("script");
+    s.src = "../lib/xlsx-js-style.min.js";
+    s.onload = cb;
+    s.onerror = function () {
+        Ext.Msg.alert("แจ้งเตือน", "โหลดตัวสร้างไฟล์ Excel ไม่สำเร็จ");
+    };
+    document.getElementsByTagName("head")[0].appendChild(s);
+};
+
+// ข้อความว่า "ถ้าจองแล้ว สถานะจะเปลี่ยนเป็นอะไร" ใส่ในไฟล์ส่งคืนผู้ใช้ - สัญญาจำลอง (po_id 9999xxxx) ตรวจแค่ขั้น PR
+Ext.fnImportRsvAfterText = function (r) {
+    var sim = /^\d+$/.test(String(r.po_id || "")) && parseInt(r.po_id, 10) >= 99990000;
+    return sim
+        ? "จองขั้น PR แล้ว [ยอดที่จอง] (สัญญาจำลอง - ไม่มีขั้นสัญญาให้จอง) = ถือว่าจองแล้ว"
+        : "จองขั้นสัญญาแล้ว [ยอดที่จอง] (ถ้าจองเฉพาะ PR จะขึ้น \"จองขั้น PR แล้ว … (ยังไม่จองขั้นสัญญา)\")";
+};
+
+// หมายเหตุอธิบายข้อความ "ไม่พบการจองในระบบงบ" (แสดงในหน้าตรวจสอบ ตอนกดดาวน์โหลด และเป็นชีต "หมายเหตุ" ในไฟล์ส่งคืนผู้ใช้)
+Ext.fnImportRsvNoteLines = [
+    "\"ไม่พบการจองในระบบงบ\" หมายถึง PR (pr_id) ของรายการนั้นยังไม่ได้จองเงินเข้าระบบงบ ไม่ใช่ข้อผิดพลาดของไฟล์ และไม่ทำให้นำเข้าไม่ได้ - ให้ผู้ดูแล ERP เวชภัณฑ์ส่งการจองของ pr_id นั้นเข้าระบบงบ",
+    "po_id ขึ้นต้น 9999 คือสัญญาจำลอง (ไม่มีสัญญาจริงใน sp_tor_contract) ระบบจึงตรวจเฉพาะการจองขั้น PR: ถ้าจอง PR แล้วจะขึ้น \"จองขั้น PR แล้ว\" แต่ถ้ายังไม่มีการจอง PR จะขึ้น \"ไม่พบการจองในระบบงบ\"",
+];
+Ext.fnImportRsvNoteHtml = "<b>หมายเหตุ:</b> " + Ext.fnImportRsvNoteLines.join("<br>");
 Ext.fnImportRsvStatus = function (v, r) {
     if (!v) {
         return "";
@@ -509,6 +539,20 @@ function winMedSupImportNew() {
     var previewPanel = new Ext.Panel({
         region: "center", title: "รายละเอียดก่อนบันทึก (ชี้ที่สถานะเพื่อดูสาเหตุ)", border: true, autoScroll: true,
         html: "<div class=\"medsup-imp-empty\">เลือกไฟล์แล้วกด \"ตรวจสอบข้อมูล\"..</div>",
+        // [ผู้ใช้ขอ] ไฟล์มี 500+ รายการ - เลือก/ล้างทั้งหมด และนำเข้าเฉพาะสัญญาที่ระบุได้ (ลองนำเข้า 1 สัญญาก่อน)
+        tbar: [
+            "นำเข้า:",
+            {text: "ติ๊กทั้งหมด", handler: function () { setAllImport(true); }},
+            {text: "ล้างทั้งหมด", handler: function () { setAllImport(false); }},
+            "-",
+            "นำเข้าเฉพาะลำดับสัญญา:",
+            {xtype: "numberfield", id: "medsupImpOnlySeq", width: 70, allowDecimals: false, allowNegative: false, emptyText: "เลข"},
+            {text: "ติ๊กเฉพาะสัญญานี้", handler: function () { setOnlyImportSeq(Ext.getCmp("medsupImpOnlySeq").getValue()); }},
+            "-",
+            "ดาวน์โหลด:",
+            {text: "ติ๊กทั้งหมด", handler: function () { setAllChk(true); }},
+            {text: "ล้างทั้งหมด", handler: function () { setAllChk(false); }},
+        ],
     });
     var saveBtn = new Ext.Button({text: "บันทึกเข้าระบบ", iconCls: "icon-save", disabled: true});
     // [ผู้ใช้ขอ] ดาวน์โหลดแถวที่ติ๊กไว้ (ค่าเริ่มต้น = รายการที่ไม่พบการจองในระบบงบ) เป็น Excel ส่งคืนผู้ใช้
@@ -527,6 +571,54 @@ function winMedSupImportNew() {
         saveBtn.setText("บันทึกเข้าระบบ" + (n ? " (" + n + " แถว)" : ""));
         saveBtn.setDisabled(!n);
     }
+    // ซิงค์ช่องติ๊กในตารางให้ตรงกับ previewRows (ตารางเป็น HTML ที่สร้างครั้งเดียวตอนตรวจสอบ)
+    function syncChecks() {
+        if (!previewPanel.body) {
+            return;
+        }
+        Ext.each(previewPanel.body.dom.querySelectorAll("input.medsup-imp-sel"), function (el) {
+            var r = previewRows[el.getAttribute("data-i")];
+            if (r && !el.disabled) {
+                el.checked = !!r._imp;
+            }
+        });
+        Ext.each(previewPanel.body.dom.querySelectorAll("input.medsup-imp-chk"), function (el) {
+            var r = previewRows[el.getAttribute("data-i")];
+            if (r) {
+                el.checked = !!r._chk;
+            }
+        });
+        updateSaveBtn();
+        updateExportBtn();
+    }
+    // สัญญาที่มีแถวผิด (_bad) นำเข้าไม่ได้ จึงไม่ติ๊กให้
+    function setAllImport(flag) {
+        previewRows.forEach(function (r) { r._imp = flag && !r._bad; });
+        syncChecks();
+    }
+    function setOnlyImportSeq(seq) {
+        var s = String(seq === null || seq === undefined ? "" : seq).trim();
+        if (s === "") {
+            Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกลำดับสัญญาที่ต้องการนำเข้า");
+            return;
+        }
+        var found = previewRows.some(function (r) { return String(r.seq) === s; });
+        if (!found) {
+            Ext.Msg.alert("แจ้งเตือน", "ไม่พบลำดับสัญญา " + enc(s) + " ในไฟล์");
+            return;
+        }
+        var bad = previewRows.some(function (r) { return String(r.seq) === s && r._bad; });
+        if (bad) {
+            Ext.Msg.alert("แจ้งเตือน", "ลำดับสัญญา " + enc(s) + " มีแถวผิดพลาด นำเข้าไม่ได้ - แก้ไฟล์แล้วตรวจสอบใหม่");
+            return;
+        }
+        previewRows.forEach(function (r) { r._imp = String(r.seq) === s; });
+        syncChecks();
+    }
+    function setAllChk(flag) {
+        previewRows.forEach(function (r) { r._chk = flag; });
+        syncChecks();
+    }
     function updateExportBtn() {
         var n = checkedRows().length;
         exportBtn.setText("ดาวน์โหลด Excel รายการที่เลือก" + (n ? " (" + n + " แถว)" : ""));
@@ -539,8 +631,27 @@ function winMedSupImportNew() {
             Ext.Msg.alert("แจ้งเตือน", "กรุณาติ๊กเลือกรายการที่ต้องการดาวน์โหลด");
             return;
         }
-        Ext.fnLoadSheetJs(function () {
-            var aoa = [Ext.MEDSUP_IMPORT_COLUMNS.map(function (c) { return c.label; }).concat(["สถานะจองเงิน (ระบบงบ)", "หมายเหตุ"])];
+        // แจ้งหมายเหตุก่อนดาวน์โหลด (ไฟล์นี้ส่งต่อให้ผู้ใช้ ชีต "หมายเหตุ" ในไฟล์มีข้อความเดียวกัน)
+        Ext.Msg.show({
+            title: "ดาวน์โหลดรายการส่งคืนผู้ใช้", icon: Ext.Msg.INFO, buttons: Ext.Msg.OKCANCEL, minWidth: 480,
+            msg: "จะดาวน์โหลด " + rows.length + " แถว<br><br><span style=\"color:#555;\">" + Ext.fnImportRsvNoteHtml + "</span>",
+            fn: function (btn) {
+                if (btn === "ok") {
+                    doExportChecked(rows);
+                }
+            },
+        });
+    }
+    function doExportChecked(rows) {
+        // ใช้ xlsx-js-style (API เดียวกับ SheetJS แต่ใส่สีตัวอักษรได้) เพื่อให้ข้อความ "ยังไม่ได้จองเงิน" เป็นตัวแดงในไฟล์ส่งคืน
+        Ext.fnLoadSheetJsStyled(function () {
+            var nCol = Ext.MEDSUP_IMPORT_COLUMNS.length;
+            var RED = {font: {bold: true, color: {rgb: "FFFF0000"}}};
+            var GREEN = {font: {color: {rgb: "FF008000"}}};
+            var HEAD = {font: {bold: true}};
+            var aoa = [Ext.MEDSUP_IMPORT_COLUMNS.map(function (c) { return c.label; })
+                .concat(["สถานะจองเงิน (ระบบงบ)", "หมายเหตุ", "เมื่อจองแล้ว สถานะจะเปลี่ยนเป็น"])];
+            var notFound = [];   // index แถวใน aoa ที่ยังไม่ได้จอง (ระบายสีแดง)
             rows.forEach(function (r) {
                 var line = Ext.MEDSUP_IMPORT_COLUMNS.map(function (c) {
                     var v = r[c.key] == null ? "" : r[c.key];
@@ -548,18 +659,41 @@ function winMedSupImportNew() {
                     return moneyKeys[c.key] && v !== "" && !isNaN(n) ? n : String(v);
                 });
                 var notes = [];
-                if (Ext.fnImportRsvNotFound(r.rsv_status)) {
+                var after = "";
+                var nf = Ext.fnImportRsvNotFound(r.rsv_status);
+                if (nf) {
                     notes.push(Ext.fnImportRsvNotFoundText(r));
+                    after = Ext.fnImportRsvAfterText(r);
                 }
                 if (r.message) {
                     notes.push(r.message);
                 }
-                aoa.push(line.concat([r.rsv_status || "", notes.join(" / ")]));
+                if (nf) {
+                    notFound.push(aoa.length);
+                }
+                aoa.push(line.concat([r.rsv_status || "", notes.join(" / "), after]));
             });
             var ws = XLSX.utils.aoa_to_sheet(aoa);
-            ws["!cols"] = aoa[0].map(function (h, i) { return {wch: i >= Ext.MEDSUP_IMPORT_COLUMNS.length ? 45 : 18}; });
+            ws["!cols"] = aoa[0].map(function (h, i) { return {wch: i >= nCol ? 55 : 18}; });
+            // หัวตารางตัวหนา ; แถวที่ยังไม่ได้จอง: สถานะ+หมายเหตุเป็นตัวแดง, ช่อง "เมื่อจองแล้ว" เป็นตัวเขียว
+            for (var c = 0; c < nCol + 3; c++) {
+                var h = ws[XLSX.utils.encode_cell({r: 0, c: c})];
+                if (h) { h.s = HEAD; }
+            }
+            notFound.forEach(function (ri) {
+                [nCol, nCol + 1].forEach(function (c) {
+                    var cell = ws[XLSX.utils.encode_cell({r: ri, c: c})];
+                    if (cell) { cell.s = RED; }
+                });
+                var ok = ws[XLSX.utils.encode_cell({r: ri, c: nCol + 2})];
+                if (ok) { ok.s = GREEN; }
+            });
             var wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "ข้อมูล");
+            // ชีต "หมายเหตุ" อยู่หลังชีต "ข้อมูล" - ตอนนำเข้าซ้ำระบบอ่านเฉพาะชีต "ข้อมูล" จึงไม่กระทบ
+            var noteWs = XLSX.utils.aoa_to_sheet([["หมายเหตุ"]].concat(Ext.fnImportRsvNoteLines.map(function (t) { return [t]; })));
+            noteWs["!cols"] = [{wch: 130}];
+            XLSX.utils.book_append_sheet(wb, noteWs, "หมายเหตุ");
             XLSX.writeFile(wb, "รายการส่งคืน_" + String(fileName || "import").replace(/\.[^.]*$/, "") + ".xlsx");
         });
     }
@@ -627,6 +761,15 @@ function winMedSupImportNew() {
                     var hasValue = false;
                     Ext.MEDSUP_IMPORT_COLUMNS.forEach(function (c) {
                         var v = colIdx[c.key] >= 0 ? Ext.fnImportCell(rows[r][colIdx[c.key]], c) : "";
+                        // ไฟล์ที่ export มาบางไฟล์มีหัวคอลัมน์ชื่อซ้ำ (เช่น c_overlap 2 คอลัมน์ ตัวแรกว่าง
+                        // ตัวหลังมีเลข) - ช่องแรกว่างให้ใช้ค่าจากคอลัมน์ชื่อเดียวกันที่ตามมาแทน
+                        if (v === "" && colIdx[c.key] >= 0) {
+                            for (var di = colIdx[c.key] + 1; di < header.length && v === ""; di++) {
+                                if (header[di] === Ext.fnImportNormLabel(c.label)) {
+                                    v = Ext.fnImportCell(rows[r][di], c);
+                                }
+                            }
+                        }
                         obj[c.key] = v;
                         if (v !== "") {
                             hasValue = true;
@@ -718,8 +861,11 @@ function winMedSupImportNew() {
                 );
                 if (noRsv.length) {
                     var noRsvMsg = "ไม่พบการจองในระบบงบ " + noRsv.length + " รายการ (ติ๊กเลือกให้แล้ว)";
+                    // หมายเหตุให้ผู้ใช้เข้าใจความหมายของข้อความ "ไม่พบการจองในระบบงบ"
+                    var noRsvNote = Ext.fnImportRsvNoteHtml;
                     summaryFld.setValue(summaryFld.getValue() + "<br><span style=\"color:#c00;\">" + noRsvMsg
-                        + " - กด \"ดาวน์โหลด Excel รายการที่เลือก\" เพื่อส่งคืนผู้ใช้</span>");
+                        + " - กด \"ดาวน์โหลด Excel รายการที่เลือก\" เพื่อส่งคืนผู้ใช้</span>"
+                        + "<br><span style=\"color:#555;font-size:12px;\">" + noRsvNote + "</span>");
                     Ext.Msg.show({
                         title: "แจ้งเตือน", icon: Ext.Msg.WARNING, buttons: Ext.Msg.OK, minWidth: 460,
                         msg: "<span style=\"color:#c00;font-weight:bold;\">" + noRsvMsg + "</span><br><br>"
@@ -727,7 +873,8 @@ function winMedSupImportNew() {
                                 return "<span style=\"color:#c00;\">แถว " + r.row_no + ": " + enc(Ext.fnImportRsvNotFoundText(r)) + "</span>";
                             }).join("<br>")
                             + (noRsv.length > 15 ? "<br>... และอีก " + (noRsv.length - 15) + " รายการ" : "")
-                            + "<br><br>กดปุ่ม \"ดาวน์โหลด Excel รายการที่เลือก\" เพื่อโหลดไฟล์ส่งคืนผู้ใช้",
+                            + "<br><br>กดปุ่ม \"ดาวน์โหลด Excel รายการที่เลือก\" เพื่อโหลดไฟล์ส่งคืนผู้ใช้"
+                            + "<br><br><span style=\"color:#555;\">" + noRsvNote + "</span>",
                     });
                 }
             },

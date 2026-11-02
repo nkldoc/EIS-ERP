@@ -240,6 +240,9 @@ if ($type == "medsup_period_bill") {
                     , g.po_expense_id
                     , g.c_expense_name
                     , g.i_budget_year
+                    , g.c_overlap, g.i_budget_year_overlap
+                    , g.c_overlap2, g.i_budget_year_overlap2
+                    , g.c_overlap3, g.i_budget_year_overlap3
                     , g.c_po_no
                     , g.dc_creditor_id
                     , g.c_creditor_name
@@ -275,6 +278,13 @@ if ($type == "medsup_period_bill") {
             // i_budget_year เก็บเป็น ค.ศ. (id ของ Ext.storeYearPeriodBill ฝั่ง JS) - แปลงเป็น
             // พ.ศ. ก่อนแสดงผล ให้ตรงกับธรรมเนียมการแสดงปีงบประมาณที่อื่นในระบบ
             "i_budget_year" => empty($row["i_budget_year"]) ? "" : intval($row["i_budget_year"]) + 543,
+            // เลขที่ใบกันเหลื่อม/ปีของใบกัน (พ.ศ.) ต่อแหล่งเงิน - ใช้แสดงที่หน้าต่างรายละเอียดส่งมอบงาน (ST00095)
+            "c_overlap" => $row["c_overlap"],
+            "i_budget_year_overlap" => empty($row["i_budget_year_overlap"]) ? "" : intval($row["i_budget_year_overlap"]) + 543,
+            "c_overlap2" => $row["c_overlap2"],
+            "i_budget_year_overlap2" => empty($row["i_budget_year_overlap2"]) ? "" : intval($row["i_budget_year_overlap2"]) + 543,
+            "c_overlap3" => $row["c_overlap3"],
+            "i_budget_year_overlap3" => empty($row["i_budget_year_overlap3"]) ? "" : intval($row["i_budget_year_overlap3"]) + 543,
             "c_po_no" => $row["c_po_no"],
             "dc_creditor_id" => intval($row["dc_creditor_id"]),
             "c_creditor_name" => $row["c_creditor_name"],
@@ -434,7 +444,10 @@ if ($type == "medsup_period_bill") {
     if (!empty($_REQUEST['i_budget_year'])) {
         // ฟิลด์ค้นหารับเป็น พ.ศ. ตามที่แสดงในกริด - แปลงกลับเป็น ค.ศ. ก่อนเทียบกับ
         // g.i_budget_year ที่เก็บเป็น ค.ศ.
-        $wh .= " and g.i_budget_year = " . (intval($_REQUEST['i_budget_year']) - 543);
+        // IR ที่ใช้ใบกันเหลื่อม ปีงบประมาณของเอกสาร = ปีงบ (1 ต.ค.) ของวันที่ออกเลข IR (ปีที่ใช้เงินเป็นปีของใบกัน
+        // ดูตัวกรอง "ปีที่ใช้ประมาณ") ส่วนที่ไม่ใช่กันเหลื่อมใช้ปีงบของสัญญาเหมือนเดิม
+        $wh .= " and (case when isnull(g.c_overlap,'') <> '' or isnull(g.c_overlap2,'') <> '' or isnull(g.c_overlap3,'') <> ''"
+            . " then year(dateadd(month, 3, r.d_ir_issue)) else g.i_budget_year end) = " . (intval($_REQUEST['i_budget_year']) - 543);
     }
     if (!empty($_REQUEST['c_fund_source'])) {
         $wh .= " and g.c_fund_source_dtl = '" . str_replace("'", "''", $_REQUEST['c_fund_source']) . "'";
@@ -459,6 +472,13 @@ if ($type == "medsup_period_bill") {
     if (!empty($_REQUEST['own_only'])) {
         $wh .= " and r.dc_user_update_id = " . intval($_SESSION["user_id"] ?? 0);
     }
+
+    // คอลัมน์ c_code_ref/po_working_hdr_id (ใบเบิก EIS) มาจากสคริปต์ sp_tor_period_bill_checking_withdraw.sql ซึ่งหายได้เมื่อ
+    // restore ฐานข้อมูล - ถ้าไม่มีคอลัมน์ให้แสดงว่างแทน (ไม่ให้ทั้งรายการล่มเงียบๆ) แล้วค่อยรันสคริปต์ให้ครบ
+    $hasWdCols = $db->GetDataBySQL("select case when col_length('NMU_ERP.dbo.sp_tor_period_bill_checking', 'c_code_ref') is not null
+                                          and col_length('NMU_ERP.dbo.sp_tor_period_bill_checking', 'po_working_hdr_id') is not null then 1 else 0 end", array());
+    $wdCodeRefSql = intval($hasWdCols) ? "max(chk.c_code_ref)" : "cast(null as nvarchar(50))";
+    $wdHdrIdSql = intval($hasWdCols) ? "max(chk.po_working_hdr_id)" : "cast(null as bigint)";
 
     $sqlTempTable = "select r.c_ir_code
                      , row_number() over (order by max(r.d_ir_issue) desc) as row
@@ -496,6 +516,10 @@ if ($type == "medsup_period_bill") {
                     -- SAVE_CHECKING/ISSUE_AP)
                     , max(case when chk.c_disburse_detail is not null and ltrim(rtrim(chk.c_disburse_detail)) <> '' then 1 else 0 end) as i_checking_ready
                     , max(chk.c_disburse_detail) as c_disburse_detail
+                    -- เลขที่ใบขอเบิก (D...) ที่ EIS ออกให้ - EIS เขียนกลับตอนบันทึกใบเบิก (po/api/mn_poReg.php)
+                    -- ต้องมีคอลัมน์จาก dc/scriptBaseUpdate/sp_tor_period_bill_checking_withdraw.sql
+                    , {$wdCodeRefSql} as c_code_ref
+                    , {$wdHdrIdSql} as po_working_hdr_id
                 "
                 . " from ({$sqlTempTable}) a "
                 . " inner join NMU_ERP.dbo.sp_tor_period_bill_receive r on r.c_ir_code = a.c_ir_code and r.i_enabled = 1"
@@ -517,7 +541,10 @@ if ($type == "medsup_period_bill") {
             "c_project_name" => $row["c_project_name"],
             "c_expense_name" => $row["c_expense_name"],
             "i_period" => intval($row["i_period"]),
-            "i_budget_year" => empty($row["i_budget_year"]) ? "" : intval($row["i_budget_year"]) + 543,
+            // ใช้ใบกันเหลื่อม = ปีงบประมาณของเอกสารเป็นปีงบของวันที่ออกเลข IR (ปีของใบกันดู i_budget_year_overlap)
+            "i_budget_year" => (!empty($row["c_overlap"]) || !empty($row["c_overlap2"]) || !empty($row["c_overlap3"])) && !empty($row["d_ir_issue"])
+                ? (intval(date("Y", strtotime($row["d_ir_issue"]))) + (intval(date("n", strtotime($row["d_ir_issue"]))) >= 10 ? 1 : 0) + 543)
+                : (empty($row["i_budget_year"]) ? "" : intval($row["i_budget_year"]) + 543),
             "c_ap_dept_type" => empty($row["c_ap_dept_type"]) ? "APMS" : $row["c_ap_dept_type"],
             // เลขที่ใบกันเหลื่อม/ปีงบประมาณของใบกันเหลื่อม (ถ้ามี) - เอาไว้ให้ฟอร์ม
             // "รายละเอียดตรวจรับ" เปลี่ยนช่อง "ใช้เงินปีงบประมาณ" ให้ตรงกับที่บันทึกไว้
@@ -543,6 +570,8 @@ if ($type == "medsup_period_bill") {
             "d_ir_issue" => empty($row["d_ir_issue"]) ? "" : $date->extDateBuddha($row["d_ir_issue"]),
             "c_create_name" => $row["c_create_name"],
             "i_checking_ready" => intval($row["i_checking_ready"]),
+            "c_code_ref" => $row["c_code_ref"],
+            "po_working_hdr_id" => intval($row["po_working_hdr_id"]),
             // แสดงเลข AP จริงถ้าออกไปแล้ว (แถวนี้ไม่ได้ถูกกรองออกจากกริดอีกต่อไปหลังออก
             // เลข AP - ผู้ใช้ต้องการให้ยังเห็นรายการที่ทำเสร็จแล้วค้างอยู่ในหน้านี้ด้วย)
             "c_ap_code" => $row["c_ap_code"],

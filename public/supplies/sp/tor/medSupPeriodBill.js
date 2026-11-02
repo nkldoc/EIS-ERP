@@ -1693,6 +1693,19 @@ Ext.AppUx = function (app, menu) {
                 {header: "ชื่อโครงการ", dataIndex: "c_project_name", width: 180},
                 {header: "ชื่อค่าใช้จ่าย", dataIndex: "c_expense_name", width: 180},
                 {header: "แหล่งเงิน", dataIndex: "c_fund_source", width: 130},
+                {
+                    // เลขที่ใบกันเหลื่อมของแต่ละแหล่งเงิน (ว่าง = ปีต่อปี) - เรียงตามแหล่งเงินที่ 1-3
+                    header: "เลขที่ใบกันเหลื่อม", dataIndex: "c_overlap", width: 150,
+                    renderer: function (v, meta, rec) {
+                        var codes = [];
+                        Ext.each(["c_overlap", "c_overlap2", "c_overlap3"], function (f) {
+                            if (rec.get(f)) {
+                                codes.push(Ext.util.Format.htmlEncode(rec.get(f)));
+                            }
+                        });
+                        return codes.length ? codes.join("<br/>") : '<span style="color:#999;">-</span>';
+                    }
+                },
                 {header: "เลข PO", dataIndex: "c_po_no", width: 100},
                 {header: "ผู้ขาย/ผู้รับจ้าง", dataIndex: "c_creditor_name", width: 180},
                 {header: "จำนวนงวด", dataIndex: "n_lines", width: 80, align: "center"},

@@ -20,6 +20,7 @@ Ext.storeDeliverMedSupList = new Ext.data.JsonStore({
         "c_contract_code", "i_period", "c_doc_ref", "d_doc_dateSub", "f_period_amt", "c_detail",
         "dc_expense_budget_type_id_dtl", "c_fund_source_dtl", "f_fund_amt_dtl",
         "c_project_name", "c_contract_type", "po_expense_id", "c_expense_name", "i_budget_year",
+        "c_overlap", "i_budget_year_overlap", "c_overlap2", "i_budget_year_overlap2", "c_overlap3", "i_budget_year_overlap3",
         "c_po_no", "dc_creditor_id", "c_creditor_name", "c_tax_number_imp",
     ],
 });
@@ -1398,6 +1399,17 @@ function winDeliverWorkMedSup(rec) {
         win.show();
     }
 
+    // ใบกันเหลื่อมของงวดนี้ (แหล่งเงินแรกที่มี) - ถ้ามี ปีงบประมาณของเอกสารเป็นปีปัจจุบัน
+    // ส่วนปีที่ใช้เงินเป็นปีของใบกัน
+    var deliverOverlapCode = rec.get("c_overlap") || rec.get("c_overlap2") || rec.get("c_overlap3") || "";
+    var deliverOverlapYear = rec.get("c_overlap") ? rec.get("i_budget_year_overlap")
+        : rec.get("c_overlap2") ? rec.get("i_budget_year_overlap2")
+        : rec.get("c_overlap3") ? rec.get("i_budget_year_overlap3") : "";
+    function deliverFiscalYearTh() {
+        var d = new Date();
+        return d.getFullYear() + (d.getMonth() >= 9 ? 1 : 0) + 543;
+    }
+
     new Ext.Window({
         id: "win-deliver-medsupID",
         title: "รายละเอียดงวดที่ " + rec.get("i_period") + " - เลขที่สัญญา " + rec.get("c_contract_code"),
@@ -1416,7 +1428,7 @@ function winDeliverWorkMedSup(rec) {
                         // border layout ของ ExtJS 3 ต้องกำหนด height ให้ north/south region
                         // ตรงๆ เสมอ (ไม่รองรับ autoHeight) ไม่งั้น panel จะถูกบีบจนสูง 0 มองไม่เห็น
                         region: "north",
-                        height: 320,
+                        height: deliverOverlapCode ? 380 : 320,
                         xtype: "form",
                         border: false,
                         bodyStyle: "padding:8px;",
@@ -1424,7 +1436,10 @@ function winDeliverWorkMedSup(rec) {
                         defaults: {xtype: "displayfield", anchor: "100%"},
                         items: [
                             {fieldLabel: "งวดที่", value: rec.get("i_period")},
-                            {fieldLabel: "ปีงบประมาณ", value: rec.get("i_budget_year")},
+                            // ใช้ใบกันเหลื่อม = ปีงบประมาณของเอกสารเป็นปีปัจจุบัน ส่วนปีที่ใช้เงินคือปีของใบกัน
+                            {fieldLabel: "ปีงบประมาณ", value: deliverOverlapCode ? deliverFiscalYearTh() : rec.get("i_budget_year")},
+                            {fieldLabel: "ใช้เงินปีงบประมาณ", value: deliverOverlapYear, hidden: !deliverOverlapCode},
+                            {fieldLabel: "เลขที่ใบกันเหลื่อม", value: deliverOverlapCode, hidden: !deliverOverlapCode, style: "font-weight:bold;"},
                             {fieldLabel: "ชื่อโครงการ", value: rec.get("c_project_name")},
                             {fieldLabel: "ชื่อค่าใช้จ่าย", value: rec.get("c_expense_name")},
                             {fieldLabel: "ผู้ขาย/ผู้รับจ้าง", value: rec.get("c_creditor_name")},
