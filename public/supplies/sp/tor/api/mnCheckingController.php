@@ -3950,6 +3950,64 @@ switch ($mode) {
         $db->CommitTran();
         exit();
         break;
+    case "enableReserveOverlap":
+        $stmt2 = true;
+        $stmt3 = true;
+        $stmt4 = true;
+        $id = filter_input(INPUT_POST, 'bg_reserve_overlap_id', FILTER_VALIDATE_INT);
+
+        if (!$id) {
+            $stmt = false;
+            $stmt2 = false;
+            $sql = "Invalid bg_reserve_overlap_id";
+            break;
+        }
+
+        $sql = "UPDATE NMU_EIS..bg_reserve_overlap
+                SET i_enable = 1, d_update = ?
+                WHERE bg_reserve_overlap_id = ? AND i_enable = 2";
+        $stmt = $db->QueryParam($sql, array(date('Y-m-d H:i:s'), $id));
+        $ret_id = $id;
+        break;
+    case "disableReserveOverlap":
+        $stmt2 = true;
+        $stmt3 = true;
+        $stmt4 = true;
+        $id = filter_input(INPUT_POST, 'bg_reserve_overlap_id', FILTER_VALIDATE_INT);
+
+        if (!$id) {
+            $stmt = false;
+            $stmt2 = false;
+            $sql = "Invalid bg_reserve_overlap_id";
+            break;
+        }
+
+        $sql = "UPDATE NMU_EIS..bg_reserve_overlap
+                SET i_enable = 2, d_update = ?
+                WHERE bg_reserve_overlap_id = ? AND i_enable = 1";
+        $stmt = $db->QueryParam($sql, array(date('Y-m-d H:i:s'), $id));
+        $ret_id = $id;
+        break;
+    case "updateReserveOverlapChkId":
+        $stmt2 = true;
+        $stmt3 = true;
+        $stmt4 = true;
+        $id = filter_input(INPUT_POST, 'bg_reserve_overlap_id', FILTER_VALIDATE_INT);
+        $chkId = filter_input(INPUT_POST, 'chk_id', FILTER_VALIDATE_INT);
+
+        if (!$id || !$chkId) {
+            $stmt = false;
+            $stmt2 = false;
+            $sql = "Invalid bg_reserve_overlap_id or chk_id";
+            break;
+        }
+
+        $sql = "UPDATE NMU_EIS..bg_reserve_overlap
+                SET chk_id = ?, d_update = ?
+                WHERE bg_reserve_overlap_id = ? AND i_enable = 1";
+        $stmt = $db->QueryParam($sql, array($chkId, date('Y-m-d H:i:s'), $id));
+        $ret_id = $id;
+        break;
     case "updateReserveOverlp":
         $stmt1 = true;
         $stmt2 = true;

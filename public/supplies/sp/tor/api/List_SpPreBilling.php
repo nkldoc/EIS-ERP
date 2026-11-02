@@ -384,6 +384,7 @@ if ($type == "WITHDRAW") {
     $c_billing = $_REQUEST['c_billing'] ?? null;
     $c_checking = $_REQUEST['c_checking'] ?? null;
     $c_code = $_REQUEST['c_code'] ?? null;
+    $sp_emp_name = trim((string)($_REQUEST['sp_emp_name'] ?? ''));
     $i_status_checking = $_REQUEST['i_status_checking'] ?? null;
     $d_doc_arrive_dt = null;
     if ($act == "SEARCH") {
@@ -393,6 +394,20 @@ if ($type == "WITHDRAW") {
         $wh .= ($c_checking != "") ? " and a.c_code like '%{$c_checking}%'" : "";
         $wh .= ($c_code != "") ? " and e.c_code like '%{$c_code}%'" : "";
         $wh .= ($c_billing != "") ? " and a.c_billing_code like '%{$c_billing}%'" : "";
+        if ($sp_emp_name !== '') {
+            $wh .= " and exists (
+                        select 1
+                        from dbo.sp_emp spe
+                        left join dbo.dc_user usr on usr.dc_emp_id = spe.dc_emp_id
+                        where spe.sp_emp_id = a.sp_emp_id
+                          and (spe.c_name like ? or usr.c_full_name like ?)
+                    )";
+            $nameSearch = '%' . $sp_emp_name . '%';
+            $arrParam[] = $nameSearch;
+            $arrParam[] = $nameSearch;
+            $arrCountParam[] = $nameSearch;
+            $arrCountParam[] = $nameSearch;
+        }
     }
     if ($i_status_checking == 3) {
         $d_doc_arrive_dt = " and a.i_status_checking = 1 and a.i_status_billing is null ";

@@ -56,6 +56,8 @@ $i_post = $_REQUEST['i_post'] ?? null;
 if ($type == "po_money_overlap") {
        
 $po_id = $_REQUEST["po_id"]?? 0;  
+$includeInactive = (int)($_REQUEST["include_inactive"] ?? 0);
+$enableCondition = ($includeInactive === 1) ? "" : " and i_enable=1";
 
 // =============================
 // SQL
@@ -83,7 +85,7 @@ SELECT
     d_update,
     dc_cost_acc_id 
 FROM NMU_EIS..bg_reserve_overlap 
-WHERE i_sys = 1 and i_enable=1
+WHERE i_sys = 1 {$enableCondition}
 AND po_id = ? 
 ORDER BY bg_reserve_overlap_id 
 "; 

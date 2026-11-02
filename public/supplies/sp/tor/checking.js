@@ -8503,7 +8503,8 @@ Ext.gridEditMoneyOverlapfn = (rec) => {
                         type: 'po_money_overlap',
                         pr_id: rec.get('sp_check_period_hdr_id'),
                         po_id: rec.get('sp_tor_contract_id'),
-                        sp_tor_id: rec.get('sp_tor_id')
+                        sp_tor_id: rec.get('sp_tor_id'),
+                        include_inactive: 0
                 },
                 fields: [
                         'bg_reserve_overlap_id',
@@ -8728,6 +8729,7 @@ Ext.gridEditMoneyOverlapfn = (rec) => {
                         {
                                 text: 'รายละเอียดข้อมูล',
                                 iconCls: 'icon-view',
+                                hidden: true,
                                 handler: function () {
 
                                         var rec = Ext.gridEditMoneyOverlap.getSelectionModel().getSelected();
@@ -8836,6 +8838,151 @@ Ext.gridEditMoneyOverlapfn = (rec) => {
                                                         }]
                                         });
                                         win.show();
+                                }
+                        },
+                        '-',
+                        {
+                                text: 'บันทึกเลขตรวจรับ (Update)',
+                                iconCls: 'icon-edit',
+                                handler: function () {
+                                        var selectedRec = Ext.gridEditMoneyOverlap.getSelectionModel().getSelected();
+                                        if (!selectedRec) {
+                                                Ext.Msg.alert('แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการบันทึกเลขตรวจรับ');
+                                                return;
+                                        }
+
+                                        Ext.Msg.confirm(
+                                                'ยืนยันการบันทึกเลขตรวจรับ',
+                                                'ยืนยันบันทึก CHK ID <b>' + targetChkId + '</b> ให้รายการ <b>' + selectedRec.get('c_code_overlap') + '</b> ใช่หรือไม่?',
+                                                function (btn) {
+                                                        if (btn !== 'yes') {
+                                                                return;
+                                                        }
+
+                                                        Ext.Ajax.request({
+                                                                url: 'tor/api/mnCheckingController.php',
+                                                                method: 'POST',
+                                                                params: {
+                                                                        mode: 'updateReserveOverlapChkId',
+                                                                        bg_reserve_overlap_id: selectedRec.get('bg_reserve_overlap_id'),
+                                                                        chk_id: targetChkId
+                                                                },
+                                                                success: function (response) {
+                                                                        var result = Ext.decode(response.responseText);
+                                                                        if (result.success && result.success !== 'Error') {
+                                                                                Ext.Msg.alert('สำเร็จ', 'บันทึกเลขตรวจรับเรียบร้อยแล้ว');
+                                                                                Ext.gridEditMoneyOverlap.getStore().reload();
+                                                                        } else {
+                                                                                Ext.Msg.alert('ผิดพลาด', result.msg || 'ไม่สามารถบันทึกเลขตรวจรับได้');
+                                                                        }
+                                                                },
+                                                                failure: function () {
+                                                                        Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+                                                                }
+                                                        });
+                                                }
+                                        );
+                                }
+                        },
+                        '-',
+                        {
+                                text: 'ยกเลิกการใช้งาน',
+                                iconCls: 'icon-cancel',
+                                handler: function () {
+                                        var selectedRec = Ext.gridEditMoneyOverlap.getSelectionModel().getSelected();
+                                        if (!selectedRec) {
+                                                Ext.Msg.alert('แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการยกเลิกการใช้งาน');
+                                                return;
+                                        }
+
+                                        Ext.Msg.confirm(
+                                                'ยืนยันยกเลิกการใช้งาน',
+                                                'ยืนยันยกเลิกการใช้งานรายการ <b>' + selectedRec.get('c_code_overlap') + '</b> (i_enable = 2) ใช่หรือไม่?',
+                                                function (btn) {
+                                                        if (btn !== 'yes') {
+                                                                return;
+                                                        }
+
+                                                        Ext.Ajax.request({
+                                                                url: 'tor/api/mnCheckingController.php',
+                                                                method: 'POST',
+                                                                params: {
+                                                                        mode: 'disableReserveOverlap',
+                                                                        bg_reserve_overlap_id: selectedRec.get('bg_reserve_overlap_id')
+                                                                },
+                                                                success: function (response) {
+                                                                        var result = Ext.decode(response.responseText);
+                                                                        if (result.success && result.success !== 'Error') {
+                                                                                Ext.Msg.alert('สำเร็จ', 'ยกเลิกการใช้งานเรียบร้อยแล้ว');
+                                                                                Ext.gridEditMoneyOverlap.getStore().reload();
+                                                                        } else {
+                                                                                Ext.Msg.alert('ผิดพลาด', result.msg || 'ไม่สามารถยกเลิกการใช้งานได้');
+                                                                        }
+                                                                },
+                                                                failure: function () {
+                                                                        Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+                                                                }
+                                                        });
+                                                }
+                                        );
+                                }
+                        },
+                        '-',
+                        {
+                                text: 'เปิดใช้งาน',
+                                iconCls: 'icon-accept',
+                                handler: function () {
+                                        var selectedRec = Ext.gridEditMoneyOverlap.getSelectionModel().getSelected();
+                                        if (!selectedRec) {
+                                                Ext.Msg.alert('แจ้งเตือน', 'กรุณาเลือกรายการที่ต้องการเปิดใช้งาน');
+                                                return;
+                                        }
+                                        if (parseInt(selectedRec.get('i_enable'), 10) === 1) {
+                                                Ext.Msg.alert('แจ้งเตือน', 'รายการนี้ใช้งานอยู่แล้ว');
+                                                return;
+                                        }
+
+                                        Ext.Msg.confirm(
+                                                'ยืนยันเปิดใช้งาน',
+                                                'ยืนยันเปิดใช้งานรายการ <b>' + selectedRec.get('c_code_overlap') + '</b> (i_enable = 1) ใช่หรือไม่?',
+                                                function (btn) {
+                                                        if (btn !== 'yes') {
+                                                                return;
+                                                        }
+                                                        Ext.Ajax.request({
+                                                                url: 'tor/api/mnCheckingController.php',
+                                                                method: 'POST',
+                                                                params: {
+                                                                        mode: 'enableReserveOverlap',
+                                                                        bg_reserve_overlap_id: selectedRec.get('bg_reserve_overlap_id')
+                                                                },
+                                                                success: function (response) {
+                                                                        var result = Ext.decode(response.responseText);
+                                                                        if (result.success && result.success !== 'Error') {
+                                                                                Ext.Msg.alert('สำเร็จ', 'เปิดใช้งานรายการเรียบร้อยแล้ว');
+                                                                                Ext.gridEditMoneyOverlap.getStore().reload();
+                                                                        } else {
+                                                                                Ext.Msg.alert('ผิดพลาด', result.msg || 'ไม่สามารถเปิดใช้งานรายการได้');
+                                                                        }
+                                                                },
+                                                                failure: function () {
+                                                                        Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+                                                                }
+                                                        });
+                                                }
+                                        );
+                                }
+                        },
+                        '->',
+                        {
+                                xtype: 'checkbox',
+                                boxLabel: 'แสดงรายการทั้งหมด (ใช้งาน/ไม่ใช้งาน)',
+                                checked: false,
+                                listeners: {
+                                        check: function (field, checked) {
+                                                store.setBaseParam('include_inactive', checked ? 1 : 0);
+                                                store.reload();
+                                        }
                                 }
                         }
 

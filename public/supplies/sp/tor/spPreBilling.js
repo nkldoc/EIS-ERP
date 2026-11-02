@@ -1081,6 +1081,12 @@ Ext.AppUx = function (app, menu) {
                                     id: "c_codeID",
                                     name: "c_code",
                                 },
+                                {
+                                    xtype: "textfield",
+                                    fieldLabel: "ชื่อพนักงานพัสดุ",
+                                    id: "sp_emp_nameID",
+                                    name: "sp_emp_name",
+                                },
                                 // new Ext.form.ComboBox({
                                 //     mode: "local",
                                 //     store: new Ext.data.JsonStore({
@@ -1159,6 +1165,7 @@ Ext.AppUx = function (app, menu) {
                                 Ext.storeDtl.setBaseParam("c_billing", Ext.getCmp("c_billingID").getValue());
                                 Ext.storeDtl.setBaseParam("c_checking", Ext.getCmp("c_checkingID").getValue());
                                 Ext.storeDtl.setBaseParam("c_code", Ext.getCmp("c_codeID").getValue());
+                                Ext.storeDtl.setBaseParam("sp_emp_name", Ext.getCmp("sp_emp_nameID").getValue());
                                 Ext.storeDtl.load();
                             },
                         }, {
@@ -1853,4 +1860,4 @@ Ext.AppUx = function (app, menu) {
             Ext.Msg.alert("แจ้งเตือน", msg);
         }
     };
-}; 
+};
