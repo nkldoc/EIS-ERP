@@ -1198,8 +1198,16 @@ Ext.AppUx = function (app, menu) {
                             grid.getSelectionModel().selectRow(rowIndex);
                             var irCode = record.get("c_ir_code");
                             var apCode = record.get("c_ap_code");
+                            var contractCode = record.get("c_contract_code");
+                            var withdrawCode = record.get("c_code_ref");
                             var menu = new Ext.menu.Menu({
                                 items: [
+                                    {
+                                        text: "คัดลอกเลขที่สัญญา: " + (contractCode || "-"),
+                                        iconCls: "icon-copy",
+                                        disabled: !contractCode,
+                                        handler: function () { Ext.fnCopyToClipboard(contractCode); }
+                                    },
                                     {
                                         text: "คัดลอกเลขรับของ (IR): " + (irCode || "-"),
                                         iconCls: "icon-copy",
@@ -1211,6 +1219,12 @@ Ext.AppUx = function (app, menu) {
                                         iconCls: "icon-copy",
                                         disabled: !apCode,
                                         handler: function () { Ext.fnCopyToClipboard(apCode); }
+                                    },
+                                    {
+                                        text: "คัดลอกเลขใบเบิก (EIS): " + (withdrawCode || "ยังไม่ออกใบเบิก"),
+                                        iconCls: "icon-copy",
+                                        disabled: !withdrawCode,
+                                        handler: function () { Ext.fnCopyToClipboard(withdrawCode); }
                                     },
                                 ]
                             });
