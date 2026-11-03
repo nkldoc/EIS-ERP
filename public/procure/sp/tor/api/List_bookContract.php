@@ -52,17 +52,34 @@ $type = $_REQUEST["type"] ?? null;
 if ($type == "lasperiodNotification") {
 
     if ($act == "SEARCH") {
+        $c_code = trim((string)($_REQUEST['c_code'] ?? ''));
+        $d_start_raw = trim((string)($_REQUEST['d_start'] ?? ''));
+        $d_end_raw = trim((string)($_REQUEST['d_end'] ?? ''));
+        $condi = '';
+        $searchParams = array();
 
-        $c_code = $_REQUEST['c_code'] ?? null;
-        $d_start = $_REQUEST['d_start'] ?? null;
-
-        if ($d_start != null) {
-            $d_start = (new DateTime($_REQUEST["d_start"]))->format("Y-m-d"); //'2025-08-26';
-            $d_end = (new DateTime($_REQUEST["d_end"]))->format("Y-m-d"); //'2025-08-26';
-            $condi = " AND d_create BETWEEN '{$d_start} 00:00:00.000' AND '{$d_end} 23:59:59.997'";
+        // Search the visible contract code as a substring, and apply either
+        // date bound independently so a one-sided range still works.
+        if ($c_code !== '') {
+            $condi .= " AND c_gen LIKE ?";
+            $searchParams[] = '%' . $c_code . '%';
         }
-        if ($c_code != '') {
-            $condi .= " AND c_gen = '{$c_code}'";
+        foreach (array('d_create' => $d_start_raw, 'd_create_end' => $d_end_raw) as $field => $rawDate) {
+            if ($rawDate === '') {
+                continue;
+            }
+            try {
+                $dateValue = (new DateTime($rawDate))->format('Y-m-d');
+            } catch (Exception $e) {
+                continue;
+            }
+            if ($field === 'd_create') {
+                $condi .= " AND d_create >= ?";
+                $searchParams[] = $dateValue . ' 00:00:00.000';
+            } else {
+                $condi .= " AND d_create <= ?";
+                $searchParams[] = $dateValue . ' 23:59:59.997';
+            }
         }
 
 //	   echo $condi;
@@ -85,8 +102,7 @@ if ($type == "lasperiodNotification") {
             . ""; //
 //		  echo $sqlTempTable;
 //		  exit();
-    $arrParam[] = $start;
-    $arrParam[] = $limit;
+    $arrParam = array_merge($searchParams ?? array(), array($start, $limit));
     $sqlMain = "select a.c_gen as c_code "
             . " , CONVERT(VARCHAR(10), a.d_create, 120) AS d_create_dt"
             . " ,a.*"
@@ -115,6 +131,6 @@ if ($type == "lasperiodNotification") {
     }
 
     $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
-    $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
+    $totalCount = $db->GetDataBySQL($sqlCount, $searchParams ?? array());
     echo json_encode(array("debug" => true, "totalCount" => $totalCount, $root => ${$root}));
 }

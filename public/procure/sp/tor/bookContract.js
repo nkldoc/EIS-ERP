@@ -1214,12 +1214,13 @@ remvoeNoConract = (c_code)=> {
 //				    Ext.getCmp("gridID").getSelectionModel().selectRow(0);
 
 //**************/
-					   Ext.storeDtl.setBaseParam("mode", "lasperiodNotification");
-                            Ext.storeDtl.setBaseParam("act", "SEARCH");
-                            Ext.storeDtl.setBaseParam("d_start", Ext.getCmp("s_checking_dateID").getValue()); 
-                            Ext.storeDtl.setBaseParam("d_end", Ext.getCmp("e_checking_dateID").getValue()); 
-                            Ext.storeDtl.setBaseParam("c_code", Ext.getCmp("inputTriggerID").getValue()); 
-                            Ext.storeDtl.load();
+					   var startDate = Ext.getCmp("s_checking_dateID").getValue();
+					   var endDate = Ext.getCmp("e_checking_dateID").getValue();
+					   Ext.storeDtl.setBaseParam("act", "SEARCH");
+					   Ext.storeDtl.setBaseParam("d_start", startDate ? startDate.format("Y-m-d") : "");
+					   Ext.storeDtl.setBaseParam("d_end", endDate ? endDate.format("Y-m-d") : "");
+					   Ext.storeDtl.setBaseParam("c_code", Ext.getCmp("inputTriggerID").getValue());
+					   Ext.storeDtl.load({params: {start: 0}});
 					   
 				    
 				}
@@ -1504,25 +1505,28 @@ remvoeNoConract = (c_code)=> {
 								    handler: function () {
 
  
-									   Ext.call_last = () => {
-										  Ext.bookContrack.setBaseParam("i_yyyy", Ext.getCmp('i_yearID').lastSelectionText);
+									   Ext.call_last = (afterLoad) => {
+						  // The combo displays the Buddhist year but stores the Gregorian year.
+						  // sp_doc_gen.c_yyyy is stored using the combo's underlying value.
+						  Ext.bookContrack.setBaseParam("i_yyyy", Ext.getCmp('i_yearID').getValue());
 										  Ext.bookContrack.setBaseParam("type", "contract");
 										  Ext.bookContrack.setBaseParam("i_purchase", Ext.getCmp('i_purchaseID').getValue().inputValue);
 										  Ext.bookContrack.setBaseParam("i_type_contract", Ext.getCmp('i_type_contractID').getValue().inputValue);
+						  Ext.bookContrack.setBaseParam("c_sub", Ext.getCmp('c_subID').getValue());
 
 										  Ext.bookContrack.reload({
-											 callback: function (record, operation, success) {
+							 callback: function (records, operation, success) {
 												if (success)
 												{
 
-												    if (!Ext.isEmpty(record)) {
-													   Ext.getCmp('i_value').setValue(this.data.items[0].get('id'));
-													   Ext.getCmp('codeCTS').setValue(this.data.items[0].get('c_name'));
+								    if (records && records.length > 0) {
+								   Ext.getCmp('i_value').setValue(records[0].get('id'));
+								   Ext.getCmp('codeCTS').setValue(records[0].get('c_name'));
 												    } else {
-													   console.log('NULL');
 													   Ext.getCmp('i_value').setValue(0);
 													   Ext.getCmp('codeCTS').setValue("ว่าง");
 												    }
+													if (Ext.isFunction(afterLoad)) afterLoad();
 												}
 											 }
 										  });
@@ -1587,21 +1591,20 @@ remvoeNoConract = (c_code)=> {
 										  Ext.example.msg("แจ้งเตือน", 'เลือกพนักงานเจ้าของสัญญาก่อน', 3);
 										  return false;
 									   }
-
-
-									   let number = 0;
-									   let result = number + ((Ext.getCmp('i_value').getValue() * 1) + 1);
+										   // Refresh the latest sequence first; generate only after its async load completes.
+										   Ext.call_last(function () {
+											  let result = (Number(Ext.getCmp('i_value').getValue()) || 0) + 1;
 // แปลงเป็น string และเติมศูนย์ด้านหน้าให้ครบ 5 หลัก
-									   let padded = result.toString().padStart(4, '0');
-									   Ext.call_last();
-									   Ext.c_contract = Ext.getCmp('i_type_contractID').getValue().inputValue + Ext.getCmp('i_purchaseID').getValue().inputValue
+											  let padded = result.toString().padStart(4, '0');
+											  Ext.c_contract = Ext.getCmp('i_type_contractID').getValue().inputValue + Ext.getCmp('i_purchaseID').getValue().inputValue
 
-											 + "" + Ext.getCmp('c_subID').getValue()
-											 + "" + padded
-											 + "/" + (Ext.getCmp('i_yearID').getValue() + 543)
+													 + "" + Ext.getCmp('c_subID').getValue()
+													 + "" + padded
+													 + "/" + (Ext.getCmp('i_yearID').getValue() + 543)
 
-									   Ext.getCmp('codeCTS2').setValue(Ext.c_contract);
-									   Ext.example.msg("แจ้งเตือน", Ext.c_contract, 3);
+											  Ext.getCmp('codeCTS2').setValue(Ext.c_contract);
+											  Ext.example.msg("แจ้งเตือน", Ext.c_contract, 3);
+										   });
 
 
 
