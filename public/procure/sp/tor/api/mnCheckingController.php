@@ -1461,6 +1461,32 @@ switch ($mode) {
         $c_code = $_REQUEST['c_code'] ?? null;
         $ienabled = $_REQUEST['i_enabled'] ?? 1;
 
+        // The checking item tables are an optional feature during staggered deployments.
+        // Avoid referencing them in the core list query until the migration is installed.
+        $hasCheckItems = (int) $db->GetDataBySQL(
+            "SELECT CASE WHEN OBJECT_ID(N'dbo.sp_check_items', N'U') IS NOT NULL THEN 1 ELSE 0 END",
+            array()
+        ) === 1;
+        $checkItemsStatusForCc = $hasCheckItems
+            ? "CASE
+                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=2) THEN 7
+                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=3) THEN 9
+                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1)
+                     AND NOT EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status IN (2,3)) THEN 10
+                ELSE NULL END"
+            : "CAST(NULL AS INT)";
+        $checkItemsStatusForC = $hasCheckItems
+            ? "CASE
+                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=2) THEN 7
+                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=3) THEN 9
+                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1)
+                     AND NOT EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status IN (2,3)) THEN 10
+                ELSE NULL END"
+            : "CAST(NULL AS INT)";
+        $checkItemsCountForC = $hasCheckItems
+            ? "(SELECT COUNT(*) FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1)"
+            : "CAST(0 AS INT)";
+
         if ($act == "SEARCH") {
             if ($_REQUEST["value"] != "") {
 
@@ -1503,10 +1529,9 @@ switch ($mode) {
             }
             if ($_REQUEST["i_status"] > 0) {
                 $wh .= " AND CASE
-            WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=2) THEN 7
-            WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=3) THEN 9
-            WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1)
-                 AND NOT EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status IN (2,3)) THEN 10
+            WHEN {$checkItemsStatusForCc} = 7 THEN 7
+            WHEN {$checkItemsStatusForCc} = 9 THEN 9
+            WHEN {$checkItemsStatusForCc} = 10 THEN 10
             WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr cancel_po WHERE cancel_po.po_working_hdr_id=cc.po_working_hdr_id AND cancel_po.i_enable=2) THEN 6
             WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr dispute_po WHERE dispute_po.po_working_hdr_id=cc.po_working_hdr_id AND dispute_po.i_enable=1 AND dispute_po.i_status_last=3) THEN 7
             WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr paid_po WHERE paid_po.po_working_hdr_id=cc.po_working_hdr_id AND paid_po.i_enable=1 AND paid_po.i_status_last=11) THEN 8
@@ -1608,10 +1633,9 @@ switch ($mode) {
             when b.i_overlap = 2  then isnull(b.c_overlap,'ยังไม่ได้เลือกใบกัน')
             else  'ใช้เงินปีงบปัจุบัน'
             end  as chek_overlap
-            , case when exists (select 1 from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1 and sci.i_status=2) then 7
-            when exists (select 1 from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1 and sci.i_status=3) then 9
-            when exists (select 1 from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1)
-                 and not exists (select 1 from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1 and sci.i_status in (2,3)) then 10
+            , case when ({$checkItemsStatusForC}) = 7 then 7
+            when ({$checkItemsStatusForC}) = 9 then 9
+            when ({$checkItemsStatusForC}) = 10 then 10
             when exists (select 1 from NMU_EIS.dbo.po_working_hdr cancel_po where cancel_po.po_working_hdr_id=c.po_working_hdr_id and cancel_po.i_enable=2) then 6
             when exists (select 1 from NMU_EIS.dbo.po_working_hdr dispute_po where dispute_po.po_working_hdr_id=c.po_working_hdr_id and dispute_po.i_enable=1 and dispute_po.i_status_last=3) then 7
             when exists (select 1 from NMU_EIS.dbo.po_working_hdr paid_po where paid_po.po_working_hdr_id=c.po_working_hdr_id and paid_po.i_enable=1 and paid_po.i_status_last=11) then 8
@@ -1621,7 +1645,7 @@ switch ($mode) {
             when c.i_status_billing  = 4  and  c.i_status_checking  = 1 and c.c_code is not null and cc.c_code  is not null  and  c.po_working_hdr_id is null   then 4   -- ผ่านรายการวางบิลแล้วรอเบิก
             when c.i_status_billing  = 4  and  c.i_status_checking  = 1 and c.c_code is not null and cc.c_code  is not null  and  c.po_working_hdr_id is not null   then 5   -- ผ่านรายการวางบิลแล้วรอเบิก
             else 0  end as i_status_chk
-            , (select count(*) from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1) as protest_count
+            , {$checkItemsCountForC} as protest_count
             , (SELECT sum(f_net_total_price) FROM sp_check_period_dtl WHERE sp_check_period_hdr_id=c.sp_check_period_hdr_id) AS f_net_total_price
             , isnull((select top 1 c_name from NMU.dbo.dc_creditor where dc_creditor_id=b.dc_creditor_id),'')  as dc_creditor_idTxt
             , c.dc_creditor_id
