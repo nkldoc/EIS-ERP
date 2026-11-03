@@ -10229,6 +10229,218 @@ var updateMissingWithdrawEmp = function (grid, record, button) {
 };
 
 
+Ext.showCheckingProtestDetails = function (record, mainGrid) {
+        var detailWindow = null;
+        var protestStore = new Ext.data.JsonStore({
+                url: "tor/api/mnCheckingController.php",
+                baseParams: { mode: "LIST_PROTEST_ITEMS", sp_check_period_hdr_id: record.get("sp_check_period_hdr_id") },
+                root: "data", totalProperty: "totalCount",
+                fields: ["id", "c_officer_name", "d_receive", "d_send", "c_reason", "c_annotation_image", "c_document_url", "i_status",
+                        "c_resolved_image", "c_resolved_note", "c_resolved_officer_name", "d_resolved", "return_count", "resolution_count"]
+        });
+        var imageUrl = function (path) {
+                if (!path) return "";
+                if (/^https?:\/\//i.test(path)) return path;
+                if (/^\/procure\//i.test(path)) return window.location.protocol + "//" + window.location.host + path;
+                path = String(path).replace(/^\.\.\/uploads\//, "").replace(/^\/?uploads\//, "");
+                return window.location.protocol + "//" + window.location.host + "/NMU_EIS/uploads/" + path;
+        };
+        var showImage = function (data) {
+                var src = imageUrl(data.c_annotation_image);
+                if (!src) { Ext.Msg.alert("แจ้งเตือน", "รายการนี้ไม่มีภาพทักท้วง"); return; }
+                new Ext.Window({
+                        title: "ภาพทักท้วง - " + (data.c_officer_name || ""), width: 1000, height: 720,
+                        maximizable: true, modal: true, layout: "border",
+                        items: [{ region: "center", xtype: "panel", autoScroll: true,
+                                bodyStyle: "background:#555;text-align:center;padding:12px",
+                                html: "<img src='" + src + "?_dc=" + new Date().getTime() + "' style='max-width:100%;height:auto;background:white' alt='ภาพทักท้วง'>"
+                        }, { region: "south", xtype: "panel", height: 105, frame: true,
+                                bodyStyle: "padding:8px;font-size:13px",
+                                html: "<b>เจ้าพนักงาน:</b> " + Ext.util.Format.htmlEncode(data.c_officer_name || "-") +
+                                      " &nbsp; <b>เวลารับ:</b> " + Ext.util.Format.htmlEncode(data.d_receive || "-") +
+                                      " &nbsp; <b>เวลาส่ง:</b> " + Ext.util.Format.htmlEncode(data.d_send || "-") +
+                                      "<br><b>รายละเอียด:</b> " + Ext.util.Format.htmlEncode(data.c_reason || "-").replace(/\n/g, "<br>")
+                        }],
+                        buttons: [{ text: "เปิดภาพเต็ม", handler: function () { window.open(src, "_blank"); } },
+                                  { text: "ปิด", handler: function (button) { button.ownerCt.ownerCt.close(); } }]
+                }).show().maximize();
+        };
+        var showResolvedImage = function (data) {
+                var src = imageUrl(data.c_resolved_image);
+                if (!src) { Ext.Msg.alert("แจ้งเตือน", "ยังไม่มีภาพใบร่างหลังแก้ไข"); return; }
+                new Ext.Window({
+                        title: "ใบร่างหลังแก้ไข - " + (data.c_resolved_officer_name || ""), width: 1000, height: 720,
+                        maximizable: true, modal: true, layout: "border",
+                        items: [{ region: "center", xtype: "panel", autoScroll: true,
+                                bodyStyle: "background:#555;text-align:center;padding:12px",
+                                html: "<img src='" + src + "?_dc=" + new Date().getTime() + "' style='max-width:100%;height:auto;background:white'>"
+                        }, { region: "south", xtype: "panel", height: 95, frame: true, bodyStyle: "padding:8px",
+                                html: "<b>ผู้ยืนยัน:</b> " + Ext.util.Format.htmlEncode(data.c_resolved_officer_name || "-") +
+                                      " &nbsp; <b>วันที่ยืนยัน:</b> " + Ext.util.Format.htmlEncode(data.d_resolved || "-") +
+                                      "<br><b>รายละเอียดการแก้ไข:</b> " + Ext.util.Format.htmlEncode(data.c_resolved_note || "-")
+                        }],
+                        buttons: [{ text: "เปิดภาพเต็ม", handler: function () { window.open(src, "_blank"); } },
+                                  { text: "ปิด", handler: function (button) { button.ownerCt.ownerCt.close(); } }]
+                }).show().maximize();
+        };
+        var showResolutionHistory = function (data) {
+                var historyStore = new Ext.data.JsonStore({
+                        url: "tor/api/mnCheckingController.php",
+                        baseParams: { mode: "LIST_PROTEST_RESOLUTIONS", sp_check_item_id: data.id },
+                        root: "data", totalProperty: "totalCount",
+                        fields: ["id", "i_round", "c_resolved_image", "c_resolved_note", "c_resolved_officer_name", "d_resolved",
+                                "i_review_status", "c_review_officer_name", "c_review_note", "d_reviewed"]
+                });
+                var historyGrid = new Ext.grid.GridPanel({
+                        store: historyStore, stripeRows: true,
+                        viewConfig: { emptyText: "ยังไม่มีประวัติการยืนยันแก้ไข", deferEmptyText: false },
+                        columns: [
+                                { header: "ครั้งที่", dataIndex: "i_round", width: 65, align: "center" },
+                                { header: "ผู้ยืนยัน", dataIndex: "c_resolved_officer_name", width: 180 },
+                                { header: "วันเวลาที่ยืนยัน", dataIndex: "d_resolved", width: 145 },
+                                { header: "รายละเอียดการแก้ไข", dataIndex: "c_resolved_note", width: 350 },
+                                { header: "ผลตรวจ", dataIndex: "i_review_status", width: 100, align: "center",
+                                  renderer: function (value) { value = parseInt(value, 10); if (value === 1) return "<b style='color:green'>ผ่าน</b>"; if (value === 2) return "<b style='color:#c00'>ทักท้วงอีกครั้ง</b>"; return "<b style='color:#d08000'>รอตรวจ</b>"; } },
+                                { header: "วันที่กดผ่าน", dataIndex: "d_reviewed", width: 145 },
+                                { header: "ใบร่างใหม่", id: "resolution_round_image", dataIndex: "c_resolved_image", width: 145, align: "center",
+                                  renderer: function (value, meta, row) { return value ? "<button style='cursor:pointer;color:green'>ดูใบร่าง ครั้งที่ " + row.get("i_round") + "</button>" : "-"; } }
+                        ],
+                        listeners: {
+                                cellclick: function (grid, rowIndex, columnIndex) {
+                                        if (columnIndex === grid.getColumnModel().getIndexById("resolution_round_image")) showResolvedImage(grid.getStore().getAt(rowIndex).data);
+                                },
+                                rowdblclick: function (grid, rowIndex) { showResolvedImage(grid.getStore().getAt(rowIndex).data); }
+                        }
+                });
+                new Ext.Window({
+                        title: "ประวัติยืนยันการแก้ไขทักท้วง (" + (data.resolution_count || 0) + " ครั้ง)",
+                        width: 950, height: 430, modal: true, maximizable: true, layout: "fit", items: [historyGrid],
+                        buttons: [{ text: "ปิด", handler: function (button) { button.ownerCt.ownerCt.close(); } }]
+                }).show().maximize();
+                historyStore.load();
+        };
+        var confirmProtestResolution = function (data) {
+                var nextRound = (parseInt(data.return_count, 10) || 0) + 1;
+                var code = String(record.get("c_checking_code") || "document").replace(/\//g, "-").replace(/\s/g, "");
+                var pdfUrl = Ext.session.NMU_EIS_HOST + "/po/pdf/PDF_PoWorking.php/" + encodeURIComponent(code) + ".pdf?id=" +
+                        encodeURIComponent(record.get("sp_check_period_hdr_id")) +
+                        "&preview_D_AP=1&dc_cost_acc_id_D_AP=" + encodeURIComponent(record.get("dc_cost_id") || Ext.session.dc_cost_acc_id || "") +
+                        "&_dc=" + new Date().getTime();
+                var hostId = Ext.id(null, "checking-resolution-");
+                var noteId = Ext.id(null, "checking-resolution-note-");
+                var canvas = null, ready = false;
+                var loadPdf = function () {
+                        if (!window.pdfjsLib) {
+                                var script = document.createElement("script");
+                                script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+                                script.onload = loadPdf;
+                                script.onerror = function () { Ext.get(hostId).dom.innerHTML = "<div style='color:white;padding:20px'>ไม่สามารถโหลดโปรแกรมอ่าน PDF ได้</div>"; };
+                                document.getElementsByTagName("head")[0].appendChild(script);
+                                return;
+                        }
+                        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+                        var host = Ext.get(hostId).dom;
+                        canvas = host.getElementsByTagName("canvas")[0];
+                        pdfjsLib.getDocument(pdfUrl).promise.then(async function (pdf) {
+                                var pages = [], width = 0, height = 0, gap = 15, scale = 1.25;
+                                for (var n = 1; n <= pdf.numPages; n++) {
+                                        var page = await pdf.getPage(n), viewport = page.getViewport({ scale: scale });
+                                        pages.push({ page: page, viewport: viewport, top: height });
+                                        width = Math.max(width, Math.ceil(viewport.width));
+                                        height += Math.ceil(viewport.height) + (n < pdf.numPages ? gap : 0);
+                                }
+                                canvas.width = width; canvas.height = height;
+                                var context = canvas.getContext("2d"); context.fillStyle = "white"; context.fillRect(0, 0, width, height);
+                                for (var i = 0; i < pages.length; i++) {
+                                        var temp = document.createElement("canvas"), item = pages[i];
+                                        temp.width = Math.ceil(item.viewport.width); temp.height = Math.ceil(item.viewport.height);
+                                        await item.page.render({ canvasContext: temp.getContext("2d"), viewport: item.viewport }).promise;
+                                        context.drawImage(temp, Math.floor((width - temp.width) / 2), item.top);
+                                }
+                                host.getElementsByTagName("div")[0].style.display = "none"; ready = true;
+                        }).catch(function (error) {
+                                host.getElementsByTagName("div")[0].innerHTML = "โหลดใบร่างไม่สำเร็จ: " + Ext.util.Format.htmlEncode(error.message || String(error));
+                        });
+                };
+                var win = new Ext.Window({
+                        title: "ยืนยันการแก้ไข พร้อมบันทึกใบขอเบิก (ร่าง) ครั้งที่ " + nextRound,
+                        width: 1050, height: 720, modal: true, maximizable: true, layout: "border",
+                        items: [{ region: "center", xtype: "panel", autoScroll: true, border: false,
+                                html: "<div id='" + hostId + "' style='background:#666;min-height:100%;padding:12px;text-align:center'><div style='color:white'>กำลังโหลดใบร่างฉบับล่าสุด...</div><canvas style='background:white;display:block;margin:auto'></canvas></div>" },
+                                { region: "south", xtype: "form", height: 90, frame: true, labelWidth: 130,
+                                  items: [{ xtype: "textarea", id: noteId, fieldLabel: "รายละเอียดการแก้ไข", anchor: "98%", height: 55 }] }],
+                        buttons: [{ text: "ยืนยันการแก้ไข ครั้งที่ " + nextRound, icon: "images/icons/accept.png", handler: function () {
+                                if (!ready || !canvas) { Ext.Msg.alert("แจ้งเตือน", "กรุณารอให้ใบร่างโหลดเสร็จ"); return; }
+                                Ext.Msg.wait("กำลังบันทึกใบร่างและส่งคืนทักท้วง...");
+                                Ext.Ajax.request({
+                                        url: "tor/api/mnCheckingController.php", method: "POST",
+                                        params: { mode: "CONFIRM_PROTEST_RESOLUTION", sp_check_period_hdr_id: record.get("sp_check_period_hdr_id"),
+                                                sp_check_item_id: data.id, c_resolved_note: Ext.getCmp(noteId).getValue(), resolved_image: canvas.toDataURL("image/png") },
+                                        success: function (response) {
+                                                var result = Ext.decode(response.responseText);
+                                                if (result.success) {
+                                                        win.close();
+                                                        if (detailWindow) { detailWindow.close(); }
+                                                        protestStore.reload();
+                                                        record.set("i_status_chk", parseInt(result.status, 10) || 9);
+                                                        record.set("i_status_chkTxt", "<b style='color:#0066CC'>" + Ext.util.Format.htmlEncode(result.status_text || "ส่งคืนทักท้วง") + "</b>");
+                                                        record.commit();
+                                                        var mainStore = mainGrid && mainGrid.getStore ? mainGrid.getStore() : (record.store || Ext.storeDtl);
+                                                        if (mainStore && mainStore.reload) {
+                                                                mainStore.reload({ callback: function () {
+                                                                        Ext.Msg.alert("ผลการบันทึก", result.msg);
+                                                                } });
+                                                        } else {
+                                                                Ext.Msg.alert("ผลการบันทึก", result.msg);
+                                                        }
+                                                } else {
+                                                        Ext.Msg.alert("ผลการบันทึก", result.msg);
+                                                }
+                                        },
+                                        failure: function (response) { var msg = "ไม่สามารถส่งคืนทักท้วงได้"; try { msg = Ext.decode(response.responseText).msg || msg; } catch (e) {} Ext.Msg.alert("แจ้งเตือน", msg); }
+                                });
+                        } }, { text: "ยกเลิก", handler: function () { win.close(); } }],
+                        listeners: { afterrender: loadPdf }
+                });
+                win.show();
+                win.maximize();
+        };
+        var detailGrid = new Ext.grid.GridPanel({
+                store: protestStore, stripeRows: true,
+                viewConfig: { emptyText: "ไม่พบประวัติการทักท้วง", deferEmptyText: false },
+                columns: [
+                        { header: "เจ้าพนักงาน", dataIndex: "c_officer_name", width: 160 },
+                        { header: "เวลารับ", dataIndex: "d_receive", width: 135 },
+                        { header: "เวลาส่ง", dataIndex: "d_send", width: 135 },
+                        { header: "รายละเอียดการทักท้วง", dataIndex: "c_reason", width: 310 },
+                        { header: "รูปภาพ", id: "checking_protest_image", dataIndex: "c_annotation_image", width: 90, align: "center",
+                          renderer: function (value) { return value ? "<button style='cursor:pointer;color:#d00000'>ภาพทักท้วง</button>" : "-"; } },
+                        { header: "สถานะ", dataIndex: "i_status", width: 120, align: "center",
+                          renderer: function (value) { value = parseInt(value, 10); if (value === 4) return "<b style='color:green'>ผู้ตรวจให้ผ่านแล้ว</b>"; if (value === 3) return "<b style='color:#0066cc'>ส่งคืนทักท้วง</b>"; return "<b style='color:#d00000'>ทักท้วง</b>"; } },
+                        { header: "ใบร่างหลังแก้ไข", id: "checking_resolved_image", dataIndex: "c_resolved_image", width: 120, align: "center",
+                          renderer: function (value, meta, row) { var count = parseInt(row.get("resolution_count"), 10) || 0; return count ? "<button style='cursor:pointer;color:green'>ดูประวัติ " + count + " ครั้ง</button>" : "-"; } },
+                        { header: "ยืนยันการแก้ไข", id: "confirm_protest_resolution", dataIndex: "return_count", width: 145, align: "center",
+                          renderer: function (value, meta, row) { if (parseInt(row.get("i_status"), 10) !== 2) return "-"; var next = (parseInt(value, 10) || 0) + 1; return "<button style='cursor:pointer;color:blue'>ยืนยัน ครั้งที่ " + next + "</button>"; } }
+                ],
+                listeners: {
+                        cellclick: function (grid, rowIndex, columnIndex) {
+                                if (columnIndex === grid.getColumnModel().getIndexById("checking_protest_image")) showImage(grid.getStore().getAt(rowIndex).data);
+                                if (columnIndex === grid.getColumnModel().getIndexById("checking_resolved_image")) showResolutionHistory(grid.getStore().getAt(rowIndex).data);
+                                if (columnIndex === grid.getColumnModel().getIndexById("confirm_protest_resolution") && parseInt(grid.getStore().getAt(rowIndex).get("i_status"), 10) === 2) confirmProtestResolution(grid.getStore().getAt(rowIndex).data);
+                        },
+                        rowdblclick: function (grid, rowIndex) { showImage(grid.getStore().getAt(rowIndex).data); }
+                }
+        });
+        detailWindow = new Ext.Window({
+                title: "รายละเอียดการทักท้วง (" + record.get("protest_count") + ")", width: 1100, height: 520,
+                modal: true, maximizable: true, layout: "fit", items: [detailGrid],
+                buttons: [{ text: "ปิด", handler: function (button) { button.ownerCt.ownerCt.close(); } }]
+        });
+        detailWindow.show();
+        detailWindow.maximize();
+        protestStore.load();
+};
+
 var cellClick = function (grid, rowIndex, columnIndex, e) {
         var updateButton = e.getTarget("button.update-missing-withdraw-emp");
         if (updateButton) {
@@ -10245,6 +10457,10 @@ var cellClick = function (grid, rowIndex, columnIndex, e) {
         var column = grid.getColumnModel().getColumnAt(columnIndex);
         if (column && column.id === 'i_is_editID') {
                 showCustomEditForm(Ext.selectRow);
+                return;
+        }
+        if (column && column.id === "protest_detailID") {
+                Ext.showCheckingProtestDetails(Ext.selectRow, grid);
                 return;
         }
         if (columnIndex === grid.getColumnModel().getIndexById("i_is_workID")) {
@@ -10276,7 +10492,9 @@ var cellClick = function (grid, rowIndex, columnIndex, e) {
                 // return;
                 controller(Ext.selectRow, "processUpdate"); //on
         } else if (columnIndex === grid.getColumnModel().getIndexById("i_status_chkTxtID")) {
-
+                if (parseInt(Ext.selectRow.get("protest_count") || 0, 10) > 0) {
+                        Ext.showCheckingProtestDetails(Ext.selectRow, grid);
+                }
         } else if (columnIndex === grid.getColumnModel().getIndexById("i_EditID")) {
                 if (Ext.selectRow.data.c_checking_code === null) {
                         Ext.MessageBox.alert("แจ้งเตือน", "<span style='white-space: nowrap;'>รายการนี้ยังไม่ออกเลขตรวจรับ</span>");
@@ -10661,6 +10879,9 @@ Ext.AppUx = function (app, menu) {
                         },
                         {
                                 name: "i_status_chkTxt",
+                        },
+                        {
+                                name: "protest_count",
                         },
                         {
                                 name: "c_code_billing",
@@ -11144,6 +11365,11 @@ Ext.AppUx = function (app, menu) {
                                         renderer: function (value, metaData, record, rowIndex, colIndex, store) {
                                                 if (!value)
                                                         return '';
+                                                if (parseInt(record.get("i_status_chk"), 10) === 7 && parseInt(record.get("protest_count") || 0, 10) > 0) {
+                                                        var protestCount = parseInt(record.get("protest_count") || 0, 10);
+                                                        metaData.attr = "style='cursor:pointer;text-align:center;' ext:qtip='คลิกเพื่อเปิดรายละเอียดคำทักท้วง'";
+                                                        return "<button style='cursor:pointer;color:#CC6600;font-weight:bold'>ทักท้วง (" + protestCount + ")</button>";
+                                                }
                                                 // 1. จัดการฟอร์แมตข้อความเพื่อใช้ใน Tooltip และตอนคลิก (แปลง \n เป็น <br/>)
                                                 var fullMessageHtml = Ext.util.Format.htmlEncode(value).replace(/\n/g, '<br/>');
                                                 // 2. ทำให้คำว่า "ติดต่อแอดมิน" เป็นสีแดง (ไม่ว่าจะพิมพ์ภาษาไทยหรืออังกฤษ)
@@ -11156,15 +11382,26 @@ Ext.AppUx = function (app, menu) {
                                                 metaData.attr = 'ext:qtip="' + fullMessageHtml + '"';
                                                 // 4. สร้างฟังก์ชัน Global ชั่วคราว (หรือจะเขียนแบบแนบ String) เพื่อให้กดคลิกแล้วแสดงผลข้อมูล Error แบบสวยงาม
                                                 // ปล. ใช้ window.showGridError เพื่อให้ HTML string สามารถเรียกใช้ฟังก์ชันนี้ได้จากทุกแถว
-                                                window.showGridError = window.showGridError || function (encodedMsg) {
+                                                window.showGridError = function (encodedMsg) {
                                                         var decodedMsg = decodeURIComponent(encodedMsg);
-                                                        Ext.Msg.show({
-                                                                title: '<span style="color: #ff4d4f;"><i class="fa fa-exclamation-triangle"></i> รายละเอียดข้อมูล</span>',
-                                                                msg: '<div style="max-height: 300px; overflow-y: auto; padding: 10px; background: #fff1f0; border: 1px solid #ffa39e; border-radius: 4px; font-family: monospace; font-size: 13px; color: #a8071a; white-space: pre-wrap; line-height: 1.6;">' + decodedMsg + '</div>',
-                                                                buttons: Ext.Msg.OK,
-                                                                icon: Ext.Msg.ERROR,
-                                                                width: 550
+                                                        var safeMessage = Ext.util.Format.htmlEncode(decodedMsg).replace(/\n/g, '<br>');
+                                                        var alertWin = new Ext.Window({
+                                                                title: '<span style="color:#ff4d4f">⚠ แจ้งเตือนแอดมิน</span>',
+                                                                width: 550,
+                                                                height: 260,
+                                                                modal: true,
+                                                                draggable: true,
+                                                                resizable: true,
+                                                                maximizable: true,
+                                                                constrainHeader: true,
+                                                                layout: 'fit',
+                                                                items: [{ xtype: 'panel', autoScroll: true, border: false,
+                                                                        bodyStyle: 'padding:12px;background:#fff1f0;',
+                                                                        html: '<div style="padding:10px;background:#fff;border:1px solid #ffa39e;border-radius:4px;font-family:monospace;font-size:13px;color:#a8071a;line-height:1.6;">' + safeMessage + '</div>'
+                                                                }],
+                                                                buttons: [{ text: 'ปิด', handler: function () { alertWin.close(); } }]
                                                         });
+                                                        alertWin.show();
                                                 };
                                                 // เข้ารหัสข้อความเดิม (รวม \n) เพื่อส่งผ่านทางพารามิเตอร์ของฟังก์ชัน onclick ได้อย่างปลอดภัย ไม่พังเพราะเครื่องหมายคำพูด
                                                 var safeParam = encodeURIComponent(record.get('c_name') + '\n' + record.get('budget_type') + '\n' + record.get('expense_name') + '\n' + record.get('c_yyyy'));
@@ -11179,6 +11416,20 @@ Ext.AppUx = function (app, menu) {
                                                         ' background: #fff5f5;' + // พื้นหลังแดงจาง ๆ
                                                         ' cursor: pointer;' + // เปลี่ยนเมาส์เป็นรูปมือ ให้ผู้ใช้รู้ว่ากดคลิกได้
                                                         '">' + displayValue + '</div>';
+                                        }
+                                },
+                                {
+                                        header: "รายละเอียดทักท้วง",
+                                        sortable: false,
+                                        align: "center",
+                                        dataIndex: "protest_count",
+                                        id: "protest_detailID",
+                                        width: 125,
+                                        renderer: function (value, metaData) {
+                                                metaData.attr = "style='cursor:pointer;text-align:center;'";
+                                                return parseInt(value || 0, 10) > 0
+                                                        ? "<button style='cursor:pointer;color:#d00000'>แสดงรูป/รายละเอียด (" + value + ")</button>"
+                                                        : "-";
                                         }
                                 },
                                 {
@@ -12091,6 +12342,8 @@ Ext.AppUx = function (app, menu) {
                                                                                 ["6", "6 - ยกเลิกเบิก"],
                                                                                 ["7", "7 - ทักท้วง"],
                                                                                 ["8", "8 - จ่ายแล้ว"],
+                                                                                ["9", "9 - ส่งคืนทักท้วง"],
+                                                                                ["10", "10 - ผ่านตรวจใบร่างแล้ว"],
                                                                         ],
                                                                 }),
                                                                 value: "0",

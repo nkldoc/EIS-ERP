@@ -1311,6 +1311,115 @@ switch ($mode) {
         echo json_encode(array("debug" => true, "totalCount" => $totalCount, $root => ${$root}));
         exit;
         break;
+    case "LIST_PROTEST_ITEMS":
+        $periodId = filter_var(@$_REQUEST["sp_check_period_hdr_id"], FILTER_VALIDATE_INT);
+        if (!$periodId) {
+            echo json_encode(array("success" => false, "totalCount" => 0, "data" => array(), "msg" => "ไม่พบรหัสตรวจรับ"));
+            exit;
+        }
+        $sqlMain = "SELECT sp_check_item_id AS id, c_officer_name,
+                           CONVERT(VARCHAR(19), d_receive, 120) AS d_receive,
+                           CONVERT(VARCHAR(19), d_send, 120) AS d_send,
+                           c_reason, c_annotation_image, c_document_url, i_status,
+                           c_resolved_image, c_resolved_note, c_resolved_officer_name,
+                           CONVERT(VARCHAR(19), d_resolved, 120) AS d_resolved,
+                           (SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r
+                            WHERE r.sp_check_item_id = sp_check_items.sp_check_item_id AND r.i_enable = 1) AS return_count,
+                           (SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r
+                            WHERE r.sp_check_item_id = sp_check_items.sp_check_item_id AND r.i_enable = 1 AND r.i_review_status = 1) AS resolution_count
+                    FROM dbo.sp_check_items
+                    WHERE sp_check_period_hdr_id = ? AND i_enable = 1
+                    ORDER BY d_create DESC, sp_check_item_id DESC";
+        $stmt = $db->QueryParam($sqlMain, array($periodId));
+        $items = array();
+        while ($row = $db->Fetch($stmt)) {
+            $items[] = $row;
+        }
+        echo json_encode(array("success" => true, "totalCount" => count($items), "data" => $items));
+        exit;
+        break;
+    case "LIST_PROTEST_RESOLUTIONS":
+        $itemId = filter_var(@$_REQUEST["sp_check_item_id"], FILTER_VALIDATE_INT);
+        if (!$itemId) {
+            echo json_encode(array("success" => false, "totalCount" => 0, "data" => array(), "msg" => "ไม่พบรายการทักท้วง"));
+            exit;
+        }
+        $sqlMain = "SELECT r.sp_check_item_resolution_id AS id, r.i_round,
+                           r.c_resolved_image, r.c_resolved_note, r.c_resolved_officer_name, r.c_review_note,
+                           CONVERT(VARCHAR(19), r.d_resolved, 120) AS d_resolved,
+                           r.i_review_status, r.c_review_officer_name,
+                           CONVERT(VARCHAR(19), r.d_reviewed, 120) AS d_reviewed
+                    FROM dbo.sp_check_item_resolutions r
+                    INNER JOIN dbo.sp_check_items i ON i.sp_check_item_id = r.sp_check_item_id
+                    WHERE r.sp_check_item_id = ? AND i.i_enable = 1 AND r.i_enable = 1
+                    ORDER BY r.i_round DESC";
+        $stmt = $db->QueryParam($sqlMain, array($itemId));
+        $items = array();
+        while ($row = $db->Fetch($stmt)) { $items[] = $row; }
+        echo json_encode(array("success" => true, "totalCount" => count($items), "data" => $items));
+        exit;
+        break;
+    case "CONFIRM_PROTEST_RESOLUTION":
+        $periodId = filter_var(@$_POST["sp_check_period_hdr_id"], FILTER_VALIDATE_INT);
+        $itemId = filter_var(@$_POST["sp_check_item_id"], FILTER_VALIDATE_INT);
+        $note = trim((string)@$_POST["c_resolved_note"]);
+        $imageData = (string)@$_POST["resolved_image"];
+        $userId = intval(@$_SESSION["user_id"]);
+        if (!$periodId || !$itemId || !$userId || !preg_match('#^data:image/png;base64,#', $imageData)) {
+            echo json_encode(array("success" => false, "msg" => "ข้อมูลยืนยันการแก้ไขไม่ครบถ้วน"));
+            exit;
+        }
+        $binary = base64_decode(substr($imageData, strpos($imageData, ',') + 1), true);
+        if ($binary === false || strlen($binary) > 15 * 1024 * 1024) {
+            echo json_encode(array("success" => false, "msg" => "ภาพใบร่างไม่ถูกต้องหรือมีขนาดเกิน 15 MB"));
+            exit;
+        }
+        $nameStmt = $db->QueryParam("SELECT TOP 1 c_full_name FROM dbo.dc_user WHERE dc_user_id = ?", array($userId));
+        $nameRow = $db->Fetch($nameStmt);
+        $officerName = trim((string)@$nameRow["c_full_name"]);
+        if ($officerName === "") { $officerName = "User #" . $userId; }
+        $uploadDir = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . "uploads" . DIRECTORY_SEPARATOR . "sp_check_items";
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true)) {
+            echo json_encode(array("success" => false, "msg" => "ไม่สามารถสร้างที่เก็บภาพใบร่างได้"));
+            exit;
+        }
+        $fileName = $periodId . "_resolved_" . date("Ymd_His") . "_" . bin2hex(random_bytes(4)) . ".png";
+        if (file_put_contents($uploadDir . DIRECTORY_SEPARATOR . $fileName, $binary, LOCK_EX) === false) {
+            echo json_encode(array("success" => false, "msg" => "ไม่สามารถบันทึกภาพใบร่างได้"));
+            exit;
+        }
+        $imagePath = "/procure/uploads/sp_check_items/" . $fileName;
+        $sqlMain = "IF NOT EXISTS (SELECT 1 FROM dbo.sp_check_items WHERE sp_check_item_id=? AND sp_check_period_hdr_id=? AND i_enable=1)
+                        THROW 50002, 'Protest item not found', 1;
+                    INSERT INTO dbo.sp_check_item_resolutions
+                        (sp_check_item_id, i_round, c_resolved_image, c_resolved_note, dc_resolved_user_id,
+                         c_resolved_officer_name, d_resolved, i_enable)
+                    SELECT ?, ISNULL(MAX(i_round),0)+1, ?, ?, ?, ?, SYSDATETIME(), 1
+                    FROM dbo.sp_check_item_resolutions WITH (UPDLOCK,HOLDLOCK) WHERE sp_check_item_id=?;
+                    UPDATE dbo.sp_check_items
+                    SET i_status=3, c_resolved_image=?, c_resolved_note=?, dc_resolved_user_id=?,
+                        c_resolved_officer_name=?, d_resolved=SYSDATETIME(), d_update=SYSDATETIME()
+                    WHERE sp_check_item_id=? AND sp_check_period_hdr_id=? AND i_enable=1";
+        $params = array($itemId, $periodId, $itemId, $imagePath, $note ?: null, $userId, $officerName, $itemId,
+                        $imagePath, $note ?: null, $userId, $officerName, $itemId, $periodId);
+        $stmt = $db->QueryParam($sqlMain, $params);
+        $roundStmt = $db->QueryParam("SELECT MAX(i_round) AS i_round FROM dbo.sp_check_item_resolutions WHERE sp_check_item_id=? AND i_enable=1", array($itemId));
+        $roundRow = $db->Fetch($roundStmt);
+        $round = intval(@$roundRow["i_round"]);
+        $statusStmt = $db->QueryParam("SELECT i_status FROM dbo.sp_check_items WHERE sp_check_item_id=? AND sp_check_period_hdr_id=? AND i_enable=1", array($itemId, $periodId));
+        $statusRow = $db->Fetch($statusStmt);
+        $saved = (bool)$stmt && $round > 0 && intval(@$statusRow["i_status"]) === 3;
+        if ($saved) {
+            $saved = (bool)$db->CommitTran();
+        } else {
+            $db->RollBackTran();
+            @unlink($uploadDir . DIRECTORY_SEPARATOR . $fileName);
+        }
+        echo json_encode(array("success" => $saved, "round" => $round, "status" => $saved ? 9 : 7,
+                               "status_text" => $saved ? "ส่งคืนทักท้วง" : "ทักท้วง",
+                               "msg" => $saved ? "ยืนยันการแก้ไขและส่งคืนทักท้วง ครั้งที่ " . $round . " เรียบร้อย" : "บันทึกแล้วแต่สถานะยังไม่เปลี่ยน กรุณาลองใหม่หรือติดต่อผู้ดูแล"));
+        exit;
+        break;
     case "LIST_SUB_PERIOD_HDR":
         $mode = @$_REQUEST["mode"];
         $filter = @$_REQUEST["filter"];
@@ -1394,6 +1503,10 @@ switch ($mode) {
             }
             if ($_REQUEST["i_status"] > 0) {
                 $wh .= " AND CASE
+            WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=2) THEN 7
+            WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=3) THEN 9
+            WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1)
+                 AND NOT EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status IN (2,3)) THEN 10
             WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr cancel_po WHERE cancel_po.po_working_hdr_id=cc.po_working_hdr_id AND cancel_po.i_enable=2) THEN 6
             WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr dispute_po WHERE dispute_po.po_working_hdr_id=cc.po_working_hdr_id AND dispute_po.i_enable=1 AND dispute_po.i_status_last=3) THEN 7
             WHEN EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr paid_po WHERE paid_po.po_working_hdr_id=cc.po_working_hdr_id AND paid_po.i_enable=1 AND paid_po.i_status_last=11) THEN 8
@@ -1495,7 +1608,11 @@ switch ($mode) {
             when b.i_overlap = 2  then isnull(b.c_overlap,'ยังไม่ได้เลือกใบกัน')
             else  'ใช้เงินปีงบปัจุบัน'
             end  as chek_overlap
-            , case when exists (select 1 from NMU_EIS.dbo.po_working_hdr cancel_po where cancel_po.po_working_hdr_id=c.po_working_hdr_id and cancel_po.i_enable=2) then 6
+            , case when exists (select 1 from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1 and sci.i_status=2) then 7
+            when exists (select 1 from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1 and sci.i_status=3) then 9
+            when exists (select 1 from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1)
+                 and not exists (select 1 from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1 and sci.i_status in (2,3)) then 10
+            when exists (select 1 from NMU_EIS.dbo.po_working_hdr cancel_po where cancel_po.po_working_hdr_id=c.po_working_hdr_id and cancel_po.i_enable=2) then 6
             when exists (select 1 from NMU_EIS.dbo.po_working_hdr dispute_po where dispute_po.po_working_hdr_id=c.po_working_hdr_id and dispute_po.i_enable=1 and dispute_po.i_status_last=3) then 7
             when exists (select 1 from NMU_EIS.dbo.po_working_hdr paid_po where paid_po.po_working_hdr_id=c.po_working_hdr_id and paid_po.i_enable=1 and paid_po.i_status_last=11) then 8
             when c.i_status_billing  is null  and  c.i_status_checking  is null and c.c_code is null then 1 -- ยังไม่ตรวจรับ
@@ -1504,6 +1621,7 @@ switch ($mode) {
             when c.i_status_billing  = 4  and  c.i_status_checking  = 1 and c.c_code is not null and cc.c_code  is not null  and  c.po_working_hdr_id is null   then 4   -- ผ่านรายการวางบิลแล้วรอเบิก
             when c.i_status_billing  = 4  and  c.i_status_checking  = 1 and c.c_code is not null and cc.c_code  is not null  and  c.po_working_hdr_id is not null   then 5   -- ผ่านรายการวางบิลแล้วรอเบิก
             else 0  end as i_status_chk
+            , (select count(*) from dbo.sp_check_items sci where sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id and sci.i_enable=1) as protest_count
             , (SELECT sum(f_net_total_price) FROM sp_check_period_dtl WHERE sp_check_period_hdr_id=c.sp_check_period_hdr_id) AS f_net_total_price
             , isnull((select top 1 c_name from NMU.dbo.dc_creditor where dc_creditor_id=b.dc_creditor_id),'')  as dc_creditor_idTxt
             , c.dc_creditor_id
@@ -1779,9 +1897,13 @@ switch ($mode) {
             if (intval($row["i_status_chk"]) === 6) {
                 $i_status_chk = "<b style='color:#CC0000'>ยกเลิกเบิก</b>";
             } elseif (intval($row["i_status_chk"]) === 7) {
-                $i_status_chk = "<b style='color:#CC6600'>ทักท้วง</b>";
+                $i_status_chk = "<b style='color:#CC6600'>ทักท้วง (" . intval($row["protest_count"] ?? 0) . ")</b>";
             } elseif (intval($row["i_status_chk"]) === 8) {
                 $i_status_chk = "<b style='color:#008040'>จ่ายแล้ว</b>";
+            } elseif (intval($row["i_status_chk"]) === 9) {
+                $i_status_chk = "<b style='color:#0066CC'>ส่งคืนทักท้วง</b>";
+            } elseif (intval($row["i_status_chk"]) === 10) {
+                $i_status_chk = "<b style='color:#008000'>ผ่านตรวจใบร่างแล้ว</b>";
             }
             $row["i_is_waiting"] = $row["i_request"]; //i_request
             $txtRed = "";
@@ -1808,6 +1930,7 @@ switch ($mode) {
                 "i_is_register" => $row["i_is_register"],
                 "imp_assetall_supplies_hdr_id" => $row["imp_assetall_supplies_hdr_id"],
                 "i_status_chk" => $row["i_status_chk"],
+                "protest_count" => intval($row["protest_count"]),
                 "chek_overlap" => $row["chek_overlap"],
                 "c_code_billing" => $row["c_code_billing"],
                 "po_working_hdr_id" => intVal($row["po_working_hdr_id"]),
