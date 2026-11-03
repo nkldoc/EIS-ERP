@@ -10404,14 +10404,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                                         params: { mode: "CONFIRM_PROTEST_RESOLUTION", sp_check_period_hdr_id: record.get("sp_check_period_hdr_id"),
                                                 sp_check_item_id: data.id, c_resolved_note: Ext.getCmp(noteId).getValue(), resolved_image: canvas.toDataURL("image/png") },
                                         success: function (response) {
-                                                Ext.Msg.hide();
-                                                var result;
-                                                try { result = Ext.decode(response.responseText); }
-                                                catch (e) {
-                                                        if (window.console && console.error) console.error("CONFIRM_PROTEST_RESOLUTION response:", response.status, response.responseText);
-                                                        Ext.Msg.alert("บันทึกไม่สำเร็จ", "ระบบตอบกลับผิดรูปแบบ (HTTP " + response.status + ") กรุณาติดต่อผู้ดูแลระบบ");
-                                                        return;
-                                                }
+                                                var result = Ext.decode(response.responseText);
                                                 if (result.success) {
                                                         win.close();
                                                         if (detailWindow) { detailWindow.close(); }
@@ -10431,8 +10424,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                                                         Ext.Msg.alert("ผลการบันทึก", result.msg);
                                                 }
                                         },
-                                        timeout: 120000,
-                                        failure: function (response) { Ext.Msg.hide(); var msg = "ไม่สามารถส่งคืนทักท้วงได้ (HTTP " + (response.status || "ไม่ทราบ") + ")"; try { msg = Ext.decode(response.responseText).msg || msg; } catch (e) { if (window.console && console.error) console.error("CONFIRM_PROTEST_RESOLUTION failure:", response.status, response.responseText); } Ext.Msg.alert("แจ้งเตือน", msg); }
+                                        failure: function (response) { var msg = "ไม่สามารถส่งคืนทักท้วงได้"; try { msg = Ext.decode(response.responseText).msg || msg; } catch (e) {} Ext.Msg.alert("แจ้งเตือน", msg); }
                                 });
                         } }, { text: "ยกเลิก", handler: function () { win.close(); } }],
                         listeners: { afterrender: loadPdf }
