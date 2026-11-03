@@ -1325,15 +1325,11 @@ switch ($mode) {
                          THEN 1 ELSE 0 END",
             array()
         ) === 1;
-        $hasResolutionReview = $hasResolutionTable && (int)$db->GetDataBySQL(
-            "SELECT CASE WHEN COL_LENGTH(N'dbo.sp_check_item_resolutions', N'i_review_status') IS NOT NULL THEN 1 ELSE 0 END",
-            array()
-        ) === 1;
         $returnCountSql = $hasResolutionTable
             ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id AND r.i_enable = 1)"
             : "CAST(0 AS INT)";
-        $resolutionCountSql = $hasResolutionReview
-            ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id AND r.i_enable = 1 AND r.i_review_status = 1)"
+        $resolutionCountSql = $hasResolutionTable
+            ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id AND r.i_enable = 1)"
             : "CAST(0 AS INT)";
         $sqlMain = "SELECT sp_check_item_id AS id, c_officer_name,
                            CONVERT(VARCHAR(19), d_receive, 120) AS d_receive,
@@ -1373,16 +1369,87 @@ switch ($mode) {
         $sqlMain = "SELECT r.sp_check_item_resolution_id AS id, r.i_round,
                            r.c_resolved_image, r.c_resolved_note, r.c_resolved_officer_name, r.c_review_note,
                            CONVERT(VARCHAR(19), r.d_resolved, 120) AS d_resolved,
-                           r.i_review_status, r.c_review_officer_name,
+                           r.i_review_status, r.c_review_officer_name, r.i_enable,
                            CONVERT(VARCHAR(19), r.d_reviewed, 120) AS d_reviewed
                     FROM dbo.sp_check_item_resolutions r
                     INNER JOIN dbo.sp_check_items i ON i.sp_check_item_id = r.sp_check_item_id
-                    WHERE r.sp_check_item_id = ? AND i.i_enable = 1 AND r.i_enable = 1
+                    WHERE r.sp_check_item_id = ? AND i.i_enable = 1
                     ORDER BY r.i_round DESC";
         $stmt = $db->QueryParam($sqlMain, array($itemId));
         $items = array();
         while ($row = $db->Fetch($stmt)) { $items[] = $row; }
         echo json_encode(array("success" => true, "totalCount" => count($items), "data" => $items));
+        exit;
+        break;
+    case "DISABLE_PROTEST_RESOLUTION":
+        if (empty($_SESSION['user_id']) || intval($_SESSION['dc_center_user'] ?? 0) !== 1) {
+            http_response_code(403);
+            echo json_encode(array("success" => false, "msg" => "ไม่มีสิทธิ์ยกเลิกการใช้งานรายการนี้"));
+            exit;
+        }
+        $resolutionId = filter_var(@$_POST["sp_check_item_resolution_id"], FILTER_VALIDATE_INT);
+        $userId = intval(@$_SESSION["user_id"]);
+        if (!$resolutionId || !$userId) {
+            echo json_encode(array("success" => false, "msg" => "ข้อมูลยกเลิกรายการไม่ครบถ้วน"));
+            exit;
+        }
+        $resolutionStmt = $db->QueryParam(
+            "SELECT r.sp_check_item_id FROM dbo.sp_check_item_resolutions r
+             INNER JOIN dbo.sp_check_items i ON i.sp_check_item_id=r.sp_check_item_id
+             WHERE r.sp_check_item_resolution_id=? AND r.i_enable=1 AND i.i_enable=1",
+            array($resolutionId)
+        );
+        $resolutionRow = $db->Fetch($resolutionStmt);
+        $itemId = intval(@$resolutionRow["sp_check_item_id"]);
+        if (!$itemId) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "รายการนี้ถูกยกเลิกหรือไม่พบข้อมูลแล้ว"));
+            exit;
+        }
+        $db->QueryParam(
+            "UPDATE dbo.sp_check_item_resolutions SET i_enable=0
+             WHERE sp_check_item_resolution_id=? AND sp_check_item_id=? AND i_enable=1",
+            array($resolutionId, $itemId)
+        );
+        $db->QueryParam(
+            "UPDATE i
+             SET i.i_status = CASE WHEN latest.i_review_status=1 THEN 4
+                                   WHEN latest.i_review_status=2 THEN 2
+                                   WHEN latest.sp_check_item_resolution_id IS NOT NULL THEN 3
+                                   ELSE 2 END,
+                 i.c_resolved_image = latest.c_resolved_image,
+                 i.c_resolved_note = latest.c_resolved_note,
+                 i.dc_resolved_user_id = latest.dc_resolved_user_id,
+                 i.c_resolved_officer_name = latest.c_resolved_officer_name,
+                 i.d_resolved = latest.d_resolved,
+                 i.d_update = SYSDATETIME()
+             FROM dbo.sp_check_items i
+             OUTER APPLY (
+                 SELECT TOP 1 r.sp_check_item_resolution_id, r.i_review_status, r.c_resolved_image,
+                        r.c_resolved_note, r.dc_resolved_user_id, r.c_resolved_officer_name, r.d_resolved
+                 FROM dbo.sp_check_item_resolutions r
+                 WHERE r.sp_check_item_id=i.sp_check_item_id AND r.i_enable=1
+                 ORDER BY r.i_round DESC
+             ) latest
+             WHERE i.sp_check_item_id=? AND i.i_enable=1",
+            array($itemId)
+        );
+        $stateStmt = $db->QueryParam(
+            "SELECT i.i_status, (SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r
+                                  WHERE r.sp_check_item_id=i.sp_check_item_id AND r.i_enable=1) AS active_rounds
+             FROM dbo.sp_check_items i WHERE i.sp_check_item_id=? AND i.i_enable=1",
+            array($itemId)
+        );
+        $stateRow = $db->Fetch($stateStmt);
+        $saved = is_array($stateRow) && $db->CommitTran();
+        if (!$saved) { $db->RollBackTran(); }
+        echo json_encode(array(
+            "success" => (bool)$saved,
+            "sp_check_item_id" => $itemId,
+            "status" => intval(@$stateRow["i_status"]),
+            "active_rounds" => intval(@$stateRow["active_rounds"]),
+            "msg" => $saved ? "ยกเลิกการใช้งานรอบที่เลือกแล้ว" : "ไม่สามารถยกเลิกรายการได้ กรุณาลองใหม่"
+        ));
         exit;
         break;
     case "CONFIRM_PROTEST_RESOLUTION":
@@ -1421,7 +1488,8 @@ switch ($mode) {
                         (sp_check_item_id, i_round, c_resolved_image, c_resolved_note, dc_resolved_user_id,
                          c_resolved_officer_name, d_resolved, i_enable)
                     SELECT ?, ISNULL(MAX(i_round),0)+1, ?, ?, ?, ?, SYSDATETIME(), 1
-                    FROM dbo.sp_check_item_resolutions WITH (UPDLOCK,HOLDLOCK) WHERE sp_check_item_id=?;
+                    FROM dbo.sp_check_item_resolutions WITH (UPDLOCK,HOLDLOCK) WHERE sp_check_item_id=?;";
+        $sqlMain .= "
                     UPDATE dbo.sp_check_items
                     SET i_status=3, c_resolved_image=?, c_resolved_note=?, dc_resolved_user_id=?,
                         c_resolved_officer_name=?, d_resolved=SYSDATETIME(), d_update=SYSDATETIME()
@@ -1495,16 +1563,16 @@ switch ($mode) {
         ) === 1;
         $checkItemsStatusForCc = $hasCheckItems
             ? "CASE
-                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=2) THEN 7
                 WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=3) THEN 9
+                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=2) THEN 7
                 WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1)
                      AND NOT EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=cc.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status IN (2,3)) THEN 10
                 ELSE NULL END"
             : "CAST(NULL AS INT)";
         $checkItemsStatusForC = $hasCheckItems
             ? "CASE
-                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=2) THEN 7
                 WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=3) THEN 9
+                WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status=2) THEN 7
                 WHEN EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1)
                      AND NOT EXISTS (SELECT 1 FROM dbo.sp_check_items sci WHERE sci.sp_check_period_hdr_id=c.sp_check_period_hdr_id AND sci.i_enable=1 AND sci.i_status IN (2,3)) THEN 10
                 ELSE NULL END"
@@ -1951,7 +2019,7 @@ switch ($mode) {
             } elseif (intval($row["i_status_chk"]) === 8) {
                 $i_status_chk = "<b style='color:#008040'>จ่ายแล้ว</b>";
             } elseif (intval($row["i_status_chk"]) === 9) {
-                $i_status_chk = "<b style='color:#0066CC'>ส่งคืนทักท้วง</b>";
+                $i_status_chk = "<b style='color:#0066CC'>ส่งคืนทักท้วงและตรวจสอบ</b>";
             } elseif (intval($row["i_status_chk"]) === 10) {
                 $i_status_chk = "<b style='color:#008000'>ผ่านตรวจใบร่างแล้ว</b>";
             }

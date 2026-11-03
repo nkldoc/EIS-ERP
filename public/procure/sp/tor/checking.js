@@ -10289,8 +10289,29 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                         baseParams: { mode: "LIST_PROTEST_RESOLUTIONS", sp_check_item_id: data.id },
                         root: "data", totalProperty: "totalCount",
                         fields: ["id", "i_round", "c_resolved_image", "c_resolved_note", "c_resolved_officer_name", "d_resolved",
-                                "i_review_status", "c_review_officer_name", "c_review_note", "d_reviewed"]
+                                "i_review_status", "c_review_officer_name", "c_review_note", "d_reviewed", "i_enable"]
                 });
+                var historyWindow;
+                var disableResolution = function (row) {
+                        Ext.Msg.confirm("ยกเลิกใช้งาน", "ยืนยันยกเลิกการใช้งานรายการรอบที่ " + row.i_round + "?", function (button) {
+                                if (button !== "yes") return;
+                                Ext.Ajax.request({
+                                        url: "tor/api/mnCheckingController.php", method: "POST",
+                                        params: { mode: "DISABLE_PROTEST_RESOLUTION", sp_check_item_resolution_id: row.id },
+                                        success: function (response) {
+                                                var result = Ext.decode(response.responseText);
+                                                if (!result.success) { Ext.Msg.alert("ยกเลิกไม่สำเร็จ", result.msg || "ไม่สามารถยกเลิกรายการได้"); return; }
+                                                historyStore.reload();
+                                                if (historyWindow) historyWindow.setTitle("รายการส่งคืนทักท้วง (" + result.active_rounds + " รายการ)");
+                                                protestStore.reload();
+                                                var mainStore = mainGrid && mainGrid.getStore ? mainGrid.getStore() : (record.store || Ext.storeDtl);
+                                                if (mainStore && mainStore.reload) mainStore.reload();
+                                                Ext.Msg.alert("สำเร็จ", result.msg);
+                                        },
+                                        failure: function (response) { var msg = "ไม่สามารถยกเลิกรายการได้"; try { msg = Ext.decode(response.responseText).msg || msg; } catch (e) {} Ext.Msg.alert("แจ้งเตือน", msg); }
+                                });
+                        });
+                };
                 var historyGrid = new Ext.grid.GridPanel({
                         store: historyStore, stripeRows: true,
                         viewConfig: { emptyText: "ยังไม่มีประวัติการยืนยันแก้ไข", deferEmptyText: false },
@@ -10299,24 +10320,30 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                                 { header: "ผู้ยืนยัน", dataIndex: "c_resolved_officer_name", width: 180 },
                                 { header: "วันเวลาที่ยืนยัน", dataIndex: "d_resolved", width: 145 },
                                 { header: "รายละเอียดการแก้ไข", dataIndex: "c_resolved_note", width: 350 },
-                                { header: "ผลตรวจ", dataIndex: "i_review_status", width: 100, align: "center",
-                                  renderer: function (value) { value = parseInt(value, 10); if (value === 1) return "<b style='color:green'>ผ่าน</b>"; if (value === 2) return "<b style='color:#c00'>ทักท้วงอีกครั้ง</b>"; return "<b style='color:#d08000'>รอตรวจ</b>"; } },
+                                { header: "ผลตรวจ", dataIndex: "i_review_status", width: 120, align: "center",
+                                  renderer: function (value, meta, row) { if (parseInt(row.get("i_enable"), 10) !== 1) return "<b style='color:#888'>ยกเลิกใช้งาน</b>"; value = parseInt(value, 10); if (value === 1) return "<b style='color:green'>ผ่าน</b>"; if (value === 2) return "<b style='color:#c00'>ทักท้วงอีกครั้ง</b>"; return "<b style='color:#d08000'>รอตรวจ</b>"; } },
                                 { header: "วันที่กดผ่าน", dataIndex: "d_reviewed", width: 145 },
                                 { header: "ใบร่างใหม่", id: "resolution_round_image", dataIndex: "c_resolved_image", width: 145, align: "center",
-                                  renderer: function (value, meta, row) { return value ? "<button style='cursor:pointer;color:green'>ดูใบร่าง ครั้งที่ " + row.get("i_round") + "</button>" : "-"; } }
+                                  renderer: function (value, meta, row) { return value ? "<button style='cursor:pointer;color:green'>ดูใบร่าง ครั้งที่ " + row.get("i_round") + "</button>" : "-"; } },
+                                { header: "การใช้งาน", id: "resolution_disable", dataIndex: "i_enable", width: 125, align: "center",
+                                  hidden: parseInt(Ext.session.dc_center_user, 10) !== 1,
+                                  renderer: function (value) { return parseInt(value, 10) === 1 ? "<button style='cursor:pointer;color:#c00'>ยกเลิกใช้งาน</button>" : "-"; } }
                         ],
                         listeners: {
                                 cellclick: function (grid, rowIndex, columnIndex) {
-                                        if (columnIndex === grid.getColumnModel().getIndexById("resolution_round_image")) showResolvedImage(grid.getStore().getAt(rowIndex).data);
+                                        var row = grid.getStore().getAt(rowIndex);
+                                        if (columnIndex === grid.getColumnModel().getIndexById("resolution_round_image")) showResolvedImage(row.data);
+                                        if (columnIndex === grid.getColumnModel().getIndexById("resolution_disable") && parseInt(row.get("i_enable"), 10) === 1) disableResolution(row.data);
                                 },
                                 rowdblclick: function (grid, rowIndex) { showResolvedImage(grid.getStore().getAt(rowIndex).data); }
                         }
                 });
-                new Ext.Window({
-                        title: "ประวัติยืนยันการแก้ไขทักท้วง (" + (data.resolution_count || 0) + " ครั้ง)",
+                historyWindow = new Ext.Window({
+                        title: "รายการส่งคืนทักท้วง (" + (data.resolution_count || 0) + " รายการ)",
                         width: 950, height: 430, modal: true, maximizable: true, layout: "fit", items: [historyGrid],
                         buttons: [{ text: "ปิด", handler: function (button) { button.ownerCt.ownerCt.close(); } }]
-                }).show().maximize();
+                });
+                historyWindow.show().maximize();
                 historyStore.load();
         };
         var confirmProtestResolution = function (data) {
@@ -10369,7 +10396,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                                 html: "<div id='" + hostId + "' style='background:#666;min-height:100%;padding:12px;text-align:center'><div style='color:white'>กำลังโหลดใบร่างฉบับล่าสุด...</div><canvas style='background:white;display:block;margin:auto'></canvas></div>" },
                                 { region: "south", xtype: "form", height: 90, frame: true, labelWidth: 130,
                                   items: [{ xtype: "textarea", id: noteId, fieldLabel: "รายละเอียดการแก้ไข", anchor: "98%", height: 55 }] }],
-                        buttons: [{ text: "ยืนยันการแก้ไข ครั้งที่ " + nextRound, icon: "images/icons/accept.png", handler: function () {
+                        buttons: [{ text: "ส่งคืนทักท้วง", icon: "images/icons/accept.png", handler: function () {
                                 if (!ready || !canvas) { Ext.Msg.alert("แจ้งเตือน", "กรุณารอให้ใบร่างโหลดเสร็จ"); return; }
                                 Ext.Msg.wait("กำลังบันทึกใบร่างและส่งคืนทักท้วง...");
                                 Ext.Ajax.request({
@@ -10418,9 +10445,9 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                         { header: "สถานะ", dataIndex: "i_status", width: 120, align: "center",
                           renderer: function (value) { value = parseInt(value, 10); if (value === 4) return "<b style='color:green'>ผู้ตรวจให้ผ่านแล้ว</b>"; if (value === 3) return "<b style='color:#0066cc'>ส่งคืนทักท้วง</b>"; return "<b style='color:#d00000'>ทักท้วง</b>"; } },
                         { header: "ใบร่างหลังแก้ไข", id: "checking_resolved_image", dataIndex: "c_resolved_image", width: 120, align: "center",
-                          renderer: function (value, meta, row) { var count = parseInt(row.get("resolution_count"), 10) || 0; return count ? "<button style='cursor:pointer;color:green'>ดูประวัติ " + count + " ครั้ง</button>" : "-"; } },
-                        { header: "ยืนยันการแก้ไข", id: "confirm_protest_resolution", dataIndex: "return_count", width: 145, align: "center",
-                          renderer: function (value, meta, row) { if (parseInt(row.get("i_status"), 10) !== 2) return "-"; var next = (parseInt(value, 10) || 0) + 1; return "<button style='cursor:pointer;color:blue'>ยืนยัน ครั้งที่ " + next + "</button>"; } }
+                          renderer: function (value, meta, row) { var count = parseInt(row.get("resolution_count"), 10) || 0; return count ? "<button style='cursor:pointer;color:green'>แสดง " + count + " รายการ</button>" : "-"; } },
+                        { header: "ส่งคืนทักท้วง", id: "confirm_protest_resolution", dataIndex: "return_count", width: 145, align: "center",
+                          renderer: function (value, meta, row) { if (parseInt(row.get("i_status"), 10) !== 2) return "-"; return "<button style='cursor:pointer;color:blue'>ส่งคืนทักท้วง</button>"; } }
                 ],
                 listeners: {
                         cellclick: function (grid, rowIndex, columnIndex) {
