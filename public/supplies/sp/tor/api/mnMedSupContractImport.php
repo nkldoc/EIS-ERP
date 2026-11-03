@@ -870,6 +870,9 @@ switch ($mode) {
 
     case "LIST":
         $data = array();
+        // ผู้ดูแลระบบ (user 1 / i_type_user 2) เห็นทุกชุดนำเข้า ผู้ใช้ทั่วไปเห็นเฉพาะชุดที่ตัวเองนำเข้า (เงื่อนไขเดียวกับ medsupOwnFilter)
+        $listUid = intval($_SESSION["user_id"] ?? 0);
+        $listOwn = ($listUid === 1 || intval($_SESSION["i_type_user"] ?? 0) === 2) ? "" : " and i.dc_user_create_id = " . $listUid;
         $stmt = $db->QueryParam(
             "select i.sp_tor_period_bill_import_id, i.c_import_name, i.c_file_name, i.i_contract_count, i.i_row_count, i.f_total_amt
                 , convert(varchar, i.d_create, 120) as d_create
@@ -878,7 +881,7 @@ switch ($mode) {
                    inner join NMU_ERP.dbo.sp_tor_period_bill b on b.sp_tor_period_bill_id = r.sp_tor_period_bill_id
                    where b.sp_tor_period_bill_import_id = i.sp_tor_period_bill_import_id and r.i_enabled = 1) as i_receive_count
              from NMU_ERP.dbo.sp_tor_period_bill_import i
-             where i.i_enabled = 1
+             where i.i_enabled = 1{$listOwn}
              order by i.sp_tor_period_bill_import_id desc",
             array()
         );
@@ -907,6 +910,10 @@ switch ($mode) {
                            or COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_ref_chk_id') is null then 0 else 1 end", array())) === 1
             ? ", b.c_ref_pr_id, b.c_ref_po_id, isnull(r.c_ref_chk_id, b.c_ref_chk_id) as c_ref_chk_id"
             : ", cast(null as varchar(50)) as c_ref_pr_id, cast(null as varchar(50)) as c_ref_po_id, cast(null as varchar(50)) as c_ref_chk_id";
+        // ดูรายการในชุดนำเข้า: ผู้ใช้ทั่วไปดูได้เฉพาะชุดที่ตัวเองนำเข้า (ผู้ดูแลระบบดูได้ทุกชุด)
+        $rowsUid = intval($_SESSION["user_id"] ?? 0);
+        $rowsOwn = ($rowsUid === 1 || intval($_SESSION["i_type_user"] ?? 0) === 2) ? ""
+            : " and exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_import i2 where i2.sp_tor_period_bill_import_id = b.sp_tor_period_bill_import_id and i2.dc_user_create_id = " . $rowsUid . ")";
         $stmt = $db->QueryParam(
             "select b.sp_tor_period_bill_hdr_id, b.c_contract_code, b.c_ap_dept_type, b.c_project_name, b.c_contract_type, b.c_creditor_name, b.i_budget_year
                 , b.i_period, b.c_doc_ref, convert(varchar, b.d_doc_dateSub, 120) as d_doc_dateSub, b.c_detail, b.c_fund_source_dtl, b.f_fund_amt_dtl
@@ -914,7 +921,7 @@ switch ($mode) {
                 , b.c_overlap {$refSel}
              from NMU_ERP.dbo.sp_tor_period_bill b
              left join NMU_ERP.dbo.sp_tor_period_bill_receive r on r.sp_tor_period_bill_id = b.sp_tor_period_bill_id and r.i_enabled = 1
-             where b.sp_tor_period_bill_import_id = ? and b.i_enabled = 1
+             where b.sp_tor_period_bill_import_id = ? and b.i_enabled = 1{$rowsOwn}
              order by b.sp_tor_period_bill_hdr_id, b.i_period, r.sp_tor_period_bill_receive_id",
             array(intval($_REQUEST["import_id"] ?? 0))
         );
