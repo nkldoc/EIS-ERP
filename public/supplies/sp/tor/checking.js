@@ -41,7 +41,8 @@ Ext.formSubmitHistory = [];
 Ext.editCheckingMaterialType = function () {
 	var rec = Ext.selectRow;
 	if (!rec) { return; }
-	if (/^D/i.test(String(rec.get('c_code_po') || '').replace(/^\s+/, ''))) {
+	var isCancelledDisbursement = Number(rec.get('i_status_chk')) === 6;
+	if (!isCancelledDisbursement && /^D/i.test(String(rec.get('c_code_po') || '').replace(/^\s+/, ''))) {
 		Ext.Msg.alert('แจ้งเตือน', 'รายการนี้มีเลขใบเบิก D แล้ว ไม่สามารถแก้ไขประเภทวัสดุ/ครุภัณฑ์ได้');
 		return;
 	}
@@ -12927,7 +12928,7 @@ Ext.AppUx = function (app, menu) {
                                                 labelWidth: 100,
                                                 id: "groupProductTypeID",
                                                 tbar: [{ text: 'แก้ไขประเภทวัสดุ/ครุภัณฑ์', iconCls: 'icon-building-edit',
-                                                        disabled: /^D/i.test(String(Ext.selectRow.get('c_code_po') || '').replace(/^\s+/, '')),
+                                                        disabled: Number(Ext.selectRow.get('i_status_chk')) !== 6 && /^D/i.test(String(Ext.selectRow.get('c_code_po') || '').replace(/^\s+/, '')),
                                                         handler: Ext.editCheckingMaterialType }],
                                                 layout: "column", // กำหนด layout ให้เป็น column เพื่อให้แบ่งเป็นคอลัมน์ได้
 
