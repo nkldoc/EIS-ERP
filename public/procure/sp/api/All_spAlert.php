@@ -357,6 +357,36 @@ if ($_REQUEST["type"] == "checkBilling") { //[sp_type_status_id]
             ${$root}[] = $temp;
         }
     }
+} else if ($_REQUEST["type"] == "sp_type_mapping_code") {
+    // Contract numbers reserved in bookContract but not yet assigned to a TOR contract.
+    $sp_emp_id = intval($_REQUEST['sp_emp_id'] ?? 0);
+    $ownerFilter = $sp_emp_id > 0
+        ? " AND g.dc_user_create_id = (SELECT TOP 1 u.dc_user_id FROM dbo.sp_emp e
+                                        INNER JOIN dbo.dc_user u ON u.dc_emp_id = e.dc_emp_id
+                                        WHERE e.sp_emp_id = ?)"
+        : "";
+    $sqlMain = "SELECT g.i_value AS id, g.dc_doc_id, g.c_yyyy, g.c_gen AS c_code, g.c_gen,
+                       g.dc_user_create_id, g.d_create
+                FROM dbo.sp_doc_gen g
+                WHERE g.i_enabled = 1
+                  AND NULLIF(LTRIM(RTRIM(g.c_gen)), '') IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM dbo.sp_tor_contract c WHERE c.c_code = g.c_gen)
+                  {$ownerFilter}
+                ORDER BY g.d_create DESC, g.i_value DESC";
+    $stmt = $db->QueryParam($sqlMain, $sp_emp_id > 0 ? array($sp_emp_id) : array());
+    if ($stmt) {
+        while ($row = $db->Fetch($stmt)) {
+            ${$root}[] = array(
+                "id" => "{$row["id"]}",
+                "c_code" => $row["c_code"],
+                "c_gen" => $row["c_gen"],
+                "dc_doc_id" => intval($row["dc_doc_id"]),
+                "c_yyyy" => intval($row["c_yyyy"]),
+                "dc_user_create_id" => intval($row["dc_user_create_id"]),
+                "d_create" => $row["d_create"]
+            );
+        }
+    }
 } else if ($_REQUEST["type"] == "sub_cost_id") {
 
 

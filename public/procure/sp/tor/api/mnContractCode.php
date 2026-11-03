@@ -18,6 +18,7 @@ $data = $util->mnUser($_REQUEST);
 $data["i_delete"] = DELETE_FALSE;
 
 $re_id = null;
+$generatedCode = null;
 $stmt2 = true;
 $stmt3 = true;
 
@@ -170,16 +171,25 @@ switch ($mode) {
 //        print_r($arrParam2);
 //        exit;
         $stmt = $db->QueryParam($sql2, $arrParam2);
-        $arr_gen_code = $db->Fetch($stmt);
-        $c_code = $arr_gen_code["c_code_gen"];//$data["code"]. substr($arr_gen_code["c_code_gen"], 1);
-        $ref_id = $arr_gen_code["reference_id"];
+        $arr_gen_code = $stmt ? $db->Fetch($stmt) : false;
+        $c_code = $arr_gen_code ? trim((string)($arr_gen_code["c_code_gen"] ?? "")) : "";
+        $ref_id = $arr_gen_code["reference_id"] ?? null;
 //        echo $c_code;
 //        echo "\n";
 //        echo $ref_id;
 //        exit;
-        if ($ret_id == $ref_id) {
-            $sql3 = "UPDATE {$table} SET c_code= '{$c_code}' WHERE {$keyName} = {$_REQUEST['sp_tor_contract_id']}";
-            $stmt3 = $db->QueryParam($sql3, array());
+        if ($c_code !== "" && intval($ret_id) === intval($ref_id)) {
+            $sql3 = "UPDATE {$table} SET c_code = ? WHERE {$keyName} = ? AND ISNULL(c_code, '') = ''";
+            $stmt3 = $db->QueryParam($sql3, array($c_code, intval($_REQUEST['sp_tor_contract_id'])));
+            if ($stmt3 && sqlsrv_rows_affected($stmt3) > 0) {
+                $generatedCode = $c_code;
+            } else {
+                $stmt3 = false;
+                $sql = "ไม่พบสัญญาที่รอออกเลข หรือสัญญานี้มีเลขแล้ว";
+            }
+        } else {
+            $stmt3 = false;
+            $sql = "ระบบไม่สามารถสร้างเลขสัญญาได้ กรุณาตรวจสอบประเภทสัญญา ปีงบประมาณ และข้อมูลสายงาน";
         }
         break;
 //        echo $sql3;
@@ -260,6 +270,7 @@ switch ($mode) {
 if ($stmt && $stmt2 && $stmt3) {
     $db->CommitTran();
     $re = array("reval" => 0, "success" => "Success", "msg" => "บันทึกเรียบร้อยแล้ว", "id" => intVal($re_id));
+    if ($generatedCode !== null) $re["code"] = $generatedCode;
 } else {
     $db->RollBackTran();
     $re = array("reval" => 1, "success" => "Error", "msg" => "check statement : {$sql}");

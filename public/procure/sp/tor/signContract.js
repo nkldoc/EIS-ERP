@@ -1077,6 +1077,8 @@ goToMapping = () => {
 
     var msg = "";
     if (msg == "") {
+        var saveButton = Ext.getCmp("btn_save_Contract");
+        if (saveButton) saveButton.disable();
         Ext.Ajax.request({
             url: "tor/api/mnContractMappingCode.php",
             method: "POST",
@@ -1094,13 +1096,23 @@ goToMapping = () => {
                 bg_type_id_0: Ext.selectRow.data.dc_expense_budget_type_id,
                 contract_type_0: Ext.selectRow.data.i_type_fix_rate == 0 ? 1 : 2,
             },
-            success: function (result, request) {
+            callback: function (options, success, result) {
+                var response;
+                try { response = Ext.decode(result.responseText); } catch (e) { response = null; }
+                if (!success || !response || !(response.success === "Success" || response.success === true || response.reval === 0)) {
+                    if (saveButton) saveButton.enable();
+                    Ext.Msg.alert("แจ้งเตือน", response && response.msg ? response.msg : "จับคู่เลขสัญญาที่จองไว้ไม่สำเร็จ");
+                    return;
+                }
                 Ext.store2.setBaseParam("tor_id", Ext.HDR_ID);
                 Ext.store2.load({
-                    callback: function (recordx, operation, success) {
-                        if (success) {
-                            Ext.Msg.alert("แจ้งเตือน", "บันทึกเรียบร้อย");
+                    callback: function (recordx, operation, loaded) {
+                        if (loaded) {
+                            Ext.Msg.alert("แจ้งเตือน", "จับคู่เลขสัญญาเรียบร้อย: " + Ext.util.Format.htmlEncode(Ext.getCmp('c_contrac_codeID').getValue()));
                             Ext.getCmp("win-frm-contractID").destroy();
+                        } else {
+                            if (saveButton) saveButton.enable();
+                            Ext.Msg.alert("แจ้งเตือน", "จับคู่เลขแล้ว แต่โหลดข้อมูลสัญญากลับมาไม่สำเร็จ กรุณารีเฟรชรายการ");
                         }
                     },
                 });
@@ -1111,7 +1123,13 @@ goToMapping = () => {
     }
 };
 GenCode_CTS = function () {
-    var date_Ymd = Ext.util.Format.date(Ext.getCmp("d_start_dateID").getValue(), "Ymd");
+    var saveButton = Ext.getCmp("btn_save_Contract");
+    var contractDate = Ext.getCmp("d_contract_dateID").getValue();
+    if (!Ext.isDate(contractDate)) {
+        Ext.Msg.alert("แจ้งเตือน", "กรุณาระบุวันที่เซ็นสัญญาก่อนออกเลขสัญญา");
+        return;
+    }
+    var date_Ymd = Ext.util.Format.date(contractDate, "Ymd");
     var date_Ym = Ext.selectRow.get("i_yyyy") / 1 + 543; //date_Ymd.substr(0, 4) / 1 + 543;
     var date_dd = date_Ymd.substr(4);
     //console.log(Ext.selectRow);
@@ -1120,11 +1138,13 @@ GenCode_CTS = function () {
     //return false;
     var msg = "";
     if (msg == "") {
+        if (saveButton) saveButton.disable();
         Ext.Ajax.request({
             url: "tor/api/mnContractCode.php",
             method: "POST",
             params: {
                 mode: "GENCODECST",
+                contract_date: contractDate.format("Y-m-d"),
                 id: Ext.HDR_ID,
                 sp_tor_contract_id: Ext.SelectStore.data.sp_tor_contract_id,
                 i_type_0: Ext.selectRow.data.i_purchase,
@@ -1137,18 +1157,23 @@ GenCode_CTS = function () {
                 contract_type_0: Ext.selectRow.data.i_type_fix_rate == 0 ? 1 : 2,
                 //                contract_type_0: Ext.selectRow.data.i_is_period == 0 ? 1 : 2,
             },
-            success: function (result, request) {
-                // Ext.getCmp("win-frm-dtlID").destroy();
+            callback: function (options, success, result) {
+                var response;
+                try { response = Ext.decode(result.responseText); } catch (e) { response = null; }
+                if (!success || !response || !(response.success === "Success" || response.success === true || response.reval === 0)) {
+                    if (saveButton) saveButton.enable();
+                    Ext.Msg.alert("แจ้งเตือน", response && response.msg ? response.msg : "ไม่สามารถออกเลขสัญญาได้");
+                    return;
+                }
                 Ext.store2.setBaseParam("tor_id", Ext.HDR_ID);
                 Ext.store2.load({
-                    callback: function (recordx, operation, success) {
-                        if (success) {
-                            Ext.Msg.alert("แจ้งเตือน", "บันทึกเรียบร้อย");
+                    callback: function (recordx, operation, loaded) {
+                        if (loaded) {
+                            Ext.Msg.alert("แจ้งเตือน", response.code ? "ออกเลขสัญญาเรียบร้อย: " + Ext.util.Format.htmlEncode(response.code) : "บันทึกเรียบร้อย");
                             Ext.getCmp("win-frm-contractID").destroy();
-                            // if (type == "SAVE_DTL") {
-                            //   var inputEl = Ext.getCmp("gridSub5ID").getView().scroller.dom;
-                            //   inputEl.scrollTop = inputEl.scrollHeight;
-                            // }
+                        } else {
+                            if (saveButton) saveButton.enable();
+                            Ext.Msg.alert("แจ้งเตือน", "ออกเลขแล้ว แต่โหลดข้อมูลสัญญากลับมาไม่สำเร็จ กรุณารีเฟรชรายการ");
                         }
                     },
                 });
@@ -3618,7 +3643,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                         autoDestroy: false,
                                                                                                         autoLoad: false,
                                                                                                         url: "api/All_spAlert.php",
-                                                                                                        baseParams: {type: "sp_type_mapping_code"},
+                                                                                                         baseParams: {type: "sp_type_mapping_code", sp_emp_id: Ext.selectRow.data.sp_emp_id},
                                                                                                         root: "data",
                                                                                                         idProperty: "id",
                                                                                                         fields: ["id", "c_code", "c_gen"]
@@ -4621,7 +4646,6 @@ Ext.AppUx = function (app, menu) {
                                                                 }
                                                                 // }
                                                                 if (Ext.getCmp("i_edit_typeID").getValue().inputValue == 4) {
-                                                                    alert('GO TO MAPPING');
                                                                     goToMapping();
                                                                     return false;
                                                                 } else if (Ext.getCmp("i_edit_typeID").getValue().inputValue == 3) {

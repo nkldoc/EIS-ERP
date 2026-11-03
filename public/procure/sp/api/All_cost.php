@@ -10,6 +10,14 @@ $root = "data";
 $data = array();
 $con = null;
 
+function contractNumberDocId($contractType, $purchaseType) {
+    $purchaseType = trim((string)$purchaseType);
+    $purchaseId = ($purchaseType === 'ซ.') ? 1 : (($purchaseType === 'จ.') ? 2 : (($purchaseType === 'ช.') ? 3 : 0));
+    if ($purchaseId === 0) return 0;
+    $contractOffset = (trim((string)$contractType) === 'สญ.') ? 3 : 0;
+    return $contractOffset + $purchaseId;
+}
+
 if ($_REQUEST["type"] == "dc_cost") {
     if (@$_REQUEST['dc_cost_acc_id']) {
         $con .= " AND a.c_code LIKE (SELECT TOP 1 left(aa.c_code,2) FROM " . DB_CENTER . "dc_cost aa WHERE aa.dc_cost_id= {$_REQUEST["dc_cost_acc_id"]}) + '%'";
@@ -80,6 +88,7 @@ if ($_REQUEST["type"] == "dc_cost") {
 	   case 'จ.': $value = 5;
 		  break; 
     }
+    $value = contractNumberDocId($i_type_contract, $i_purchase);
       $sqlMain = "select top 1 dc_doc_id , ref_id, c_yyyy , i_value
 				    , c_gen, c_date, d_gen_date 
 				    , dc_user_create_id
@@ -124,6 +133,11 @@ if ($_REQUEST["type"] == "dc_cost") {
 		  break;
 	   case 'จ.': $value = 5;
 		  break; 
+    }
+    $value = contractNumberDocId($i_type_contract0, $i_purchase0);
+    if ($value < 1) {
+        echo json_encode(array("success" => false, "msg" => "กรุณาเลือกประเภทสัญญาและลักษณะการดำเนินงานให้ถูกต้อง"));
+        exit;
     }
     
 $dc_cost2_id       = $_REQUEST['dc_cost2_id'] ?? null;
