@@ -41,7 +41,7 @@ Ext.MEDSUP_IMPORT_COLUMNS = [
     // ลำดับสัญญา + งวดที่ เดียวกันคืองวดเดียวกัน (1 งวดมีหลายรายการรับของได้)
     {key: "rc_code", label: "ใบแจ้งหนี้/รับของ"},
     {key: "rc_erp", label: "เลขรับเข้าคลังของ ERP"},
-    {key: "rc_date", label: "วันรับของ", date: true},
+    {key: "rc_date", label: "วันรับของ", alias: ["วันรับของ/วันที่รับเข้าคลัง"], date: true},
     {key: "rc_detail", label: "รายละเอียดรับของ"},
     {key: "rc_amt", label: "จำนวนเงินรับของ(บิลส่งของ)", alias: ["จำนวนเงินรับของ"]},
     // VAT ของรายการรับของ (ตามหน้า "แก้ไข VAT" ที่หน้าส่งมอบงาน) - ไม่บังคับ ว่าง = ค่าเริ่มต้น
@@ -465,6 +465,14 @@ function winMedSupImportNew() {
         fieldLabel: "ชื่อรายการ", width: 420, allowBlank: false, emptyText: "เช่น นำเข้าสัญญา 100 รายการ",
     });
     var fileFld = new Ext.form.TextField({fieldLabel: "ไฟล์ Excel", width: 420, inputType: "file"});
+    // [ผู้ใช้ขอ] ไฟล์ที่มีหลายชีต (แท็บ) ให้เลือกได้ว่าจะนำเข้าชีตไหน - รายชื่อชีตโหลดตอนเลือกไฟล์ (ดู loadSheetOptions)
+    // ค่าเริ่มต้น = ชีต "ข้อมูล" (แม่แบบ) ถ้าไม่มีใช้ชีตแรก ไม่ได้เลือก = ทำงานเหมือนเดิม
+    var sheetCombo = new Ext.form.ComboBox({
+        fieldLabel: "ชีตที่นำเข้า", width: 420, mode: "local", triggerAction: "all", forceSelection: true, editable: false,
+        store: new Ext.data.ArrayStore({fields: ["v", "t"], data: []}),
+        valueField: "v", displayField: "t", emptyText: "เลือกไฟล์ก่อน (ถ้าไฟล์มีหลายชีตเลือกชีตที่จะนำเข้าได้)",
+    });
+    sheetCombo.on("select", resetPreview);
     var summaryFld = new Ext.form.DisplayField({hideLabel: true, value: "", style: "font-weight:bold;"});
 
     // [ผู้ใช้ขอ] ตารางก่อนบันทึกแสดง "ตาม Excel" - คอลัมน์/ชื่อ/ลำดับเดียวกับไฟล์ทุกช่อง (ค่าที่
@@ -708,6 +716,50 @@ function winMedSupImportNew() {
         updateExportBtn();
     }
 
+    // อ่านรายชื่อชีตของไฟล์ที่เลือกมาใส่ sheetCombo (แสดงจำนวนแถวด้วย) ค่าเริ่มต้น: ชีต "ข้อมูล" ถ้าไม่มี = ชีตที่หัวคอลัมน์
+    // ตรงกับแม่แบบมากที่สุด (เท่ากันเอาชีตแรก)
+    function loadSheetOptions() {
+        var input = fileFld.getEl() && fileFld.getEl().dom;
+        var file = input && input.files && input.files[0];
+        sheetCombo.clearValue();
+        sheetCombo.getStore().loadData([]);
+        if (!file) {
+            return;
+        }
+        Ext.fnLoadSheetJs(function () {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    var wb = XLSX.read(new Uint8Array(e.target.result), {type: "array"});
+                    var labels = Ext.MEDSUP_IMPORT_COLUMNS.map(function (c) { return Ext.fnImportNormLabel(c.label); });
+                    var data = [];
+                    var bestName = null, bestScore = -1;
+                    wb.SheetNames.forEach(function (name) {
+                        var ws = wb.Sheets[name];
+                        var rows = XLSX.utils.sheet_to_json(ws, {header: 1, raw: true, defval: ""});
+                        var head = (rows[0] || []).map(Ext.fnImportNormLabel);
+                        var score = labels.filter(function (l) { return head.indexOf(l) >= 0; }).length;
+                        data.push([name, name + "  (" + Math.max(rows.length - 1, 0) + " แถว" + (score >= 10 ? "" : " - หัวคอลัมน์ไม่ตรงแม่แบบ") + ")"]);
+                        if (name === "ข้อมูล") {
+                            bestName = name;
+                            bestScore = 9999;
+                        } else if (score > bestScore) {
+                            bestName = name;
+                            bestScore = score;
+                        }
+                    });
+                    sheetCombo.getStore().loadData(data);
+                    if (bestName) {
+                        sheetCombo.setValue(bestName);
+                    }
+                } catch (err) {
+                    // อ่านไม่ได้ปล่อยให้ readFile แจ้งเตือนตอนกดตรวจสอบ
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
     function readFile() {
         var input = fileFld.getEl() && fileFld.getEl().dom;
         var file = input && input.files && input.files[0];
@@ -722,8 +774,9 @@ function winMedSupImportNew() {
                 var rows;
                 try {
                     var wb = XLSX.read(new Uint8Array(e.target.result), {type: "array"});
-                    // ชีต "ข้อมูล" ของแม่แบบ ไม่มีก็ใช้ชีตแรก
-                    var ws = wb.Sheets["ข้อมูล"] || wb.Sheets[wb.SheetNames[0]];
+                    // ชีตที่ผู้ใช้เลือก (ดู sheetCombo) ไม่ได้เลือก/ไม่พบ = ชีต "ข้อมูล" ของแม่แบบ ไม่มีก็ใช้ชีตแรก
+                    var pickedSheet = sheetCombo.getValue();
+                    var ws = (pickedSheet && wb.Sheets[pickedSheet]) || wb.Sheets["ข้อมูล"] || wb.Sheets[wb.SheetNames[0]];
                     rows = XLSX.utils.sheet_to_json(ws, {header: 1, raw: true, defval: ""});
                 } catch (err) {
                     Ext.Msg.alert("แจ้งเตือน", "อ่านไฟล์ไม่สำเร็จ (ต้องเป็นไฟล์ .xlsx / .xls)");
@@ -788,6 +841,8 @@ function winMedSupImportNew() {
                 // รวมสัญญาด้านล่างรวมเป็นสัญญาเดียว ระบบไม่มีช่อง "ครั้งที่" แยก จึงใส่ "ครั้งที่ N" นำหน้า "รายละเอียดรับของ"
                 // ของแถวนั้นให้ (เฉพาะแถวที่มีรายการรับของ และยังไม่มีคำว่า ครั้งที่ N อยู่แล้ว)
                 var roundSuffix = /\s*[(\[（]\s*ค\.?\s*(\d+)\s*[)\]）]\s*$/;
+                var roundGroups = {};
+                var numOf = function (v) { return parseFloat(String(v == null ? "" : v).replace(/,/g, "")); };
                 out.forEach(function (o) {
                     var m = roundSuffix.exec(String(o.contract_code == null ? "" : o.contract_code));
                     if (!m) {
@@ -795,12 +850,37 @@ function winMedSupImportNew() {
                     }
                     var roundTag = "ครั้งที่ " + m[1];
                     o.contract_code = String(o.contract_code).replace(roundSuffix, "");
+                    (roundGroups[o.contract_code] = roundGroups[o.contract_code] || []).push(o);
                     if (o.rc_code !== "" || o.rc_amt !== "") {
-                        var detail = String(o.rc_detail == null ? "" : o.rc_detail);
+                        var detail = String(o.rc_detail == null ? "" : o.rc_detail).trim();
+                        if (detail === "-" || detail === "–" || detail === "—") {
+                            detail = "";
+                        }
                         if (detail.indexOf(roundTag) < 0) {
                             o.rc_detail = detail !== "" ? roundTag + " - " + detail : roundTag;
                         }
                     }
+                });
+                // แต่ละแถว (ค.N) ในไฟล์ใส่ "จำนวนเงินจากแหล่งเงินนี้" เป็นยอดของรับของครั้งนั้นๆ (รวมกัน = ยอดทั้งงวด) แต่ระบบรวมเป็น
+                // งวดเดียวที่มีรายการรับของหลายรายการ - ถ้ายอดงวดของแถวต่างกัน ให้แถวแรกเป็นยอดรวมและแถวถัดไปเว้นว่าง
+                // (ไม่งั้นจะขึ้น "ข้อมูลงวดไม่ตรงกับแถวแรก"/"ยอดรับของเกินยอดงวด") ถ้ายอดงวดทุกแถวเท่ากันอยู่แล้ว ไม่แตะ
+                Object.keys(roundGroups).forEach(function (code) {
+                    var g = roundGroups[code];
+                    if (g.length < 2) {
+                        return;
+                    }
+                    var amts = g.map(function (o) { return numOf(o.period_amt); });
+                    if (amts.some(function (v) { return isNaN(v); })) {
+                        return;
+                    }
+                    var min = Math.min.apply(null, amts), max = Math.max.apply(null, amts);
+                    if (max - min <= 0.005) {
+                        return;
+                    }
+                    var sum = amts.reduce(function (t, v) { return t + v; }, 0);
+                    g.forEach(function (o, i) {
+                        o.period_amt = i === 0 ? Math.round(sum * 100) / 100 : "";
+                    });
                 });
                 // [ผู้ใช้ขอ] เลขที่สัญญาเดียวกันที่รับของหลายรอบ (คนละใบแจ้งหนี้/เลขรับเข้าคลัง ERP) ไฟล์ที่ export มา
                 // แยกลำดับสัญญาต่างกัน = รวมเป็นสัญญาเดียวกัน (ใช้ลำดับของแถวแรก) 1 สัญญามีรายการรับของหลายแถวได้
@@ -958,7 +1038,7 @@ function winMedSupImportNew() {
         width: 1250, height: 620, modal: true, maximizable: true, layout: "border", closeAction: "destroy",
         items: [
             {
-                region: "north", xtype: "form", height: 150, border: false, bodyStyle: "padding:10px;", labelWidth: 90,
+                region: "north", xtype: "form", height: 185, border: false, bodyStyle: "padding:10px;", labelWidth: 90,
                 items: [
                     nameFld,
                     {
@@ -972,6 +1052,7 @@ function winMedSupImportNew() {
                             },
                         ],
                     },
+                    sheetCombo,
                     summaryFld,
                 ],
             },
@@ -981,7 +1062,10 @@ function winMedSupImportNew() {
     });
     win.show();
     // เลือกไฟล์ใหม่ = ล้างผลตรวจเดิม (ต้องกดตรวจสอบใหม่ก่อนบันทึก)
-    fileFld.getEl().on("change", resetPreview);
+    fileFld.getEl().on("change", function () {
+        resetPreview();
+        loadSheetOptions();
+    });
     // ติ๊ก/เอาติ๊กออกในตารางก่อนบันทึก (ตารางถูกสร้างใหม่ทุกครั้งที่ตรวจสอบ จึงดักที่ตัวพาเนล)
     previewPanel.body.on("click", function (e, t) {
         // ติ๊ก "นำเข้า" = ทั้งสัญญา (ทุกแถวของลำดับสัญญาเดียวกัน)

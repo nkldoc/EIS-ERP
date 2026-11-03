@@ -324,7 +324,7 @@ function imp_validate($db, $inputRows)
         $errs = array();
         $warns = array();
         // "-" ในช่องรับของ/อ้างอิง = ว่าง (เช่น สัญญาข้ามปียังไม่มีวันรับของ)
-        foreach (array("rc_code", "rc_erp", "rc_date", "rc_detail", "rc_amt", "pr_id", "po_id", "chk_id", "c_overlap") as $dk) {
+        foreach (array("period", "doc_ref", "rc_code", "rc_erp", "rc_date", "rc_detail", "rc_amt", "pr_id", "po_id", "chk_id", "c_overlap") as $dk) {
             if (in_array(imp_str($in[$dk] ?? ""), array("-", "–", "—"), true)) {
                 $in[$dk] = "";
             }
