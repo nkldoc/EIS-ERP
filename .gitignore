@@ -14,6 +14,7 @@
 /storage/sessions/
 /storage/logs/
 /storage/
+/public/procure/uploads/sp_check_items/
 *.log
 *.tmp
 *.cache
