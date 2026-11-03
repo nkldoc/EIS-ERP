@@ -1462,19 +1462,6 @@ switch ($mode) {
             echo json_encode(array("success" => false, "msg" => "ข้อมูลยืนยันการแก้ไขไม่ครบถ้วน"));
             exit;
         }
-        $hasResolutionTable = (int)$db->GetDataBySQL(
-            "SELECT CASE WHEN OBJECT_ID(N'dbo.sp_check_item_resolutions', N'U') IS NOT NULL
-                              AND COL_LENGTH(N'dbo.sp_check_item_resolutions', N'i_enable') IS NOT NULL
-                              AND COL_LENGTH(N'dbo.sp_check_item_resolutions', N'i_review_status') IS NOT NULL
-                         THEN 1 ELSE 0 END",
-            array()
-        ) === 1;
-        if (!$hasResolutionTable) {
-            $db->RollBackTran();
-            http_response_code(503);
-            echo json_encode(array("success" => false, "msg" => "ฐานข้อมูลยังไม่ได้ติดตั้งตารางประวัติการส่งคืน กรุณาติดตั้ง migration 20261102_sp_check_item_resolutions.sql ก่อนใช้งาน"));
-            exit;
-        }
         $binary = base64_decode(substr($imageData, strpos($imageData, ',') + 1), true);
         if ($binary === false || strlen($binary) > 15 * 1024 * 1024) {
             echo json_encode(array("success" => false, "msg" => "ภาพใบร่างไม่ถูกต้องหรือมีขนาดเกิน 15 MB"));
