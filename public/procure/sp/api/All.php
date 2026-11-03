@@ -15,6 +15,9 @@ $limit = $_REQUEST["limit"] ?? null;
 $dir = $_REQUEST["dir"] ?? null;
 $sort = $_REQUEST["sort"] ?? null;
 $start = $_REQUEST["start"] ?? null;
+$mode = $_REQUEST["mode"] ?? null;
+$filter = $_REQUEST["filter"] ?? null;
+$value = trim((string)($_REQUEST["value"] ?? ""));
 
 function get($a)
 {
@@ -50,13 +53,22 @@ if ($_REQUEST['type'] == 'storeSpEmp') {
                 where a.i_enable = 1";
 
 
-    if (@$mode == "SEARCH") {
-        if (isset($value) && $value != "") {
-            $sqlTempTable .= " and " . $filter . " like ?";
+    if ($mode == "SEARCH") {
+        // Only allow known fields in the picker; values remain parameterized.
+        $searchFields = array(
+            "c_name" => "a.c_name",
+            "c_department" => "a.c_department",
+            "c_code" => "a.c_department"
+        );
+        $searchField = $searchFields[$filter] ?? "a.c_name";
+        $searchParams = array();
+        if ($value !== "") {
+            $sqlTempTable .= " and " . $searchField . " like ?";
+            $searchParams[] = "%{$value}%";
         }
         $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
-        $arrParam = array("%{$value}%", $start, $limit);
-        $arrCountParam = array("%{$value}%");
+        $arrParam = array_merge($searchParams, array($start, $limit));
+        $arrCountParam = $searchParams;
     } else {
         $sqlMain = "select * from ({$sqlTempTable}) a WHERE a.row > ? and a.row <= ?";
         $arrParam = array($start, $limit);
