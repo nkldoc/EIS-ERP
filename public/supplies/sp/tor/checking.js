@@ -1565,6 +1565,11 @@ Ext.uiConfirmVat = (rec) => {
                                                                 },
                                                         }),
                                                         renderer: function (value, metaData, record, rowIndex, colIndex, store) {
+                                                                var accountName = record && record.get ? record.get("dc_acc_name") : null;
+                                                                if (accountName) {
+                                                                        metaData.attr = "style='text-align: left;'";
+                                                                        return accountName;
+                                                                }
                                                                 if (value && value != 0) {
                                                                         metaData.attr = "style='text-align: left;'";
                                                                         // ค้นหาด้วยทั้ง string และ number
@@ -13646,6 +13651,11 @@ Ext.AppUx = function (app, menu) {
                                                                                         },
                                                                                 }),
                                                                                 renderer: function (value, metaData, record, rowIndex, colIndex, store) {
+                                                                                        var accountName = record && record.get ? record.get("dc_acc_name") : null;
+                                                                                        if (accountName) {
+                                                                                                metaData.attr = "style='text-align: left;'";
+                                                                                                return accountName;
+                                                                                        }
                                                                                         if (value && value != 0) {
                                                                                                 metaData.attr = "style='text-align: left;'";
                                                                                                 // ค้นหาด้วยทั้ง string และ number
