@@ -1317,19 +1317,35 @@ switch ($mode) {
             echo json_encode(array("success" => false, "totalCount" => 0, "data" => array(), "msg" => "ไม่พบรหัสตรวจรับ"));
             exit;
         }
+        // The resolution-history table is deployed separately from the main protest table.
+        // Keep showing protest items while older databases are waiting for that migration.
+        $hasResolutionTable = (int)$db->GetDataBySQL(
+            "SELECT CASE WHEN OBJECT_ID(N'dbo.sp_check_item_resolutions', N'U') IS NOT NULL
+                              AND COL_LENGTH(N'dbo.sp_check_item_resolutions', N'i_enable') IS NOT NULL
+                         THEN 1 ELSE 0 END",
+            array()
+        ) === 1;
+        $hasResolutionReview = $hasResolutionTable && (int)$db->GetDataBySQL(
+            "SELECT CASE WHEN COL_LENGTH(N'dbo.sp_check_item_resolutions', N'i_review_status') IS NOT NULL THEN 1 ELSE 0 END",
+            array()
+        ) === 1;
+        $returnCountSql = $hasResolutionTable
+            ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id AND r.i_enable = 1)"
+            : "CAST(0 AS INT)";
+        $resolutionCountSql = $hasResolutionReview
+            ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id AND r.i_enable = 1 AND r.i_review_status = 1)"
+            : "CAST(0 AS INT)";
         $sqlMain = "SELECT sp_check_item_id AS id, c_officer_name,
                            CONVERT(VARCHAR(19), d_receive, 120) AS d_receive,
                            CONVERT(VARCHAR(19), d_send, 120) AS d_send,
                            c_reason, c_annotation_image, c_document_url, i_status,
                            c_resolved_image, c_resolved_note, c_resolved_officer_name,
                            CONVERT(VARCHAR(19), d_resolved, 120) AS d_resolved,
-                           (SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r
-                            WHERE r.sp_check_item_id = sp_check_items.sp_check_item_id AND r.i_enable = 1) AS return_count,
-                           (SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r
-                            WHERE r.sp_check_item_id = sp_check_items.sp_check_item_id AND r.i_enable = 1 AND r.i_review_status = 1) AS resolution_count
-                    FROM dbo.sp_check_items
-                    WHERE sp_check_period_hdr_id = ? AND i_enable = 1
-                    ORDER BY d_create DESC, sp_check_item_id DESC";
+                           {$returnCountSql} AS return_count,
+                           {$resolutionCountSql} AS resolution_count
+                    FROM dbo.sp_check_items i
+                    WHERE i.sp_check_period_hdr_id = ? AND i.i_enable = 1
+                    ORDER BY i.d_create DESC, i.sp_check_item_id DESC";
         $stmt = $db->QueryParam($sqlMain, array($periodId));
         $items = array();
         while ($row = $db->Fetch($stmt)) {
@@ -1342,6 +1358,16 @@ switch ($mode) {
         $itemId = filter_var(@$_REQUEST["sp_check_item_id"], FILTER_VALIDATE_INT);
         if (!$itemId) {
             echo json_encode(array("success" => false, "totalCount" => 0, "data" => array(), "msg" => "ไม่พบรายการทักท้วง"));
+            exit;
+        }
+        $hasResolutionTable = (int)$db->GetDataBySQL(
+            "SELECT CASE WHEN OBJECT_ID(N'dbo.sp_check_item_resolutions', N'U') IS NOT NULL
+                              AND COL_LENGTH(N'dbo.sp_check_item_resolutions', N'i_review_status') IS NOT NULL
+                         THEN 1 ELSE 0 END",
+            array()
+        ) === 1;
+        if (!$hasResolutionTable) {
+            echo json_encode(array("success" => true, "totalCount" => 0, "data" => array()));
             exit;
         }
         $sqlMain = "SELECT r.sp_check_item_resolution_id AS id, r.i_round,
