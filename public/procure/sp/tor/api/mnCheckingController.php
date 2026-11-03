@@ -1326,10 +1326,10 @@ switch ($mode) {
             array()
         ) === 1;
         $returnCountSql = $hasResolutionTable
-            ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id AND r.i_enable = 1)"
+            ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id)"
             : "CAST(0 AS INT)";
         $resolutionCountSql = $hasResolutionTable
-            ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id AND r.i_enable = 1)"
+            ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id)"
             : "CAST(0 AS INT)";
         $sqlMain = "SELECT sp_check_item_id AS id, c_officer_name,
                            CONVERT(VARCHAR(19), d_receive, 120) AS d_receive,
