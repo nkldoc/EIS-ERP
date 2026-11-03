@@ -1512,7 +1512,6 @@ remvoeNoConract = (c_code)=> {
 										  Ext.bookContrack.setBaseParam("type", "contract");
 										  Ext.bookContrack.setBaseParam("i_purchase", Ext.getCmp('i_purchaseID').getValue().inputValue);
 										  Ext.bookContrack.setBaseParam("i_type_contract", Ext.getCmp('i_type_contractID').getValue().inputValue);
-						  Ext.bookContrack.setBaseParam("c_sub", Ext.getCmp('c_subID').getValue());
 
 										  Ext.bookContrack.reload({
 							 callback: function (records, operation, success) {

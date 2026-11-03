@@ -12,14 +12,14 @@ $con = null;
 
 function contractNumberDocId($contractType, $purchaseType) {
     $purchaseType = trim((string)$purchaseType);
-    $purchaseId = ($purchaseType === 'ซ.') ? 1 : (($purchaseType === 'จ.') ? 2 : (($purchaseType === 'ช.') ? 3 : 0));
+    $purchaseId = ($purchaseType === 'ซ.') ? 1 : (($purchaseType === 'จ.') ? 2 : 0);
     if ($purchaseId === 0) return 0;
-    // sp_doc_gen uses IDs 2/3/4 for contracts and 4/5/6 for orders.
-    // The previous offset was reversed, so order lookups searched the wrong
-    // document type and always appeared to have no previous number.
+    // Match the configured dbo.sp_doc rows: contract purchase/hire use 2/3;
+    // purchase/hire orders use 4/5.
     $contractType = trim((string)$contractType);
-    $contractOffset = ($contractType === 'สญ.') ? 1 : (($contractType === '') ? 3 : 0);
-    return $contractOffset + $purchaseId;
+    if ($contractType === 'สญ.') return $purchaseId + 1;
+    if ($contractType === '') return $purchaseId + 3;
+    return 0;
 }
 
 if ($_REQUEST["type"] == "dc_cost") {
@@ -80,7 +80,7 @@ if ($_REQUEST["type"] == "dc_cost") {
 	$i_type_contract = $_REQUEST['i_type_contract']??null;   
 	$yyyy = intval($_REQUEST['i_yyyy'] ?? 0);
 	$yyyyBuddhist = ($yyyy < 2400) ? $yyyy + 543 : $yyyy;
-	$c_sub = trim((string)($_REQUEST['c_sub'] ?? ''));
+	$yyyyAlt = ($yyyy < 2400) ? $yyyy + 543 : $yyyy - 543;
 	
     $contra = "{$i_type_contract}{$i_purchase}";
     
@@ -95,19 +95,18 @@ if ($_REQUEST["type"] == "dc_cost") {
 		  break; 
     }
     $value = contractNumberDocId($i_type_contract, $i_purchase);
-      $sequencePrefix = trim((string)$i_type_contract) . trim((string)$i_purchase) . $c_sub;
+      $codePrefix = trim((string)$i_type_contract) . trim((string)$i_purchase);
       $sqlMain = "select top 1 g.dc_doc_id , g.ref_id, g.c_yyyy , s.sequence_value AS i_value
 				    , g.c_gen, g.c_date, g.d_gen_date
 				    , g.dc_user_create_id, g.dc_user_create_cost_id, g.d_create
 				    from dbo.sp_doc_gen g
-				    CROSS APPLY (SELECT TRY_CONVERT(int, SUBSTRING(g.c_gen, LEN(?) + 1,
-				        CHARINDEX('/', g.c_gen) - LEN(?) - 1)) AS sequence_value) s
+				    CROSS APPLY (SELECT TRY_CONVERT(int, g.i_value) AS sequence_value) s
 				    where g.i_enabled=1 AND ISNULL(g.c_gen,'') <> ''
-				      AND g.c_gen LIKE ? AND CHARINDEX('/', g.c_gen) > LEN(?)
+				      AND ((g.c_yyyy IN (?, ?) AND g.dc_doc_id = ?)
+				        OR g.c_gen LIKE ?)
 				      AND s.sequence_value IS NOT NULL
 				    order by s.sequence_value desc, g.d_create desc";
-    $arrParam = array($sequencePrefix, $sequencePrefix,
-        $sequencePrefix . '%/' . $yyyyBuddhist, $sequencePrefix);
+    $arrParam = array($yyyy, $yyyyAlt, $value, $codePrefix . '%/' . $yyyyBuddhist);
 //    echo $db->debugSql($sqlMain, $arrParam);
 //    exit();
     $stmt = $db->QueryParam($sqlMain, $arrParam);
