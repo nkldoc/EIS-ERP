@@ -7217,6 +7217,11 @@ var win_edir_alldata = function (rec) {
                 };
                 return labels[name] || name;
         };
+        var lookupDisplayField = function (name) {
+                return { dc_cost_id: 'dc_cost_id_name', dc_cost2_id: 'dc_cost2_id_name',
+                        dc_expense_budget_type_id: 'dc_expense_budget_type_id_name',
+                        dc_bg_budget_type_id: 'dc_expense_budget_type_id_name' }[name] || null;
+        };
         var relationLogGrid = null;
         var relationDataTabs = [];
         var relationGridByTable = {};
@@ -7529,13 +7534,15 @@ var win_edir_alldata = function (rec) {
                                         var rightFields = [];
                                         Ext.each(dataset.columns || [], function (formFieldName, fieldIndex) {
                                                 var fieldValue = selectedRecord.get(formFieldName);
+                                                var displayField = lookupDisplayField(formFieldName);
+                                                var displayValue = displayField ? selectedRecord.get(displayField) : fieldValue;
                                                 var canEditField = isEditableField(formFieldName);
                                                 var fieldConfig = {
                                                         xtype: String(fieldValue || '').length > 100 ? 'textarea' : 'textfield',
                                                         name: formFieldName,
                                                         fieldLabel: fieldLabel(formFieldName),
-                                                        value: fieldValue === null || typeof fieldValue === 'undefined' ? '' : fieldValue,
-                                                        readOnly: !canEditField,
+                                                        value: displayValue === null || typeof displayValue === 'undefined' || displayValue === '' ? (fieldValue === null || typeof fieldValue === 'undefined' ? '' : fieldValue) : displayValue,
+                                                        readOnly: !canEditField || !!displayField,
                                                         anchor: '96%',
                                                         height: String(fieldValue || '').length > 100 ? 55 : undefined,
                                                         style: canEditField
@@ -7587,6 +7594,9 @@ var win_edir_alldata = function (rec) {
                                                                 var formChanges = [];
                                                                 Ext.each(dataset.columns || [], function (saveFieldName) {
                                                                         if (!isEditableField(saveFieldName)) {
+                                                                                return;
+                                                                        }
+                                                                        if (lookupDisplayField(saveFieldName)) {
                                                                                 return;
                                                                         }
                                                                         var formField = detailForm.getForm().findField(saveFieldName);
