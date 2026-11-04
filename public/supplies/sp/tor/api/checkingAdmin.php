@@ -8,15 +8,19 @@ function adminCheckingReply($status, $data) {
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
-if (empty($_SESSION['user_id']) || intval($_SESSION['dc_center_user'] ?? 0) !== 1) {
-    adminCheckingReply(403, array('success' => false, 'msg' => 'เฉพาะ Admin เท่านั้นที่แก้ไขได้'));
-}
+if (empty($_SESSION['user_id'])) adminCheckingReply(401, array('success' => false, 'msg' => 'กรุณาเข้าสู่ระบบใหม่'));
+$isAdmin = intval($_SESSION['dc_center_user'] ?? 0) === 1;
 $id = intval($_REQUEST['sp_check_period_hdr_id'] ?? 0);
 if ($id <= 0) adminCheckingReply(400, array('success' => false, 'msg' => 'กรุณาเลือกใบตรวจรับ'));
 $db = new DatabaseServer();
 $query = function ($sql, $params = array()) use ($db) {
     $stmt = @sqlsrv_query($db->conn, $sql, $params);
-    if (!$stmt) throw new RuntimeException('ไม่สามารถอ่านหรือบันทึกข้อมูลได้');
+    if (!$stmt) {
+        $errors = sqlsrv_errors(SQLSRV_ERR_ERRORS) ?: array();
+        $details = array_map(function ($error) { return trim(($error['SQLSTATE'] ?? '') . ' ' . ($error['code'] ?? '') . ' ' . ($error['message'] ?? '')); }, $errors);
+        error_log('checkingAdmin SQL error: ' . implode(' | ', $details));
+        throw new RuntimeException('เกิดข้อผิดพลาดระหว่างอ่านหรือบันทึกข้อมูล (' . (isset($errors[0]['code']) ? $errors[0]['code'] : 'SQL') . ')');
+    }
     return $stmt;
 };
 $rows = function ($sql, $params = array()) use ($query) {
@@ -29,6 +33,10 @@ $rows = function ($sql, $params = array()) use ($query) {
     }
     return $result;
 };
+$access = $rows('SELECT sp_check_period_hdr_id FROM dbo.sp_check_period_hdr WHERE sp_check_period_hdr_id=? AND i_enabled=1', array($id));
+if (!$access) adminCheckingReply(404, array('success' => false, 'msg' => 'ไม่พบใบตรวจรับที่เลือก'));
+if (!$isAdmin) adminCheckingReply(403, array('success' => false, 'msg' => 'เฉพาะ Admin เท่านั้นที่แก้ไขใบตรวจรับได้'));
+$token = hash_hmac('sha256', 'checking-admin|' . $_SESSION['user_id'] . '|' . $id, session_id());
 // Only these fields can be changed; document IDs and relationship keys stay fixed.
 $fields = array(
     'sp_check_period_hdr' => array(

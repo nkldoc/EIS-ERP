@@ -1,4 +1,14 @@
 (function () {
+    if (Ext.data && Ext.data.Connection && !Ext.checkingAdminPostUrlNormalizerInstalled) {
+        var originalRequest = Ext.data.Connection.prototype.request;
+        Ext.data.Connection.prototype.request = function (options) {
+            if (options && String(options.method || 'GET').toUpperCase() === 'POST' && typeof options.url === 'string') {
+                options.url = options.url.replace(/checkingAdmin\.php(?=([?#]|$))/i, 'checkingAdmin');
+            }
+            return originalRequest.call(this, options);
+        };
+        Ext.checkingAdminPostUrlNormalizerInstalled = true;
+    }
     function encode(value) { return Ext.util.Format.htmlEncode(String(value === null || value === undefined ? '' : value)); }
     function dateValue(value) {
         if (value === null || value === undefined || value === '') return null;
@@ -227,7 +237,7 @@
                             Ext.Msg.alert('บันทึกสำเร็จ', saved.msg);
                         }});
                 }});
-                var win = new Ext.Window({title: 'แก้ไขโดย Admin — ' + encode(header.c_code || header.c_arrive_code), modal: true,
+                var win = new Ext.Window({title: 'แก้ไขข้อมูลตรวจรับโดย Admin — ' + encode(header.c_code || header.c_arrive_code), modal: true,
                     width: Math.min(1080, Ext.getBody().getViewSize().width - 40), height: Math.min(740, Ext.getBody().getViewSize().height - 40),
                     maximizable: true, layout: 'border', items: [
                         new Ext.TabPanel({region: 'center', activeTab: 0, deferredRender: false, items: tabs}),

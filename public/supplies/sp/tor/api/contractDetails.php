@@ -47,7 +47,10 @@ if (intval($_SESSION['dc_center_user'] ?? 0) === 1) {
     $scope = ' AND 1=0';
 }
 $prCondition = $contractId > 0 ? 't.tor_id=(SELECT sp_tor_id FROM dbo.sp_tor_contract WHERE sp_tor_contract_id=?)' : 't.tor_id=?';
-$pr = $fetch('SELECT t.*, bg.c_name AS pr_type_name FROM dbo.sp_tor t
+$pr = $fetch('SELECT t.*, bg.c_name AS pr_type_name,
+    (SELECT TOP 1 cost.c_name FROM ' . DB_CENTER . 'dc_cost cost
+        WHERE cost.dc_cost_id=COALESCE(NULLIF(t.dc_cost_id,0),t.dc_cost2_id)) AS owner_department_name
+    FROM dbo.sp_tor t
     INNER JOIN dbo.sp_emp e ON e.sp_emp_id=t.sp_emp_id
     LEFT JOIN dbo.sp_type_bg bg ON bg.sp_type_bg_id=t.i_type_bg
     WHERE ' . $prCondition . $scope, $params);
@@ -63,7 +66,10 @@ if ($contractId > 0) {
     $selectedContract = ' AND c.sp_tor_contract_id=?';
     $contractParams[] = $contractId;
 }
-$contracts = $fetch('SELECT c.*, cr.c_name AS creditor_name FROM dbo.sp_tor_contract c
+$contracts = $fetch('SELECT c.*, cr.c_name AS creditor_name,
+    (SELECT TOP 1 cost.c_name FROM ' . DB_CENTER . 'dc_cost cost
+        WHERE cost.dc_cost_id=c.dc_cost_id) AS owner_department_name
+    FROM dbo.sp_tor_contract c
     LEFT JOIN ' . DB_NMU . 'dc_creditor cr ON cr.dc_creditor_id=c.dc_creditor_id
     WHERE c.sp_tor_id=?' . $selectedContract . ' ORDER BY c.sp_tor_contract_id', $contractParams);
 $contractsById = array();
@@ -74,7 +80,9 @@ $contractList = $contractsById ? implode(',', array_keys($contractsById)) : '0';
 // Continuing projects may instead link through the original contract.
 // Resolve both kinds of parents only through the PR/contracts authorized above.
 $parentContracts = $fetch('SELECT p.*,
-    cr.c_name AS creditor_name
+    cr.c_name AS creditor_name,
+    (SELECT TOP 1 cost.c_name FROM ' . DB_CENTER . 'dc_cost cost
+        WHERE cost.dc_cost_id=p.dc_cost_id) AS owner_department_name
     FROM dbo.sp_tor_contract p
     LEFT JOIN ' . DB_NMU . 'dc_creditor cr ON cr.dc_creditor_id=p.dc_creditor_id
     WHERE EXISTS (SELECT 1 FROM dbo.sp_tor_contract child
@@ -82,7 +90,9 @@ $parentContracts = $fetch('SELECT p.*,
         AND p.sp_tor_contract_id=child.parent_id AND p.sp_tor_contract_id<>child.sp_tor_contract_id)
     ORDER BY p.sp_tor_contract_id', array());
 $parentPr = $fetch('SELECT p.*, expense.c_code AS expense_code,
-    expense.c_name AS expense_name, bg.c_name AS pr_type_name
+    expense.c_name AS expense_name, bg.c_name AS pr_type_name,
+    (SELECT TOP 1 cost.c_name FROM ' . DB_CENTER . 'dc_cost cost
+        WHERE cost.dc_cost_id=COALESCE(NULLIF(p.dc_cost_id,0),p.dc_cost2_id)) AS owner_department_name
     FROM dbo.sp_tor p
     LEFT JOIN ' . DB_NMU_EIS . 'bg_expense expense ON expense.bg_expense_id=p.po_expense_id
     LEFT JOIN dbo.sp_type_bg bg ON bg.sp_type_bg_id=p.i_type_bg
@@ -153,12 +163,15 @@ $bidders = $fetch('SELECT b.*, cr.c_name AS creditor_name, d.c_name AS item_name
     LEFT JOIN NMU.dbo.dc_creditor cr ON cr.dc_creditor_id=b.dc_creditor_id
     LEFT JOIN dbo.sp_tor_dtl d ON d.sp_tor_dtl_id=b.sp_tor_dtl_id
     WHERE b.sp_tor_id=? AND b.i_enabled=1 ORDER BY b.sp_tor_dtl_id,b.sp_tor_bidder_dtl_id', array($torId));
-$periods = $fetch('SELECT h.*, c.c_code AS contract_code, budget.c_name AS budget_name,
-    cost.c_code AS receiving_department_code, cost.c_name AS receiving_department_name
+$periods = $fetch('SELECT h.*, c.c_code AS contract_code, budget.c_name AS budget_name, t.sp_emp_id AS owner_sp_emp_id,
+    cost.c_code AS receiving_department_code, cost.c_name AS receiving_department_name,
+    (SELECT TOP 1 owner.c_name FROM ' . DB_CENTER . 'dc_cost owner
+        WHERE owner.dc_cost_id=COALESCE(NULLIF(c.dc_cost_id,0),NULLIF(t.dc_cost_id,0),t.dc_cost2_id)) AS owner_department_name
     FROM dbo.sp_tor_hdr_period h
     INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
+    INNER JOIN dbo.sp_tor t ON t.tor_id=c.sp_tor_id
     LEFT JOIN ' . DB_CENTER . 'dc_expense_budget_type budget ON budget.dc_expense_budget_type_id=h.dc_expense_budget_type_id
-    LEFT JOIN dbo.dc_cost cost ON cost.dc_cost_id=COALESCE(NULLIF(h.dc_cost_id,0),h.dc_cost2_id)
+    LEFT JOIN dbo.dc_cost cost ON cost.dc_cost_id=COALESCE(NULLIF(c.dc_cost_id,0),NULLIF(t.dc_cost_id,0),t.dc_cost2_id)
     WHERE h.sp_tor_contract_id IN (' . $contractList . ') ORDER BY h.sp_tor_contract_id,h.i_period,h.sp_tor_hdr_period_id', array());
 $periodItems = $fetch('SELECT d.*, expense.c_code AS expense_code, expense.c_name AS expense_name
     FROM dbo.sp_tor_dtl_period d INNER JOIN dbo.sp_tor_hdr_period h
@@ -167,7 +180,10 @@ $periodItems = $fetch('SELECT d.*, expense.c_code AS expense_code, expense.c_nam
     WHERE h.sp_tor_contract_id IN (' . $contractList . ')
     ORDER BY h.sp_tor_contract_id,h.i_period,d.sp_tor_dtl_period_id', array());
 $checks = $fetch('SELECT h.*, COALESCE(h.c_arrive_code,m.c_arrive_code) AS ir_code,
-    cn.sp_tor_contract_id AS linked_contract_id, cn.c_code AS contract_code,
+    (SELECT TOP 1 owner.c_name FROM ' . DB_CENTER . 'dc_cost owner
+        INNER JOIN dbo.sp_tor ownerPr ON ownerPr.tor_id=cn.sp_tor_id
+        WHERE owner.dc_cost_id=COALESCE(NULLIF(cn.dc_cost_id,0),NULLIF(ownerPr.dc_cost_id,0),ownerPr.dc_cost2_id)) AS owner_department_name,
+    cn.sp_tor_contract_id AS linked_contract_id, cn.c_code AS contract_code, ownerPr.sp_emp_id AS owner_sp_emp_id,
     p.i_period AS payment_period, p.i_period_contract AS contract_period, p.c_contract_code AS period_reference,
     COALESCE(NULLIF(LTRIM(RTRIM(h.c_overlap)),\'\'),cn.c_overlap) AS resolved_overlap_code,
     COALESCE(h.i_yyyy_overlap,cn.i_yyyy_overlap) AS resolved_overlap_year,
@@ -179,6 +195,7 @@ $checks = $fetch('SELECT h.*, COALESCE(h.c_arrive_code,m.c_arrive_code) AS ir_co
     (SELECT TOP 1 w.c_code FROM NMU_EIS..po_working_dtl w WHERE w.po_working_hdr_id=h.po_working_hdr_id ORDER BY w.c_code) AS payment_code
     FROM dbo.sp_check_period_hdr h LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=h.sp_mn_contract_hdr_id
     LEFT JOIN dbo.sp_tor_contract cn ON cn.sp_tor_contract_id=COALESCE(NULLIF(h.sp_tor_contract_id,0),m.sp_contract_id)
+    LEFT JOIN dbo.sp_tor ownerPr ON ownerPr.tor_id=cn.sp_tor_id
     LEFT JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id=h.sp_tor_hdr_period_id
     LEFT JOIN ' . DB_NMU . 'dc_creditor cr ON cr.dc_creditor_id=h.dc_creditor_id
     LEFT JOIN ' . DB_NMU . 'dc_creditor tr ON tr.dc_creditor_id=COALESCE(NULLIF(h.dc_creditor_transfer_id,0),h.dc_creditor_id)
@@ -219,7 +236,11 @@ foreach ($checks as &$check) {
         && intval($check['resolved_overlap_year'] ?? 0) === intval($contract['i_yyyy_overlap2'] ?? 0) ? 1 : 0;
 }
 unset($check);
-$checkItems = $fetch('SELECT d.*, budget.c_name AS budget_name, expense.c_code AS expense_code,
+foreach ($checks as &$check) {
+    $check['edit_csrf_token'] = hash_hmac('sha256', 'checking-admin|' . $_SESSION['user_id'] . '|' . intval($check['sp_check_period_hdr_id']), session_id());
+}
+unset($check);
+$checkItems = $fetch('SELECT d.*, budget.c_name AS budget_name, t.sp_emp_id AS owner_sp_emp_id, expense.c_code AS expense_code,
     expense.c_name AS expense_name, p.i_pr_type1 AS period_booking_type
     FROM dbo.sp_check_period_dtl d
     INNER JOIN dbo.sp_check_period_hdr h ON h.sp_check_period_hdr_id=d.sp_check_period_hdr_id
@@ -253,7 +274,8 @@ if (intval($_GET['preflight'] ?? 0) === 1) {
     $result=loadCheckingPreflight($db,$check,$contractsById[intval($check['linked_contract_id'])]??array(),$period,$debtItems);
     echo json_encode(array('success'=>true,'analysis'=>$result),JSON_UNESCAPED_UNICODE);exit;
 }
-echo json_encode(array('success' => true, 'can_admin_edit' => intval($_SESSION['dc_center_user'] ?? 0) === 1,
+    $canManageEdit = intval($_SESSION['dc_center_user'] ?? 0) === 1;
+echo json_encode(array('success' => true, 'can_admin_edit' => $canManageEdit,
     'pr' => $pr, 'parentPr' => $parentPr, 'parentContracts' => $parentContracts,
     'funds' => $funds, 'items' => $items,
     'bidders' => $bidders, 'contracts' => $contracts, 'periods' => $periods,
