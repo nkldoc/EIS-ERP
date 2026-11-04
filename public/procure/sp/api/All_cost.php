@@ -14,10 +14,10 @@ function contractNumberDocId($contractType, $purchaseType) {
     $purchaseType = trim((string)$purchaseType);
     $purchaseId = ($purchaseType === 'ซ.') ? 1 : (($purchaseType === 'จ.') ? 2 : 0);
     if ($purchaseId === 0) return 0;
-    // dc_doc_id 1-3 are orders; 4-6 are contracts (purchase, hire, rental).
+    // dbo.sp_doc: 2/3 are purchase/hire contracts and 4/5 are purchase/hire orders.
     $contractType = trim((string)$contractType);
-    if ($contractType === 'สญ.') return $purchaseId + 3;
-    if ($contractType === '') return $purchaseId;
+    if ($contractType === 'สญ.') return $purchaseId + 1;
+    if ($contractType === '') return $purchaseId + 3;
     return 0;
 }
 
@@ -78,18 +78,15 @@ if ($_REQUEST["type"] == "dc_cost") {
 	$i_purchase = $_REQUEST['i_purchase']??null;   
 	$i_type_contract = $_REQUEST['i_type_contract']??null;   
 	$yyyy = intval($_REQUEST['i_yyyy'] ?? 0);
-	$yyyyBuddhist = ($yyyy < 2400) ? $yyyy + 543 : $yyyy;
 	$yyyyAlt = ($yyyy < 2400) ? $yyyy + 543 : $yyyy - 543;
     $value = contractNumberDocId($i_type_contract, $i_purchase);
-      $sqlMain = "select top 1 g.dc_doc_id , g.ref_id, g.c_yyyy , s.sequence_value AS i_value
+	  $sqlMain = "select top 1 g.dc_doc_id , g.ref_id, g.c_yyyy , g.i_value AS i_value
 				    , g.c_gen, g.c_date, g.d_gen_date
 				    , g.dc_user_create_id, g.dc_user_create_cost_id, g.d_create
 				    from dbo.sp_doc_gen g
-				    CROSS APPLY (SELECT TRY_CONVERT(int, g.i_value) AS sequence_value) s
 				    where g.i_enabled=1 AND ISNULL(g.c_gen,'') <> ''
 				      AND g.c_yyyy IN (?, ?) AND g.dc_doc_id = ?
-				      AND s.sequence_value IS NOT NULL
-				    order by s.sequence_value desc, g.d_create desc";
+				    order by g.i_value desc, g.d_create desc";
     $arrParam = array($yyyy, $yyyyAlt, $value);
 //    echo $db->debugSql($sqlMain, $arrParam);
 //    exit();
