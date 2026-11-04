@@ -428,7 +428,10 @@
                         ? table(winners, bidderColumns) : parentCreditorHtml));
                 var contractHtml = overviewFunding;
                 Ext.each(data.contracts, function (contract) {
-                    contractHtml += section('รายละเอียดสัญญา', fundBadge('การใช้เงินสัญญา', contract, data.pr[0]) + table([contract], [['c_code', 'เลขสัญญา'], ['creditor_name', 'คู่สัญญา'], ['owner_department_name', 'หน่วยงานเจ้าของเรื่อง']]) + contractTerms(contract));
+                    var contractEdit = data.can_admin_edit
+                        ? '<div style="text-align:right;margin:6px 0"><button type="button" class="contract-period-edit" data-contract-id="' + String(contract.sp_tor_contract_id || contract.id || '') + '">แก้ไขสัญญา / งวด (Admin)</button></div>'
+                        : '';
+                    contractHtml += section('รายละเอียดสัญญา', contractEdit + fundBadge('การใช้เงินสัญญา', contract, data.pr[0]) + table([contract], [['c_code', 'เลขสัญญา'], ['creditor_name', 'คู่สัญญา'], ['owner_department_name', 'หน่วยงานเจ้าของเรื่อง']]) + contractTerms(contract));
                 });
                 if (!data.contracts.length) contractHtml += section('รายละเอียดสัญญา', '<p style="padding:10px;color:#666">PR นี้ยังไม่มีสัญญา</p>');
                 contractHtml += contractBookingDetails(data.contractFunds || []);
@@ -443,6 +446,23 @@
                     contractPanel.periodFilter = select.value;
                     contractPanel.update(contractPanel.overviewHtml + renderPeriods(contractPanel.overviewData, select.value));
                 }, null, {delegate: '.contract-period-filter'});
+                contractPanel.body.on('click', function (event, button) {
+                    event.stopEvent();
+                    if (!contractPanel.overviewData.can_admin_edit) return;
+                    var contractId = String(button.getAttribute('data-contract-id') || '');
+                    var contract = children(contractPanel.overviewData.contracts, 'sp_tor_contract_id', contractId)[0] || {};
+                    var check = children(contractPanel.overviewData.checks, 'linked_contract_id', contractId)[0] || contractPanel.overviewData.checks[0] || {};
+                    if (typeof win_edir_alldata !== 'function' || !check.sp_check_period_hdr_id) {
+                        Ext.Msg.alert('แก้ไขข้อมูล', 'ไม่พบเครื่องมือแก้ไขสัญญา/งวดสำหรับรายการนี้');
+                        return;
+                    }
+                    var record = { get: function (name) {
+                        if (name === 'sp_tor_contract_id') return contract.sp_tor_contract_id || contract.id || contractId;
+                        if (name === 'sp_tor_id') return (contractPanel.overviewData.pr[0] || {}).tor_id || contractPanel.overviewData.sp_tor_id;
+                        return check[name];
+                    }};
+                    win_edir_alldata(record);
+                }, null, {delegate: '.contract-period-edit'});
                 contractPanel.body.on('click', function (event, button) {
                     event.stopEvent();
                     if (!contractPanel.overviewData.can_admin_edit || button.disabled) return;

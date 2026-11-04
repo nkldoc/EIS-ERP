@@ -276,6 +276,7 @@ if (intval($_GET['preflight'] ?? 0) === 1) {
 }
     $canManageEdit = intval($_SESSION['dc_center_user'] ?? 0) === 1;
 echo json_encode(array('success' => true, 'can_admin_edit' => $canManageEdit,
+    'can_manage_edit' => $canManageEdit,
     'pr' => $pr, 'parentPr' => $parentPr, 'parentContracts' => $parentContracts,
     'funds' => $funds, 'items' => $items,
     'bidders' => $bidders, 'contracts' => $contracts, 'periods' => $periods,

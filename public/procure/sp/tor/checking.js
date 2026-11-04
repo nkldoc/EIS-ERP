@@ -7201,6 +7201,22 @@ var win_edir_alldata = function (rec) {
         }
 
         var relationLogStore = null;
+        var fieldLabel = function (name) {
+                var labels = {
+                        dc_cost_id: 'หน่วยงานเจ้าของเรื่อง',
+                        dc_cost2_id: 'หน่วยงานผู้รับผิดชอบ',
+                        dc_expense_budget_type_id: 'ค่าใช้จ่ายแหล่งเงิน',
+                        dc_bg_budget_type_id: 'ค่าใช้จ่ายแหล่งเงิน',
+                        dc_acc_id: 'บัญชี',
+                        c_code: 'เลขที่เอกสาร',
+                        c_contract_code: 'เลขที่สัญญา',
+                        i_period: 'งวดที่',
+                        f_total_amt: 'จำนวนเงินรวม',
+                        d_doc_date: 'วันที่เอกสาร',
+                        d_period_date: 'วันที่งวด'
+                };
+                return labels[name] || name;
+        };
         var relationLogGrid = null;
         var relationDataTabs = [];
         var relationGridByTable = {};
@@ -7455,7 +7471,7 @@ var win_edir_alldata = function (rec) {
                                         var isIdColumn = /(^id$|_id$)/i.test(fieldName);
                                         var isNumberColumn = /(^i_|^f_|amt|qty|price|total|year)/i.test(fieldName);
                                         var columnConfig = {
-                                                header: fieldName,
+                                                header: fieldLabel(fieldName),
                                                 dataIndex: fieldName,
                                                 width: calculatedWidth,
                                                 align: isIdColumn ? 'center' : (isNumberColumn ? 'right' : 'left'),
@@ -7517,7 +7533,7 @@ var win_edir_alldata = function (rec) {
                                                 var fieldConfig = {
                                                         xtype: String(fieldValue || '').length > 100 ? 'textarea' : 'textfield',
                                                         name: formFieldName,
-                                                        fieldLabel: formFieldName,
+                                                        fieldLabel: fieldLabel(formFieldName),
                                                         value: fieldValue === null || typeof fieldValue === 'undefined' ? '' : fieldValue,
                                                         readOnly: !canEditField,
                                                         anchor: '96%',
