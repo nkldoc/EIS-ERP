@@ -72,7 +72,7 @@ Ext.storeAcceptMedSupList = new Ext.data.JsonStore({
     fields: [
         "id", "c_ir_code", "sp_tor_period_bill_id", "c_contract_code", "c_project_name", "c_expense_name",
         "i_period", "i_budget_year", "c_ap_dept_type", "n_lines", "c_detail", "f_total_amt", "d_receive_date_last", "d_ir_issue",
-        "c_create_name", "c_ap_code", "d_ap_issue", "i_checking_ready", "chk_id", "c_code_ref", "po_working_hdr_id",
+        "c_create_name", "c_ap_code", "d_ap_issue", "i_checking_ready", "chk_id", "d_checking", "c_code_ref", "po_working_hdr_id",
         "c_overlap", "i_budget_year_overlap", "c_overlap2", "i_budget_year_overlap2", "c_overlap3", "i_budget_year_overlap3",
     ],
 });
@@ -200,6 +200,138 @@ function winAcceptMedSupDetail(rec) {
 // ต้นฉบับ เปิดเป็นแท็บเต็มจอ (เพิ่มเข้า contenterCenter ตรงๆ ไม่ใช่ modal window)
 // ตามที่ขอ - ต้องกรอก "รายการส่งเบิก" ให้ครบก่อนถึงจะออกเลข AP ให้เลข IR นี้ได้
 // (บังคับจริงฝั่งเซิร์ฟเวอร์ที่ mode SAVE_CHECKING/ISSUE_AP)
+// "แก้ไขข้อมูล ADMIN" (คลิกขวา) - ผู้ใช้ทุกคนที่เข้าเมนูได้ใช้ได้ - ฟอร์มคำร้องแก้ไขข้อมูลตรวจรับของเลข AP เหมือน ST0013 (checking.js win_edit_admin)
+// เก็บคำร้องลง sp_tor_period_bill_checking_request ผ่าน mode ADMIN_REQUEST (ต้องออกเลข AP แล้ว)
+function winAdminRequest(rec) {
+    var reasons = [
+        "ผู้ใช้งานระบบทำระบุข้อมูลผิด (แจ้งหัวหน้าฝ่ายแล้ว)",
+        "รหัสงบประมาณ/ประเภทรายจ่าย/รายการค่าใช้จ่าย",
+        "รายการบัญชี",
+        "จำนวนเงิน",
+        "ชื่อเจ้าหนี้/เลขที่บัญชีธนาคาร",
+    ];
+    var noteFld = new Ext.form.TextArea({fieldLabel: "หมายเหตุ", width: 530, height: 100, allowBlank: true});
+    var otherChk = new Ext.form.Checkbox({boxLabel: "อื่น ๆ", checked: false});
+    var otherFld = new Ext.form.TextField({hideLabel: true, width: 300, style: "margin-left: 5px;", disabled: true, emptyText: "กรุณาระบุสาเหตุ"});
+    var checks = [];
+    for (var i = 0; i < reasons.length; i++) {
+        checks.push(new Ext.form.Checkbox({boxLabel: reasons[i], checked: false}));
+    }
+    function selectedLabels() {
+        var out = [];
+        for (var j = 0; j < checks.length; j++) {
+            if (checks[j].getValue()) { out.push(checks[j].boxLabel); }
+        }
+        if (otherChk.getValue()) { out.push("อื่น ๆ : " + otherFld.getValue()); }
+        return out;
+    }
+    function refreshNote() {
+        var labels = selectedLabels();
+        for (var k = 0; k < labels.length; k++) { labels[k] = "- " + labels[k]; }
+        noteFld.setValue(labels.join("\n"));
+    }
+    for (var c = 0; c < checks.length; c++) { checks[c].on("check", refreshNote); }
+    otherChk.on("check", function (cb, checked) {
+        otherFld.setDisabled(!checked);
+        if (!checked) { otherFld.setValue(""); }
+        refreshNote();
+    });
+    otherFld.enableKeyEvents = true;
+    otherFld.on("keyup", refreshNote);
+    // วันที่ตรวจรับ: ดึงจากที่บันทึกตรวจรับไว้ (ถ้ามี) แก้ไขได้ / วันที่ทำรายการ = วันนี้ (อ่านอย่างเดียว)
+    var d_checkingEditFld = new Ext.form.DateField({
+        fieldLabel: "วันที่ตรวจรับ", name: "d_checking_edit", width: 200, allowBlank: true,
+        style: {background: "#EEEEEE", "font-weight": "bold"},
+    });
+    if (rec.get("d_checking")) { d_checkingEditFld.setValue(rec.get("d_checking")); }
+    var win = new Ext.Window({
+        title: "รายการแก้ไข",
+        modal: true, plain: true, border: false, layout: "fit",
+        items: [{
+            xtype: "form", frame: true, labelAlign: "right", labelWidth: 150, width: 800, height: 400, autoScroll: true,
+            bodyStyle: {padding: "10px 20px"},
+            defaults: {anchor: "100%", msgTarget: "side", allowBlank: false},
+            items: [{
+                xtype: "container", layout: "hbox", align: "stretch",
+                defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
+                items: [{
+                    title: "ร้องขอยกเลิกการบันทึกบัญชี : " + rec.get("c_ap_code"),
+                    collapsible: false, collapsed: false,
+                    defaults: {allowBlank: true},
+                    items: [
+                        {
+                            xtype: "textfield", fieldLabel: "เลขที่ตรวจรับ", width: 200, readOnly: true,
+                            value: rec.get("c_ap_code"),
+                            style: {background: "#EEEEEE", "font-weight": "bold", color: "red"},
+                        },
+                        {
+                            xtype: "datefield", fieldLabel: "วันที่ทำรายการ", readOnly: true, value: new Date(),
+                            style: {background: "#EEEEEE", "font-weight": "bold"},
+                        },
+                        d_checkingEditFld,
+                        {
+                            xtype: "container", layout: "anchor", RemoveHeight: true,
+                            style: "padding-left: 145px;", width: 680,
+                            defaults: {xtype: "fieldset", flex: 1, margins: "0px 3px", autoHeight: true},
+                            items: [{
+                                title: "ข้อสาเหตุ (ใช้เป็นสาเหตุที่แก้ไขข้อมูลการตรวจรับ) ",
+                                collapsible: false, collapsed: false,
+                                defaults: {labelStyle: "width:200px;", allowBlank: true},
+                                items: [{
+                                    xtype: "container", anchor: "100%", layout: "anchor",
+                                    items: checks.concat([{
+                                        xtype: "container", layout: "hbox", style: "margin-bottom: 5px;",
+                                        items: [otherChk, otherFld],
+                                    }]),
+                                }],
+                            }],
+                        },
+                        noteFld,
+                    ],
+                }],
+            }],
+        }],
+        buttonAlign: "left",
+        buttons: [
+            {
+                text: "&nbsp;ส่งขอร้อง&nbsp;",
+                icon: "../images/icons/delete.png",
+                handler: function () {
+                    if (noteFld.getValue() === "") {
+                        Ext.example.msg("แจ้งเตือน", "กรุณาระบุเหตุผล", 1);
+                        return;
+                    }
+                    Ext.Msg.confirm("ยืนยัน", "ยืนยันส่งคำร้องแก้ไขข้อมูลตรวจรับ " + rec.get("c_ap_code") + " ?", function (btn) {
+                        if (btn !== "yes") { return; }
+                        Ext.Ajax.request({
+                            url: "tor/api/mnMedSupPeriodBillReceiveController.php",
+                            method: "POST",
+                            params: {
+                                mode: "ADMIN_REQUEST",
+                                c_ir_code: rec.get("c_ir_code"),
+                                d_checking_edit: d_checkingEditFld.getRawValue(),
+                                json_select: Ext.encode(selectedLabels()),
+                                c_comment: noteFld.getValue(),
+                            },
+                            success: function (resp) {
+                                var res = Ext.decode(resp.responseText);
+                                if (res.reval === 0) {
+                                    Ext.Msg.alert("สำเร็จ", res.msg || "บันทึกเรียบร้อย");
+                                    win.destroy();
+                                } else {
+                                    Ext.Msg.alert("แจ้งเตือน", res.msg || "ส่งคำร้องไม่สำเร็จ");
+                                }
+                            },
+                            failure: function () { Ext.Msg.alert("แจ้งเตือน", "ส่งคำร้องไม่สำเร็จ"); },
+                        });
+                    });
+                },
+            },
+            {text: "ย้อนกลับ", handler: function () { win.destroy(); }},
+        ],
+    }).show();
+}
+
 // ใบขอเบิก (ร่าง) - เปิด PDF จาก EIS (po/pdf/PDF_PoWorking.php) แบบเดียวกับ ST0013 แต่ส่ง medsup_ir=1
 // ให้ EIS อ่านข้อมูลจากรายละเอียดตรวจรับเวชภัณฑ์ (id = sp_tor_period_bill_checking_id) แทน sp_check_period_hdr
 function winDraftWithdrawPdf(rec) {
@@ -373,12 +505,19 @@ function winCheckingDetailTab(rec) {
         fieldLabel: "วันที่บันทึกการตรวจรับ", width: 200, allowBlank: false,
         maxValue: new Date(), maxText: "วันที่ตรวจรับต้องไม่เกินวันที่ปัจจุบัน",
     });
+    // เลขที่ EGP: บังคับกรอกเมื่อใช้เงินปีงบประมาณปัจจุบัน ถ้าใช้เงินปีงบประมาณเก่า (กันเหลื่อม เช่น 2569 ขณะที่ปีปัจจุบัน 2570)
+    // ยังไม่มีเลข EGP ระบบใส่ "-" ให้และล็อกช่องไว้ จะกรอกได้เมื่อ "ใช้เงินปีงบประมาณ" เป็นปีปัจจุบัน (ดู applyEgpRule)
     var c_egp_noFld = new Ext.form.TextField({fieldLabel: "เลขที่ EGP", width: 200, allowBlank: false});
+    var egpHintFld = new Ext.form.DisplayField({
+        fieldLabel: "", width: 420, hidden: true, style: "color:#c60;",
+        value: "ใช้เงินปีงบประมาณเก่า (กันเหลื่อม): เลขที่ EGP ใส่ \"-\" ไว้ก่อน จะกรอกได้เมื่อ \"ใช้เงินปีงบประมาณ\" เป็นปีปัจจุบัน",
+    });
+    // รายการส่งเบิก: ไม่บังคับกรอก (บันทึกและออกเลข AP ได้เลย)
     var c_disburse_detailFld = new Ext.form.TextArea({
         fieldLabel: "รายการส่งเบิก",
         width: 420,
         height: 60,
-        allowBlank: false,
+        allowBlank: true,
     });
     // "ใช้เงินปีงบประมาณ" ต้องเป็น dropdown ให้เลือก (เหมือนหน้า ST0013 ต้นแบบ) ไม่ใช่
     // กล่องพิมพ์ตัวเลขเฉยๆ - ใช้ช่วงปีเดียวกับตัวกรอง "ปีงบประมาณ" ในแถบค้นหา
@@ -487,9 +626,28 @@ function winCheckingDetailTab(rec) {
         value: MEDSUP_DC_COST_ID,
     });
 
+    // ใช้เงินปีงบประมาณเก่ากว่าปีปัจจุบัน -> เลขที่ EGP = "-" (ล็อก ไม่บังคับ) · ปีปัจจุบัน -> กรอกได้และบังคับกรอก
+    function applyEgpRule() {
+        var useYear = parseInt(i_budget_year_useFld.getValue(), 10) || 0;
+        if (useYear > 0 && useYear < currentFiscalYearTh()) {
+            c_egp_noFld.setValue("-");
+            c_egp_noFld.setReadOnly(true);
+            c_egp_noFld.allowBlank = true;
+            egpHintFld.show();
+        } else {
+            c_egp_noFld.setReadOnly(false);
+            c_egp_noFld.allowBlank = false;
+            if (c_egp_noFld.getValue() === "-") {
+                c_egp_noFld.setValue("");
+            }
+            egpHintFld.hide();
+        }
+        c_egp_noFld.clearInvalid();
+    }
+
     function saveChecking() {
-        if (!d_checkingFld.isValid() || !c_egp_noFld.isValid() || !c_disburse_detailFld.isValid()) {
-            Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกวันที่บันทึกการตรวจรับ / เลขที่ EGP / รายการส่งเบิก ให้ครบ");
+        if (!d_checkingFld.isValid() || !c_egp_noFld.isValid()) {
+            Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกวันที่บันทึกการตรวจรับ / เลขที่ EGP (กรณีใช้เงินปีงบประมาณปัจจุบัน) ให้ครบ");
             return;
         }
         Ext.Ajax.request({
@@ -553,10 +711,14 @@ function winCheckingDetailTab(rec) {
         });
     }
 
+    i_budget_year_useFld.on("select", applyEgpRule);
+    applyEgpRule();
+
     var leftItems = [
         d_doc_completeFld,
         d_checkingFld,
         c_egp_noFld,
+        egpHintFld,
         c_disburse_detailFld,
         {xtype: "displayfield", fieldLabel: "", width: 380, value: "* ระบุงวด แสดงที่ใบส่งเบิก", style: "color:#c00;"},
         {
@@ -769,6 +931,7 @@ function winCheckingDetailTab(rec) {
         if (hasVal(d.i_budget_year_use)) {
             i_budget_year_useFld.setValue(d.i_budget_year_use);
         }
+        applyEgpRule();
         if (d.dc_cost_responsible_id) {
             dc_cost_responsible_idFld.setValue(d.dc_cost_responsible_id);
         }
@@ -855,12 +1018,12 @@ Ext.AppUx = function (app, menu) {
         // ต้องกรอกรายละเอียดตรวจรับ (รายการส่งเบิก) ให้ครบทุกเลข IR ที่เลือกก่อน - เช็ค
         // ฝั่ง UI จาก i_checking_ready ที่โหลดมาพร้อมกริดแล้ว (เซิร์ฟเวอร์เช็คซ้ำอีกชั้น
         // เป็นตัวจริงตอน ISSUE_AP)
-        var notReady = selected.filter(function (r) { return !r.get("i_checking_ready"); });
+        var notReady = selected.filter(function (r) { return !r.get("i_checking_ready"); }); // i_checking_ready = บันทึกรายละเอียดตรวจรับแล้ว
         if (notReady.length) {
             var notReadyCodes = notReady.map(function (r) { return r.get("c_ir_code"); });
             Ext.Msg.alert(
                 "แจ้งเตือน",
-                "กรุณากรอกรายละเอียดตรวจรับ (รายการส่งเบิก) ให้ครบก่อนออกเลข AP<br>เลข IR ที่ยังไม่ได้กรอก: " + notReadyCodes.join(", ")
+                "กรุณาบันทึกรายละเอียดตรวจรับให้ครบก่อนออกเลข AP<br>เลข IR ที่ยังไม่ได้บันทึก: " + notReadyCodes.join(", ")
             );
             return;
         }
@@ -1225,6 +1388,13 @@ Ext.AppUx = function (app, menu) {
                                         iconCls: "icon-copy",
                                         disabled: !withdrawCode,
                                         handler: function () { Ext.fnCopyToClipboard(withdrawCode); }
+                                    },
+                                    "-",
+                                    {
+                                        text: "แก้ไขข้อมูล ADMIN",
+                                        icon: "../images/icons/application_edit.png",
+                                        disabled: !apCode,
+                                        handler: function () { winAdminRequest(record); }
                                     },
                                 ]
                             });

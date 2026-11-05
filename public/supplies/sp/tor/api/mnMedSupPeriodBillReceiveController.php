@@ -21,17 +21,18 @@ function medsupApDeptCostId($deptType)
     return $map[$deptType] ?? 82;
 }
 
-// เลข AP รูปแบบ {dc_cost_id}-{ประเภทหน่วยงาน}-{ปีงบประมาณ พ.ศ.}-{เลขรัน 6 หลัก} เช่น
-// 82-APMS-2570-000030 - เลขรันแยกชุดกันทั้งต่อหน่วยงานและต่อปีงบประมาณ (ขึ้นปีงบใหม่
-// เริ่มนับ 000001 ใหม่ ตามที่ผู้ใช้ยืนยัน) ปีงบประมาณไทยเริ่ม 1 ต.ค. - เดือน ต.ค.-ธ.ค.
-// ถือเป็นปีงบถัดไปแล้ว (รูปแบบเดียวกับ medsupGenContractCode ใน mnMedSupPeriodBillController.php)
-function medsupGenApCode($db, $deptType)
+// เลข AP รูปแบบ {รหัส}{ปี 2 หลัก}-{เลขรัน 6 หลัก} เช่น APF69-000001 (เวชภัณฑ์ APMS) / APMD70-000001 (เภสัช)
+// ปี 2 หลัก = "ใช้เงินปีงบประมาณ" ของรายการ (พ.ศ.) - ปี 2569 ได้ APF69-/APMD69- ปี 2570 ได้ APF70-/APMD70-
+// ผู้ใช้ยืนยันให้ใช้รูปแบบเดียวกันทุกปี (ไม่ใช้รูปแบบเดิม 82-APMS-2570-000001 อีก) เลขรันแยกชุดกันต่อ prefix
+// ไม่ระบุปีใช้เงิน (0) = ใช้ปีงบประมาณปัจจุบัน (ปีงบไทยเริ่ม 1 ต.ค. - เดือน ต.ค.-ธ.ค. ถือเป็นปีงบถัดไป)
+function medsupGenApCode($db, $deptType, $useYear = 0)
 {
-    $costId = medsupApDeptCostId($deptType);
     $now = new DateTime();
     $yearBE = intval($now->format("Y")) + 543;
     $fiscalYear = (intval($now->format("n")) >= 10) ? $yearBE + 1 : $yearBE;
-    $prefix = $costId . "-" . $deptType . "-" . $fiscalYear . "-";
+    $apYear = $useYear > 0 ? $useYear : $fiscalYear;
+    $shortCodes = array("APMS" => "APF", "APMD" => "APMD", "APPS" => "APPS");
+    $prefix = ($shortCodes[$deptType] ?? $deptType) . substr((string) $apYear, -2) . "-";
 
     $stmt = $db->QueryParam(
         "SELECT c_ap_code FROM NMU_ERP.dbo.sp_tor_period_bill_receive WHERE c_ap_code LIKE ? + '%'",
@@ -456,10 +457,9 @@ switch ($mode) {
         }
         $placeholders = implode(",", array_fill(0, count($ids), "?"));
 
-        // ต้องกรอกรายละเอียดตรวจรับ (sp_tor_period_bill_checking - โดยเฉพาะ
-        // c_disburse_detail "รายการส่งเบิก") ให้ครบทุกเลข IR ที่เกี่ยวข้องก่อน ถึงจะ
-        // ออกเลข AP ได้ (เงื่อนไขที่ผู้ใช้ระบุไว้ - บังคับจริงฝั่งเซิร์ฟเวอร์ ไม่ใช่แค่
-        // ฝั่ง UI เหมือนที่ ST0013 เดิมทำ)
+        // ต้องบันทึกรายละเอียดตรวจรับ (sp_tor_period_bill_checking มีแถว และมีวันที่บันทึกการตรวจรับ)
+        // ของทุกเลข IR ที่เกี่ยวข้องก่อน ถึงจะออกเลข AP ได้ (บังคับจริงฝั่งเซิร์ฟเวอร์ ไม่ใช่แค่ฝั่ง UI)
+        // "รายการส่งเบิก" (c_disburse_detail) ไม่บังคับกรอกแล้ว - ว่างได้
         $irCodesInIds = array();
         $stmtIrOfIds = $db->QueryParam(
             "select distinct c_ir_code from NMU_ERP.dbo.sp_tor_period_bill_receive
@@ -475,7 +475,7 @@ switch ($mode) {
             $stmtReady = $db->QueryParam(
                 "select c_ir_code from NMU_ERP.dbo.sp_tor_period_bill_checking
                  where c_ir_code in ({$irCheckPlaceholders}) and i_enabled = 1
-                    and c_disburse_detail is not null and ltrim(rtrim(c_disburse_detail)) <> ''",
+                    and d_checking is not null",
                 $irCodesInIds
             );
             while ($rowReady = $db->Fetch($stmtReady)) {
@@ -484,7 +484,7 @@ switch ($mode) {
             $missingIrCodes = array_values(array_diff($irCodesInIds, $readyIrCodes));
             if (!empty($missingIrCodes)) {
                 $stmt = false;
-                $errMsg = "กรุณากรอกรายละเอียดตรวจรับ (รายการส่งเบิก) ให้ครบก่อนออกเลข AP - เลข IR ที่ยังไม่ได้กรอก: " . implode(", ", $missingIrCodes);
+                $errMsg = "กรุณาบันทึกรายละเอียดตรวจรับให้ครบก่อนออกเลข AP - เลข IR ที่ยังไม่ได้บันทึก: " . implode(", ", $missingIrCodes);
                 break;
             }
 
@@ -541,7 +541,13 @@ switch ($mode) {
                 break;
             }
             $deptType = !empty($deptTypes[0]) ? $deptTypes[0] : "APMS";
-            $apCode = medsupGenApCode($db, $deptType);
+            $useYearRow = $db->GetDataBySQL(
+                "select min(c.i_budget_year_use) from NMU_ERP.dbo.sp_tor_period_bill_checking c
+                 where c.c_ir_code in (select r.c_ir_code from NMU_ERP.dbo.sp_tor_period_bill_receive r
+                                       where r.sp_tor_period_bill_receive_id in ({$placeholders}))",
+                $ids
+            );
+            $apCode = medsupGenApCode($db, $deptType, intval($useYearRow));
         }
 
         $arrParam = array_merge(
@@ -557,6 +563,41 @@ switch ($mode) {
         $responseExtra["c_ap_code"] = $apCode;
         break;
 
+    case "ADMIN_REQUEST":
+        // คำร้อง "แก้ไขข้อมูล ADMIN" ของเลข AP (เมนู ST00096 - เทียบเท่า sp/checking/mnUploadDocAcc.php ของ ST0013)
+        // ต้องออกเลข AP แล้ว คำร้องเดิมของเลข IR เดียวกันตั้งเป็น i_enable = 2
+        $irCode = trim((string) ($_REQUEST["c_ir_code"] ?? ""));
+        $reqComment = trim((string) ($_REQUEST["c_comment"] ?? ""));
+        $apCodeReq = $db->GetDataBySQL(
+            "select top 1 c_ap_code from NMU_ERP.dbo.sp_tor_period_bill_receive
+             where c_ir_code = ? and c_ap_code is not null and i_enabled = 1",
+            array($irCode)
+        );
+        if ($irCode === "" || empty($apCodeReq)) {
+            $stmt = false;
+            $errMsg = "รายการยังไม่ออกเลข AP";
+            break;
+        }
+        if ($reqComment === "") {
+            $stmt = false;
+            $errMsg = "กรุณาระบุเหตุผล";
+            break;
+        }
+        $dChkEdit = trim((string) ($_REQUEST["d_checking_edit"] ?? ""));
+        $sql = "UPDATE NMU_ERP.dbo.sp_tor_period_bill_checking_request SET i_enable = 2 WHERE c_ir_code = ? AND i_enable = 1;
+                INSERT INTO NMU_ERP.dbo.sp_tor_period_bill_checking_request
+                    (c_ir_code, c_ap_code, d_doc_date, d_checking_edit, json_select, c_comment, i_status, i_enable
+                     , dc_user_create_id, dc_user_create_cost_id, d_create)
+                VALUES (?, ?, CAST(GETDATE() AS date), ?, ?, ?, 1, 1, ?, ?, GETDATE())";
+        $stmt = $db->QueryParam($sql, array(
+            $irCode, $irCode, $apCodeReq,
+            $dChkEdit !== "" ? $date->bc_to_ad($dChkEdit) : null,
+            (string) ($_REQUEST["json_select"] ?? ""),
+            $reqComment,
+            $_SESSION["user_id"] ?? null, $_SESSION["dc_cost_id"] ?? null,
+        ));
+        break;
+
     case "SAVE_CHECKING":
         // บันทึกรายละเอียดตรวจรับของเลข IR หนึ่งๆ (เมนู "ตรวจรับ (เวชภัณฑ์)") - เลียน
         // แบบฟิลด์ของฟอร์ม ST0013 เฉพาะที่ต้องการ ไม่ผูก GL/ตัดงบจริง คำนวณยอดสุทธิ
@@ -566,9 +607,16 @@ switch ($mode) {
         $disburseDetail = trim((string) ($_REQUEST["c_disburse_detail"] ?? ""));
         $checkingDate = trim((string) ($_REQUEST["d_checking"] ?? ""));
         $egpNo = trim((string) ($_REQUEST["c_egp_no"] ?? ""));
-        if ($irCode === "" || $disburseDetail === "" || $checkingDate === "" || $egpNo === "") {
+        // เลขที่ EGP: ใช้เงินปีงบประมาณเก่ากว่าปีงบปัจจุบัน (เช่น กันเหลื่อมปี 2569 ขณะที่ปีปัจจุบัน 2570) ยังไม่มีเลข EGP
+        // = เก็บ "-" เสมอ (ไม่ว่า client ส่งอะไรมา) ใช้เงินปีงบประมาณปัจจุบันถึงจะต้องกรอกเลข EGP ("รายการส่งเบิก" ไม่บังคับ)
+        $useYearTh = intval($_REQUEST["i_budget_year_use"] ?? 0);
+        $fiscalYearTh = intval(date("Y")) + 543 + (intval(date("n")) >= 10 ? 1 : 0);
+        if ($useYearTh > 0 && $useYearTh < $fiscalYearTh) {
+            $egpNo = "-";
+        }
+        if ($irCode === "" || $checkingDate === "" || $egpNo === "") {
             $stmt = false;
-            $errMsg = "กรุณากรอกวันที่บันทึกการตรวจรับ/เลขที่ EGP/รายการส่งเบิก ให้ครบก่อนบันทึก";
+            $errMsg = "กรุณากรอกวันที่บันทึกการตรวจรับ/เลขที่ EGP (กรณีใช้เงินปีงบประมาณปัจจุบัน) ให้ครบก่อนบันทึก";
             break;
         }
 
@@ -611,7 +659,7 @@ switch ($mode) {
             !empty($_REQUEST["d_doc_complete"]) ? $date->bc_to_ad($_REQUEST["d_doc_complete"]) : null,
             $date->bc_to_ad($checkingDate),
             $egpNo,
-            $disburseDetail,
+            $disburseDetail !== "" ? $disburseDetail : null,
             !empty($_REQUEST["i_budget_year_use"]) ? intval($_REQUEST["i_budget_year_use"]) : null,
             $totalVat,
             $hasVat ? 1 : 0,
@@ -713,7 +761,7 @@ switch ($mode) {
                  where r.c_ir_code = ?",
                 array($irCode)
             );
-            $apCodeForIr = medsupGenApCode($db, !empty($deptTypeForIr) ? $deptTypeForIr : "APMS");
+            $apCodeForIr = medsupGenApCode($db, !empty($deptTypeForIr) ? $deptTypeForIr : "APMS", $useYearTh);
         }
 
         if (!empty($idsForAp)) {

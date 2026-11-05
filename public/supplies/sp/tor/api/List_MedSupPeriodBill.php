@@ -463,8 +463,8 @@ if ($type == "medsup_period_bill") {
     }
     if (isset($_REQUEST['i_checking_ready']) && $_REQUEST['i_checking_ready'] !== '') {
         $wh .= $_REQUEST['i_checking_ready'] == '1'
-            ? " and exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_checking c2 where c2.c_ir_code = r.c_ir_code and c2.i_enabled = 1 and c2.c_disburse_detail is not null and ltrim(rtrim(c2.c_disburse_detail)) <> '')"
-            : " and not exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_checking c2 where c2.c_ir_code = r.c_ir_code and c2.i_enabled = 1 and c2.c_disburse_detail is not null and ltrim(rtrim(c2.c_disburse_detail)) <> '')";
+            ? " and exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_checking c2 where c2.c_ir_code = r.c_ir_code and c2.i_enabled = 1 and c2.d_checking is not null)"
+            : " and not exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_checking c2 where c2.c_ir_code = r.c_ir_code and c2.i_enabled = 1 and c2.d_checking is not null)";
     }
     if (!empty($_REQUEST['i_budget_year_use'])) {
         $wh .= " and exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_checking c3 where c3.c_ir_code = r.c_ir_code and c3.i_enabled = 1 and c3.i_budget_year_use = " . intval($_REQUEST['i_budget_year_use']) . ")";
@@ -514,9 +514,10 @@ if ($type == "medsup_period_bill") {
                     -- กรอกรายละเอียดตรวจรับ (รายการส่งเบิก) ครบหรือยัง - เงื่อนไขก่อน
                     -- ออกเลข AP ได้ (ดู mnMedSupPeriodBillReceiveController.php mode
                     -- SAVE_CHECKING/ISSUE_AP)
-                    , max(case when chk.c_disburse_detail is not null and ltrim(rtrim(chk.c_disburse_detail)) <> '' then 1 else 0 end) as i_checking_ready
+                    , max(case when chk.d_checking is not null then 1 else 0 end) as i_checking_ready
                     , max(chk.c_disburse_detail) as c_disburse_detail
                     , max(chk.sp_tor_period_bill_checking_id) as chk_id
+                    , convert(varchar, max(chk.d_checking), 120) as d_checking
                     -- เลขที่ใบขอเบิก (D...) ที่ EIS ออกให้ - EIS เขียนกลับตอนบันทึกใบเบิก (po/api/mn_poReg.php)
                     -- ต้องมีคอลัมน์จาก dc/scriptBaseUpdate/sp_tor_period_bill_checking_withdraw.sql
                     , {$wdCodeRefSql} as c_code_ref
@@ -571,6 +572,7 @@ if ($type == "medsup_period_bill") {
             "d_ir_issue" => empty($row["d_ir_issue"]) ? "" : $date->extDateBuddha($row["d_ir_issue"]),
             "c_create_name" => $row["c_create_name"],
             "i_checking_ready" => intval($row["i_checking_ready"]),
+            "d_checking" => empty($row["d_checking"]) ? "" : $date->extDateBuddha($row["d_checking"]),
             "chk_id" => intval($row["chk_id"]), // sp_tor_period_bill_checking_id - ใช้เปิดใบขอเบิก (ร่าง) PDF ของ EIS
             "c_code_ref" => $row["c_code_ref"],
             "po_working_hdr_id" => intval($row["po_working_hdr_id"]),

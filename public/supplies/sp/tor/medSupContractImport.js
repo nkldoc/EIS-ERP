@@ -157,7 +157,11 @@ Ext.fnImportRsvNotFound = function (v) {
 };
 Ext.fnImportRsvNotFoundText = function (r) {
     var simPo = /^\d+$/.test(String(r.po_id || "")) && parseInt(r.po_id, 10) >= 99990000; // po_id 9999xxxx = สัญญาจำลอง ไม่มีใน sp_tor_contract
-    return "เลข pr_id " + (r.pr_id || "-") + " และเลข po_id " + (r.po_id || "-") + (simPo ? " (สัญญาจำลอง)" : "") + " นี้ยังไม่ได้จองเงินมา";
+    // แยกข้อความตามชนิดสัญญา [ผู้ใช้ขอ]: po_id 9999 = สัญญาจำลองที่ผู้ใช้จองซ้ำ/สัญญาปีต่อปี, มี po_id จริง = สัญญาหลายปี (3C/4C)
+    var kind = simPo ? " - สัญญาจำลองที่จองซ้ำ / สัญญาปีต่อปี" : (r.po_id ? " - สัญญาหลายปี (3C/4C)" : "");
+    return "เลข pr_id " + (r.pr_id || "-") + " และเลข po_id " + (r.po_id || "-") + (simPo ? " (สัญญาจำลอง)" : "") + " นี้ยังไม่ได้จองเงินมา" + kind
+        // มีเลขใบกันเหลื่อม = ตัดเงินได้ แม้ยังไม่มีการจองในระบบงบ [ผู้ใช้ขอ]
+        + (r.c_overlap ? " สามารถตัดเงินได้เพราะมีเลขใบกันเหลื่อม" : "");
 };
 // โหลด xlsx-js-style (ใส่สี/ตัวหนาได้) - ใช้ตอนสร้างไฟล์ส่งคืนผู้ใช้ ; ตัวนี้แทน window.XLSX เดิมได้ (API เดียวกัน)
 Ext.fnLoadSheetJsStyled = function (cb) {
@@ -185,6 +189,7 @@ Ext.fnImportRsvAfterText = function (r) {
 // หมายเหตุอธิบายข้อความ "ไม่พบการจองในระบบงบ" (แสดงในหน้าตรวจสอบ ตอนกดดาวน์โหลด และเป็นชีต "หมายเหตุ" ในไฟล์ส่งคืนผู้ใช้)
 Ext.fnImportRsvNoteLines = [
     "\"ไม่พบการจองในระบบงบ\" หมายถึง PR (pr_id) ของรายการนั้นยังไม่ได้จองเงินเข้าระบบงบ ไม่ใช่ข้อผิดพลาดของไฟล์ และไม่ทำให้นำเข้าไม่ได้ - ให้ผู้ดูแล ERP เวชภัณฑ์ส่งการจองของ pr_id นั้นเข้าระบบงบ",
+    "ชนิดสัญญาที่ระบบระบุในข้อความ: po_id ขึ้นต้น 9999 = สัญญาจำลองที่ผู้ใช้จองซ้ำ / สัญญาปีต่อปี ; มี po_id จริง = สัญญาหลายปี (3C = 3 ปี, 4C = 4 ปี)",
     "po_id ขึ้นต้น 9999 คือสัญญาจำลอง (ไม่มีสัญญาจริงใน sp_tor_contract) ระบบจึงตรวจเฉพาะการจองขั้น PR: ถ้าจอง PR แล้วจะขึ้น \"จองขั้น PR แล้ว\" แต่ถ้ายังไม่มีการจอง PR จะขึ้น \"ไม่พบการจองในระบบงบ\"",
 ];
 Ext.fnImportRsvNoteHtml = "<b>หมายเหตุ:</b> " + Ext.fnImportRsvNoteLines.join("<br>");
@@ -799,7 +804,8 @@ function winMedSupImportNew() {
                         }
                     });
                     colIdx[c.key] = idx;
-                    if (idx < 0 && /\*$/.test(c.label)) {
+                    // ไฟล์ปี 2570 ที่ export จาก EIS ไม่มีคอลัมน์ "ลำดับสัญญา" - ไม่ถือว่าขาด ระบบรันลำดับให้เองด้านล่าง
+                    if (idx < 0 && /\*$/.test(c.label) && c.key !== "seq") {
                         missing.push(c.label);
                     }
                 });
@@ -885,6 +891,22 @@ function winMedSupImportNew() {
                 // [ผู้ใช้ขอ] เลขที่สัญญาเดียวกันที่รับของหลายรอบ (คนละใบแจ้งหนี้/เลขรับเข้าคลัง ERP) ไฟล์ที่ export มา
                 // แยกลำดับสัญญาต่างกัน = รวมเป็นสัญญาเดียวกัน (ใช้ลำดับของแถวแรก) 1 สัญญามีรายการรับของหลายแถวได้
                 // ถ้าข้อมูลหัวสัญญา/งวดของแถวไม่ตรงกับแถวแรก เซิร์ฟเวอร์จะแจ้งผิดตามเดิม
+                // ไฟล์ไม่มีคอลัมน์ "ลำดับสัญญา": รันลำดับให้ตามเลขที่สัญญา (เลขที่สัญญาเดียวกัน = ลำดับเดียวกัน
+                // ตามลำดับที่เจอก่อนหลัง) แถวที่ไม่มีเลขที่สัญญาได้ลำดับของตัวเอง
+                if (colIdx.seq < 0) {
+                    var autoSeq = {}, autoN = 0;
+                    out.forEach(function (o) {
+                        var code = o.contract_code == null ? "" : String(o.contract_code);
+                        if (code === "") {
+                            o.seq = String(++autoN);
+                        } else {
+                            if (autoSeq[code] === undefined) {
+                                autoSeq[code] = String(++autoN);
+                            }
+                            o.seq = autoSeq[code];
+                        }
+                    });
+                }
                 var codeSeq = {};
                 out.forEach(function (o) {
                     var code = o.contract_code;
@@ -968,10 +990,10 @@ function winMedSupImportNew() {
                     Ext.Msg.show({
                         title: "แจ้งเตือน", icon: Ext.Msg.WARNING, buttons: Ext.Msg.OK, minWidth: 460,
                         msg: "<span style=\"color:#c00;font-weight:bold;\">" + noRsvMsg + "</span><br><br>"
-                            + noRsv.slice(0, 15).map(function (r) {
+                            + noRsv.slice(0, 5).map(function (r) {
                                 return "<span style=\"color:#c00;\">แถว " + r.row_no + ": " + enc(Ext.fnImportRsvNotFoundText(r)) + "</span>";
                             }).join("<br>")
-                            + (noRsv.length > 15 ? "<br>... และอีก " + (noRsv.length - 15) + " รายการ" : "")
+                            + (noRsv.length > 5 ? "<br>... และอีก " + (noRsv.length - 5) + " รายการ" : "")
                             + "<br><br>กดปุ่ม \"ดาวน์โหลด Excel รายการที่เลือก\" เพื่อโหลดไฟล์ส่งคืนผู้ใช้"
                             + "<br><br><span style=\"color:#555;\">" + noRsvNote + "</span>",
                     });
