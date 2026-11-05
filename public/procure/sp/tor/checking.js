@@ -7544,6 +7544,14 @@ var win_edir_alldata = function (rec) {
                                                 Ext.Msg.alert('แจ้งเตือน', 'ตารางนี้ไม่มีข้อมูลสำหรับแสดงแบบฟอร์ม');
                                                 return;
                                         }
+                                        var prLookupFields = dataset.table === 'sp_tor' ? {
+                                                dc_expense_budget_type_id: ['แหล่งเงิน', 'dc_expense_budget_type'],
+                                                po_expense_id: ['รายการย่อย', 'po_expense'],
+                                                dc_cost_id: ['หน่วยงานที่รับผิดชอบ', 'dc_cost_all'],
+                                                dc_cost2_id: ['หน่วยงานเจ้าของเรื่อง', 'dc_cost_all']
+                                        } : (dataset.table === 'sp_tor_hdr_period' ? {
+                                                dc_cost_id: ['หน่วยงานที่รับผิดชอบ', 'dc_cost_all']
+                                        } : {});
                                         var leftFields = [];
                                         var rightFields = [];
                                         Ext.each(dataset.columns || [], function (formFieldName, fieldIndex) {
@@ -7563,6 +7571,35 @@ var win_edir_alldata = function (rec) {
                                                                 ? 'background:#fff;color:#222;'
                                                                 : 'background:#f0f0f0;color:#666;'
                                                 };
+                                                if (prLookupFields[formFieldName] && canEditField) {
+                                                        var lookupDefinition = prLookupFields[formFieldName];
+                                                        var lookupStore = new Ext.data.JsonStore({
+                                                                url: 'api/All_PoWorkingImpHdr.php', root: 'data',
+                                                                fields: [{name: 'id', type: 'string'}, 'c_name'],
+                                                                baseParams: {type: lookupDefinition[1]}, autoLoad: false
+                                                        });
+                                                        fieldConfig = new Ext.form.ComboBox({
+                                                                name: formFieldName, hiddenName: formFieldName,
+                                                                fieldLabel: lookupDefinition[0] + ' : ' + (fieldValue || ''),
+                                                                store: lookupStore, valueField: 'id', displayField: 'c_name',
+                                                                mode: 'local', triggerAction: 'all', forceSelection: true,
+                                                                editable: true, typeAhead: false, anchor: '96%',
+                                                                value: fieldValue == null ? '' : String(fieldValue),
+                                                                disabled: true
+                                                        });
+                                                        (function (combo, store, originalValue) {
+                                                                store.load({callback: function (records, options, success) {
+                                                                        if (combo.isDestroyed) return;
+                                                                        if (!success) {
+                                                                                combo.markInvalid('โหลดรายการไม่สำเร็จ กรุณาปิดแล้วเปิดฟอร์มใหม่');
+                                                                                return;
+                                                                        }
+                                                                        combo.enable();
+                                                                        combo.setValue(originalValue == null ? '' : String(originalValue));
+                                                                }});
+                                                                combo.on('destroy', function () { store.destroy(); });
+                                                        }(fieldConfig, lookupStore, fieldValue));
+                                                }
                                                 if (fieldIndex % 2 === 0) {
                                                         leftFields.push(fieldConfig);
                                                 } else {
@@ -7605,12 +7642,22 @@ var win_edir_alldata = function (rec) {
                                                         text: 'บันทึกการแก้ไข',
                                                         iconCls: 'icon-disk',
                                                         handler: function () {
+                                                                var lookupReady = true;
+                                                                for (var lookupName in prLookupFields) {
+                                                                        if (!Object.prototype.hasOwnProperty.call(prLookupFields, lookupName)) continue;
+                                                                        var lookupControl = detailForm.getForm().findField(lookupName);
+                                                                        if (lookupControl && isEditableField(lookupName) && (lookupControl.disabled || !lookupControl.isValid())) lookupReady = false;
+                                                                }
+                                                                if (!lookupReady) {
+                                                                        Ext.Msg.alert('แจ้งเตือน', 'กรุณารอโหลดรายการและเลือกข้อมูลให้ถูกต้อง');
+                                                                        return;
+                                                                }
                                                                 var formChanges = [];
                                                                 Ext.each(dataset.columns || [], function (saveFieldName) {
                                                                         if (!isEditableField(saveFieldName)) {
                                                                                 return;
                                                                         }
-                                                                        if (lookupDisplayField(saveFieldName)) {
+                                                                        if (lookupDisplayField(saveFieldName) && !prLookupFields[saveFieldName]) {
                                                                                 return;
                                                                         }
                                                                         var formField = detailForm.getForm().findField(saveFieldName);
