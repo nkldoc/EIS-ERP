@@ -1,3 +1,17 @@
+Ext.checkingBudgetYearError = function (selectedYear, activeYear, bookingId) {
+    function year(value) {
+        var n = Number(value);
+        if (!isFinite(n) || n % 1 || n < 1900) return 0;
+        return n < 2400 ? n + 543 : n;
+    }
+    var selected = year(selectedYear), active = year(activeYear);
+    if (!active) return 'ไม่สามารถอ่านปีงบประมาณที่เปิดได้ กรุณาลองใหม่';
+    if (!selected) return 'กรุณาเลือกปีงบประมาณที่ใช้เงิน';
+    if (selected === active) return '';
+    if (selected < active && bookingId && String(bookingId).trim() !== '0') return '';
+    return selected < active ? 'ใช้เงินปีก่อน กรุณาเลือกใบกันเงินเหลื่อมปี' : 'ใช้เงินปีงบประมาณ ไม่ตรงกับปีงบที่เปิด';
+};
+// End checking budget year validation
 // alert กรณี API จองเงินตอบ Not enough money: แสดงเลขใบกันและเงินคงเหลือ (ขอข้อมูลแบบ sync เพราะใช้แทน string ใน alert เดิม)
 Ext.overlapNotEnoughMsg = function () {
     var base = "เงินใบกันไม่เพียงพอ";
@@ -16888,6 +16902,26 @@ Ext.AppUx = function (app, menu) {
                                                 icon: "../images/icons/save.png",
                                                 text: "บันทึกรายการหลัก",
                                                 handler: function () {
+                                                        var budgetSaveButton = Ext.getCmp("buSaveSub3ID");
+                                                        if (!budgetSaveButton.budgetYearRefreshed) {
+                                                                if (budgetSaveButton.budgetYearLoading) return;
+                                                                budgetSaveButton.budgetYearLoading = true;
+                                                                budgetSaveButton.disable();
+                                                                Ext.bg_budget_year.load({callback: function (records, options, success) {
+                                                                        budgetSaveButton.budgetYearLoading = false;
+                                                                        if (budgetSaveButton.isDestroyed) return;
+                                                                        budgetSaveButton.enable();
+                                                                        if (!success || !records || !records.length) {
+                                                                                Ext.Msg.alert("แจ้งเตือน", "โหลดปีงบประมาณล่าสุดไม่สำเร็จ กรุณาลองบันทึกใหม่");
+                                                                                return;
+                                                                        }
+                                                                        budgetSaveButton.budgetYearRefreshed = true;
+                                                                        budgetSaveButton.handler.call(budgetSaveButton.scope || budgetSaveButton, budgetSaveButton);
+                                                                }});
+                                                                return;
+                                                        }
+                                                        budgetSaveButton.budgetYearRefreshed = false;
+
                                                         console.log(Ext.session); var validationSaveButton = Ext.getCmp("buSaveSub3ID");
                                                         if (!validationSaveButton.receiveValidationPassed) {
                                                                 var validationContext = {
@@ -17054,9 +17088,13 @@ Ext.AppUx = function (app, menu) {
                                                                         if (Ext.selectRow.data.c_checking_code != null && Ext.getCmp("submodeID").getValue() !== "modeEditAp") {
                                                                                 msg += "ออกเลขตรวจรับแล้ว ไม่สามารถทำรายการซ้ำได้";
                                                                         }
-                                                                        var i_year = Ext.bg_budget_year.data.items[0].data.i_year_be;
-                                                                        if (Ext.selectRow.get("c_yyyy") != i_year && Ext.selectRow.data.i_chk_bg == 1) {
-                                                                                msg += "ใช้เงินปีงบประมาณ ไม่ตรงกับปีงบที่เปิด ";
+                                                                        var yearRecord = Ext.bg_budget_year.getAt(0);
+                                                                        var yearField = Ext.getCmp("i_yyyy_overlapID");
+                                                                        var bookingField = Ext.getCmp("c_bookingID");
+                                                                        if (Number(Ext.selectRow.data.i_chk_bg) === 1) {
+                                                                                msg += Ext.checkingBudgetYearError(yearField ? yearField.getValue() : null,
+                                                                                    yearRecord ? yearRecord.get("i_year_be") : null,
+                                                                                    bookingField ? bookingField.getValue() : null);
                                                                         }
                                                                         if (Ext.getCmp("i_is_warrantyID").getValue().inputValue == 1) {
                                                                                 if (Ext.getCmp("warraty_ageID").getValue() == 0) {
