@@ -85,16 +85,42 @@ $fields = array(
 );
 $fields['sp_tranf_hdr'] = array('f_net_total_price' => array('ยอดหัวตั้งหนี้', 'money'));
 $keys = array('sp_check_period_hdr' => 'sp_check_period_hdr_id', 'sp_check_period_dtl' => 'sp_check_period_dtl_id', 'sp_tranf_item' => 'sp_tranf_item_id', 'sp_tranf_hdr' => 'sp_tranf_hdr_id');
+// Related records are scoped through the selected inspection; relationship IDs are never editable.
+$fields['sp_tor'] = array('c_name' => array('ชื่อเรื่อง PR', 'text'));
+$fields['sp_tor_dtl'] = array('c_name' => array('ชื่อรายการ PR', 'text'));
+$fields['sp_tor_contract'] = array(
+    'd_doc_date' => array('วันที่ออกเลขสัญญา', 'date'),
+    'd_contract_receiving_date' => array('วันที่รับสัญญา', 'date'),
+    'd_contract_start_date' => array('วันที่สัญญามีผล', 'date'),
+    'd_due_date' => array('วันที่สิ้นสุดสัญญา', 'date'));
+$fields['sp_tor_hdr_period'] = array(
+    'c_contract_code' => array('เลขอ้างอิงงวด', 'text'),
+    'd_doc_date' => array('วันที่เริ่มนับการส่งของ', 'date'),
+    'd_period_date' => array('วันที่กำหนดส่ง', 'date'));
+$keys += array('sp_tor'=>'tor_id','sp_tor_dtl'=>'sp_tor_dtl_id',
+    'sp_tor_contract'=>'sp_tor_contract_id','sp_tor_hdr_period'=>'sp_tor_hdr_period_id');
 $loadData = function ($lock = false) use ($rows, $id) {
     $hint = $lock ? ' WITH (UPDLOCK,HOLDLOCK)' : '';
-    return array(
+    $data = array(
         'sp_check_period_hdr' => $rows('SELECT * FROM dbo.sp_check_period_hdr' . $hint . ' WHERE sp_check_period_hdr_id=? AND i_enabled=1', array($id)),
         'sp_check_period_dtl' => $rows('SELECT * FROM dbo.sp_check_period_dtl' . $hint . ' WHERE sp_check_period_hdr_id=? ORDER BY sp_check_period_dtl_id', array($id)),
         'sp_tranf_item' => $rows('SELECT i.* FROM dbo.sp_tranf_item i' . $hint . ' INNER JOIN dbo.sp_tranf_hdr t ON t.sp_tranf_hdr_id=i.sp_tranf_hdr_id WHERE t.sp_check_period_hdr_id=? AND i.i_enabled=1 ORDER BY i.sp_tranf_item_id', array($id)),
         'sp_tranf_hdr' => $rows('SELECT * FROM dbo.sp_tranf_hdr' . $hint . ' WHERE sp_check_period_hdr_id=? ORDER BY sp_tranf_hdr_id', array($id))
     );
+    $header = $data['sp_check_period_hdr'][0] ?? array();
+    $contractId = intval($header['sp_tor_contract_id'] ?? 0);
+    if (!$contractId && !empty($header['sp_mn_contract_hdr_id'])) {
+        $legacy = $rows('SELECT sp_contract_id FROM dbo.sp_mn_contract_hdr' . $hint . ' WHERE sp_mn_contract_hdr_id=?', array($header['sp_mn_contract_hdr_id']));
+        $contractId = intval($legacy[0]['sp_contract_id'] ?? 0);
+    }
+    $data['sp_tor_contract'] = $rows('SELECT * FROM dbo.sp_tor_contract' . $hint . ' WHERE sp_tor_contract_id=?', array($contractId));
+    $torId = intval($data['sp_tor_contract'][0]['sp_tor_id'] ?? 0);
+    $data['sp_tor'] = $rows('SELECT * FROM dbo.sp_tor' . $hint . ' WHERE tor_id=?', array($torId));
+    $data['sp_tor_dtl'] = $rows('SELECT * FROM dbo.sp_tor_dtl' . $hint . ' WHERE sp_tor_id=? ORDER BY sp_tor_dtl_id', array($torId));
+    $data['sp_tor_hdr_period'] = $rows('SELECT * FROM dbo.sp_tor_hdr_period' . $hint . ' WHERE sp_tor_contract_id=? ORDER BY i_period,sp_tor_hdr_period_id', array($contractId));
+    return $data;
 };
-$snapshotToken = function ($data) { return hash_hmac('sha256', json_encode($data), session_id()); };
+$snapshotToken = function ($data) { $data = array_intersect_key($data, array_flip(array('sp_check_period_hdr','sp_check_period_dtl','sp_tranf_item','sp_tranf_hdr'))); return hash_hmac('sha256', json_encode($data), session_id()); };
 $normalize = function ($value, $definition) {
     if ($value === null || $value === '') return null;
     $type = $definition[1];
