@@ -240,7 +240,7 @@ foreach ($checks as &$check) {
     $check['edit_csrf_token'] = hash_hmac('sha256', 'checking-admin|' . $_SESSION['user_id'] . '|' . intval($check['sp_check_period_hdr_id']), session_id());
 }
 unset($check);
-$checkItems = $fetch('SELECT d.*, budget.c_name AS budget_name, t.sp_emp_id AS owner_sp_emp_id, expense.c_code AS expense_code,
+$checkItems = $fetch('SELECT d.*, budget.c_name AS budget_name, expense.c_code AS expense_code,
     expense.c_name AS expense_name, p.i_pr_type1 AS period_booking_type
     FROM dbo.sp_check_period_dtl d
     INNER JOIN dbo.sp_check_period_hdr h ON h.sp_check_period_hdr_id=d.sp_check_period_hdr_id

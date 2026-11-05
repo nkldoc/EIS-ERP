@@ -86,13 +86,14 @@
                     xtype: 'form', autoScroll: true, bodyStyle: 'padding:16px', labelWidth: 255, border: false, items: groups[title]});
                 function addGrid(tableName, title) {
                     var definitions = result.fields[tableName], key = result.keys[tableName];
+                    if (!definitions || !result.data[tableName]) return;
                     var names = [key], columns = [];
                     for (var name in definitions) if (Object.prototype.hasOwnProperty.call(definitions, name)) {
                         names.push(name);
                         var editor = field(definitions[name], null);
                         if(name==='f_sum_Transf')editor.setReadOnly(true);
                         columns.push({header: definitions[name][0], dataIndex: name, width: definitions[name][1] === 'text' ? 410 : 145,
-                            renderer: function (value) { return encode(value); }, editor: editor});
+                            renderer: (function (type) { return function (value) { return encode(initial(value, type)); }; }(definitions[name][1])), editor: editor});
                     }
                     var store = new Ext.data.JsonStore({fields: names, idProperty: key, data: result.data[tableName]});
                     var grid = new Ext.grid.EditorGridPanel({title: title, store: store, columns: columns, clicksToEdit: 1,
@@ -100,6 +101,10 @@
                     grids.push({grid: grid, table: tableName, key: key, definitions: definitions});
                     tabs.push(grid);
                 }
+                addGrid('sp_tor', 'PR');
+                addGrid('sp_tor_dtl', 'รายการ PR');
+                addGrid('sp_tor_contract', 'สัญญา');
+                addGrid('sp_tor_hdr_period', 'งวดสัญญา');
                 addGrid('sp_check_period_dtl', 'รายการตรวจรับ');
                 addGrid('sp_tranf_item', 'รายการตั้งหนี้');
                 var fineMode = new Ext.form.ComboBox({fieldLabel: 'วิธีคิดค่าปรับ', store: new Ext.data.SimpleStore({fields: ['id','name'],
@@ -186,7 +191,7 @@
                 });
                 fineMode.on('select',queueCalculation);fineRate.on('change',queueCalculation);fineRate.on('keyup',queueCalculation);
                 Ext.each(grids,function(entry){entry.grid.on('afteredit',function(event){
-                    if(applying||entry.definitions[event.field][1]==='text')return;
+                    if(applying||['sp_check_period_dtl','sp_tranf_item'].indexOf(entry.table)===-1||entry.definitions[event.field][1]==='text')return;
                     financeSource={kind:entry.table==='sp_tranf_item'?'debts':'items',row_id:Number(event.record.get(entry.key)),field:event.field};
                     if(entry.table==='sp_tranf_item'&&event.field==='f_vat_amt') {
                         if(manualVatIds.indexOf(financeSource.row_id)===-1)manualVatIds.push(financeSource.row_id);

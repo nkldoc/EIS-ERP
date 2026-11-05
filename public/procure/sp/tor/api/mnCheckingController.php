@@ -575,19 +575,17 @@ switch ($mode) {
                         "SELECT * FROM dbo.sp_tor_victory WHERE sp_tor_id = ?", array($torId)
                 ) : array();
         $contractRows = $torId > 0 ? $fetchRows(
-                        "SELECT c.*, cost.c_name AS dc_cost_id_name, cost2.c_name AS dc_cost2_id_name, budget.c_name AS dc_expense_budget_type_id_name
+                        "SELECT c.*, cost.c_name AS dc_cost_id_name, budget.c_name AS dc_expense_budget_type_id_name
                            FROM dbo.sp_tor_contract c
                            LEFT JOIN " . DB_CENTER . "dc_cost cost ON cost.dc_cost_id=c.dc_cost_id
-                           LEFT JOIN " . DB_CENTER . "dc_cost cost2 ON cost2.dc_cost_id=c.dc_cost2_id
                            LEFT JOIN " . DB_CENTER . "dc_expense_budget_type budget ON budget.dc_expense_budget_type_id=c.dc_expense_budget_type_id
                           WHERE c.sp_tor_id = ? ORDER BY c.sp_tor_contract_id", array($torId)
                 ) : $selectedContractRows;
         $torHdrRows = $torId > 0 ? $fetchRows(
-                        "SELECT h.*, cost.c_name AS dc_cost_id_name, cost2.c_name AS dc_cost2_id_name, budget.c_name AS dc_expense_budget_type_id_name
+                        "SELECT h.*, cost.c_name AS dc_cost_id_name, budget.c_name AS dc_expense_budget_type_id_name
                            FROM dbo.sp_tor_hdr_period h
              INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
              LEFT JOIN " . DB_CENTER . "dc_cost cost ON cost.dc_cost_id=h.dc_cost_id
-             LEFT JOIN " . DB_CENTER . "dc_cost cost2 ON cost2.dc_cost_id=h.dc_cost2_id
              LEFT JOIN " . DB_CENTER . "dc_expense_budget_type budget ON budget.dc_expense_budget_type_id=h.dc_expense_budget_type_id
              WHERE c.sp_tor_id=? ORDER BY h.sp_tor_hdr_period_id", array($torId)
                 ) : array();

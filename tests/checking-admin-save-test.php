@@ -7,7 +7,7 @@ if (!function_exists('mb_strlen')) { function mb_strlen($s,$encoding=null){retur
 class DatabaseServer {public $conn='fake';}
 class FakeRows {public $rows;public function __construct($rows){$this->rows=$rows;}}
 require __DIR__ . '/../public/supplies/sp/tor/api/checkingFinance.php';
-$GLOBALS['state']=array('header'=>array('sp_check_period_hdr_id'=>6881,'i_enabled'=>1,'c_egp_no'=>'OLD',
+$GLOBALS['state']=array('header'=>array('sp_check_period_hdr_id'=>6881,'i_enabled'=>1,'sp_tor_contract_id'=>77,'c_egp_no'=>'OLD',
  'f_total'=>'107.00','i_vat_amt'=>1,'f_rate_vat'=>7,'i_tax_personal'=>1,'f_tax_personal_rate'=>1,
  'i_rate'=>1,'f_tax_warranty_rate'=>5,'f_fine_amt'=>0,'f_other'=>0,'i_edit_vat'=>0),
  'items'=>array(array('sp_check_period_dtl_id'=>1,'sp_check_period_hdr_id'=>6881,'i_qty'=>1,'f_net_unit_price'=>'107.00','f_net_total_price'=>'107.00')),
@@ -21,6 +21,11 @@ function sqlsrv_rollback($c){$GLOBALS['state']=$GLOBALS['snapshot'];$GLOBALS['ro
 function sqlsrv_fetch_array($stmt,$mode){return array_shift($stmt->rows);}
 function sqlsrv_query($conn,$sql,$params){
  if(strpos($sql,'SELECT')===0){
+  if(strpos($sql,'FROM dbo.sp_tor_contract')!==false)return new FakeRows(array(array('sp_tor_contract_id'=>77,'sp_tor_id'=>55,'d_doc_date'=>'2026-01-01')));
+  if(preg_match('/FROM dbo.sp_tor(?: WITH| WHERE)/',$sql))return new FakeRows(array(array('tor_id'=>55,'c_name'=>'PR OLD')));
+  if(strpos($sql,'FROM dbo.sp_tor_dtl')!==false)return new FakeRows(array(array('sp_tor_dtl_id'=>56,'c_name'=>'ITEM OLD')));
+  if(strpos($sql,'FROM dbo.sp_tor_hdr_period')!==false)return new FakeRows(array(array('sp_tor_hdr_period_id'=>78,'c_contract_code'=>'PERIOD OLD')));
+
   if(strpos($sql,'FROM dbo.sp_check_period_hdr')!==false && intval($params[0])===6881)return new FakeRows(array($GLOBALS['state']['header']));
   if(strpos($sql,'FROM dbo.sp_check_period_dtl')!==false)return new FakeRows($GLOBALS['state']['items']);
   if(strpos($sql,'FROM dbo.sp_tranf_item')!==false)return new FakeRows($GLOBALS['state']['debts']);
@@ -29,6 +34,7 @@ function sqlsrv_query($conn,$sql,$params){
  }
  if(strpos($sql,'UPDATE')===0){
   preg_match('/UPDATE dbo\.\[([^\]]+)\] SET \[([^\]]+)\]/',$sql,$match);$table=$match[1];$field=$match[2];
+  if(in_array($table,array('sp_tor','sp_tor_dtl','sp_tor_contract','sp_tor_hdr_period'))){$GLOBALS['relatedWrite']=array($table,$field,$params[0],$params[3]);return new FakeRows(array());}
   if($table==='sp_check_period_hdr')$GLOBALS['state']['header'][$field]=$params[0];
   else{$groups=array('sp_check_period_dtl'=>array('items','sp_check_period_dtl_id'),'sp_tranf_item'=>array('debts','sp_tranf_item_id'),'sp_tranf_hdr'=>array('ledger','sp_tranf_hdr_id'));[$group,$key]=$groups[$table];foreach($GLOBALS['state'][$group] as &$row)if(intval($row[$key])===intval($params[3]))$row[$field]=$params[0];unset($row);}
   return new FakeRows(array());
@@ -52,11 +58,15 @@ if(in_array($GLOBALS['case'],array('finance','preview','financeauditfail','snaps
  $_POST['finance_source']=json_encode(array('kind'=>'header'));$_POST['fine_calculation']=json_encode(array('mode'=>'percent','rate'=>2));
  if($GLOBALS['case']==='preview'){$_POST['mode']='calculate';$_POST['reason']='';}
 }
+$relatedCases=array('pr'=>array('sp_tor',55,'c_name','PR OLD','PR NEW'), 'pritem'=>array('sp_tor_dtl',56,'c_name','ITEM OLD','ITEM NEW'), 'contract'=>array('sp_tor_contract',77,'d_doc_date','2026-01-01','2026-02-01'), 'period'=>array('sp_tor_hdr_period',78,'c_contract_code','PERIOD OLD','PERIOD NEW'));
+if(isset($relatedCases[$GLOBALS['case']])){[$table,$rowId,$field,$old,$new]=$relatedCases[$GLOBALS['case']];$_POST['changes']=json_encode(array(array('table'=>$table,'row_id'=>$rowId,'field'=>$field,'old_value'=>$old,'new_value'=>$new)));}
+if($GLOBALS['case']==='relatedscope')$_POST['changes']=json_encode(array(array('table'=>'sp_tor','row_id'=>999,'field'=>'c_name','old_value'=>'PR OLD','new_value'=>'BAD')));
 if($GLOBALS['case']==='csrf')$_POST['csrf_token']='invalid';
 ob_start();
 register_shutdown_function(function(){
  $out=ob_get_clean();$json=json_decode($out,true);$case=$GLOBALS['case'];$s=$GLOBALS['state'];
- if($case==='finance')$pass=$json['success']&&$GLOBALS['committed']&&$s['header']['f_total']==='214.00'&&$s['header']['f_vat_amt']==='14.00'&&$s['header']['f_tax_personal']==='2.00'&&$s['header']['f_warranty']==='10.70'&&$s['header']['f_fine_amt']==='4.28'&&$s['header']['f_pay']==='197.02'&&$s['items'][0]['f_net_total_price']==='214.00'&&$s['debts'][0]['f_sum_Transf']==='214.00'&&$s['ledger'][0]['f_net_total_price']==='214.00'&&count($s['logs'])>8;
+ if(isset($GLOBALS['relatedCases'][$case])){$expected=$GLOBALS['relatedCases'][$case];$pass=$json['success']&&$GLOBALS['committed']&&$GLOBALS['relatedWrite']===array($expected[0],$expected[2],$expected[4],$expected[1])&&count($s['logs'])===1;}
+ elseif($case==='finance')$pass=$json['success']&&$GLOBALS['committed']&&$s['header']['f_total']==='214.00'&&$s['header']['f_vat_amt']==='14.00'&&$s['header']['f_tax_personal']==='2.00'&&$s['header']['f_warranty']==='10.70'&&$s['header']['f_fine_amt']==='4.28'&&$s['header']['f_pay']==='197.02'&&$s['items'][0]['f_net_total_price']==='214.00'&&$s['debts'][0]['f_sum_Transf']==='214.00'&&$s['ledger'][0]['f_net_total_price']==='214.00'&&count($s['logs'])>8;
  elseif($case==='preview')$pass=$json['success']&&!$GLOBALS['committed']&&$s['header']['f_total']==='107.00'&&$json['data']['sp_check_period_hdr'][0]['f_pay']==='197.02'&&count($s['logs'])===0;
  elseif($case==='success')$pass=$json['success']&&$GLOBALS['committed']&&$s['header']['c_egp_no']==='NEW'&&count($s['logs'])===1&&$s['logs'][0][4]==='OLD'&&$s['logs'][0][5]==='NEW';
  else $pass=$json&&!$json['success']&&!$GLOBALS['committed']&&$s['header']['c_egp_no']==='OLD'&&count($s['logs'])===0;
