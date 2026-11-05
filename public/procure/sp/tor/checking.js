@@ -7201,6 +7201,27 @@ var win_edir_alldata = function (rec) {
         }
 
         var relationLogStore = null;
+        var fieldLabel = function (name) {
+                var labels = {
+                        dc_cost_id: 'หน่วยงานเจ้าของเรื่อง',
+                        dc_cost2_id: 'หน่วยงานผู้รับผิดชอบ',
+                        dc_expense_budget_type_id: 'ค่าใช้จ่ายแหล่งเงิน',
+                        dc_bg_budget_type_id: 'ค่าใช้จ่ายแหล่งเงิน',
+                        dc_acc_id: 'บัญชี',
+                        c_code: 'เลขที่เอกสาร',
+                        c_contract_code: 'เลขที่สัญญา',
+                        i_period: 'งวดที่',
+                        f_total_amt: 'จำนวนเงินรวม',
+                        d_doc_date: 'วันที่เอกสาร',
+                        d_period_date: 'วันที่งวด'
+                };
+                return labels[name] || name;
+        };
+        var lookupDisplayField = function (name) {
+                return { dc_cost_id: 'dc_cost_id_name', dc_cost2_id: 'dc_cost2_id_name',
+                        dc_expense_budget_type_id: 'dc_expense_budget_type_id_name',
+                        dc_bg_budget_type_id: 'dc_expense_budget_type_id_name' }[name] || null;
+        };
         var relationLogGrid = null;
         var relationDataTabs = [];
         var relationGridByTable = {};
@@ -7455,7 +7476,7 @@ var win_edir_alldata = function (rec) {
                                         var isIdColumn = /(^id$|_id$)/i.test(fieldName);
                                         var isNumberColumn = /(^i_|^f_|amt|qty|price|total|year)/i.test(fieldName);
                                         var columnConfig = {
-                                                header: fieldName,
+                                                header: fieldLabel(fieldName),
                                                 dataIndex: fieldName,
                                                 width: calculatedWidth,
                                                 align: isIdColumn ? 'center' : (isNumberColumn ? 'right' : 'left'),
@@ -7513,13 +7534,15 @@ var win_edir_alldata = function (rec) {
                                         var rightFields = [];
                                         Ext.each(dataset.columns || [], function (formFieldName, fieldIndex) {
                                                 var fieldValue = selectedRecord.get(formFieldName);
+                                                var displayField = lookupDisplayField(formFieldName);
+                                                var displayValue = displayField ? selectedRecord.get(displayField) : fieldValue;
                                                 var canEditField = isEditableField(formFieldName);
                                                 var fieldConfig = {
                                                         xtype: String(fieldValue || '').length > 100 ? 'textarea' : 'textfield',
                                                         name: formFieldName,
-                                                        fieldLabel: formFieldName,
-                                                        value: fieldValue === null || typeof fieldValue === 'undefined' ? '' : fieldValue,
-                                                        readOnly: !canEditField,
+                                                        fieldLabel: fieldLabel(formFieldName),
+                                                        value: displayValue === null || typeof displayValue === 'undefined' || displayValue === '' ? (fieldValue === null || typeof fieldValue === 'undefined' ? '' : fieldValue) : displayValue,
+                                                        readOnly: !canEditField || !!displayField,
                                                         anchor: '96%',
                                                         height: String(fieldValue || '').length > 100 ? 55 : undefined,
                                                         style: canEditField
@@ -7571,6 +7594,9 @@ var win_edir_alldata = function (rec) {
                                                                 var formChanges = [];
                                                                 Ext.each(dataset.columns || [], function (saveFieldName) {
                                                                         if (!isEditableField(saveFieldName)) {
+                                                                                return;
+                                                                        }
+                                                                        if (lookupDisplayField(saveFieldName)) {
                                                                                 return;
                                                                         }
                                                                         var formField = detailForm.getForm().findField(saveFieldName);
@@ -10480,6 +10506,11 @@ var cellClick = function (grid, rowIndex, columnIndex, e) {
                 }
                 return;
         }
+        if (columnIndex === grid.getColumnModel().getIndexById("contract_detailsID")) {
+                var overviewRow = grid.getStore().getAt(rowIndex);
+                Ext.showContractDetails(overviewRow, {maximized: true, allowAdminEdit: true, onUpdated: function () { grid.getStore().reload(); }});
+                return;
+        }
         Ext.selectRow = this.selModel.selection.record;
         var column = grid.getColumnModel().getColumnAt(columnIndex);
         if (column && column.id === 'i_is_editID') {
@@ -11358,6 +11389,16 @@ Ext.AppUx = function (app, menu) {
                                                 return record.get("no");
                                         },
                                 }),
+                                {
+                                        header: "ดูรายละเอียดทั้งหมด",
+                                        id: "contract_detailsID",
+                                        width: 120,
+                                        align: "center",
+                                        sortable: false,
+                                        renderer: function () {
+                                                return '<span style="cursor:pointer;color:#15428b"><img src="../images/icons/book_magnify.png" alt=""> ดูรายละเอียด</span>';
+                                        }
+                                },
                                 {
                                         header: "ลำดับ",
                                         sortable: false,

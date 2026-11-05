@@ -631,7 +631,7 @@ switch ($mode) {
              LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
              LEFT JOIN dbo.sp_tor_contract c1 ON c1.sp_tor_contract_id=m.sp_contract_id
              LEFT JOIN dbo.sp_tor_contract c2 ON c2.sp_tor_contract_id=ch.sp_tor_contract_id
-             WHERE c1.sp_tor_id=? OR c2.sp_tor_id=? ORDER BY i.sp_tranf_item_id",
+             WHERE (c1.sp_tor_id=? OR c2.sp_tor_id=?) AND i.i_enabled=1 ORDER BY i.sp_tranf_item_id",
                         array($torId, $torId)
                 ) : array();
 

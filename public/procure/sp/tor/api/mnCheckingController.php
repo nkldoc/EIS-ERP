@@ -575,11 +575,20 @@ switch ($mode) {
                         "SELECT * FROM dbo.sp_tor_victory WHERE sp_tor_id = ?", array($torId)
                 ) : array();
         $contractRows = $torId > 0 ? $fetchRows(
-                        "SELECT * FROM dbo.sp_tor_contract WHERE sp_tor_id = ? ORDER BY sp_tor_contract_id", array($torId)
+                        "SELECT c.*, cost.c_name AS dc_cost_id_name, cost2.c_name AS dc_cost2_id_name, budget.c_name AS dc_expense_budget_type_id_name
+                           FROM dbo.sp_tor_contract c
+                           LEFT JOIN " . DB_CENTER . "dc_cost cost ON cost.dc_cost_id=c.dc_cost_id
+                           LEFT JOIN " . DB_CENTER . "dc_cost cost2 ON cost2.dc_cost_id=c.dc_cost2_id
+                           LEFT JOIN " . DB_CENTER . "dc_expense_budget_type budget ON budget.dc_expense_budget_type_id=c.dc_expense_budget_type_id
+                          WHERE c.sp_tor_id = ? ORDER BY c.sp_tor_contract_id", array($torId)
                 ) : $selectedContractRows;
         $torHdrRows = $torId > 0 ? $fetchRows(
-                        "SELECT h.* FROM dbo.sp_tor_hdr_period h
+                        "SELECT h.*, cost.c_name AS dc_cost_id_name, cost2.c_name AS dc_cost2_id_name, budget.c_name AS dc_expense_budget_type_id_name
+                           FROM dbo.sp_tor_hdr_period h
              INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
+             LEFT JOIN " . DB_CENTER . "dc_cost cost ON cost.dc_cost_id=h.dc_cost_id
+             LEFT JOIN " . DB_CENTER . "dc_cost cost2 ON cost2.dc_cost_id=h.dc_cost2_id
+             LEFT JOIN " . DB_CENTER . "dc_expense_budget_type budget ON budget.dc_expense_budget_type_id=h.dc_expense_budget_type_id
              WHERE c.sp_tor_id=? ORDER BY h.sp_tor_hdr_period_id", array($torId)
                 ) : array();
         $torDtlRows = $torId > 0 ? $fetchRows(
@@ -634,7 +643,7 @@ switch ($mode) {
              LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=ch.sp_mn_contract_hdr_id
              LEFT JOIN dbo.sp_tor_contract c1 ON c1.sp_tor_contract_id=m.sp_contract_id
              LEFT JOIN dbo.sp_tor_contract c2 ON c2.sp_tor_contract_id=ch.sp_tor_contract_id
-             WHERE c1.sp_tor_id=? OR c2.sp_tor_id=? ORDER BY i.sp_tranf_item_id",
+             WHERE (c1.sp_tor_id=? OR c2.sp_tor_id=?) AND i.i_enabled=1 ORDER BY i.sp_tranf_item_id",
                         array($torId, $torId)
                 ) : array();
 

@@ -2,6 +2,31 @@
 Ext.AppUx = function (app, menu)
 {
 
+    // Ext 3 RadioGroup#getValue returns the selected inputValue string.
+    // Accept a radio component too for compatibility with custom overrides.
+    function radioValue(id) {
+        var group = Ext.getCmp(id);
+        var selected = null;
+        if (group.items && group.items.each) {
+            group.items.each(function (item) {
+                if (item.checked) {
+                    selected = item.inputValue;
+                    return false;
+                }
+            });
+        }
+        if (selected !== null) return selected;
+
+        var value = group.getValue();
+        if (value && typeof value === "object") {
+            if (value.inputValue !== undefined) return value.inputValue;
+            for (var key in value) {
+                if (Object.prototype.hasOwnProperty.call(value, key)) return value[key];
+            }
+        }
+        return value;
+    }
+
     Ext.HDR_ID = null;
     Ext.selectRow = [];
     Ext.menuEditGrid = true;
@@ -1510,8 +1535,8 @@ remvoeNoConract = (c_code)=> {
 						  // sp_doc_gen.c_yyyy is stored using the combo's underlying value.
 						  Ext.bookContrack.setBaseParam("i_yyyy", Ext.getCmp('i_yearID').getValue());
 										  Ext.bookContrack.setBaseParam("type", "contract");
-										  Ext.bookContrack.setBaseParam("i_purchase", Ext.getCmp('i_purchaseID').getValue().inputValue);
-										  Ext.bookContrack.setBaseParam("i_type_contract", Ext.getCmp('i_type_contractID').getValue().inputValue);
+										  Ext.bookContrack.setBaseParam("i_purchase", radioValue('i_purchaseID'));
+										  Ext.bookContrack.setBaseParam("i_type_contract", radioValue('i_type_contractID'));
 
 										  Ext.bookContrack.reload({
 							 callback: function (records, operation, success) {
@@ -1591,11 +1616,11 @@ remvoeNoConract = (c_code)=> {
 										  return false;
 									   }
 										   // Refresh the latest sequence first; generate only after its async load completes.
-										   Ext.call_last(function () {
-											  let result = (Number(Ext.getCmp('i_value').getValue()) || 0) + 1;
+											  Ext.call_last(function () {
+											  var result = (Number(Ext.getCmp('i_value').getValue()) || 0) + 1;
 // แปลงเป็น string และเติมศูนย์ด้านหน้าให้ครบ 5 หลัก
-											  let padded = result.toString().padStart(4, '0');
-											  Ext.c_contract = Ext.getCmp('i_type_contractID').getValue().inputValue + Ext.getCmp('i_purchaseID').getValue().inputValue
+											  var padded = ("0000" + result).slice(-4);
+											  Ext.c_contract = radioValue('i_type_contractID') + radioValue('i_purchaseID')
 
 													 + "" + Ext.getCmp('c_subID').getValue()
 													 + "" + padded
