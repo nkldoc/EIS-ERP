@@ -25,7 +25,8 @@ SELECT
     , SUM(r.f_amt) AS f_ir_amt
     , MAX(r.d_ir_issue) AS d_ir_issue
     , MAX(r.d_ap_issue) AS d_ap_issue
-    , MAX(chk.sp_tor_period_bill_checking_id) AS sp_tor_period_bill_checking_id
+    , MIN(r.sp_tor_period_bill_receive_id) AS sp_tor_period_bill_receive_id    -- pk ใบตรวจรับ (แถวรับของที่ถือเลข AP/IR ถ้า IR มีหลายแถวรับของใช้ค่าต่ำสุด)
+    , MAX(chk.sp_tor_period_bill_checking_id) AS sp_tor_period_bill_checking_id -- pk รายละเอียดใบตรวจรับ
     , 100000 + MAX(chk.sp_tor_period_bill_checking_id) AS chk_id
     , MAX(chk.d_checking) AS d_checking
     , MAX(chk.i_budget_year_use) AS i_budget_year_use      -- ใช้เงินปีงบประมาณ (พ.ศ.)
