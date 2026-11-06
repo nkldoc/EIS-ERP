@@ -38,6 +38,14 @@ class clsPageStatus {
         $this->db = $db;
         $this->req_name = $req;
 
+        // ค่าเริ่มต้น: เปิดหน้านี้โดยไม่มี ?st= (หรือ st ไม่ตรงเมนูใด) จะไม่มีแถวจาก sp_status_hdr
+        // เดิม $this->temp เป็น null ทำให้ขึ้น "Trying to access array offset on null" และ
+        // JS ที่ echo ค่า (เช่น Ext.menu_id = ;) พัง
+        $this->temp = array(
+            "id" => 0, "type_id" => 0, "i_seq" => 0, "js" => null, "c_code" => "", "c_name" => "",
+            "i_last" => 0, "code_tomenu" => "", "i_day" => 0, "i_alarm" => 0, "i_entrance" => 0, "i_config" => 0
+        );
+
         $stmt = $this->db->QueryParam("select [sp_status_hdr_id] as id "
                 . ",[sp_type_status_id] as type_id "
                 . ", js"
