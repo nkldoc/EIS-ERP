@@ -35,7 +35,8 @@ function medsupGenApCode($db, $deptType, $useYear = 0)
     $prefix = ($shortCodes[$deptType] ?? $deptType) . substr((string) $apYear, -2) . "-";
 
     $stmt = $db->QueryParam(
-        "SELECT c_ap_code FROM NMU_ERP.dbo.sp_tor_period_bill_receive WHERE c_ap_code LIKE ? + '%'",
+        // นับเฉพาะแถวที่ยังใช้งาน (i_enabled = 1) - ยกเลิกการนำเข้าแล้วนำเข้าใหม่ เลข AP เริ่มนับ 000001 ใหม่ได้
+        "SELECT c_ap_code FROM NMU_ERP.dbo.sp_tor_period_bill_receive WHERE i_enabled = 1 AND c_ap_code LIKE ? + '%'",
         array($prefix)
     );
     $maxNum = 0;
