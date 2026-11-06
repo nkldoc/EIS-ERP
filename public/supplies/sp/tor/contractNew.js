@@ -959,6 +959,14 @@ const Uiedit_contractNew = function (rec) {
               } else {
                 var win = bgBagedTypeNew().show();
                 win.items.items[0].getForm().loadRecord(Ext.selectRow);
+                // ยังไม่เคยจอง: เติมจำนวนเงินจองจากเงินแหล่งเงินที่กำหนดไว้ (กันส่งยอด 0.00 ไปจอง)
+                [["f_type_amtID", "f_type_amt"], ["f_type2_amtID", "f_type2_amt"], ["f_type3_amtID", "f_type3_amt"]].forEach(function (p) {
+                  var cmp = Ext.getCmp(p[0]);
+                  var planned = String(Ext.selectRow.get(p[1]) || "0").replace(/,/g, "") / 1;
+                  if (cmp && !cmp.disabled && String(cmp.getValue() || "0").replace(/,/g, "") / 1 === 0 && planned > 0) {
+                    cmp.setValue(Ext.floatRenderer(planned));
+                  }
+                });
                 // ซิงค์ "ลักษณะการจ้าง/ของที่ได้มา" ตามค่า "ของที่ได้" (i_working_type) ที่โหลดจากสัญญา
                 var _wt = String(Ext.getCmp("i_working_type").getValue());
                 if (_wt === "1" || _wt === "2") {
