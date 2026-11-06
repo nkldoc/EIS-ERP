@@ -8,4 +8,3 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 echo json_encode(['success' => true, 'remaining_seconds' => $timeout]);
-// test
