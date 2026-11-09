@@ -116,7 +116,7 @@ Ext.storeApDeptTypePeriodBill = new Ext.data.JsonStore({
     data: [
         {id: "APPS", c_name: "APPS - พัสดุ"},
         {id: "APF", c_name: "APF - เภสัช"},
-        {id: "APMD", c_name: "APMD - เวชภัณฑ์"},
+        {id: "APMSD", c_name: "APMSD - เวชภัณฑ์"},
     ],
 });
 
@@ -126,7 +126,7 @@ Ext.storeApDeptTypePeriodBill = new Ext.data.JsonStore({
 Ext.userApDeptPeriodBill = (function () {
     // admin (user_id = 1) ไม่ถูกล็อกเสมอ
     if (parseInt(Ext.session && Ext.session.user_id) === 1) { return null; }
-    var map = {38: "APPS", 50: "APF", 82: "APMD"};
+    var map = {38: "APPS", 50: "APF", 82: "APMSD"};
     return map[parseInt(Ext.session && Ext.session.dc_cost_id)] || null;
 })();
 if (Ext.userApDeptPeriodBill) {
@@ -135,7 +135,7 @@ if (Ext.userApDeptPeriodBill) {
 
 // ค่าใช้จ่ายเริ่มต้นของเภสัช/เวชภัณฑ์ = bg_expense_id 133 (030300090001 : ค่ายาและเวชภัณฑ์
 // อวัยวะเทียม) ล็อกไม่ให้เลือกเอง
-Ext.expenseLockedPeriodBill = Ext.userApDeptPeriodBill === "APF" || Ext.userApDeptPeriodBill === "APMD";
+Ext.expenseLockedPeriodBill = Ext.userApDeptPeriodBill === "APF" || Ext.userApDeptPeriodBill === "APMSD";
 Ext.DEFAULT_EXPENSE_ID_PERIOD_BILL = "133";
 // เติมค่าเริ่มต้นลงช่องค่าใช้จ่าย/ชื่อโครงการ (ชื่อโครงการเติมเฉพาะตอนยังว่าง) - ต้องรอทั้ง
 // store และ combo พร้อม จึงถูกเรียกทั้งตอน store โหลดเสร็จและตอน combo render
@@ -1215,7 +1215,7 @@ function winMedSupPeriodBill(rec) {
                                 Ext.Msg.alert("แจ้งเตือน", "PR นี้ยังไม่ได้จองเงิน<br>บันทึกสัญญาได้ แต่จะกดจองเงินที่หน้านี้ไม่ได้ ต้องไปจองเงินของ PR ที่เมนู \"การจัดทำ PR (หน่วยงาน) เวชภัณฑ์\" ก่อน<br>หรือถ้าต้องการจองที่หน้าสัญญานี้เลย ให้เปิดสัญญาใหม่โดยไม่เลือก PR (ระบบจะจองขั้น PR ให้อัตโนมัติ)");
                             }
                             if (!Ext.userApDeptPeriodBill) {
-                                Ext.getCmp("c_ap_dept_typeID").setValue(record.get("c_ap_dept_type") || "APMD");
+                                Ext.getCmp("c_ap_dept_typeID").setValue(record.get("c_ap_dept_type") || "APMSD");
                             }
                             if (!Ext.expenseLockedPeriodBill) {
                                 Ext.getCmp("po_expense_idID").setValue(record.get("po_expense_id"));
@@ -1266,7 +1266,7 @@ function winMedSupPeriodBill(rec) {
                     forceSelection: true,
                     typeAhead: false,
                     editable: false,
-                    value: Ext.userApDeptPeriodBill || "APMD",
+                    value: Ext.userApDeptPeriodBill || "APMSD",
                     readOnly: !!Ext.userApDeptPeriodBill,
                     hideTrigger: !!Ext.userApDeptPeriodBill,
                 },
@@ -1496,7 +1496,7 @@ function winMedSupPeriodBill(rec) {
                         // ค่าที่บันทึกจริง ไม่ใช่ค่าปัจจุบันของสัญญาในระบบ)
                         Ext.getCmp("c_nameID").setValue(Ext.selectRow.get("c_project_name"));
                         Ext.getCmp("c_contract_typeID").setValue(Ext.selectRow.get("c_contract_type"));
-                        Ext.getCmp("c_ap_dept_typeID").setValue(Ext.userApDeptPeriodBill || Ext.selectRow.get("c_ap_dept_type") || "APMD");
+                        Ext.getCmp("c_ap_dept_typeID").setValue(Ext.userApDeptPeriodBill || Ext.selectRow.get("c_ap_dept_type") || "APMSD");
                         Ext.getCmp("c_expense_nameID").setValue(Ext.selectRow.get("c_expense_name"));
                         Ext.getCmp("po_expense_idID").setValue(Ext.selectRow.get("po_expense_id"));
                         Ext.getCmp("po_expense_idID").setRawValue(Ext.selectRow.get("c_expense_name"));

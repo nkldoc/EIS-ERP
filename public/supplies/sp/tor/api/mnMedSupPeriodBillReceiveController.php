@@ -14,15 +14,15 @@ $util = new apiUtil();
 // เพราะเป็นตารางคนละก้อน ไม่เกี่ยวกับ flow บันทึกสัญญา/งวดเดิม
 
 // รหัสหน่วยงานตามประเภท (c_ap_dept_type) - สอดคล้องกับ Ext.MEDSUP_AP_DEPT_COST ฝั่ง
-// regTorMedSup.js (APPS พัสดุ=38 / APF เภสัช=50 / APMD เวชภัณฑ์=82) ใช้ทำ prefix เลข AP
+// regTorMedSup.js (APPS พัสดุ=38 / APF เภสัช=50 / APMSD เวชภัณฑ์=82) ใช้ทำ prefix เลข AP
 function medsupApDeptCostId($deptType)
 {
-    $map = array("APPS" => 38, "APF" => 50, "APMD" => 82);
+    $map = array("APPS" => 38, "APF" => 50, "APMSD" => 82);
     return $map[$deptType] ?? 82;
 }
 
-// เลข AP รูปแบบ {รหัส}{ปี 2 หลัก}-{เลขรัน 6 หลัก} เช่น APMD69-000001 (เวชภัณฑ์ ประเภท APMD) / APF70-000001 (เภสัช ประเภท APF)
-// ปี 2 หลัก = "ใช้เงินปีงบประมาณ" ของรายการ (พ.ศ.) - ปี 2569 ได้ APMD69-/APF69- ปี 2570 ได้ APMD70-/APF70-
+// เลข AP รูปแบบ {รหัส}{ปี 2 หลัก}-{เลขรัน 6 หลัก} เช่น APMSD69-000001 (เวชภัณฑ์ ประเภท APMSD) / APF70-000001 (เภสัช ประเภท APF)
+// ปี 2 หลัก = "ใช้เงินปีงบประมาณ" ของรายการ (พ.ศ.) - ปี 2569 ได้ APMSD69-/APF69- ปี 2570 ได้ APMSD70-/APF70-
 // ผู้ใช้ยืนยันให้ใช้รูปแบบเดียวกันทุกปี (ไม่ใช้รูปแบบเดิม 82-APMS-2570-000001 อีก) เลขรันแยกชุดกันต่อ prefix
 // ไม่ระบุปีใช้เงิน (0) = ใช้ปีงบประมาณปัจจุบัน (ปีงบไทยเริ่ม 1 ต.ค. - เดือน ต.ค.-ธ.ค. ถือเป็นปีงบถัดไป)
 function medsupGenApCode($db, $deptType, $useYear = 0)
@@ -31,8 +31,8 @@ function medsupGenApCode($db, $deptType, $useYear = 0)
     $yearBE = intval($now->format("Y")) + 543;
     $fiscalYear = (intval($now->format("n")) >= 10) ? $yearBE + 1 : $yearBE;
     $apYear = $useYear > 0 ? $useYear : $fiscalYear;
-    // ผู้ใช้ยืนยัน: เวชภัณฑ์ = APMD / เภสัช = APF / พัสดุ = APPS (รหัสประเภทตรงกับ prefix เลข AP แล้ว)
-    $shortCodes = array("APMD" => "APMD", "APF" => "APF", "APPS" => "APPS");
+    // ผู้ใช้ยืนยัน: เวชภัณฑ์ = APMSD / เภสัช = APF / พัสดุ = APPS (รหัสประเภทตรงกับ prefix เลข AP แล้ว)
+    $shortCodes = array("APMSD" => "APMSD", "APF" => "APF", "APPS" => "APPS");
     $prefix = ($shortCodes[$deptType] ?? $deptType) . substr((string) $apYear, -2) . "-";
 
     $stmt = $db->QueryParam(
@@ -419,7 +419,7 @@ switch ($mode) {
             // เลือกมาจากคนละหน่วยงานปนกันห้ามออกเลขรวมกัน เพราะ prefix จะผิดสำหรับบางรายการ
             $deptTypes = array();
             $stmtDept = $db->QueryParam(
-                "select distinct isnull(g.c_ap_dept_type, 'APMD') as c_ap_dept_type
+                "select distinct isnull(g.c_ap_dept_type, 'APMSD') as c_ap_dept_type
                  from NMU_ERP.dbo.sp_tor_period_bill_receive r
                  inner join NMU_ERP.dbo.sp_tor_period_bill g on g.sp_tor_period_bill_id = r.sp_tor_period_bill_id
                  where r.sp_tor_period_bill_receive_id in ({$placeholders})",
@@ -440,7 +440,7 @@ switch ($mode) {
                 $errMsg = "รายการที่เลือกใช้เงินคนละปีงบประมาณกัน (ใบกันเหลื่อมกับเงินปัจจุบัน หรือคนละปีของใบกัน) ออกเลข IR รวมกันไม่ได้ กรุณาเลือกออกแยกกัน";
                 break;
             }
-            $irCode = medsupGenIrCode($db, !empty($deptTypes[0]) ? $deptTypes[0] : "APMD", !empty($irYears) ? $irYears[0] : 0);
+            $irCode = medsupGenIrCode($db, !empty($deptTypes[0]) ? $deptTypes[0] : "APMSD", !empty($irYears) ? $irYears[0] : 0);
         }
 
         $arrParam = array_merge(
@@ -463,7 +463,7 @@ switch ($mode) {
         // "82-APMS-2570-000030" (dc_cost_id-ประเภทหน่วยงาน-ปีงบประมาณ พ.ศ.-เลขรัน 6 หลัก
         // แยกชุดกันต่อหน่วยงาน/ต่อปีงบ ดู medsupGenApCode ด้านบนไฟล์) แล้วปั๊มวันที่ออกให้
         // - ค่อยไปผูก API จริงทีหลัง
-        // prefix (APPS พัสดุ/APF เภสัช/APMD เวชภัณฑ์) มาจากคอลัมน์ c_ap_dept_type ของ
+        // prefix (APPS พัสดุ/APF เภสัช/APMSD เวชภัณฑ์) มาจากคอลัมน์ c_ap_dept_type ของ
         // สัญญา/งวดต้นทาง (ผูกกับ "ประเภท" ที่เลือกไว้ในหน้า "บันทึกรายละเอียดในสัญญา
         // (เวชภัณฑ์)" จริงๆ แล้ว ไม่ hardcode เป็น APMS ตายตัวอีกต่อไป)
         $ids = $_REQUEST["ids"] ?? array();
@@ -568,7 +568,7 @@ switch ($mode) {
             // IR ของ APPS) ห้ามออกเลข AP รวมกัน เพราะจะได้ prefix ผิดสำหรับบางรายการ
             $deptTypes = array();
             $stmtDept = $db->QueryParam(
-                "select distinct isnull(g.c_ap_dept_type, 'APMD') as c_ap_dept_type
+                "select distinct isnull(g.c_ap_dept_type, 'APMSD') as c_ap_dept_type
                  from NMU_ERP.dbo.sp_tor_period_bill_receive r
                  inner join NMU_ERP.dbo.sp_tor_period_bill g on g.sp_tor_period_bill_id = r.sp_tor_period_bill_id
                  where r.sp_tor_period_bill_receive_id in ({$placeholders})",
@@ -582,7 +582,7 @@ switch ($mode) {
                 $errMsg = "รายการที่เลือกมาจากคนละหน่วยงานกัน (" . implode(", ", $deptTypes) . ") ออกเลข AP รวมกันไม่ได้ กรุณาแยกออกเลขทีละหน่วยงาน";
                 break;
             }
-            $deptType = !empty($deptTypes[0]) ? $deptTypes[0] : "APMD";
+            $deptType = !empty($deptTypes[0]) ? $deptTypes[0] : "APMSD";
             $useYearRow = $db->GetDataBySQL(
                 "select min(c.i_budget_year_use) from NMU_ERP.dbo.sp_tor_period_bill_checking c
                  where c.c_ir_code in (select r.c_ir_code from NMU_ERP.dbo.sp_tor_period_bill_receive r
@@ -797,13 +797,13 @@ switch ($mode) {
             $apCodeForIr = $existingApForIr;
         } else {
             $deptTypeForIr = $db->GetDataBySQL(
-                "select top 1 isnull(g.c_ap_dept_type, 'APMD') as c_ap_dept_type
+                "select top 1 isnull(g.c_ap_dept_type, 'APMSD') as c_ap_dept_type
                  from NMU_ERP.dbo.sp_tor_period_bill_receive r
                  inner join NMU_ERP.dbo.sp_tor_period_bill g on g.sp_tor_period_bill_id = r.sp_tor_period_bill_id
                  where r.c_ir_code = ?",
                 array($irCode)
             );
-            $apCodeForIr = medsupGenApCode($db, !empty($deptTypeForIr) ? $deptTypeForIr : "APMD", $useYearTh);
+            $apCodeForIr = medsupGenApCode($db, !empty($deptTypeForIr) ? $deptTypeForIr : "APMSD", $useYearTh);
         }
 
         if (!empty($idsForAp)) {

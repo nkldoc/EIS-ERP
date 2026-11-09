@@ -138,10 +138,10 @@ if ($type == "medsup_period_bill") {
             "i_period" => intval($row["i_period"]),
             "c_project_name" => $row["c_project_name"],
             "c_contract_type" => $row["c_contract_type"],
-            // รหัสหน่วยงานที่ใช้ออกเลข AP (APPS พัสดุ/APMD เภสัช/APMS เวชภัณฑ์) - เดิม
+            // รหัสหน่วยงานที่ใช้ออกเลข AP (APPS พัสดุ/APMSD เภสัช/APMS เวชภัณฑ์) - เดิม
             // เป็นข้อความคงที่ "APMS - เวชภัณฑ์" ในฟอร์ม ตอนนี้เลือกได้จริงและมีผลต่อ
             // prefix ตอนออกเลข AP จริง (ดู mnMedSupPeriodBillReceiveController.php)
-            "c_ap_dept_type" => empty($row["c_ap_dept_type"]) ? "APMD" : $row["c_ap_dept_type"],
+            "c_ap_dept_type" => empty($row["c_ap_dept_type"]) ? "APMSD" : $row["c_ap_dept_type"],
             "dc_expense_budget_type_id" => intval($row["dc_expense_budget_type_id"]),
             "c_fund_source" => $row["c_fund_source"],
             "f_fund_amt" => is_null($row["f_fund_amt"]) ? "" : number_format($row["f_fund_amt"], 2),
@@ -422,7 +422,7 @@ if ($type == "medsup_period_bill") {
     $searchByColumns = array(
         'c_contract_code' => 'g.c_contract_code',
         'c_ir_code' => 'r.c_ir_code',
-        'c_ap_code' => 'r.c_ap_code', // เลขตรวจรับ (AP) เช่น 50-APMD-2569-000003
+        'c_ap_code' => 'r.c_ap_code', // เลขตรวจรับ (AP) เช่น 50-APMSD-2569-000003
         'c_creditor_name' => 'g.c_creditor_name',
         'c_tax_number_imp' => 'g.c_tax_number_imp',
         'c_overlap' => null, // จัดการแยกด้านล่าง (ต้องเช็ค 3 คอลัมน์)
@@ -439,7 +439,7 @@ if ($type == "medsup_period_bill") {
         }
     }
     if (!empty($_REQUEST['c_ap_dept_type'])) {
-        $wh .= " and isnull(g.c_ap_dept_type, 'APMD') = '" . str_replace("'", "''", $_REQUEST['c_ap_dept_type']) . "'";
+        $wh .= " and isnull(g.c_ap_dept_type, 'APMSD') = '" . str_replace("'", "''", $_REQUEST['c_ap_dept_type']) . "'";
     }
     if (!empty($_REQUEST['i_budget_year'])) {
         // ฟิลด์ค้นหารับเป็น พ.ศ. ตามที่แสดงในกริด - แปลงกลับเป็น ค.ศ. ก่อนเทียบกับ
@@ -547,7 +547,7 @@ if ($type == "medsup_period_bill") {
             "i_budget_year" => (!empty($row["c_overlap"]) || !empty($row["c_overlap2"]) || !empty($row["c_overlap3"])) && !empty($row["d_ir_issue"])
                 ? (intval(date("Y", strtotime($row["d_ir_issue"]))) + (intval(date("n", strtotime($row["d_ir_issue"]))) >= 10 ? 1 : 0) + 543)
                 : (empty($row["i_budget_year"]) ? "" : intval($row["i_budget_year"]) + 543),
-            "c_ap_dept_type" => empty($row["c_ap_dept_type"]) ? "APMD" : $row["c_ap_dept_type"],
+            "c_ap_dept_type" => empty($row["c_ap_dept_type"]) ? "APMSD" : $row["c_ap_dept_type"],
             // เลขที่ใบกันเหลื่อม/ปีงบประมาณของใบกันเหลื่อม (ถ้ามี) - เอาไว้ให้ฟอร์ม
             // "รายละเอียดตรวจรับ" เปลี่ยนช่อง "ใช้เงินปีงบประมาณ" ให้ตรงกับที่บันทึกไว้
             // จริงตอนบันทึกรายละเอียดสัญญา (มีได้สูงสุด 3 แหล่งเงิน เอาแหล่งแรกที่มีค่า)

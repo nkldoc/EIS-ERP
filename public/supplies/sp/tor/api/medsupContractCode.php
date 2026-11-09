@@ -11,7 +11,7 @@ function medsupGenContractCode($db, $deptType)
     $prefixMap = array(
         "APPS" => "พวช.พ.",
         "APF" => "พวช.ภ.",
-        "APMD" => "พวช.ว.",
+        "APMSD" => "พวช.ว.",
     );
     $prefix = $prefixMap[$deptType] ?? "พวช.";
 
