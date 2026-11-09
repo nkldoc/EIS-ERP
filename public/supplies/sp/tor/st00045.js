@@ -914,7 +914,8 @@ Ext.AppUx = function (app, menu) {
             i_pa: Ext.menu_i_day,
             tor_status_id: Ext.menu_id,
             type_enabled: 2,
-            type_menu: 2, //ชุดสอง ผู้รับผิดชอบ 
+            incl_type12: 1, // รายการยกเลิกให้เห็น PR ประเภท 12 (ก่อนปีงบประมาณ) ด้วย
+            type_menu: 2, //ชุดสอง ผู้รับผิดชอบ
         },
         root: "data",
         idProperty: "id",

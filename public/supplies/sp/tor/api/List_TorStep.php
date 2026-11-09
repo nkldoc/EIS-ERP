@@ -1885,6 +1885,7 @@ if ($type == "ownnerPr") {
         $wh .= "  and a.sp_emp_id =" . $_REQUEST['sp_emp_id'];
     }
     $type_menu = $_REQUEST['type_menu'] ?? null;
+    $whExclType12 = (($_REQUEST['incl_type12'] ?? 0) == 1) ? "" : " and a.i_type_bg <> 12 ";
     $type_enabled = $_REQUEST['type_enabled'] ?? null;
     if ($type_enabled != null) {
         $wh .= "  and a.i_enabled =" . $_REQUEST['type_enabled'];
@@ -1912,7 +1913,7 @@ if ($type == "ownnerPr") {
                         , (select count (sp_tor_dtl_id) from sp_tor_dtl aa where  aa. sp_tor_id = a.tor_id ) as tor_hdr_dtl
                         , a.i_type_contract, a.i_hire_type, isnull(a.i_product_type,0) as i_product_type, a.i_is_inv, a.i_type_fix_rate,i_delivery_date
                         , row_number() over (order by a.tor_id DESC) as row
-                        from dbo.sp_tor a  where a.i_is_notor = 0 and a.i_type_bg <> 12   {$wh}"; // ทุกประเภท PR ยกเว้น 12 = PR ก่อนปีงบประมาณ (มีเมนูติดตามแยกต่างหาก)
+                        from dbo.sp_tor a  where a.i_is_notor = 0 {$whExclType12}   {$wh}"; // ทุกประเภท PR ยกเว้น 12 = PR ก่อนปีงบประมาณ (มีเมนูติดตามแยกต่างหาก) ยกเว้นหน้า ST00045 (รายการยกเลิก) ส่ง incl_type12=1 มาให้เห็นด้วย
 
     //    if ($tor_status_id == 13) {
     //        $sqlTempTable .= " and (a.i_edit in (3 , 5) or a.tor_status_id in (" . $step . '))' . $wh . $util->viewDepartment('a', 0, $type_menu); //
