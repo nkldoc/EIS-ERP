@@ -1010,7 +1010,7 @@ Ext.AppUx = function (app, menu) {
         // เช็คหน่วยงานปนกันตั้งแต่ฝั่ง UI ก่อน (เซิร์ฟเวอร์เช็คซ้ำอีกชั้นเป็นตัวจริง) -
         // กันเลือกข้าม APPS/APMD/APMS มาออกเลข AP รวมกัน ซึ่งจะได้ prefix ผิดสำหรับ
         // บางรายการในกลุ่ม
-        var deptTypes = selected.map(function (r) { return r.get("c_ap_dept_type") || "APMS"; }).filter(function (v, i, arr) { return arr.indexOf(v) === i; });
+        var deptTypes = selected.map(function (r) { return r.get("c_ap_dept_type") || "APMD"; }).filter(function (v, i, arr) { return arr.indexOf(v) === i; });
         if (deptTypes.length > 1) {
             Ext.Msg.alert("แจ้งเตือน", "รายการที่เลือกมาจากคนละหน่วยงานกัน (" + deptTypes.join(", ") + ") ออกเลข AP รวมกันไม่ได้ กรุณาแยกออกเลขทีละหน่วยงาน");
             return;
@@ -1108,7 +1108,7 @@ Ext.AppUx = function (app, menu) {
         width: 130, mode: "local", triggerAction: "all", forceSelection: true, editable: false,
         store: new Ext.data.ArrayStore({
             fields: ["v", "t"],
-            data: [["", "ทั้งหมด"], ["APPS", "APPS พัสดุ"], ["APMD", "APMD เภสัช"], ["APMS", "APMS เวชภัณฑ์"]],
+            data: [["", "ทั้งหมด"], ["APPS", "APPS พัสดุ"], ["APF", "APF เภสัช"], ["APMD", "APMD เวชภัณฑ์"]],
         }),
         valueField: "v", displayField: "t", value: "",
     });

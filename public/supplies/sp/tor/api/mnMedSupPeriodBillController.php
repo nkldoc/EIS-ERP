@@ -158,7 +158,7 @@ switch ($mode) {
             // COST_ID; เขียนทับไปแล้วที่ด้านบนไฟล์สำหรับทุก mode) default เป็นเวชภัณฑ์
             // (82) ถ้าไม่ได้เลือกมา
             "dc_cost_id" => !empty($_REQUEST["dc_cost_id"]) ? intval($_REQUEST["dc_cost_id"]) : MEDSUP_DC_COST_ID,
-            "c_ap_dept_type" => $data["c_ap_dept_type"] ?? "APMS",
+            "c_ap_dept_type" => $data["c_ap_dept_type"] ?? "APMD",
             // ประเภท PR (dbo.sp_type_bg) - ค่าเริ่มต้น 1 = "PR ปกติ" ถ้าไม่ได้ส่งมา
             "i_type_bg" => isset($data["i_type_bg"]) && $data["i_type_bg"] !== "" ? intval($data["i_type_bg"]) : 1,
             "po_expense_id" => $data["po_expense_id"] ?? null,
@@ -279,7 +279,7 @@ switch ($mode) {
             // เก็บเป็น ค.ศ. เหมือน ADD_PR ด้านบน (ดูคำอธิบายที่นั่น)
             "i_budget_year" => isset($data["i_budget_year"]) && $data["i_budget_year"] !== "" ? intval($data["i_budget_year"]) - 543 : null,
             "dc_cost_id" => !empty($_REQUEST["dc_cost_id"]) ? intval($_REQUEST["dc_cost_id"]) : MEDSUP_DC_COST_ID,
-            "c_ap_dept_type" => $data["c_ap_dept_type"] ?? "APMS",
+            "c_ap_dept_type" => $data["c_ap_dept_type"] ?? "APMD",
             "i_type_bg" => isset($data["i_type_bg"]) && $data["i_type_bg"] !== "" ? intval($data["i_type_bg"]) : 1,
             "po_expense_id" => $data["po_expense_id"] ?? null,
             "c_expense_name" => $data["c_expense_name"] ?? null,
@@ -576,7 +576,7 @@ function reserveMedSupFundSource($hdrId, $slot, $level = "contract") {
     }
     $poId = !empty($row["sp_tor_contract_id"]) ? intval($row["sp_tor_contract_id"]) : $ownHdrId;
 
-    $apDeptCostMap = array("APPS" => 38, "APMD" => 50, "APMS" => 82);
+    $apDeptCostMap = array("APPS" => 38, "APF" => 50, "APMD" => 82);
     $iPrType = intval($row["i_pr_type{$suffix}"] ?? 1);
     if ($iPrType < 1) {
         $iPrType = 1;
@@ -592,7 +592,7 @@ function reserveMedSupFundSource($hdrId, $slot, $level = "contract") {
         "i_year" => $yearRaw > 2400 ? $yearRaw - 543 : $yearRaw,
         "i_pr_type" => $iPrType, // 1 = แบบแผน / 2 = แบบงวด
         "i_reserve" => 1,
-        // งบผูกกับหน่วยงานตาม "ประเภท" ของรายการ (APPS พัสดุ=38 / APMD เภสัช=50 / APMS เวชภัณฑ์=82)
+        // งบผูกกับหน่วยงานตาม "ประเภท" ของรายการ (APPS พัสดุ=38 / APF เภสัช=50 / APMD เวชภัณฑ์=82)
         // ห้ามใช้ dc_cost_id ที่เก็บในแถว (เมนูนี้เก็บ 82 คงที่) - งบค่ายา/เวชภัณฑ์ 133 แหล่งเงิน กทม.
         // ปี 2026 อยู่ใต้หน่วยงาน 50 เท่านั้น
         "dc_cost_id" => ($apDeptCostMap[$src["c_ap_dept_type"] ?? ""] ?? intval($src["dc_cost_id"])),
