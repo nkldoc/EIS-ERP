@@ -174,7 +174,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                 <div class="toolbar">
                         <div class="d-flex flex-wrap align-items-center justify-content-between">
                                 <div class="mb-2">
-                                        <h4 class="mb-1 font-weight-bold">ระบบติดตามงบประมาณ </h4>
+                                        <h4 class="mb-1 font-weight-bold">ระบบติดตามงบประมาณ<?= !empty($ASSET_ONLY) ? ' พัสดุ แยกตาม ครุภัณฑ์' : '' ?> </h4>
                                         <div class="legend-badges">
                                                 <span class="badge badge-primary mr-1">จำนวนงบประมาณ</span>
                                                 <span class="badge badge-info mr-1">จองเงิน</span>
@@ -222,7 +222,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                                                         onclick="openProcureSummary()">
                                                         📈 สรุปยอดปริมาณการจัดซื้อจัดจ้าง
                                                 </button>
+                                                <button id="btnProcureByAsset" type="button"
+                                                        class="btn btn-warning btn-sm rounded-pill px-3 ml-2"
+                                                        onclick="openProcureByAsset()">
+                                                        งบประมาณ พัสดุ แยกตาม ครุภัณฑ์
+                                                </button>
                                                 <script>
+                                                // TODO: ปรับ URL ปลายทางให้ตรงกับหน้ารายงานงบประมาณพัสดุแยกตามครุภัณฑ์
+                                                function openProcureByAsset() {
+                                                        var sel = document.getElementById('budget_year_filter');
+                                                        var th = sel && sel.value ? sel.value : '';
+                                                        var en = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex].dataset.yearEn : '';
+                                                        var q = th ? '?year_th=' + encodeURIComponent(th) + '&year_en=' + encodeURIComponent(en) : '';
+                                                        window.open('Budget_Procurement_ByAsset.php' + q, '_blank');
+                                                }
                                                 function openProcureSummary() {
                                                         var sel = document.getElementById('budget_year_filter');
                                                         var th = sel && sel.value ? sel.value : '';
@@ -263,7 +276,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                 </div>
 
                 <!-- ========== [เพิ่ม] PR/PO Section ========== -->
-                <div class="row mt-3" id="prpo-section">
+                <!-- หน้า ByAsset (ASSET_ONLY) ซ่อนทั้งส่วนนี้: กราฟสถานะการจองเงิน PR/PO, สรุป PR/PO, PR ตามแผน/นอกแผน, สัดส่วน PR vs PO -->
+                <div class="row mt-3" id="prpo-section" <?= !empty($ASSET_ONLY) ? 'style="display:none"' : '' ?>>
                         <!-- กราฟแท่ง PR vs PO แยกตามหมวดค่าใช้จ่าย -->
                         <div class="col-lg-8">
                                 <div class="card mb-3">
@@ -317,8 +331,45 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                 </div>
                 <!-- ========== [/เพิ่ม] ========== -->
 
+                <?php if (!empty($ASSET_ONLY)) : ?>
+                <!-- ===== รายการแผน 05-/06- (แทน Data View เดิมในหน้างบประมาณ พัสดุ แยกตาม ครุภัณฑ์) ===== -->
+                <div class="card mb-3">
+                        <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                        <h5 class="mb-0">รายการแผน (ทุกสถานะ)</h5>
+                                        <div id="planFilter" class="btn-group btn-group-sm" role="group">
+                                                <button type="button" class="btn btn-outline-primary" data-plan="05">05</button>
+                                                <button type="button" class="btn btn-outline-primary active" data-plan="06">06</button>
+                                        </div>
+                                </div>
+                                <!-- สถานะรหัสแผน 4 แบบ: กดเพื่อกรองตาราง (กดซ้ำ/ทั้งหมด = ดูทุกสถานะ) -->
+                                <div id="planStatusBar" class="d-flex flex-wrap mb-3" style="gap:8px"></div>
+                                <div class="dv-wrapper">
+                                        <table id="planTable" class="table-dv-main">
+                                                <thead>
+                                                        <tr>
+                                                                <th>ลำดับ</th>
+                                                                <th>รหัสแผน</th>
+                                                                <th>สถานะ</th>
+                                                                <th>รหัสงบประมาณ / หมวดค่าใช้จ่าย</th>
+                                                                <th>รายการ</th>
+                                                                <th>แหล่งเงิน</th>
+                                                                <th>งบประมาณ</th>
+                                                                <th>เลข PR</th>
+                                                                <th>เลขที่หนังสือ</th>
+                                                                <th>จำนวนเงิน</th>
+                                                                <th>คงเหลือหลังขออนุมัติ</th>
+                                                        </tr>
+                                                </thead>
+                                                <tbody id="planBody"></tbody>
+                                        </table>
+                                </div>
+                        </div>
+                </div>
+                <?php endif; ?>
+
                 <!-- ===== Data View ===== -->
-                <div class="card">
+                <div class="card" <?= !empty($ASSET_ONLY) ? 'style="display:none"' : '' ?>>
                         <div class="card-body">
                                 <div class="d-flex align-items-center justify-content-between">
                                         <h5 class="mb-3">Data View</h5>
@@ -372,6 +423,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'data') {
                 </div>
         </div>
 
+        <script>window.ASSET_ONLY = <?= !empty($ASSET_ONLY) ? 'true' : 'false' ?>;</script>
+        <?php if (!empty($ASSET_ONLY)) : ?>
+        <script type="text/javascript" src="../js/Budget_Procurement_ByAsset.js?_dc<?= __VPRODUCT_; ?>"></script>
+        <?php endif; ?>
         <script type="text/javascript" src="../js/Budget_Monitoring_Dashboard.js?_dc<?= __VPRODUCT_; ?>"></script>
         <!-- ========== [เพิ่ม] script PR/PO ========== -->
         <script type="text/javascript" src="../js/PrPoChartSection.js?_dc<?= __VPRODUCT_; ?>"></script>

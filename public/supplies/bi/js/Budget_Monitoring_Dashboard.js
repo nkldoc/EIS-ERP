@@ -62,7 +62,9 @@
   function getCanonicalFundSourceIds() {
     const ids = new Set();
     (window.DATA_BUDGET || []).forEach((r) => {
-      if (CANONICAL_FUND_SOURCE_NAMES.includes(String(r.c_name || "").trim())) {
+      const nm = String(r.c_name || "").trim();
+      // หน้า ByAsset: วงเงินแผนที่ยังไม่รู้แหล่งเงินแสดงเป็นช่อง "ไม่ระบุแหล่งเงิน" เพื่อให้ยอดรวมครบ
+      if (CANONICAL_FUND_SOURCE_NAMES.includes(nm) || (window.ASSET_ONLY && nm === "ไม่ระบุแหล่งเงิน")) {
         ids.add(String(r.dc_expense_budget_type_id));
       }
     });
@@ -586,6 +588,7 @@ return Array.from(map.values())
     renderDonut();
     syncPrPoWithDonutSelection();
     refreshDataView(); // Data View เหลือเฉพาะแหล่งเงินที่เลือกจากการ์ด/วงกลมโดนัท
+    window.dispatchEvent(new Event("fundSelectionChanged")); // หน้า Budget_Procurement_ByAsset ฟังเพื่อกรองรายการแผน
   }
 
   function renderDonut(itemsRaw) {
@@ -1374,6 +1377,6 @@ return Array.from(map.values())
     const year_en = init?.year_en_init || String(new Date().getFullYear());
 
     // โหลดข้อมูลตามปี
-    loadAll({ year_th, year_en });
+    loadAll({ year_th, year_en, ...(window.ASSET_ONLY ? { asset_only: 1 } : {}) });
   });
 })();
