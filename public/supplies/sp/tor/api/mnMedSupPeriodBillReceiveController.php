@@ -49,16 +49,49 @@ function medsupGenApCode($db, $deptType, $useYear = 0)
     return $prefix . str_pad($maxNum + 1, 6, "0", STR_PAD_LEFT);
 }
 
+// ปีงบประมาณ (พ.ศ.) ของเงินที่ใช้ ของรายการรับของที่เลือก: สัญญาที่ใช้ใบกันเหลื่อม (c_overlap ไม่ว่าง) = ปีของใบกันเหลื่อม
+// (i_budget_year_overlap + 543 หรืออ่านจาก 2 หลักแรกของเลขใบกัน เช่น 69-102-03-1-0540 = 2569) สัญญาที่ไม่ใช้ใบกัน = 0 (ปีปัจจุบัน)
+// คืน array ปีที่ไม่ซ้ำ (0 = ปัจจุบัน) - ถ้ามีมากกว่า 1 ปีแปลว่าเลือกรายการที่ใช้เงินคนละปีมาออกเลข IR รวมกัน
+function medsupIrUseYears($db, $ids)
+{
+    $placeholders = implode(",", array_fill(0, count($ids), "?"));
+    $stmt = $db->QueryParam(
+        "select distinct isnull(g.c_overlap, '') as c_overlap, isnull(g.i_budget_year_overlap, 0) as i_year_overlap
+         from NMU_ERP.dbo.sp_tor_period_bill_receive r
+         inner join NMU_ERP.dbo.sp_tor_period_bill g on g.sp_tor_period_bill_id = r.sp_tor_period_bill_id
+         where r.sp_tor_period_bill_receive_id in ({$placeholders})",
+        $ids
+    );
+    $years = array();
+    while ($row = $db->Fetch($stmt)) {
+        $y = 0;
+        if (trim((string) $row["c_overlap"]) !== "") {
+            if (intval($row["i_year_overlap"]) > 0) {
+                $y = intval($row["i_year_overlap"]) + 543;
+            } elseif (preg_match('/^(\d{2})-/', trim((string) $row["c_overlap"]), $m)) {
+                $y = 2500 + intval($m[1]);
+            }
+        }
+        $years[$y] = $y;
+    }
+    return array_values($years);
+}
+
 // เลข IR รูปแบบ IR{dc_cost_id}-{ปีงบประมาณ พ.ศ. 2 หลัก}-{เลขรัน 5 หลัก} เช่น IR50-69-00001
 // (50 = หน่วยงานตาม c_ap_dept_type, 69 = ปีงบ 2569) เลขรันแยกชุดกันทั้งต่อหน่วยงานและต่อ
 // ปีงบ ขึ้นปีงบใหม่เริ่ม 00001 ใหม่ - นับปีงบแบบเดียวกับ medsupGenApCode (เดือน ต.ค.-ธ.ค.
 // ถือเป็นปีงบถัดไปแล้ว) เลข IR รูปแบบเก่า "IR-000033" ไม่ขึ้นต้นด้วย prefix นี้ จึงไม่ถูกนับรวม
-function medsupGenIrCode($db, $deptType)
+// $useYear (พ.ศ.) = ปีงบประมาณของเงินที่ใช้ เช่น ใช้ใบกันเหลื่อมปี 2569 ต้องได้ IR82-69-xxxxx (ไม่ใช่ปีปัจจุบัน 70) -
+// ไม่ระบุ (0) = ใช้เงินปีปัจจุบัน ได้ปีงบปัจจุบัน (IR82-70-xxxxx) ดู medsupIrUseYear ว่าหาจากสัญญาอย่างไร
+function medsupGenIrCode($db, $deptType, $useYear = 0)
 {
     $costId = medsupApDeptCostId($deptType);
     $now = new DateTime();
     $yearBE = intval($now->format("Y")) + 543;
     $fiscalYear = (intval($now->format("n")) >= 10) ? $yearBE + 1 : $yearBE;
+    if ($useYear > 0) {
+        $fiscalYear = $useYear;
+    }
     $prefix = "IR" . $costId . "-" . substr((string) $fiscalYear, -2) . "-";
 
     $stmt = $db->QueryParam(
@@ -399,7 +432,14 @@ switch ($mode) {
                 $errMsg = "รายการที่เลือกมาจากคนละหน่วยงานกัน (" . implode(", ", $deptTypes) . ") ออกเลข IR รวมกันไม่ได้ กรุณาแยกออกเลขทีละหน่วยงาน";
                 break;
             }
-            $irCode = medsupGenIrCode($db, !empty($deptTypes[0]) ? $deptTypes[0] : "APMS");
+            // ปีของเลข IR ตามเงินที่ใช้ (ใบกันเหลื่อมปี 69 -> IR82-69-xxxxx / ใช้เงินปัจจุบัน -> IR82-70-xxxxx)
+            $irYears = medsupIrUseYears($db, $ids);
+            if (count($irYears) > 1) {
+                $stmt = false;
+                $errMsg = "รายการที่เลือกใช้เงินคนละปีงบประมาณกัน (ใบกันเหลื่อมกับเงินปัจจุบัน หรือคนละปีของใบกัน) ออกเลข IR รวมกันไม่ได้ กรุณาเลือกออกแยกกัน";
+                break;
+            }
+            $irCode = medsupGenIrCode($db, !empty($deptTypes[0]) ? $deptTypes[0] : "APMS", !empty($irYears) ? $irYears[0] : 0);
         }
 
         $arrParam = array_merge(
