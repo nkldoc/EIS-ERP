@@ -1,7 +1,6 @@
 <?php
 include("../../../conf/config.php");
 include("../../../lib/database/DatabaseServer.php");
-include("../../conf/configSp.php");
 
 header('Content-Type: application/json; charset=utf-8');
 function reply($ok, $message) {
@@ -54,13 +53,10 @@ try {
         (SELECT 1 FROM dbo.sp_withdraw WHERE sp_check_period_hdr_id = ? AND i_enable = 1)
         OR EXISTS (SELECT 1 FROM ' . DB_NMU_EIS . 'po_working_hdr
             WHERE po_working_hdr_id = ? AND i_enable = 1)
-        OR EXISTS (SELECT 1 FROM ' . DB_CENTER . 'dc_map_send_ap
-            WHERE sp_check_period_hdr_id = ? AND i_enable = 1 AND i_sys = 1
-            AND i_send_jv IN (3, 4, 5, 6, 99))
-        THEN 1 ELSE 0 END AS blocked', array($id, $check['po_working_hdr_id'], $id));
+        THEN 1 ELSE 0 END AS blocked', array($id, $check['po_working_hdr_id']));
     $blocked = sqlsrv_fetch_array($blocking, SQLSRV_FETCH_ASSOC);
     if ((int)$blocked['blocked'] === 1) {
-        throw new DomainException('รายการนี้มีใบเบิกหรือข้อมูลบัญชีแล้ว ไม่สามารถถอยสถานะได้');
+        throw new DomainException('รายการนี้มีใบเบิกแล้ว ไม่สามารถถอยสถานะได้');
     }
 
     $details = array();
