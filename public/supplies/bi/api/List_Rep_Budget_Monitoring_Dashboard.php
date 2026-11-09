@@ -38,6 +38,29 @@ function List_QueryParam()
 		$dc_condition_plan     = "AND bb.dc_cost_id = 38";        // ← แก้ alias: bb (detail) ไม่ใช่ aa (header)
 	}
 
+	// หน้า "งบประมาณ พัสดุ แยกตาม ครุภัณฑ์" (asset_only=1):
+	// เหลือเฉพาะ PR ที่รหัสแผน (sp_tor_plan.plan_code) ขึ้นต้น 05- หรือ 06- และลงท้ายปีที่เลือก เช่น 06-OPH-000-001-2570
+	// และตัด PR ของโครงการหลายปี (ชื่อมีช่วงปี เช่น 2568-2571)
+	$asset_only = !empty($_REQUEST["asset_only"]);
+	$asset_filter_sql = "";
+	if ($asset_only) {
+		$asset_filter_sql = "
+DELETE FROM #temp_bg_reserve_money
+WHERE NOT (
+	i_sys = 1
+	AND EXISTS (
+		SELECT 1
+		FROM NMU_ERP..sp_tor t
+			INNER JOIN NMU_ERP..sp_tor_plan p ON p.tor_id = t.tor_id AND p.i_enabled = 1
+		WHERE t.tor_id = #temp_bg_reserve_money.pr_id
+			AND (p.plan_code LIKE '05-%' OR p.plan_code LIKE '06-%')
+			AND p.plan_code LIKE '%-{$yearTh}'
+			AND ISNULL(t.c_name,'') NOT LIKE '%25[0-9][0-9]%[-–]%25[0-9][0-9]%'
+	)
+)
+";
+	}
+
 	$sqlMain = "SET NOCOUNT ON
 -- ===== สร้าง Temp Table สำหรับ bg_reserve_money =====
 SELECT
@@ -103,9 +126,9 @@ WHERE i_last = i_last_max
 			AND aa.i_sys = a.i_sys
 			AND aa.pr_id = a.pr_id
 			AND aa.i_pr_type = a.i_pr_type
-			AND aa.dc_budget_type_id = a.dc_budget_type_id 
+			AND aa.dc_budget_type_id = a.dc_budget_type_id
 	)
-
+{$asset_filter_sql}
 -- ===== สร้าง Temp Table สำหรับ SP_BG_BUDGET_SUM =====
 DECLARE @TEMP_SP_BG_BUDGET_SUM TABLE (
 	i_year bigint,
@@ -448,6 +471,19 @@ foreach (${$root} as &$item) {
 unset($item);
 
 	}  // ← ปิด if ($stmt)
+
+	// asset_only: ยอดจอง/ตรวจรับ/เบิกจ่ายถูกกรองตามรหัสแผนไปแล้วใน SQL (ดู $asset_filter_sql)
+	// ตรงนี้ตัดหมวดงบที่ไม่มี PR ของแผน 05/06 เลยออก และไม่นับ D1 (po_working) เพราะผูกกับ PR ไม่ได้
+	if ($asset_only) {
+		${$root} = array_values(array_filter(${$root}, function ($r) {
+			return ($r["f_pr_total"] + $r["f_po_total"] + $r["f_reserve_check_total"] + $r["f_paid_total"]) != 0;
+		}));
+		foreach (${$root} as &$r) {
+			$r["f_d1_not_finish"] = 0;
+		}
+		unset($r);
+		$i = count(${$root});
+	}
 
 	echo json_encode(array(
 		$root        => ${$root},

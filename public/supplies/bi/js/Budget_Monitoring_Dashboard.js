@@ -586,6 +586,7 @@ return Array.from(map.values())
     renderDonut();
     syncPrPoWithDonutSelection();
     refreshDataView(); // Data View เหลือเฉพาะแหล่งเงินที่เลือกจากการ์ด/วงกลมโดนัท
+    window.dispatchEvent(new Event("fundSelectionChanged")); // หน้า Budget_Procurement_ByAsset ฟังเพื่อกรองรายการแผน
   }
 
   function renderDonut(itemsRaw) {
@@ -1374,6 +1375,6 @@ return Array.from(map.values())
     const year_en = init?.year_en_init || String(new Date().getFullYear());
 
     // โหลดข้อมูลตามปี
-    loadAll({ year_th, year_en });
+    loadAll({ year_th, year_en, ...(window.ASSET_ONLY ? { asset_only: 1 } : {}) });
   });
 })();

@@ -479,9 +479,9 @@
         <div class="row g-2 text-center align-items-stretch mt-3">
             <div class="col-12 d-flex">
                 <div class="pr-po-card clickable" style="${cardBase} ${clickable} background:#eef4ff;border-left:4px solid #4a6cf7;"
-                    onclick="window.open('${link("plan_pr")}','_blank')">
-                    <div class="small text-muted pr-po-label">รหัสแผน / PR<span>▶</span></div>
-                    <div class="font-weight-bold pr-po-value" style="font-size:20px;color:#3454d1;">${planCodeCount} รหัสแผน / ${total} PR</div>
+                    onclick="${window.ASSET_ONLY ? "return false" : "window.open('" + link("plan_pr") + "','_blank')"}">
+                    <div class="small text-muted pr-po-label">${window.ASSET_ONLY ? "แผน / PR (นับจากตารางรายการแผนด้านล่าง)" : "รหัสแผน / PR<span>▶</span>"}</div>
+                    <div id="assetPlanPrValue" class="font-weight-bold pr-po-value" style="font-size:20px;color:#3454d1;">${window.ASSET_ONLY ? (window.ASSET_PLAN_STATS ? window.ASSET_PLAN_STATS.plans + " แผน / " + window.ASSET_PLAN_STATS.prs + " PR" : "-") : planCodeCount + " รหัสแผน / " + total + " PR"}</div>
                 </div>
             </div>
         </div>`;
