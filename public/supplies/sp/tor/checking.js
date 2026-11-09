@@ -9148,6 +9148,34 @@ function showCustomEditForm(rec) {
                                                         labelWidth: 140,
                                                         bodyStyle: { padding: '15px' },
                                                         defaults: { anchor: '100%', msgTarget: 'side', allowBlank: false },
+                                                        tbar: [{
+                                                                text: 'ถอยสถานะกลับมารอวางบิล',
+                                                                iconCls: 'icon-arrow-undo',
+                                                                hidden: Number(Ext.session.dc_center_user) !== 1,
+                                                                disabled: !rec || ![3, 4].includes(Number(rec.get('i_status_chk'))),
+                                                                handler: function () {
+                                                                        var checkId = rec && rec.get('sp_check_period_hdr_id');
+                                                                        if (!checkId) return Ext.Msg.alert('แจ้งเตือน', 'ไม่พบรายการตรวจรับ');
+                                                                        Ext.Msg.confirm('ยืนยันการถอยสถานะ', 'ต้องการถอยกลับเป็นรอวางบิลหรือไม่? ข้อมูลวางบิลเดิมจะเก็บไว้ในประวัติ', function (answer) {
+                                                                                if (answer !== 'yes') return;
+                                                                                Ext.Ajax.request({
+                                                                                        url: 'tor/api/rollbackWaitBilling.php',
+                                                                                        method: 'POST',
+                                                                                        params: { sp_check_period_hdr_id: checkId },
+                                                                                        success: function (response) {
+                                                                                                var result;
+                                                                                                try { result = Ext.decode(response.responseText); } catch (e) { result = {}; }
+                                                                                                Ext.Msg.alert(result.success ? 'สำเร็จ' : 'แจ้งเตือน', result.msg || 'ไม่สามารถถอยสถานะได้');
+                                                                                                if (result.success) {
+                                                                                                        win.close();
+                                                                                                        if (Ext.store && Ext.store.reload) Ext.store.reload();
+                                                                                                }
+                                                                                        },
+                                                                                        failure: function () { Ext.Msg.alert('แจ้งเตือน', 'ไม่สามารถเชื่อมต่อระบบได้'); }
+                                                                                });
+                                                                        });
+                                                                }
+                                                        }],
                                                         items: [
                                                                 { xtype: 'hidden', name: 'id', value: rec ? rec.data.id : '' },
                                                                 { xtype: 'textfield', fieldLabel: 'เลขสัญญา', name: 'c_code', value: rec && rec.data ? rec.data.c_code || '' : '', readOnly: true, style: { background: '#EEEEEE', 'font-weight': 'bold', color: 'black' } },
