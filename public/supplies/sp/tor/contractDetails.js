@@ -276,7 +276,8 @@
             '<label>ใบตรวจรับ <select class="checking-preflight-select" style="padding:6px;max-width:100%">';
         Ext.each(checks,function(check){html+='<option value="'+encode(check.sp_check_period_hdr_id)+'">งวดเงินที่ '+encode(check.payment_period)+' — '+encode(check.c_code||check.ir_code)+'</option>';});
         return html+'</select></label> <button type="button" class="checking-preflight-run" style="padding:7px 14px;border:1px solid #93b5e2;border-radius:6px;background:#eaf2ff;color:#15428b;cursor:pointer">วิเคราะห์ก่อนส่งเบิก</button>'+
-            '<div class="checking-edit-actions" style="display:inline-flex;gap:8px;align-items:center;margin-left:12px"></div></div>'+
+            '<div class="checking-edit-actions" style="display:inline-flex;gap:8px;align-items:center;margin-left:12px"></div>'+
+            '<div class="checking-accounting-status" aria-live="polite" style="display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 0 12px"></div></div>'+
             '<div class="checking-preflight-results" aria-live="polite" style="margin-top:16px"><p style="color:#64748b">กดปุ่มเพื่อเริ่มตรวจสอบรายการที่เลือก</p></div>';
     }
     function preflightRule(rule,index) {
@@ -349,6 +350,7 @@
         var torId = Number(options.sp_tor_id || record.get('sp_tor_id') || 0);
         if (!id && !torId) return Ext.Msg.alert('ดูรายละเอียดทั้งหมด', 'กรุณาเลือก PR หรือสัญญา');
         var requestParams = id ? {sp_tor_contract_id: id} : {sp_tor_id: torId};
+        if (options.adminPrManagement) requestParams.admin_pr_management = 1;
         if (Number(options.sp_check_period_hdr_id) > 0) requestParams.sp_check_period_hdr_id = Number(options.sp_check_period_hdr_id);
         var tabs = new Ext.TabPanel({activeTab: options.initialTab || 0, border: false, deferredRender: false, items: [
             {title: 'PR / แหล่งเงิน / รายการ', autoScroll: true, bodyStyle: 'padding:12px', html: 'กำลังโหลดข้อมูล...'},
@@ -545,13 +547,34 @@
                     host.innerHTML = currentData.can_manage_edit && Ext.editCheckingOverview
                         ? '<button type="button" class="checking-edit-action checking-edit-open" style="padding:7px 12px;border:1px solid #93b5e2;border-radius:6px;background:#fff;color:#15428b;cursor:pointer">แก้ไขข้อมูลตรวจรับ</button>'
                         : '';
+                    var statusHost = preflightPanel.body.dom.querySelector('.checking-accounting-status');
+                    if (statusHost) {
+                        var badges = [];
+                        function badge(text, bg, color) { badges.push('<span style="display:inline-block;padding:5px 9px;border-radius:5px;background:'+bg+';color:'+color+';font-weight:bold">'+encode(text)+'</span>'); }
+                        if (Number(selectedCheck.payment_enabled) === 2) badge('ยกเลิกเบิก', '#fff1f1', '#a12828');
+                        else if (Number(selectedCheck.payment_enabled) === 1 && Number(selectedCheck.payment_status_last) === 3) badge('ทักท้วง', '#fff1e5', '#a14a00');
+                        else if (Number(selectedCheck.payment_enabled) === 1 && Number(selectedCheck.payment_status_last) === 11) badge('จ่ายแล้ว', '#edf9f1', '#22673b');
+                        var labels = {3:'ดึงไปรอลงบัญชี', 4:'บันทึกบัญชีแล้ว · รอยืนยัน GX', 5:'ลงบัญชี GX', 6:'ลงบัญชี GL', 9:'ยกเลิกบันทึกบัญชี'};
+                        Ext.each(selectedCheck.accounting_statuses || [], function (status) {
+                            if (labels[Number(status)]) badge(labels[Number(status)], '#edf2ff', '#2946a6');
+                        });
+                        if (Number(selectedCheck.accounting_cancel_status) === 1) badge('ส่งคำร้องยกเลิกบัญชีแล้ว', '#fff8e5', '#855a10');
+                        statusHost.innerHTML = badges.length ? badges.join('') : '<span style="color:#64748b">ยังไม่มีสถานะบัญชี</span>';
+                    }
                 }
                 var preflightSelect = preflightPanel.body.dom.querySelector('.checking-preflight-select');
                 if (preflightSelect) renderEditActions(preflightSelect.value);
                 if(!preflightPanel.preflightBound){
                     preflightPanel.preflightBound=true;
                     preflightPanel.body.on('change', function (event, select) {
-                        if (select && select.className.indexOf('checking-preflight-select') !== -1) renderEditActions(select.value);
+                        if (select && select.className.indexOf('checking-preflight-select') !== -1) {
+                            analysisRun++;
+                            var runButton = preflightPanel.body.dom.querySelector('.checking-preflight-run');
+                            var results = preflightPanel.body.dom.querySelector('.checking-preflight-results');
+                            if (runButton) { runButton.disabled = false; runButton.textContent = 'วิเคราะห์ก่อนส่งเบิก'; }
+                            if (results) results.innerHTML = '<p style="color:#64748b">กดปุ่มเพื่อเริ่มตรวจสอบรายการที่เลือก</p>';
+                            renderEditActions(select.value);
+                        }
                     }, null, {delegate: '.checking-preflight-select'});
                     preflightPanel.body.on('click', function (event, button) {
                         event.stopEvent();
@@ -580,6 +603,12 @@
                             if(win.isDestroyed||run!==analysisRun)return;
                             var result;try{result=Ext.decode(response.responseText);}catch(ignore){result=null;}
                             if(!success||!result||!result.success){button.disabled=false;button.textContent='วิเคราะห์ก่อนส่งเบิก';output.innerHTML='<p style="color:#a12828">'+encode(result&&result.msg?result.msg:'วิเคราะห์ไม่สำเร็จ กรุณาลองอีกครั้ง')+'</p>';return;}
+                            if (result.check) {
+                                Ext.each(preflightPanel.overviewData.checks, function (item, index) {
+                                    if (Number(item.sp_check_period_hdr_id) === Number(result.check.sp_check_period_hdr_id)) preflightPanel.overviewData.checks[index] = result.check;
+                                });
+                                renderEditActions(result.check.sp_check_period_hdr_id);
+                            }
                             var analysis=result.analysis,html='<p style="color:#52647b">ใบตรวจรับ '+encode(analysis.check_code)+' · งวดเงินที่ '+encode(analysis.payment_period)+' · ตรวจสอบเมื่อ '+encode(analysis.analyzed_at)+'</p>';
                             var step=0;
                             function showStep(){

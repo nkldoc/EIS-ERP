@@ -1088,7 +1088,7 @@ Ext.onReady(function () {
         //activeTab: 0, //default Tab
         id: "contenterCenter",
         defaults: {autoScroll: true},
-        items: [gridMain],
+        items: [gridMain, createPrTransferTab(), createEmployeeManagementTab()],
     });
     // SET ref Grid&Tab
     Ext.getCmp("tabpanel1").on("cellclick", cellClick, this);

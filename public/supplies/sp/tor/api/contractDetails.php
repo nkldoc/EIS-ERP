@@ -35,7 +35,11 @@ $fetch = function ($sql, $params) use ($db) {
 // Apply the same department/employee scope as the contract listing.
 $scope = '';
 $params = array($contractId > 0 ? $contractId : $requestedTorId);
-if (intval($_SESSION['dc_center_user'] ?? 0) === 1) {
+$adminPrAccess = false;
+if ($requestedTorId > 0 && intval($_GET['admin_pr_management'] ?? 0) === 1) {
+    $adminPrAccess = (bool)$db->GetDataBySQL('SELECT TOP 1 m.dc_menu_id FROM dc_menu m JOIN dc_user u ON u.dc_user_id=? WHERE m.c_filelocation=? AND m.i_enable=1 AND m.i_delete=2 AND (u.i_type_user=2 OR EXISTS (SELECT 1 FROM dc_user_menu um WHERE um.dc_menu_id=m.dc_menu_id AND um.dc_user_id=u.dc_user_id))', array($_SESSION['user_id'], 'sp-AdminUpdatePR'));
+}
+if ($adminPrAccess || intval($_SESSION['dc_center_user'] ?? 0) === 1) {
     // Authorized central admins search details across departments.
 } elseif (intval($_SESSION['i_level'] ?? 0) === 2) {
     $scope = ' AND e.dc_department_id=?';
@@ -190,6 +194,8 @@ $checks = $fetch('SELECT h.*, COALESCE(h.c_arrive_code,m.c_arrive_code) AS ir_co
     CASE WHEN h.i_is_warranty IN (1,3) AND h.i_before >= 0
         THEN CONVERT(varchar(10),DATEADD(day,-h.i_before,h.d_warranty_date),23)
         ELSE NULL END AS warranty_notification_date,
+    payhdr.i_enable AS payment_enabled, payhdr.i_status_last AS payment_status_last,
+    acc.i_status AS accounting_cancel_status,
     cr.c_name AS payee_name, tr.c_name AS transfer_name,
     ba.c_code AS bank_account_number, ba.c_name AS bank_account_name, bank.c_name AS bank_name,
     (SELECT TOP 1 w.c_code FROM NMU_EIS..po_working_dtl w WHERE w.po_working_hdr_id=h.po_working_hdr_id ORDER BY w.c_code) AS payment_code
@@ -197,6 +203,8 @@ $checks = $fetch('SELECT h.*, COALESCE(h.c_arrive_code,m.c_arrive_code) AS ir_co
     LEFT JOIN dbo.sp_tor_contract cn ON cn.sp_tor_contract_id=COALESCE(NULLIF(h.sp_tor_contract_id,0),m.sp_contract_id)
     LEFT JOIN dbo.sp_tor ownerPr ON ownerPr.tor_id=cn.sp_tor_id
     LEFT JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id=h.sp_tor_hdr_period_id
+    LEFT JOIN ' . DB_NMU_EIS . 'po_working_hdr payhdr ON payhdr.po_working_hdr_id=h.po_working_hdr_id
+    LEFT JOIN dbo.sp_check_period_disable_acc acc ON acc.sp_check_period_disable_acc_id=h.sp_check_period_disable_acc_id AND acc.i_enable=1
     LEFT JOIN ' . DB_NMU . 'dc_creditor cr ON cr.dc_creditor_id=h.dc_creditor_id
     LEFT JOIN ' . DB_NMU . 'dc_creditor tr ON tr.dc_creditor_id=COALESCE(NULLIF(h.dc_creditor_transfer_id,0),h.dc_creditor_id)
     LEFT JOIN ' . DB_NMU . 'dc_bank_acc_creditor ba ON ba.dc_bank_acc_creditor_id=h.dc_bank_acc_creditor_id
@@ -217,10 +225,25 @@ if ($selectedCheckId > 0) {
         return intval($row['sp_tor_hdr_period_id']) === $selectedPeriodId;
     }));
 }
+// Read every active accounting mapping for the authorized inspection rows.
+$accountingByCheck = array();
+if ($checks) {
+    $checkIds = array_map(function ($check) { return intval($check['sp_check_period_hdr_id']); }, $checks);
+    foreach (array_chunk($checkIds, 1000) as $chunk) {
+        $marks = implode(',', array_fill(0, count($chunk), '?'));
+        $accountingRows = $fetch('SELECT sp_check_period_hdr_id,i_send_jv FROM ' . DB_CENTER . 'dc_map_send_ap WHERE i_enable=1 AND i_sys=1 AND sp_check_period_hdr_id IN (' . $marks . ')', $chunk);
+        foreach ($accountingRows as $mapping) {
+            $checkId = intval($mapping['sp_check_period_hdr_id']);
+            if (!isset($accountingByCheck[$checkId])) $accountingByCheck[$checkId] = array();
+            if ($mapping['i_send_jv'] !== null) $accountingByCheck[$checkId][] = intval($mapping['i_send_jv']);
+        }
+    }
+}
 // Match the fund usage labels on the original inspection form.
 $fundUsage = array(1 => 'ใช้เงินกันเหลื่อมยังไม่ก่อหนี้ - ยังไม่จองใบกัน',
     2 => 'ใช้เงินกันเหลื่อมยังไม่ก่อหนี้ - จองใบกันแล้ว', 3 => 'ใช้เงินกันเหลื่อมก่อหนี้แล้ว');
 foreach ($checks as &$check) {
+    $check['accounting_statuses'] = array_values(array_unique($accountingByCheck[intval($check['sp_check_period_hdr_id'])] ?? array()));
     $contract = $contractsById[intval($check['linked_contract_id'])] ?? array();
     $overlap = intval($check['i_overlap'] ?? 0) ?: intval($contract['i_overlap'] ?? 0);
     if (trim((string)($check['resolved_overlap_code'] ?? '')) !== ''
@@ -272,7 +295,7 @@ if (intval($_GET['preflight'] ?? 0) === 1) {
     $check=$checks[0];$period=null;
     foreach($periods as $row)if(intval($row['sp_tor_hdr_period_id'])===intval($check['sp_tor_hdr_period_id']))$period=$row;
     $result=loadCheckingPreflight($db,$check,$contractsById[intval($check['linked_contract_id'])]??array(),$period,$debtItems);
-    echo json_encode(array('success'=>true,'analysis'=>$result),JSON_UNESCAPED_UNICODE);exit;
+    echo json_encode(array('success'=>true,'analysis'=>$result,'check'=>$check),JSON_UNESCAPED_UNICODE);exit;
 }
     $canManageEdit = intval($_SESSION['dc_center_user'] ?? 0) === 1;
 echo json_encode(array('success' => true, 'can_admin_edit' => $canManageEdit,

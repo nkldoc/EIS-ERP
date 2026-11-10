@@ -55,6 +55,8 @@ if (!isset($_SESSION['user_id'])) {
         <script type="text/javascript" src="adminupdatepr/FormAdd.js?_dc=<?= __VPRODUCT_; ?>"></script>
         <script type="text/javascript" src="adminupdatepr/FormGrid.js?_dc=<?= __VPRODUCT_; ?>"></script>
         <script type="text/javascript" src="adminupdatepr/FormGridDtl.js?_dc=<?= __VPRODUCT_; ?>"></script>
+        <script type="text/javascript" src="tor/contractDetails.js?_dc=<?= filemtime(__DIR__ . '/tor/contractDetails.js'); ?>"></script>
+        <script type="text/javascript" src="adminupdatepr/AdminManagement.js?_dc=<?= __VPRODUCT_; ?>"></script>
     </head>
 
     <body>

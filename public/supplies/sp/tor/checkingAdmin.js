@@ -71,7 +71,7 @@
                 var result;
                 try { result = Ext.decode(response.responseText); } catch (ignore) { result = null; }
                 if (!success || !result || !result.success) return Ext.Msg.alert('แก้ไขโดย Admin', result && result.msg ? result.msg : 'ไม่สามารถโหลดข้อมูลแก้ไขได้');
-                var header = result.data.sp_check_period_hdr[0], tabs = [], groups = {}, controls = [], grids = [], saving = false;
+                var header = result.data.sp_check_period_hdr[0], tabs = [], groups = {}, controls = [], relatedControls = [], grids = [], saving = false;
                 var byName = {}, applying = false, financeDirty = false, calculating = false, timer = null, sequence = 0;
                 var financeSource = {kind: 'header'}, manualVatIds = [];
                 var headerDefinitions = result.fields.sp_check_period_hdr;
@@ -84,10 +84,51 @@
                 }
                 for (var title in groups) if (Object.prototype.hasOwnProperty.call(groups, title)) tabs.push({title: title,
                     xtype: 'form', autoScroll: true, bodyStyle: 'padding:16px', labelWidth: 255, border: false, items: groups[title]});
+                function displayYear(value) {
+                    var year = Number(value);
+                    return year > 0 ? String(year < 2400 ? year + 543 : year) : '-';
+                }
+                function displayMoney(value) {
+                    return value === null || value === undefined || value === '' ? '-' : Ext.util.Format.number(Number(value), '0,000.00');
+                }
+                function summaryCard(rows) {
+                    var html = '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px">';
+                    Ext.each(rows, function (row) {
+                        html += '<div style="flex:1 1 190px;min-width:160px;background:#f4f8fd;border:1px solid #d7e4f2;border-radius:5px;padding:10px 12px">' +
+                            '<div style="color:#64748b;margin-bottom:5px">' + encode(row[0]) + '</div><div style="color:#173d70;font-weight:bold;word-break:break-word">' + encode(row[1] === null || row[1] === undefined || row[1] === '' ? '-' : row[1]) + '</div></div>';
+                    });
+                    return html + '</div>';
+                }
+                function addDocumentForm(table, title, summary, description) {
+                    var row = (result.data[table] || [])[0], definitions = result.fields[table], key = result.keys[table];
+                    if (!row || !definitions) {
+                        tabs.push({title: title, border: false, bodyStyle: 'padding:20px', html: 'ไม่พบข้อมูล' + encode(title)});
+                        return;
+                    }
+                    var items = [{xtype: 'box', autoEl: {tag: 'div', html: summaryCard(summary(row))}},
+                        {xtype: 'box', autoEl: {tag: 'div', html: '<h3 style="color:#173d70;margin:4px 0 8px">ข้อมูลที่แก้ไขได้</h3><p style="color:#64748b;margin:0 0 14px">' + encode(description) + '</p>'}}];
+                    for (var name in definitions) if (Object.prototype.hasOwnProperty.call(definitions, name)) {
+                        var definition = definitions[name], control;
+                        if (table === 'sp_tor' && name === 'c_name') {
+                            control = new Ext.form.TextArea({fieldLabel: definition[0], value: initial(row[name], definition[1]), anchor: '97%', height: 90, maxLength: 4000});
+                        } else control = field(definition, row[name]);
+                        items.push(control);
+                        relatedControls.push({table: table, key: key, row: row, name: name, definition: definition, control: control});
+                    }
+                    tabs.push({title: title, xtype: 'form', autoScroll: true, border: false, labelWidth: 190,
+                        bodyStyle: 'padding:20px;background:#fff', items: items});
+                }
                 function addGrid(tableName, title) {
                     var definitions = result.fields[tableName], key = result.keys[tableName];
                     if (!definitions || !result.data[tableName]) return;
                     var names = [key], columns = [];
+                    if (tableName === 'sp_tor_dtl') {
+                        names.push('i_qty', 'f_unit_price');
+                        columns.push({header: 'รหัสรายการ', dataIndex: key, width: 95, renderer: encode});
+                    } else if (tableName === 'sp_tor_hdr_period') {
+                        names.push('i_period', 'f_total_amt');
+                        columns.push({header: 'งวดที่', dataIndex: 'i_period', width: 70, renderer: encode});
+                    }
                     for (var name in definitions) if (Object.prototype.hasOwnProperty.call(definitions, name)) {
                         names.push(name);
                         var editor = field(definitions[name], null);
@@ -95,15 +136,22 @@
                         columns.push({header: definitions[name][0], dataIndex: name, width: definitions[name][1] === 'text' ? 410 : 145,
                             renderer: (function (type) { return function (value) { return encode(initial(value, type)); }; }(definitions[name][1])), editor: editor});
                     }
+                    if (tableName === 'sp_tor_dtl') {
+                        columns.push({header: 'จำนวน', dataIndex: 'i_qty', width: 100, align: 'right', renderer: encode});
+                        columns.push({header: 'ราคาต่อหน่วย', dataIndex: 'f_unit_price', width: 130, align: 'right', renderer: function (v) { return encode(displayMoney(v)); }});
+                    } else if (tableName === 'sp_tor_hdr_period') {
+                        columns.push({header: 'จำนวนเงินงวด', dataIndex: 'f_total_amt', width: 140, align: 'right', renderer: function (v) { return encode(displayMoney(v)); }});
+                    }
                     var store = new Ext.data.JsonStore({fields: names, idProperty: key, data: result.data[tableName]});
                     var grid = new Ext.grid.EditorGridPanel({title: title, store: store, columns: columns, clicksToEdit: 1,
-                        border: false, viewConfig: {emptyText: 'ไม่มีรายการ', deferEmptyText: false}});
+                        border: false, tbar: [{xtype: 'tbtext', text: 'คลิกช่องที่ต้องการแก้ไข · ข้อมูลอ้างอิงแสดงเพื่อประกอบการตรวจสอบ'}],
+                        viewConfig: {forceFit: false, emptyText: 'ไม่มีรายการ', deferEmptyText: false}});
                     grids.push({grid: grid, table: tableName, key: key, definitions: definitions});
                     tabs.push(grid);
                 }
-                addGrid('sp_tor', 'PR');
+                addDocumentForm('sp_tor', 'ข้อมูล PR', function (row) { return [['เลข PR', row.c_code], ['ปีงบประมาณ', displayYear(row.i_pr_year)], ['วงเงิน PR', displayMoney(row.f_total_amt) + ' บาท']]; }, 'แก้ไขชื่อเรื่อง PR และระบุเหตุผลก่อนบันทึก');
                 addGrid('sp_tor_dtl', 'รายการ PR');
-                addGrid('sp_tor_contract', 'สัญญา');
+                addDocumentForm('sp_tor_contract', 'ข้อมูลสัญญา', function (row) { return [['เลขสัญญา', row.c_code], ['ชื่อสัญญา', row.c_name], ['ปีงบประมาณ', displayYear(row.i_yyyy)], ['วงเงินสัญญา', displayMoney(row.f_total_amt) + ' บาท']]; }, 'ตรวจสอบวันสำคัญของสัญญา โดยระบุวันที่เป็น วัน-เดือน-ปี พ.ศ.');
                 addGrid('sp_tor_hdr_period', 'งวดสัญญา');
                 addGrid('sp_check_period_dtl', 'รายการตรวจรับ');
                 addGrid('sp_tranf_item', 'รายการตั้งหนี้');
@@ -121,6 +169,11 @@
                         var value = canonical(entry.control.getValue(), entry.definition[1]);
                         if (canonical(header[entry.name], entry.definition[1]) !== value) changes.push({table:'sp_check_period_hdr',row_id:checkId,
                             field:entry.name,old_value:header[entry.name],new_value:value});
+                    });
+                    Ext.each(relatedControls, function (entry) {
+                        var value = canonical(entry.control.getValue(), entry.definition[1]);
+                        if (canonical(entry.row[entry.name], entry.definition[1]) !== value) changes.push({table: entry.table,
+                            row_id: entry.row[entry.key], field: entry.name, old_value: entry.row[entry.name], new_value: value});
                     });
                     Ext.each(grids, function (entry) {
                         entry.grid.stopEditing();
@@ -154,6 +207,11 @@
                         if (!success || !calculated || !calculated.success) return Ext.Msg.alert('คำนวณไม่สำเร็จ',calculated&&calculated.msg?calculated.msg:'ไม่สามารถคำนวณยอดเงินได้');
                         applying=true;
                         Ext.each(controls,function(entry){entry.control.setValue(initial(calculated.data.sp_check_period_hdr[0][entry.name],entry.definition[1]));});
+                        Ext.each(relatedControls, function (entry) {
+                            Ext.each(calculated.data[entry.table] || [], function (row) {
+                                if (String(row[entry.key]) === String(entry.row[entry.key])) entry.control.setValue(initial(row[entry.name], entry.definition[1]));
+                            });
+                        });
                         Ext.each(grids,function(entry){
                             entry.grid.store.each(function(record){
                                 Ext.each(calculated.data[entry.table],function(row){if(String(row[entry.key])===String(record.get(entry.key))) {
@@ -206,21 +264,9 @@
                     try {
                         Ext.each(controls, function (entry) {
                             valid = entry.control.isValid() && valid;
-                            var oldValue = header[entry.name], newValue = canonical(entry.control.getValue(), entry.definition[1]);
-                            if (canonical(oldValue, entry.definition[1]) !== newValue) changes.push({table: 'sp_check_period_hdr', row_id: checkId,
-                                field: entry.name, old_value: oldValue, new_value: newValue});
                         });
-                        Ext.each(grids, function (entry) {
-                            entry.grid.stopEditing();
-                            entry.grid.store.each(function (record) {
-                                var original;
-                                Ext.each(result.data[entry.table], function (row) { if (String(row[entry.key]) === String(record.get(entry.key))) original = row; });
-                                for (var name in entry.definitions) if (Object.prototype.hasOwnProperty.call(entry.definitions, name)) {
-                                    var type = entry.definitions[name][1], value = canonical(record.get(name), type);
-                                    if (canonical(original[name], type) !== value) changes.push({table: entry.table, row_id: original[entry.key], field: name, old_value: original[name], new_value: value});
-                                }
-                            });
-                        });
+                        Ext.each(relatedControls, function (entry) { valid = entry.control.isValid() && valid; });
+                        changes = collectChanges();
                     } catch (error) { return Ext.Msg.alert('ตรวจสอบข้อมูล', error.message); }
                     if (!valid) return Ext.Msg.alert('ตรวจสอบข้อมูล', 'กรุณาตรวจข้อมูลและระบุเหตุผลในการแก้ไข');
                     if(financeDirty||calculating){runCalculation(function(){saveButton.handler();});return;}
