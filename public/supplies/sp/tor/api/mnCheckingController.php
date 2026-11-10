@@ -207,6 +207,24 @@ function shouldUseWorkInProcessAccount($request, $db) {
     return $row && trim((string) $row['c_code']) === '9999';
 }
 
+// สิทธิ์ตรวจ/แก้ใบกันเหลื่อมของตรวจรับ: admin (user_id 1) ทั้งหมด, ที่เหลือใช้ขอบเขตเดียวกับ UPDATE_MISSING_WITHDRAW_EMP
+function overlapScopeAllowed($db, $chkId) {
+    if (intval($_SESSION['user_id'] ?? 0) === 1) {
+        return true;
+    }
+    $level = intval($_SESSION['i_level'] ?? 0);
+    $sql = "SELECT TOP 1 1 AS ok
+            FROM dbo.sp_check_period_hdr c
+            INNER JOIN dbo.sp_tor_contract b ON b.sp_tor_contract_id = c.sp_tor_contract_id
+            INNER JOIN dbo.sp_tor t ON t.tor_id = b.sp_tor_id
+            WHERE c.sp_check_period_hdr_id = ?
+              AND (?=1 OR (?=2 AND t.dc_department_id=?) OR (?=3 AND t.sp_emp_id=?))";
+    $res = sqlsrv_query($db->conn, $sql, array($chkId, $level, $level,
+        intval($_SESSION['dc_department_id'] ?? 0), $level, intval($_SESSION['sp_emp_id'] ?? 0)));
+    $row = $res ? $db->Fetch($res) : false;
+    return !empty($row);
+}
+
 switch ($mode) {
     case "UPDATE_MISSING_WITHDRAW_EMP":
         header("Content-Type: application/json; charset=utf-8");
@@ -3157,6 +3175,36 @@ switch ($mode) {
         unset($fldA);
         unset($arrValue);
 
+        // VAT ของหัวตรวจรับ (ติ๊ก "ภาษีมูลค่าเพิ่ม" + อัตรา) - ใช้คำนวณ VAT รายการที่ส่งมาเป็น 0/ว่าง
+        // (บันทึกรอบแรก รายการที่เพิ่งเพิ่มยังไม่มียอด f_net_total ฝั่งหน้าจอ ทำให้ VAT รายการ = 0 และใบขอเบิก(ร่าง) ไม่มี VAT)
+        $hdrVatOn = false;
+        $hdrVatRate = 0;
+        if (!empty($Arr[0]["sp_tranf_item_id"])) {
+            $vatRes = sqlsrv_query($db->conn, "SELECT TOP 1 h.i_vat_amt, h.f_rate_vat
+                FROM sp_tranf_item t INNER JOIN sp_check_period_hdr h ON h.sp_check_period_hdr_id = t.sp_check_period_hdr_id
+                WHERE t.sp_tranf_item_id = ?", array($Arr[0]["sp_tranf_item_id"]));
+            $vatRow = $vatRes ? $db->Fetch($vatRes) : null;
+            if ($vatRow) {
+                $hdrVatOn = intval($vatRow["i_vat_amt"]) === 1;
+                $hdrVatRate = floatval($vatRow["f_rate_vat"]);
+            }
+        }
+        foreach ($Arr as $k => $fldd) {
+            $sentVat = isset($fldd["f_vat_amt"]) && $fldd["f_vat_amt"] !== null ? floatval(str_replace(',', '', $fldd["f_vat_amt"])) : 0;
+            if ($hdrVatOn && $hdrVatRate > 0 && $sentVat == 0) {
+                $netForVat = 0;
+                foreach (array("f_net_total", "f_net_total_price", "f_wip_total_price", "f_under_total_price") as $nk) {
+                    $nv = !empty($fldd[$nk]) ? floatval(str_replace(',', '', $fldd[$nk])) : 0;
+                    if ($nv > 0) {
+                        $netForVat = $nv;
+                        break;
+                    }
+                }
+                if ($netForVat > 0) {
+                    $Arr[$k]["f_vat_amt"] = round($netForVat / (1 + $hdrVatRate / 100) * ($hdrVatRate / 100), 2);
+                }
+            }
+        }
         foreach ($Arr as $fldd) {
             // รีเซ็ตตัวแปรในแต่ละรอบ
             $arrParam = array();
@@ -3950,6 +3998,85 @@ switch ($mode) {
         $db->CommitTran();
         exit();
         break;
+    case "listOverlapByContract":
+        // หน้าจอผู้ใช้: ตรวจใบกันเหลื่อมทั้งสัญญาของตรวจรับที่เลือก (แสดงเป็นข้อมูล ไม่ใช่ ID)
+        header("Content-Type: application/json; charset=utf-8");
+        $chkId = filter_var($_REQUEST['chk_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$chkId || $chkId < 1 || !overlapScopeAllowed($db, $chkId)) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ไม่พบรายการตรวจรับ หรือไม่มีสิทธิ์ตรวจสอบรายการนี้"));
+            exit;
+        }
+        $sqlHead = "
+            SELECT TOP 1 ct.sp_tor_contract_id, ct.c_code AS c_contract_code, ct.c_name AS c_contract_name,
+                   t.c_code AS c_tor_code, t.c_name AS c_tor_name
+            FROM dbo.sp_check_period_hdr chk
+            INNER JOIN dbo.sp_tor_contract ct ON ct.sp_tor_contract_id = chk.sp_tor_contract_id
+            LEFT JOIN dbo.sp_tor t ON t.tor_id = ct.sp_tor_id
+            WHERE chk.sp_check_period_hdr_id = ?";
+        $res = sqlsrv_query($db->conn, $sqlHead, array($chkId));
+        $head = $res ? $db->Fetch($res) : null;
+        if (!$head) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ไม่พบสัญญาของตรวจรับนี้"));
+            exit;
+        }
+        $sqlRows = "
+            SELECT chk.sp_check_period_hdr_id, p.i_period, chk.c_arrive_code, chk.c_code,
+                   CONVERT(varchar(10), chk.d_checking_date, 23) AS d_checking_date, chk.f_total,
+                   chk.c_overlap, chk.i_yyyy_overlap,
+                   (SELECT TOP 1 d.c_code FROM NMU_EIS..po_working_dtl d WHERE d.po_working_hdr_id = chk.po_working_hdr_id) AS c_po_working,
+                   CASE WHEN ro.bg_reserve_overlap_id IS NULL THEN 1 ELSE 0 END AS no_overlap_row,
+                   CASE WHEN rm.i_enable = 1 AND ro.bg_reserve_overlap_id IS NOT NULL THEN 1 ELSE 0 END AS need_cancel_money,
+                   CASE WHEN ro.bg_reserve_overlap_id IS NOT NULL
+                             AND ( ro.i_sys <> 1
+                                OR ISNULL(ro.chk_id,0) <> chk.sp_check_period_hdr_id
+                                OR ISNULL(ro.i_year,0) <> ISNULL(chk.i_yyyy_overlap, ro.i_year)
+                                OR (chk.po_working_hdr_id IS NOT NULL AND ISNULL(ro.i_finish,0) <> 1) )
+                        THEN 1 ELSE 0 END AS need_fix_overlap
+            FROM dbo.sp_check_period_hdr chk
+            LEFT JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id = chk.sp_tor_hdr_period_id
+            LEFT JOIN NMU_EIS..bg_reserve_money rm ON rm.bg_reserve_money_id = chk.bg_checking_money_id
+            LEFT JOIN NMU_EIS..bg_reserve_overlap ro
+                   ON ro.bg_reserve_overlap_id = chk.bg_reserve_overlap_id
+                  AND ro.c_code_overlap = chk.c_overlap
+                  AND ro.po_id = chk.sp_tor_contract_id
+                  AND ro.i_enable = 1
+            WHERE chk.sp_tor_contract_id = ?
+              AND ISNULL(chk.i_enabled,1) = 1
+              AND ISNULL(chk.c_overlap,'') <> ''
+            ORDER BY p.i_period, chk.sp_check_period_hdr_id";
+        $rows = array();
+        $res = sqlsrv_query($db->conn, $sqlRows, array($head['sp_tor_contract_id']));
+        while ($res && ($r = $db->Fetch($res))) {
+            $rows[] = $r;
+        }
+        // ยอดใบกันของสัญญานี้: ยอดใบกัน - ใบเบิกที่ใช้ใบกัน - จองรอเบิก
+        $sqlBal = "
+            SELECT o.c_code_ref, o.i_year, o.f_total AS f_overlap,
+                   ISNULL(pw.f_used,0) AS f_used, ISNULL(r.f_open,0) AS f_open,
+                   o.f_total - ISNULL(pw.f_used,0) - ISNULL(r.f_open,0) AS f_remain
+            FROM NMU_EIS..vw_bg_budget_overlap o
+            OUTER APPLY (SELECT SUM(d.f_total) f_used FROM NMU_EIS..po_working_dtl d
+                         INNER JOIN NMU_EIS..po_working_hdr h ON h.po_working_hdr_id = d.po_working_hdr_id AND h.i_enable = 1
+                         WHERE d.c_booking = o.c_code_ref) pw
+            OUTER APPLY (SELECT SUM(f_amt) f_open FROM NMU_EIS..vw_bg_reserve_overlap
+                         WHERE c_code_overlap = o.c_code_ref AND i_reserve IN (1,2,3) AND ISNULL(i_finish,0) = 0) r
+            WHERE o.c_code_ref IN (
+                SELECT c_overlap FROM dbo.sp_check_period_hdr WHERE sp_tor_contract_id = ? AND ISNULL(c_overlap,'') <> ''
+                UNION SELECT c_overlap FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ? AND ISNULL(c_overlap,'') <> ''
+                UNION SELECT c_overlap2 FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ? AND ISNULL(c_overlap2,'') <> '')
+            ORDER BY o.c_code_ref";
+        $bal = array();
+        $cid = $head['sp_tor_contract_id'];
+        $res = sqlsrv_query($db->conn, $sqlBal, array($cid, $cid, $cid));
+        while ($res && ($r = $db->Fetch($res))) {
+            $bal[] = $r;
+        }
+        $db->RollBackTran();
+        echo json_encode(array("success" => true, "head" => $head, "rows" => $rows, "overlaps" => $bal));
+        exit;
+
     case "checkDoubleReserveOverlap":
     case "fixDoubleReserveOverlap":
         // ตรวจรับที่ใช้ใบกันเหลื่อม แต่ยังจองเงินปีปัจจุบัน (bg_reserve_money) ค้างอยู่ = ตัดเงินซ้ำ
@@ -3959,6 +4086,11 @@ switch ($mode) {
         if (!$chkId || $chkId < 1) {
             $db->RollBackTran();
             echo json_encode(array("success" => false, "msg" => "ไม่พบเลขตรวจรับ (chk_id)"));
+            exit;
+        }
+        if (!overlapScopeAllowed($db, $chkId)) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ไม่มีสิทธิ์แก้ไขรายการนี้"));
             exit;
         }
 

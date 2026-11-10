@@ -1199,6 +1199,16 @@ switch ($mode) {
         $arrParam[] = $_SESSION["dc_cost_id"];
         $arrParam[] = date("Y-m-d H:i:s");
         $arrParam[] = $data["i_overlap"];
+
+        // เลือกเลขใบกันมาพร้อมการยืนยัน -> เก็บไว้ที่สัญญา ตอนออกเลข AP จะใช้ใบกันนี้ให้อัตโนมัติ
+        $overlapCode = trim((string) ($_REQUEST["c_overlap_select"] ?? ""));
+        $overlapYear = intval($_REQUEST["i_yyyy_overlap_select"] ?? 0);
+        $contractOverlapSql = "";
+        if ($overlapCode !== "" && $overlapYear > 0) {
+            $contractOverlapSql = ", c_overlap = ?, i_yyyy_overlap = ?";
+            $arrParam[] = $overlapCode;
+            $arrParam[] = (string) $overlapYear;
+        }
         $arrParam[] = $data["sp_tor_contract_id"];
 
         $sql = "UPDATE {$table}
@@ -1217,6 +1227,7 @@ switch ($mode) {
                         , dc_user_update_cost_id = ?
                         , d_update = ?
                         , i_overlap = ?
+                        {$contractOverlapSql}
                     WHERE sp_tor_contract_id = ?
                     ";
         $arrParam[] = $data["id"];

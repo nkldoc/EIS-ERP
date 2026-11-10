@@ -283,16 +283,26 @@ if ($_REQUEST["type"] == "dc_cost_all") {
     // ทั้งสองนี้ (ใช้เฉพาะหน้านี้เท่านั้น หน้าจองเงินใหม่ - medSupPeriodBill.js - ไม่ส่ง
     // flag นี้มา จึงยังกรองตามปกติเหมือนเดิมทุกประการ)
     $includeAllOverlap = isset($_REQUEST["b_include_all"]) && $_REQUEST["b_include_all"] == "1";
+    // ช่วงปีใบกัน (หน้ายืนยันกันเหลื่อมก่อหนี้: แสดงใบกันหลายปีให้เลือก) ถ้าไม่ส่งมา = ปีเดียวตามเดิม
+    $yearMin = isset($_REQUEST["i_yyyy_overlap_min"]) ? intval($_REQUEST["i_yyyy_overlap_min"]) : 0;
+    $yearCon = $yearMin > 0 ? "a.i_year BETWEEN ? AND ?" : "a.i_year = ?";
+    $yearParams = $yearMin > 0 ? array($yearMin, $_REQUEST["i_yyyy_overlap"] ?? null) : array($_REQUEST["i_yyyy_overlap"] ?? null);
+    // กรองหมวดค่าใช้จ่าย (ถ้าส่งมา) ให้ query เบาลง - หน้ายืนยันกันเหลื่อมก่อหนี้
+    $expFilter = isset($_REQUEST["bg_expense_id"]) ? intval($_REQUEST["bg_expense_id"]) : 0;
+    if ($expFilter > 0) {
+        $yearCon .= " AND a.bg_expense_id = ?";
+        $yearParams[] = $expFilter;
+    }
     if ($contractBookingCode !== "") {
         // เลือกใบกันใบที่ 2 จากสัญญา: ค้นด้วยเลขใบกันโดยตรง ไม่บังคับประเภทงบเดิม
-        $con_cost = " AND dc_cost_id = ? AND a.i_year = ? AND a.c_code_ref = ? ";
+        $con_cost = " AND dc_cost_id = ? AND {$yearCon} AND a.c_code_ref = ? ";
     } else if ($bgTypeFilter !== "") {
         // WF ปกติคงเงื่อนไขเดิม
-        $con_cost = " AND dc_cost_id = ? AND a.i_year = ? AND a.dc_expense_budget_type_id = ? ";
+        $con_cost = " AND dc_cost_id = ? AND {$yearCon} AND a.dc_expense_budget_type_id = ? ";
     } else {
         // ยังไม่รู้แหล่งเงิน (เช่น หน้าเวชภัณฑ์ที่เลือกใบกันเหลื่อมก่อน แล้วให้ดึงแหล่งเงิน/
         // จำนวนเงินจากใบกันเหลื่อมมาเติมทีหลัง) - แสดงทุกแหล่งเงินของปีงบนั้นให้เลือก
-        $con_cost = " AND dc_cost_id = ? AND a.i_year = ? ";
+        $con_cost = " AND dc_cost_id = ? AND {$yearCon} ";
     }
 
     // หน้าตรวจรับ (แก้ใบกัน): ใบเบิกที่อยู่สายเดียวกับรายการตรวจรับนี้ (ใบเดิมที่ยกเลิก + ใบใหม่ที่ทำแทนผ่าน parent_id)
@@ -400,11 +410,11 @@ if ($_REQUEST["type"] == "dc_cost_all") {
                 -- ✅ ลบ Temporary Table หลังใช้งานเสร็จ
                 DROP TABLE #tmp_working;";
     if ($contractBookingCode !== "") {
-        $arrParam = array(date("Y-m-d"), $_REQUEST["dc_cost_id"], $_REQUEST['i_yyyy_overlap'], $contractBookingCode);
+        $arrParam = array_merge(array(date("Y-m-d"), $_REQUEST["dc_cost_id"]), $yearParams, array($contractBookingCode));
     } else if ($bgTypeFilter !== "") {
-        $arrParam = array(date("Y-m-d"), $_REQUEST["dc_cost_id"], $_REQUEST['i_yyyy_overlap'], $bgTypeFilter);
+        $arrParam = array_merge(array(date("Y-m-d"), $_REQUEST["dc_cost_id"]), $yearParams, array($bgTypeFilter));
     } else {
-        $arrParam = array(date("Y-m-d"), $_REQUEST["dc_cost_id"], $_REQUEST['i_yyyy_overlap']);
+        $arrParam = array_merge(array(date("Y-m-d"), $_REQUEST["dc_cost_id"]), $yearParams);
     }
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     if ($stmt) {
@@ -420,9 +430,22 @@ if ($_REQUEST["type"] == "dc_cost_all") {
                 // จำนวนเงินคงเหลือของใบกันเหลื่อม - ใช้เติม "จำนวนเงิน" ให้อัตโนมัติตอน
                 // เลือกใบกันเหลื่อมในหน้าเวชภัณฑ์ (ไม่ต้องให้ผู้ใช้พิมพ์เอง)
                 "f_total" => $row["f_total"],
+                "d_end_date" => ($row["d_end_date"] instanceof DateTime) ? $row["d_end_date"]->format("Y-m-d") : $row["d_end_date"],
             );
             ${$root}[] = $temp;
         }
+    }
+} else if ($_REQUEST["type"] == "overlap_by_contract") {
+    // ใบกันที่ขอกันเหลื่อมมาจากสัญญานี้ (bg_overlap_hdr.po_id = sp_tor_contract_id) - ใช้เลือกให้อัตโนมัติในหน้ายืนยันกันเหลื่อมก่อหนี้
+    $sqlMain = "SELECT DISTINCT d.c_code_ref, bh.i_year
+                FROM " . DB_NMU_EIS . "bg_overlap_hdr h
+                INNER JOIN " . DB_NMU_EIS . "bg_budget_dtl_overlap d ON d.bg_overlap_hdr_id = h.bg_overlap_hdr_id
+                INNER JOIN " . DB_NMU_EIS . "bg_budget_hdr_overlap bh ON bh.bg_budget_hdr_overlap_id = d.bg_budget_hdr_overlap_id AND bh.i_enable = 1
+                WHERE h.po_id = ? AND ISNULL(h.i_sys, 1) <> 3
+                ORDER BY bh.i_year DESC";
+    $stmt = $db->QueryParam($sqlMain, array(intval($_REQUEST["po_id"] ?? 0)));
+    while ($stmt && ($row = $db->Fetch($stmt))) {
+        ${$root}[] = array("c_booking" => $row["c_code_ref"], "i_year" => intval($row["i_year"]));
     }
 } else if ($_REQUEST["type"] == "overlap_remain") {
     // เลขใบกัน + ยอดใช้ไปแล้ว + คงเหลือ ใช้แสดงใน alert เมื่อ API จองเงินตอบ Not enough money (ค้นด้วยเลขใบกัน c_booking)

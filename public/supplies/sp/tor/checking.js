@@ -149,8 +149,13 @@ const edit_bg = function (data) {
                                                                 waitMsg: "Uploading...",
                                                                 success: function (form, action) {
                                                                         const res = Ext.decode(action.response.responseText); // ✅ ใช้ responseText แทน result
+                                                                        // ยืนยันพร้อมเลือกใบกัน -> อัปเดตรายการที่เปิดอยู่ทันที ให้กดบันทึกออกเลข AP แล้วตัดใบกันได้เลย
+                                                                        var pickCode = Ext.getCmp("c_overlap_select_hidden") ? Ext.getCmp("c_overlap_select_hidden").getValue() : "";
+                                                                        var pickYear = Ext.getCmp("i_yyyy_overlap_select_hidden") ? Number(Ext.getCmp("i_yyyy_overlap_select_hidden").getValue()) : 0;
+                                                                        Ext.applyConfirmedOverlap(pickCode, pickYear);
 
-                                                                        Ext.Msg.alert("สำเร็จ", res.msg || "บันทึกเรียบร้อย");
+                                                                        Ext.Msg.alert("สำเร็จ", (res.msg || "บันทึกเรียบร้อย")
+                                                                                + (pickCode ? "<br>ใบกัน " + pickCode + " จะถูกตัดเงินให้อัตโนมัติตอนกดบันทึกออกเลข AP" : ""));
                                                                         Ext.getCmp("MessageBox_re").hide();
                                                                         Ext.getCmp("MessageBox_re").destroy();
                                                                         Ext.getCmp("win-pop").hide();
@@ -751,9 +756,71 @@ const win_edit_admin = function (rec) {
                 ],
         }).show();
 };
+// หลังยืนยันกันเหลื่อมก่อหนี้: ให้รายการที่เลือกอยู่และหน้าตรวจรับที่เปิดอยู่รู้สถานะใหม่ทันที
+// (i_chk_bg=2 = ก่อหนี้แล้ว) และใส่เลขใบกันไว้ ตอนกดบันทึกออกเลข AP จะตัดใบกันนี้ให้เลย
+Ext.applyConfirmedOverlap = function (code, year) {
+        var row = Ext.selectRow;
+        if (row && row.set) {
+                row.set("i_type_bg", 4);
+                row.set("i_chk_bg", 2);
+                row.set("i_overlap", 3);
+                if (code) {
+                        row.set("c_contract_overlap", code);
+                        row.set("c_booking", code);
+                        row.set("i_yyyy_overlap", year);
+                }
+        }
+        Ext.confirmedOverlap = code ? { code: code, year: year, sp_tor_contract_id: row && row.get ? row.get("sp_tor_contract_id") : null } : null;
+        var combo = Ext.getCmp("c_bookingID");
+        if (code && combo) {
+                combo.setValue(code);
+                combo.lastSelectionText = code;
+                if (Ext.getCmp("i_yyyy_overlapID") && year) {
+                        Ext.getCmp("i_yyyy_overlapID").setValue(year);
+                }
+                if (Ext.getCmp("c_booking_radiogroup")) {
+                        Ext.getCmp("c_booking_radiogroup").show();
+                }
+                combo.setReadOnly(true);
+        }
+        if (Ext.getCmp("btnConfirmBookingID")) {
+                Ext.getCmp("btnConfirmBookingID").setText("เลือกเลขที่ใบกัน (เปิดหน้ายืนยันใบกัน)");
+        }
+};
+// "ออกเลขตรวจรับโดยไม่เช็คเงิน" ข้ามเฉพาะการเช็ค/จองเงินปีปัจจุบัน
+// รายการที่ใช้ใบกันเหลื่อม (ยืนยันกันเหลื่อมแล้วและมีเลขใบกัน) ยังตัดใบกันตามปกติแม้ติ๊กไว้
+Ext.usesOverlapForAp = function (data) {
+        var row = Ext.selectRow && Ext.selectRow.data ? Ext.selectRow.data : {};
+        var chkBg = Number(row.i_chk_bg);
+        if (chkBg === 2) {
+                return !!Ext.overlapBookCode(data || row);
+        }
+        if (chkBg === 3 || chkBg === 4) {
+                return !!((data && data.c_contract_overlap) || row.c_contract_overlap);
+        }
+        return false;
+};
+// เลขใบกัน/ปีที่จะใช้ตัดเงินตอนออกเลข AP (combo -> ใบกันที่ยืนยันไว้ -> ใบกันของสัญญา)
+Ext.overlapBookCode = function (rec) {
+        var combo = Ext.getCmp("c_bookingID");
+        var txt = combo && combo.lastSelectionText ? String(combo.lastSelectionText).trim() : "";
+        if (txt) {
+                return txt;
+        }
+        var cf = Ext.confirmedOverlap;
+        if (cf && cf.code && (!cf.sp_tor_contract_id || Number(cf.sp_tor_contract_id) === Number(rec.sp_tor_contract_id))) {
+                return cf.code;
+        }
+        return rec.c_contract_overlap || rec.c_booking || (Ext.selectRow && Ext.selectRow.data ? Ext.selectRow.data.c_contract_overlap : "") || "";
+};
+// ยืนยันกันเหลื่อมก่อหนี้ + เลือกเลขที่ใบกัน (ใช้ได้ทั้งก่อนยืนยัน i_type_bg=1 และยืนยันแล้วแต่ยังไม่ออกเลข AP)
+Ext.canPickOverlapBeforeAp = function (data) {
+        var t = Number(data.i_type_bg);
+        return t === 1 || (t === 4 && Ext.isEmpty(data.c_checking_code));
+};
 const win_request_edit_bg = function (rec) {
         new Ext.Window({
-                title: "ยืนยันกันเหลื่อมก่อหนี้แล้ว",
+                title: Number(rec.data.i_type_bg) === 4 ? "เลือกเลขที่ใบกัน (ยืนยันกันเหลื่อมก่อหนี้แล้ว)" : "ยืนยันกันเหลื่อมก่อหนี้แล้ว",
                 id: "win-pop",
                 layout: "fit",
                 modal: true,
@@ -887,56 +954,121 @@ const win_request_edit_bg = function (rec) {
                                                                                 value: rec.data.expense_name,
                                                                                 width: 450,
                                                                         },
+                                                                        // เลขที่ใบกัน: เฉพาะใบกันที่ขอกันเหลื่อมมาจากสัญญานี้ (มียอดคงเหลือ)
+                                                                        // ปีงบประมาณแสดงตามปีของใบกันที่เลือก (ไม่ให้เลือกปีเอง)
                                                                         new Ext.form.ComboBox({
                                                                                 mode: "local",
-                                                                                // allowBlank: false, ReadOnly_set
-                                                                                fieldLabel: "ปีงบประมาณ",
-                                                                                submitValue: true,
-                                                                                allowBlank: false,
-                                                                                id: "i_budget_year_edit_bg",
-                                                                                hiddenName: "i_budget_year",
-                                                                                name: "i_budget_yearTxt",
-                                                                                store: Ext.store_year,
+                                                                                fieldLabel: "เลขที่ใบกัน",
+                                                                                id: "c_overlap_select_edit_bg",
+                                                                                submitValue: false,
+                                                                                allowBlank: true,
+                                                                                store: new Ext.data.JsonStore({
+                                                                                        url: "api/All_PoWorkingImpHdr.php",
+                                                                                        root: "data",
+                                                                                        idProperty: "id",
+                                                                                        fields: ["id", "c_booking", "i_year", "f_total", "d_end_date", "bg_expense_id",
+                                                                                                {
+                                                                                                        name: "c_label",
+                                                                                                        convert: function (v, r) {
+                                                                                                                return r.c_booking + "  (ปีงบ " + (Number(r.i_year) + 543) + "  คงเหลือ "
+                                                                                                                        + Ext.util.Format.number(Number(r.f_total || 0), "0,000.00") + ")";
+                                                                                                        },
+                                                                                                }],
+                                                                                }),
                                                                                 valueField: "id",
-                                                                                displayField: "c_name",
-                                                                                value: rec.data.i_yyyy,
+                                                                                displayField: "c_label",
                                                                                 triggerAction: "all",
                                                                                 forceSelection: true,
-                                                                                selectOnFocus: true,
-                                                                                typeAhead: false,
-                                                                                emptyText: "กรุณาเลือกปีงบประมาณ...",
-                                                                                config: {
-                                                                                        requireMe: false,
-                                                                                },
+                                                                                editable: false,
+                                                                                width: 450,
+                                                                                listWidth: 450,
+                                                                                emptyText: "กำลังโหลดใบกัน...",
                                                                                 listeners: {
-                                                                                        afterrender: function () {
-                                                                                                // ReadOnly_set("i_budget_year_edit_bg", true);
-                                                                                                // this.ReadOnly_set = function (set) {
-                                                                                                //   this.setReadOnly(set);
-                                                                                                //   this.getEl().dom.style.background = set ? "#EEEEEE" : "";
-                                                                                                // };
-                                                                                                this.fn = function () { };
-                                                                                                this.select_value = function () { };
+                                                                                        afterrender: function (combo) {
+                                                                                                // แสดงเฉพาะใบกันของสัญญานี้ (bg_overlap_hdr.po_id = สัญญา) พร้อมยอดคงเหลือ
+                                                                                                var st = combo.getStore();
+                                                                                                var setText = function (t) {
+                                                                                                        combo.emptyText = t;
+                                                                                                        if (combo.rendered && !combo.getValue()) {
+                                                                                                                combo.applyEmptyText();
+                                                                                                        }
+                                                                                                };
+                                                                                                var loadOne = function (list, i, noBalance) {
+                                                                                                        if (!combo.rendered) {
+                                                                                                                return;
+                                                                                                        }
+                                                                                                        if (i >= list.length) {
+                                                                                                                if (st.getCount()) {
+                                                                                                                        setText("เลือกเลขที่ใบกัน...");
+                                                                                                                        var pick = st.getAt(0);
+                                                                                                                        combo.setValue(pick.get("id"));
+                                                                                                                        combo.fireEvent("select", combo, pick, 0);
+                                                                                                                } else {
+                                                                                                                        setText(noBalance.length
+                                                                                                                                ? "ใบกันของสัญญา " + noBalance.join(", ") + " ไม่มียอดคงเหลือหรือหมดอายุ"
+                                                                                                                                : "ไม่พบใบกันของสัญญานี้");
+                                                                                                                }
+                                                                                                                return;
+                                                                                                        }
+                                                                                                        var tmp = new Ext.data.JsonStore({ url: st.url, root: "data", idProperty: "id", fields: st.fields.items });
+                                                                                                        tmp.load({
+                                                                                                                params: {
+                                                                                                                        type: "booking_store",
+                                                                                                                        dc_cost_id: rec.data.dc_cost_id,
+                                                                                                                        i_yyyy_overlap: list[i].i_year,
+                                                                                                                        c_booking: list[i].c_booking,
+                                                                                                                },
+                                                                                                                callback: function () {
+                                                                                                                        if (tmp.getCount()) {
+                                                                                                                                st.add(tmp.getRange());
+                                                                                                                        } else {
+                                                                                                                                noBalance.push(list[i].c_booking);
+                                                                                                                        }
+                                                                                                                        loadOne(list, i + 1, noBalance);
+                                                                                                                },
+                                                                                                        });
+                                                                                                };
+                                                                                                Ext.Ajax.request({
+                                                                                                        url: "api/All_PoWorkingImpHdr.php",
+                                                                                                        method: "GET",
+                                                                                                        params: { type: "overlap_by_contract", po_id: rec.data.sp_tor_contract_id },
+                                                                                                        callback: function (opt, ok, resp) {
+                                                                                                                var list = [];
+                                                                                                                try {
+                                                                                                                        list = Ext.decode(resp.responseText).data || [];
+                                                                                                                } catch (e) { }
+                                                                                                                st.removeAll(true);
+                                                                                                                loadOne(list, 0, []);
+                                                                                                        },
+                                                                                                });
                                                                                         },
-                                                                                        select: function () {
-                                                                                                this.select_value();
-                                                                                        },
-                                                                                        Change: function () {
-                                                                                                this.fn();
-                                                                                                this.select_value();
-                                                                                        },
-                                                                                        beforequery: function (q) {
-                                                                                                if (q.query) {
-                                                                                                        var length = q.query.length;
-                                                                                                        q.query = new RegExp(Ext.escapeRe(q.query));
-                                                                                                        q.query.length = length;
-                                                                                                }
-                                                                                        },
-                                                                                        blur: function () {
-                                                                                                this.getStore().clearFilter();
+                                                                                        select: function (combo, r) {
+                                                                                                Ext.getCmp("c_overlap_select_hidden").setValue(r.get("c_booking"));
+                                                                                                Ext.getCmp("i_yyyy_overlap_select_hidden").setValue(r.get("i_year"));
+                                                                                                Ext.getCmp("i_budget_year_edit_bg").setValue(Number(r.get("i_year")) + 543);
                                                                                         },
                                                                                 },
                                                                         }),
+                                                                        {
+                                                                                xtype: "hidden",
+                                                                                id: "c_overlap_select_hidden",
+                                                                                name: "c_overlap_select",
+                                                                        },
+                                                                        {
+                                                                                xtype: "hidden",
+                                                                                id: "i_yyyy_overlap_select_hidden",
+                                                                                name: "i_yyyy_overlap_select",
+                                                                        },
+                                                                        {
+                                                                                xtype: "textfield",
+                                                                                fieldLabel: "ปีงบประมาณ",
+                                                                                id: "i_budget_year_edit_bg",
+                                                                                submitValue: false,
+                                                                                readOnly: true,
+                                                                                width: 120,
+                                                                                emptyText: "ตามปีของใบกัน",
+                                                                                style: { background: "#EEEEEE", "font-weight": "bold" },
+                                                                        },
                                                                         {
                                                                                 xtype: "datefield",
                                                                                 fieldLabel: "วันที่ทำรายการ",
@@ -987,7 +1119,7 @@ const win_request_edit_bg = function (rec) {
                                 buttonAlign: "left",
                                 buttons: [
                                         {
-                                                text: "&nbsp;ส่งขอร้อง&nbsp;",
+                                                text: "&nbsp;ยืนยัน&nbsp;",
                                                 icon: "../images/icons/accept.png",
                                                 listeners: {
                                                         afterrender: function () {
@@ -995,24 +1127,17 @@ const win_request_edit_bg = function (rec) {
                                                         },
                                                 },
                                                 handler: function () {
-                                                        var msg = "";
-        // if (Ext.getCmp("i_is_upload_acc").getValue() == "") {
-        //   msg += "กรุณาอัพโหลดไฟล์เอกสาร";   UPDATE_OVERLAP2
-        // }
-        // if (Ext.getCmp("disable_acc_c_comment").getValue() == "") {
-        //   msg += "กรุณาระบุเหตุผล";
-        // }
-
-                                                        if (msg != "") {
-                                                                Ext.example.msg("แจ้งเตือน", msg, 1);
-                                                                $(this).next("text copied");
-                                                                setTimeout(function () {
-                                                                        $(this).next().remove();
-                                                                }, 6000);
+                                                        if (!Ext.getCmp("c_overlap_select_hidden").getValue()) {
+                                                                Ext.Msg.confirm("ยังไม่ได้เลือกใบกัน",
+                                                                        "ยังไม่ได้เลือกเลขที่ใบกัน ต้องการยืนยันกันเหลื่อมก่อหนี้โดยยังไม่เลือกใบกันใช่หรือไม่?<br>(ตอนออกเลข AP จะต้องเลือกใบกันเอง)",
+                                                                        function (btn) {
+                                                                                if (btn === "yes") {
+                                                                                        edit_bg(rec.data);
+                                                                                }
+                                                                        });
                                                                 return;
-                                                        } else {
-                                                                edit_bg(rec.data);
                                                         }
+                                                        edit_bg(rec.data);
                                                 },
                                         },
                                         {
@@ -1784,7 +1909,7 @@ Ext.uiConfirmVat = (rec) => {
                                                                                                 if (rec._vatManual) {
                                                                                                         vatVal = parseFloat((rec.get("f_vat_amt") || "0").toString().replace(/,/g, "")) || 0;
                                                                                                 } else {
-                                                                                                        var net = parseFloat((rec.get("f_net_total") || "0").toString().replace(/,/g, "")) || 0;
+                                                                                                        var net = Ext.itemNetForVat(rec.data);
                                                                                                         if (net > 0 && record._vatManual === true) {
                                                                                                                 vatVal = Math.round((net / 1.07) * 0.07 * 100) / 100;
                                                                                                         }
@@ -3208,6 +3333,19 @@ Ext.clearVatMemory = () => {
                 grid.getStore().rejectChanges();
         }
 };
+// ยอดของรายการตั้งหนี้ที่ใช้คิด VAT: f_net_total (หลังโหลดจาก server) -> f_net_total_price (รายการที่เพิ่งเพิ่ม ยังไม่ reload)
+// -> งานระหว่างดำเนินการ/ครุภัณฑ์ เดิมใช้แค่ f_net_total ทำให้บันทึกรอบแรก VAT รายการ = 0 ใบขอเบิก(ร่าง) จึงไม่มี VAT
+Ext.itemNetForVat = function (d) {
+        d = d || {};
+        var keys = ["f_net_total", "f_net_total_price", "f_wip_total_price", "f_under_total_price"];
+        for (var i = 0; i < keys.length; i++) {
+                var n = parseFloat(String(d[keys[i]] == null ? "" : d[keys[i]]).replace(/,/g, "")) || 0;
+                if (n > 0) {
+                        return n;
+                }
+        }
+        return 0;
+};
 Ext.storeVatAcc = () => {
         // ดึงค่าจาก Checkbox (true หรือ false)
         var isVatChecked = Ext.getCmp('i_vat_amtID').getValue();
@@ -3238,7 +3376,7 @@ Ext.storeVatAcc = () => {
                                 vatVal = parseFloat((rec.get("f_vat_amt") || "0").toString().replace(/,/g, "")) || 0;
                         } else {
                                 // คำนวณ VAT จาก Net Total (กรณีไม่ได้กรอกเอง)
-                                var net = parseFloat((rec.get("f_net_total") || "0").toString().replace(/,/g, "")) || 0;
+                                var net = Ext.itemNetForVat(rec.data);
                                 if (net > 0) {
                                         vatVal = Math.round((net / 1.07) * 0.07 * 100) / 100;
                                         // อัปเดตค่ากลับเข้าไปใน Store ให้เห็นบนหน้าจอ
@@ -5463,6 +5601,24 @@ const genLinkBg = function (event, rec) {
                                 "/";
                         break;
                 case "c_overlap_book":
+                        // chk_id ต้องเป็นเลขตรวจรับ: แถวจากตารางหลักมี id = เลขงวด จึงใช้ sp_check_period_hdr_id ก่อน
+                        // i_year ต้องเป็นปีของใบกัน: เอาจากใบกันที่เลือกใน combo -> ปีใบกันของรายการ/สัญญา -> ปีเดิม
+                        var bookYear = (function () {
+                                var combo = Ext.getCmp("c_bookingID");
+                                var idx = combo && combo.getValue() ? Ext.booking_store.findExact("id", combo.getValue()) : -1;
+                                if (idx < 0 && combo && combo.lastSelectionText) {
+                                        idx = Ext.booking_store.findExact("c_booking", combo.lastSelectionText);
+                                }
+                                if (idx >= 0 && Number(Ext.booking_store.getAt(idx).get("i_year")) > 0) {
+                                        return Number(Ext.booking_store.getAt(idx).get("i_year"));
+                                }
+                                var cf = Ext.confirmedOverlap;
+                                if (cf && cf.year && cf.code === Ext.overlapBookCode(rec)) {
+                                        return Number(cf.year);
+                                }
+                                return parseInt(rec.i_yyyy_overlap, 10) || (parseInt(rec.i_yyyy) - setYear);
+                        })();
+                        Ext.lastOverlapBookYear = useContractOverlap2 ? selectedOverlapYear : bookYear;
                         link =
                                 Ext.getApiBgBaseUrl() +
                                 "/?/bg/mn_BgReserveMoney/mode/POST" +
@@ -5473,9 +5629,9 @@ const genLinkBg = function (event, rec) {
                                 "/po_id/" +
                                 rec.sp_tor_contract_id +
                                 "/chk_id/" +
-                                rec.id +
+                                (rec.sp_check_period_hdr_id || rec.id) +
                                 "/i_year/" +
-                                (useContractOverlap2 ? selectedOverlapYear : (parseInt(rec.i_yyyy) - setYear)) +
+                                (useContractOverlap2 ? selectedOverlapYear : bookYear) +
                                 "/i_pr_type/" +
                                 rec.i_pr_type1 + //  plan or period
                                 "/i_reserve/3" + // step 1 PR step 2 po step3 checking
@@ -5488,7 +5644,7 @@ const genLinkBg = function (event, rec) {
                                 "/i_last/" +
                                 (rec.i_type_contract === 3 ? 0 : 1) + // pr มี สัญญาเดียว = 1
                                 "/c_code_overlap/" +
-                                encodeURIComponent(useContractOverlap2 ? selectedOverlapCode : Ext.getCmp("c_bookingID").lastSelectionText) +
+                                encodeURIComponent(useContractOverlap2 ? selectedOverlapCode : Ext.overlapBookCode(rec)) +
                                 "/f_amt/" +
                                 Ext.getApiBgAmount(Ext.getCmp("f_totalID").getValue());
                         break;
@@ -6268,7 +6424,11 @@ Ext.c_overlap_close = function (rec, event, edit) {
                 success: function (result, request) {
                         var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
                         if (jsonData.success) {
-                                Ext.MessageBox.alert("Success", "เรียบร้อยแล้ว", function () {
+                                var bookedCode = event == "c_overlap_close" ? rec.c_contract_overlap : Ext.overlapBookCode(rec);
+                                var bookedAmt = Ext.getCmp("f_totalID") ? Ext.getCmp("f_totalID").getValue() : "";
+                                Ext.lastOverlapBooked = { code: bookedCode, amt: bookedAmt };
+                                Ext.MessageBox.alert("Success", "ตัดเงินใบกันเหลื่อม <b>" + Ext.util.Format.htmlEncode(bookedCode || "") + "</b> จำนวน <b>"
+                                        + Ext.util.Format.number(Number(String(bookedAmt).replace(/,/g, "")) || 0, "0,000.00") + "</b> บาท เรียบร้อยแล้ว", function () {
                                         Ext.Ajax.request({
                                                 url: "tor/api/mnPeriodController.php",
                                                 method: "POST",
@@ -6278,8 +6438,8 @@ Ext.c_overlap_close = function (rec, event, edit) {
                                                         sp_check_period_hdr_id: Ext.perioidHdr.get("id"), //checking_hdr_id
                                                         i_overlap: event == "c_overlap_close" ? 3 : 2,
                                                         bg_reserve_overlap_id: jsonData.bg_reserve_overlap_id,
-                                                        i_yyyy_overlap: i_yyyy_overlap,
-                                                        c_booking: event == "c_overlap_close" ? rec.c_contract_overlap : Ext.getCmp("c_bookingID").lastSelectionText,
+                                                        i_yyyy_overlap: event == "c_overlap_book" && Ext.lastOverlapBookYear ? Ext.lastOverlapBookYear : i_yyyy_overlap,
+                                                        c_booking: event == "c_overlap_close" ? rec.c_contract_overlap : Ext.overlapBookCode(rec),
                                                         edit: "edit",
                                                         i_yyyy: Ext.getCmp("i_budget_year").getValue(),
                                                 },
@@ -6415,7 +6575,13 @@ Ext.genCode = function (rec, skipBgCheck) {
                 success: function (result, request) {
                         if (result.statusText) {
                                 Ext.storeDtl.reload();
-                                Ext.Msg.alert("แจ้งเตือน", skipBgCheck === true ? "ออกเลขตรวจรับเรียบร้อยแล้ว (ไม่ได้เช็คเงินและใบกัน)" : "หักเงินและออกเลขเรียบร้อยแล้ว");
+                                var ob = Ext.lastOverlapBooked;
+                                Ext.lastOverlapBooked = null;
+                                Ext.Msg.alert("แจ้งเตือน", skipBgCheck === true
+                                        ? "ออกเลขตรวจรับเรียบร้อยแล้ว (ไม่ได้เช็คเงินและใบกัน)"
+                                        : (ob && ob.code
+                                                ? "ตัดเงินใบกันเหลื่อม <b>" + Ext.util.Format.htmlEncode(ob.code) + "</b> และออกเลขตรวจรับเรียบร้อยแล้ว"
+                                                : "หักเงินและออกเลขเรียบร้อยแล้ว"));
                                 Ext.getCmp("winPeriodHdrID").destroy();
                         }
                 },
@@ -9238,6 +9404,200 @@ Ext.showFixDoubleReserveOverlap = function (chkId, onDone) {
         });
 };
 
+// หน้าจอผู้ใช้: ตรวจใบกันเหลื่อมทั้งสัญญา แสดงเป็นข้อมูล และกดแก้รายการที่ผิดได้เอง
+Ext.showUserOverlapCheck = function (chkId, onDone) {
+        var esc = Ext.util.Format.htmlEncode;
+        var fmt = function (v) {
+                return Ext.util.Format.number(Number(v || 0), '0,000.00');
+        };
+        var thYear = function (y) {
+                return y ? (Number(y) + 543) : '-';
+        };
+        var th = 'style="padding:5px 8px;border:1px solid #c9d7e8;background:#eaf1fb;white-space:nowrap;"';
+        var td = 'style="padding:5px 8px;border:1px solid #c9d7e8;"';
+        var tdR = 'style="padding:5px 8px;border:1px solid #c9d7e8;text-align:right;"';
+        var win = null;
+
+        var statusOf = function (r) {
+                if (Number(r.no_overlap_row) === 1) {
+                        return { bad: false, txt: '<span style="color:#b45f06">ยังไม่ได้ตัดเงินใบกัน</span>' };
+                }
+                var msg = [];
+                if (Number(r.need_cancel_money) === 1) {
+                        msg.push('ตัดเงินปีปัจจุบันซ้ำ');
+                }
+                if (Number(r.need_fix_overlap) === 1) {
+                        msg.push('รายการตัดใบกันไม่สมบูรณ์ (ยอดคงเหลือใบกันไม่ถูกต้อง)');
+                }
+                if (msg.length) {
+                        return { bad: true, txt: '<span style="color:#c00;font-weight:bold">' + msg.join('<br>') + '</span>' };
+                }
+                return { bad: false, txt: '<span style="color:#080">ถูกต้อง</span>' };
+        };
+
+        var render = function (res) {
+                var h = res.head || {};
+                var rows = res.rows || [];
+                var ovs = res.overlaps || [];
+                var bad = [];
+                var html = '<div style="padding:10px;font-size:13px;line-height:1.6;">'
+                        + '<div><b>สัญญา</b> ' + esc(h.c_contract_code || '-') + ' &nbsp; ' + esc(h.c_contract_name || '') + '</div>'
+                        + '<div><b>PR</b> ' + esc(h.c_tor_code || '-') + ' &nbsp; ' + esc(h.c_tor_name || '') + '</div>';
+
+                html += '<div style="margin-top:10px;font-weight:bold;">ยอดใบกันเหลื่อมของสัญญานี้</div>';
+                if (!ovs.length) {
+                        html += '<div style="color:#666">สัญญานี้ยังไม่ได้ใช้ใบกันเหลื่อม</div>';
+                } else {
+                        html += '<table style="border-collapse:collapse;margin-top:4px;"><tr>'
+                                + '<td ' + th + '>เลขใบกัน</td><td ' + th + '>ปีงบ</td><td ' + th + '>ยอดใบกัน</td>'
+                                + '<td ' + th + '>เบิกแล้ว</td><td ' + th + '>ตัดรอเบิก</td><td ' + th + '>คงเหลือ</td></tr>';
+                        Ext.each(ovs, function (o) {
+                                html += '<tr><td ' + td + '>' + esc(o.c_code_ref) + '</td><td ' + td + '>' + thYear(o.i_year) + '</td>'
+                                        + '<td ' + tdR + '>' + fmt(o.f_overlap) + '</td><td ' + tdR + '>' + fmt(o.f_used) + '</td>'
+                                        + '<td ' + tdR + '>' + fmt(o.f_open) + '</td><td ' + tdR + '><b>' + fmt(o.f_remain) + '</b></td></tr>';
+                        });
+                        html += '</table>';
+                }
+
+                html += '<div style="margin-top:12px;font-weight:bold;">ตรวจรับที่ใช้ใบกันเหลื่อม</div>';
+                if (!rows.length) {
+                        html += '<div style="color:#666">ไม่มีตรวจรับที่ใช้ใบกันเหลื่อม</div>';
+                } else {
+                        html += '<table style="border-collapse:collapse;margin-top:4px;"><tr>'
+                                + '<td ' + th + '>งวด</td><td ' + th + '>เลขรับของ</td><td ' + th + '>เลขตรวจรับ</td>'
+                                + '<td ' + th + '>วันที่ตรวจรับ</td><td ' + th + '>จำนวนเงิน</td><td ' + th + '>ใบกัน</td>'
+                                + '<td ' + th + '>ใบเบิก</td><td ' + th + '>สถานะ</td></tr>';
+                        Ext.each(rows, function (r) {
+                                var s = statusOf(r);
+                                if (s.bad) {
+                                        bad.push(r);
+                                }
+                                var isMe = Number(r.sp_check_period_hdr_id) === Number(chkId);
+                                var trStyle = isMe ? ' style="background:#fff2cc;"' : '';
+                                html += '<tr' + trStyle + '><td ' + td + '>' + esc(r.i_period || '-') + '</td>'
+                                        + '<td ' + td + '>' + esc(r.c_arrive_code || '-') + '</td>'
+                                        + '<td ' + td + '>' + esc(r.c_code || '-') + '</td>'
+                                        + '<td ' + td + '>' + esc(r.d_checking_date || '-') + '</td>'
+                                        + '<td ' + tdR + '>' + fmt(r.f_total) + '</td>'
+                                        + '<td ' + td + '>' + esc(r.c_overlap) + '</td>'
+                                        + '<td ' + td + '>' + esc(r.c_po_working || 'ยังไม่ออก') + '</td>'
+                                        + '<td ' + td + '>' + s.txt + '</td></tr>';
+                        });
+                        html += '</table>';
+                }
+                html += '<div style="margin-top:10px;font-weight:bold;color:' + (bad.length ? '#c00' : '#080') + '">'
+                        + (bad.length
+                                ? 'พบ ' + bad.length + ' รายการที่ต้องแก้ กด "แก้ไขรายการที่ผิด" เพื่อคืนยอดใบกันให้ถูกต้อง'
+                                : 'ข้อมูลใบกันของสัญญานี้ถูกต้อง')
+                        + '</div></div>';
+                return { html: html, bad: bad };
+        };
+
+        var fixAll = function (list, done) {
+                var ok = [], fail = [];
+                var next = function (i) {
+                        if (i >= list.length) {
+                                done(ok, fail);
+                                return;
+                        }
+                        var r = list[i];
+                        Ext.Ajax.request({
+                                url: 'tor/api/mnCheckingController.php',
+                                method: 'POST',
+                                params: { mode: 'fixDoubleReserveOverlap', chk_id: r.sp_check_period_hdr_id },
+                                success: function (resp) {
+                                        var o = Ext.decode(resp.responseText);
+                                        (o.success ? ok : fail).push((r.c_code || r.c_arrive_code) + (o.success ? '' : ' : ' + o.msg));
+                                        next(i + 1);
+                                },
+                                failure: function () {
+                                        fail.push((r.c_code || r.c_arrive_code) + ' : เชื่อมต่อเซิร์ฟเวอร์ไม่ได้');
+                                        next(i + 1);
+                                }
+                        });
+                };
+                next(0);
+        };
+
+        var load = function () {
+                var target = win ? win.getEl() : Ext.getBody();
+                target.mask('กำลังตรวจสอบ...');
+                Ext.Ajax.request({
+                        url: 'tor/api/mnCheckingController.php',
+                        method: 'POST',
+                        params: { mode: 'listOverlapByContract', chk_id: chkId },
+                        success: function (response) {
+                                target.unmask();
+                                var res = Ext.decode(response.responseText);
+                                if (!res.success) {
+                                        Ext.Msg.alert('แจ้งเตือน', res.msg || 'ตรวจสอบไม่สำเร็จ');
+                                        return;
+                                }
+                                var out = render(res);
+                                if (!win) {
+                                        win = new Ext.Window({
+                                                title: 'ตรวจสอบใบกันเหลื่อม',
+                                                width: Math.min(1000, Ext.getBody().getViewSize().width - 40),
+                                                height: Math.min(560, Ext.getBody().getViewSize().height - 40),
+                                                autoScroll: true,
+                                                modal: true,
+                                                html: out.html,
+                                                buttons: [{
+                                                                text: 'แก้ไขรายการที่ผิด',
+                                                                id: 'btnUserOverlapFix',
+                                                                iconCls: 'icon-accept',
+                                                                disabled: !out.bad.length,
+                                                                handler: function () {
+                                                                        var list = win.badRows || [];
+                                                                        Ext.Msg.confirm('ยืนยัน', 'แก้ไข ' + list.length + ' รายการ เพื่อคืนยอดใบกันให้ถูกต้อง ใช่หรือไม่?', function (btn) {
+                                                                                if (btn !== 'yes') {
+                                                                                        return;
+                                                                                }
+                                                                                win.getEl().mask('กำลังแก้ไข...');
+                                                                                fixAll(list, function (ok, fail) {
+                                                                                        win.getEl().unmask();
+                                                                                        var msg = ok.length ? 'แก้ไขเรียบร้อย: ' + ok.join(', ') : '';
+                                                                                        if (fail.length) {
+                                                                                                msg += (msg ? '<br><br>' : '') + '<span style="color:#c00">แก้ไม่สำเร็จ:<br>' + fail.join('<br>') + '</span>';
+                                                                                        }
+                                                                                        Ext.Msg.alert('ผลการแก้ไข', msg, function () {
+                                                                                                load();
+                                                                                                if (onDone) {
+                                                                                                        onDone();
+                                                                                                }
+                                                                                        });
+                                                                                });
+                                                                        });
+                                                                }
+                                                        }, {
+                                                                text: 'ตรวจใหม่',
+                                                                iconCls: 'icon-refresh',
+                                                                handler: function () {
+                                                                        load();
+                                                                }
+                                                        }, {
+                                                                text: 'ปิด',
+                                                                handler: function () {
+                                                                        win.close();
+                                                                }
+                                                        }]
+                                        });
+                                        win.show();
+                                } else {
+                                        win.body.update(out.html);
+                                        Ext.getCmp('btnUserOverlapFix').setDisabled(!out.bad.length);
+                                }
+                                win.badRows = out.bad;
+                        },
+                        failure: function () {
+                                target.unmask();
+                                Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+                        }
+                });
+        };
+        load();
+};
+
 //สถานะที่แก้ไขได้ gl_dr => 3,4,5,6,99
 function showCustomEditForm(rec) {
 
@@ -10700,6 +11060,14 @@ var updateMissingWithdrawEmp = function (grid, record, button) {
 
 
 var cellClick = function (grid, rowIndex, columnIndex, e) {
+        if (e.getTarget("button.check-overlap-user")) {
+                e.stopEvent();
+                var ovRow = grid.getStore().getAt(rowIndex);
+                Ext.showUserOverlapCheck(ovRow.get("sp_check_period_hdr_id"), function () {
+                        grid.getStore().reload();
+                });
+                return;
+        }
         var updateButton = e.getTarget("button.update-missing-withdraw-emp");
         if (updateButton) {
                 e.stopEvent();
@@ -11649,6 +12017,24 @@ Ext.AppUx = function (app, menu) {
                                         },
                                 },
                                 {
+                                        header: "ใบกันเหลื่อม",
+                                        sortable: false,
+                                        align: "center",
+                                        dataIndex: "sp_check_period_hdr_id",
+                                        width: 130,
+                                        renderer: function (value, metaData, record) {
+                                                if (!value) {
+                                                        return "";
+                                                }
+                                                // ตัดใบกันแล้ว (ตรวจรับผูกเลขใบกันแล้ว - ตั้งตอนตัดเงินใบกัน) -> แสดงเลขใบกันให้เห็นเลย
+                                                var code = record.get("c_overlap");
+                                                var used = code
+                                                        ? '<div style="color:#080;font-weight:bold;white-space:nowrap;">✔ ' + Ext.util.Format.htmlEncode(code) + '</div>'
+                                                        : "";
+                                                return used + '<button type="button" class="check-overlap-user" style="cursor:pointer;color:#0b5394;border:1px solid #6fa8dc;border-radius:3px;background:#fff;padding:2px 8px;">ตรวจใบกัน</button>';
+                                        },
+                                },
+                                {
                                         header: "เลขรับของ",
                                         sortable: false,
                                         align: "center",
@@ -12074,8 +12460,8 @@ Ext.AppUx = function (app, menu) {
                                                                         },
                                                                 },
                                                                 {
-                                                                        text: "ยืนยันกันเหลื่อมก่อหนี้แล้ว",
-                                                                        hidden: Ext.selectRow.data.i_type_bg != 1 ? true : false,
+                                                                        text: Number(Ext.selectRow.data.i_type_bg) === 4 ? "เลือกเลขที่ใบกัน (ยืนยันกันเหลื่อมแล้ว)" : "ยืนยันกันเหลื่อมก่อหนี้แล้ว",
+                                                                        hidden: !Ext.canPickOverlapBeforeAp(Ext.selectRow.data),
                                                                         icon: "../images/icons/book_edit.png",
                                                                         scope: this,
                                                                         handler: function (e) {
@@ -13134,7 +13520,13 @@ Ext.AppUx = function (app, menu) {
                                                         Ext.getCmp("c_booking_radiogroup").hide();
                                                         // Ext.getCmp("chek_overlapID").show().setValue(Ext.selectRow.data.chek_overlap);
                                                 } else if (Ext.isEmpty(Ext.selectRow.data.c_checking_code) && Ext.selectRow.data.i_chk_bg == 2) {
-                                                        Ext.getCmp("c_booking_radiogroup").hide(true);
+                                                        // ยืนยันกันเหลื่อมก่อหนี้แล้ว: ถ้าเลือกใบกันไว้ตอนยืนยัน ให้แสดงเลขใบกัน (อ่านอย่างเดียว) ที่จะใช้ตอนออกเลข AP
+                                                        if (Ext.selectRow.data.c_contract_overlap) {
+                                                                Ext.getCmp("c_booking_radiogroup").show(true);
+                                                                // มีใบกันที่ยืนยันไว้แล้ว -> ออกเลข AP พร้อมตัดใบกัน (แม้ติ๊ก "ไม่เช็คเงิน" ไว้)
+                                                        } else {
+                                                                Ext.getCmp("c_booking_radiogroup").hide(true);
+                                                        }
                                                         Ext.getCmp("c_bookingID").setReadOnly(true);
                                                 } else if (Ext.selectRow.data.i_yyyy_overlap != Ext.BudgetYear) {
                                                         Ext.getCmp("c_booking_radiogroup").show(true);
@@ -14084,7 +14476,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                         if (rec._vatManual) {
                                                                                                                                 vatVal = parseFloat((rec.get("f_vat_amt") || "0").toString().replace(/,/g, "")) || 0;
                                                                                                                         } else {
-                                                                                                                                var net = parseFloat((rec.get("f_net_total") || "0").toString().replace(/,/g, "")) || 0;
+                                                                                                                                var net = Ext.itemNetForVat(rec.data);
                                                                                                                                 if (net > 0 && record._vatManual === true) {
                                                                                                                                         vatVal = Math.round((net / 1.07) * 0.07 * 100) / 100;
                                                                                                                                 }
@@ -14664,7 +15056,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                 xtype: "checkbox",
                                                                                                 id: "i_skip_bg_checkID",
                                                                                                 fieldLabel: "ออกเลขตรวจรับ",
-                                                                                                boxLabel: '<span style="color:red">ออกเลขตรวจรับโดยไม่เช็คเงิน</span>',
+                                                                                                boxLabel: '<span style="color:red">ออกเลขตรวจรับโดยไม่เช็คเงิน</span> <span style="color:#666">(ใบกันเหลื่อมยังตัดตามปกติ)</span>',
                                                                                                 checked: true, // ค่าเริ่มต้น: ไม่เช็คเงินและใบกัน (เอาติ๊กออกเพื่อกลับไปจองเงิน/หักใบกันแบบเดิม)
                                                                                                 submitValue: false,
                                                                                         },
@@ -14910,9 +15302,9 @@ Ext.AppUx = function (app, menu) {
                                                                                                 xtype: "button",
                                                                                                 id: "btnConfirmBookingID",
                                                                                                 fieldLabel: "ยืนยันใบกัน",
-                                                                                                text: "ยืนยันกันเหลื่อมก่อหนี้ (เปิดหน้ายืนยันใบกัน)",
+                                                                                                text: Number(Ext.selectRow.data.i_type_bg) === 4 ? "เลือกเลขที่ใบกัน (เปิดหน้ายืนยันใบกัน)" : "ยืนยันกันเหลื่อมก่อหนี้ (เปิดหน้ายืนยันใบกัน)",
                                                                                                 icon: "../images/icons/book_edit.png",
-                                                                                                hidden: Number(Ext.selectRow.data.i_type_bg) !== 1,
+                                                                                                hidden: !Ext.canPickOverlapBeforeAp(Ext.selectRow.data),
                                                                                                 handler: function () {
                                                                                                         win_request_edit_bg(Ext.selectRow);
                                                                                                 },
@@ -16887,9 +17279,12 @@ Ext.AppUx = function (app, menu) {
                                                                                                 value: 1,
                                                                                         },
                                                                                         {
+                                                                                                // mnUploadDocChk.php: i_sys 1 = NMU_ERP (upload_Chk/), 3 = EIS_PROCURE (upload_eis_Chk/)
+                                                                                                // หน้านี้เป็นระบบพัสดุ (NMU_ERP) เสมอ ไม่ใช้ Ext.session.i_sys (I_SYS ใน config อาจเป็น 3)
+                                                                                                // ไม่งั้น PDF ไปลงโฟลเดอร์/ฐานข้อมูล procure แล้วหน้านี้หาไฟล์ไม่เจอ ต้องเลือกไฟล์ใหม่ทุกครั้ง
                                                                                                 xtype: "hidden",
                                                                                                 name: "i_sys",
-                                                                                                value: Ext.session.i_sys,
+                                                                                                value: 1,
                                                                                         },
                                                                                         {
                                                                                                 fieldLabel: "hostname",
@@ -17123,7 +17518,7 @@ Ext.AppUx = function (app, menu) {
                                                                                 } else if (rec._vatManual) {
                                                                                         v = parseFloat((rec.get("f_vat_amt") || "0").toString().replace(/,/g, "")) || 0;
                                                                                 } else {
-                                                                                        var net = parseFloat((rec.get("f_net_total") || "0").toString().replace(/,/g, "")) || 0;
+                                                                                        var net = Ext.itemNetForVat(rec.data);
                                                                                         if (net > 0)
                                                                                                 v = Math.round((net / 1.07) * 0.07 * 100) / 100;
                                                                                 }
@@ -17166,7 +17561,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         if (v._vatManual) {
                                                                                                 return parseFloat((v.data.f_vat_amt + "").replace(/,/g, "")) || 0;
                                                                                         }
-                                                                                        var net = parseFloat((v.data.f_net_total + "").replace(/,/g, "")) || 0;
+                                                                                        var net = Ext.itemNetForVat(v.data);
                                                                                         return net > 0 ? Math.round((net / 1.07) * 0.07 * 100) / 100 : 0;
                                                                                 })()
                                                                         });
@@ -17413,8 +17808,8 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                                                                                                                                         },
                                                                                                                                                                                                                                                                 });
                                                                                                                                                                                                                                                         });
-                                                                                                                                                                                                                                                } else if (Ext.isSkipBgCheck()) {
-                                                                                                                                                                                                                                                        // ออกเลขตรวจรับโดยไม่เช็คเงินและใบกัน: ข้ามการจองเงิน/หักใบกัน
+                                                                                                                                                                                                                                                } else if (Ext.isSkipBgCheck() && !Ext.usesOverlapForAp(record[0].data)) {
+                                                                                                                                                                                                                                                        // ออกเลขตรวจรับโดยไม่เช็คเงิน: ข้ามการจองเงินปีปัจจุบัน (รายการใช้ใบกันเหลื่อมไปทาง bookingOverall เพื่อตัดใบกัน)
                                                                                                                                                                                                                                                         Ext.genCodeSkipBg(record[0].data);
                                                                                                                                                                                                                                                 } else {
                                                                                                                                                                                                                                                         Ext.bookingOverall(record, rec);

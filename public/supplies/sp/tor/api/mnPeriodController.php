@@ -852,6 +852,28 @@ switch ($mode) {
                 . " where sp_check_period_hdr_id = ?";
 
         $stmt = $db->QueryParam($sql, $arrParam);
+
+        // ทำให้แถวตัดใบกันอยู่ในรูปแบบของระบบพัสดุ (NMU_ERP): i_sys = 1, chk_id = เลขตรวจรับ, i_year = ปีใบกัน
+        // (ไม่ขึ้นกับค่า I_SYS ใน config และกันกรณีลิงก์จองส่ง chk_id/ปี ผิดมา) - ไม่งั้นหน้าเงินกันเหลื่อมจะไม่แสดง
+        // และตอนออกใบเบิกจะไม่ปิดรายการ (i_finish) ทำให้ยอดคงเหลือใบกันผิด
+        if ($stmt && !empty($data["bg_reserve_overlap_id"])) {
+            $db->QueryParam("
+                UPDATE ro SET
+                    ro.i_sys = 1,
+                    ro.chk_id = chk.sp_check_period_hdr_id,
+                    ro.i_year = ISNULL((SELECT TOP 1 o.i_year FROM NMU_EIS..vw_bg_budget_overlap o
+                                        WHERE o.c_code_ref = ro.c_code_overlap), ro.i_year),
+                    ro.d_update = GETDATE()
+                FROM NMU_EIS..bg_reserve_overlap ro
+                INNER JOIN dbo.sp_check_period_hdr chk ON chk.bg_reserve_overlap_id = ro.bg_reserve_overlap_id
+                WHERE ro.bg_reserve_overlap_id = ?
+                  AND chk.sp_check_period_hdr_id = ?
+                  AND ro.po_id = chk.sp_tor_contract_id
+                  AND ro.c_code_overlap = chk.c_overlap
+                  AND ro.i_enable = 1", array(
+                $data["bg_reserve_overlap_id"],
+                $data["sp_check_period_hdr_id"]));
+        }
         $re_id = $data["id"];
         break;
 
