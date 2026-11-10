@@ -9039,6 +9039,19 @@ Ext.gridEditMoneyOverlapfn = (rec) => {
                         },
                         '-',
                         {
+                                text: 'แก้จองซ้ำ (ปีปัจจุบัน + กันเหลื่อม)',
+                                iconCls: 'icon-edit',
+                                handler: function () {
+                                        Ext.showFixDoubleReserveOverlap(targetChkId, function () {
+                                                store.reload();
+                                                if (Ext.gridEditMoney) {
+                                                        Ext.gridEditMoney.getStore().reload();
+                                                }
+                                        });
+                                }
+                        },
+                        '-',
+                        {
                                 text: 'เปิดใช้งาน',
                                 iconCls: 'icon-accept',
                                 handler: function () {
@@ -9099,6 +9112,132 @@ Ext.gridEditMoneyOverlapfn = (rec) => {
                 ]
         });
 };
+// แก้ตรวจรับที่ใช้ใบกันเหลื่อม แต่ยังจองเงินปีปัจจุบันค้าง (ตัดเงินซ้ำ)
+// + แก้แถวตัดใบกันที่บันทึกผิดรูปแบบ (i_sys / chk_id / i_year / i_finish)
+Ext.showFixDoubleReserveOverlap = function (chkId, onDone) {
+        var fmt = function (v) {
+                return Ext.util.Format.number(Number(v || 0), '0,000.00');
+        };
+        var nz = function (v) {
+                return (v === null || v === undefined || v === '') ? '-' : v;
+        };
+        var td = 'style="padding:4px 8px;border:1px solid #ccc;"';
+        var tdBad = 'style="padding:4px 8px;border:1px solid #ccc;color:#c00;font-weight:bold;"';
+        var tdOk = 'style="padding:4px 8px;border:1px solid #ccc;color:#080;font-weight:bold;"';
+
+        Ext.getBody().mask('กำลังตรวจสอบ...');
+        Ext.Ajax.request({
+                url: 'tor/api/mnCheckingController.php',
+                method: 'POST',
+                params: { mode: 'checkDoubleReserveOverlap', chk_id: chkId },
+                success: function (response) {
+                        Ext.getBody().unmask();
+                        var res = Ext.decode(response.responseText);
+                        if (!res.success) {
+                                Ext.Msg.alert('แจ้งเตือน', res.msg || 'ตรวจสอบไม่สำเร็จ');
+                                return;
+                        }
+                        var d = res.data;
+                        var hasOverlap = d.c_overlap && String(d.c_overlap).trim() !== '';
+                        var needA = Number(d.need_cancel_money) === 1;
+                        var needB = Number(d.need_fix_overlap) === 1;
+                        var expectFinish = d.po_working_hdr_id ? 1 : nz(d.ro_finish);
+
+                        var html = '<div style="padding:8px;font-size:13px;line-height:1.6;">'
+                                + '<b>ตรวจรับ</b> ' + nz(d.c_code) + ' (ID ' + d.sp_check_period_hdr_id + ')'
+                                + ' &nbsp; <b>ใบกัน</b> ' + (hasOverlap ? d.c_overlap : '<span style="color:#c00">ไม่ได้ใช้ใบกัน</span>')
+                                + ' &nbsp; <b>ปีใบกัน</b> ' + nz(d.i_yyyy_overlap)
+                                + ' &nbsp; <b>ใบเบิก</b> ' + (d.po_working_hdr_id ? 'ออกแล้ว' : 'ยังไม่ออก')
+                                + '<br><br><b>1) จองเงินปีปัจจุบัน (bg_reserve_money)</b>';
+                        if (!d.bg_reserve_money_id) {
+                                html += '<div style="color:#080">ไม่มีรายการจองเงินปีปัจจุบัน</div>';
+                        } else {
+                                html += '<table style="border-collapse:collapse;margin:4px 0;">'
+                                        + '<tr><td ' + td + '>ID</td><td ' + td + '>ปี</td><td ' + td + '>จำนวนเงิน</td><td ' + td + '>สถานะ</td><td ' + td + '>จะแก้เป็น</td></tr>'
+                                        + '<tr><td ' + td + '>' + d.bg_reserve_money_id + '</td><td ' + td + '>' + nz(d.rm_year) + '</td>'
+                                        + '<td ' + td + ' align="right">' + fmt(d.rm_amt) + '</td>'
+                                        + '<td ' + (needA ? tdBad : td) + '>' + (Number(d.rm_enable) === 1 ? 'ยังจองอยู่' : 'ยกเลิกแล้ว') + '</td>'
+                                        + '<td ' + (needA ? tdOk : td) + '>' + (needA ? 'ยกเลิกการจอง' : '-') + '</td></tr></table>';
+                        }
+                        html += '<b>2) ตัดเงินใบกันเหลื่อม (bg_reserve_overlap)</b>';
+                        if (!d.bg_reserve_overlap_id) {
+                                html += '<div style="color:#c00">ยังไม่มีรายการตัดใบกัน — เลือกใบกันให้เรียบร้อยก่อน</div>';
+                        } else {
+                                var cell = function (label, now, want) {
+                                        var bad = String(nz(now)) !== String(nz(want));
+                                        return '<tr><td ' + td + '>' + label + '</td><td ' + (bad ? tdBad : td) + '>' + nz(now) + '</td>'
+                                                + '<td ' + (bad ? tdOk : td) + '>' + (bad ? nz(want) : '-') + '</td></tr>';
+                                };
+                                html += '<table style="border-collapse:collapse;margin:4px 0;">'
+                                        + '<tr><td ' + td + '>ID ' + d.bg_reserve_overlap_id + ' (' + fmt(d.ro_amt) + ')</td><td ' + td + '>ปัจจุบัน</td><td ' + td + '>จะแก้เป็น</td></tr>'
+                                        + cell('i_sys', d.ro_sys, 1)
+                                        + cell('chk_id', d.ro_chk_id, d.sp_check_period_hdr_id)
+                                        + cell('i_year', d.ro_year, d.i_yyyy_overlap || d.ro_year)
+                                        + cell('i_finish', d.ro_finish, expectFinish)
+                                        + '</table>';
+                        }
+                        var canFix = hasOverlap && d.bg_reserve_overlap_id && (needA || needB);
+                        html += '<div style="margin-top:8px;font-weight:bold;color:' + (canFix ? '#c60' : '#080') + '">'
+                                + (canFix ? 'พบรายการที่ต้องแก้ กด "ยืนยันแก้ไข" เพื่อบันทึก'
+                                        : (hasOverlap && !d.bg_reserve_overlap_id ? 'ยังแก้ไม่ได้' : 'รายการนี้ถูกต้องแล้ว ไม่ต้องแก้'))
+                                + '</div></div>';
+
+                        var win = new Ext.Window({
+                                title: 'แก้จองซ้ำ: จองเงินปีปัจจุบัน แต่ใช้ใบกันเหลื่อม',
+                                width: 620,
+                                autoHeight: true,
+                                modal: true,
+                                html: html,
+                                buttons: [{
+                                                text: 'ยืนยันแก้ไข',
+                                                iconCls: 'icon-accept',
+                                                disabled: !canFix,
+                                                handler: function () {
+                                                        Ext.Msg.confirm('ยืนยัน', 'ยืนยันแก้ไขตรวจรับ ID <b>' + chkId + '</b> ใช่หรือไม่?', function (btn) {
+                                                                if (btn !== 'yes') {
+                                                                        return;
+                                                                }
+                                                                win.getEl().mask('กำลังบันทึก...');
+                                                                Ext.Ajax.request({
+                                                                        url: 'tor/api/mnCheckingController.php',
+                                                                        method: 'POST',
+                                                                        params: { mode: 'fixDoubleReserveOverlap', chk_id: chkId },
+                                                                        success: function (r) {
+                                                                                win.getEl().unmask();
+                                                                                var o = Ext.decode(r.responseText);
+                                                                                if (o.success) {
+                                                                                        win.close();
+                                                                                        Ext.Msg.alert('สำเร็จ', o.msg);
+                                                                                        if (onDone) {
+                                                                                                onDone();
+                                                                                        }
+                                                                                } else {
+                                                                                        Ext.Msg.alert('ผิดพลาด', o.msg || 'แก้ไขไม่สำเร็จ');
+                                                                                }
+                                                                        },
+                                                                        failure: function () {
+                                                                                win.getEl().unmask();
+                                                                                Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+                                                                        }
+                                                                });
+                                                        });
+                                                }
+                                        }, {
+                                                text: 'ปิด',
+                                                handler: function () {
+                                                        win.close();
+                                                }
+                                        }]
+                        });
+                        win.show();
+                },
+                failure: function () {
+                        Ext.getBody().unmask();
+                        Ext.Msg.alert('ผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+                }
+        });
+};
+
 //สถานะที่แก้ไขได้ gl_dr => 3,4,5,6,99
 function showCustomEditForm(rec) {
 

@@ -3950,6 +3950,117 @@ switch ($mode) {
         $db->CommitTran();
         exit();
         break;
+    case "checkDoubleReserveOverlap":
+    case "fixDoubleReserveOverlap":
+        // ตรวจรับที่ใช้ใบกันเหลื่อม แต่ยังจองเงินปีปัจจุบัน (bg_reserve_money) ค้างอยู่ = ตัดเงินซ้ำ
+        // และแถวตัดใบกัน (bg_reserve_overlap) ที่บันทึกผิดรูปแบบ (i_sys/chk_id/i_year/i_finish)
+        header("Content-Type: application/json; charset=utf-8");
+        $chkId = filter_var($_REQUEST['chk_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$chkId || $chkId < 1) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ไม่พบเลขตรวจรับ (chk_id)"));
+            exit;
+        }
+
+        $sqlDiag = "
+            SELECT
+                chk.sp_check_period_hdr_id, chk.c_code, chk.c_overlap, chk.i_overlap, chk.i_yyyy_overlap,
+                chk.sp_tor_contract_id, chk.po_working_hdr_id, chk.f_total AS f_check_total,
+                rm.bg_reserve_money_id, rm.i_year AS rm_year, rm.i_reserve AS rm_reserve,
+                rm.i_finish AS rm_finish, rm.i_enable AS rm_enable, rm.f_amt AS rm_amt,
+                ro.bg_reserve_overlap_id, ro.c_code_overlap AS ro_code, ro.i_sys AS ro_sys, ro.chk_id AS ro_chk_id,
+                ro.i_year AS ro_year, ro.i_finish AS ro_finish, ro.i_enable AS ro_enable, ro.f_amt AS ro_amt,
+                CASE WHEN ISNULL(chk.c_overlap,'') <> '' AND rm.i_enable = 1
+                          AND ro.bg_reserve_overlap_id IS NOT NULL THEN 1 ELSE 0 END AS need_cancel_money,
+                CASE WHEN ro.bg_reserve_overlap_id IS NOT NULL
+                          AND ( ro.i_sys <> 1
+                             OR ISNULL(ro.chk_id,0) <> chk.sp_check_period_hdr_id
+                             OR ISNULL(ro.i_year,0) <> ISNULL(chk.i_yyyy_overlap, ro.i_year)
+                             OR (chk.po_working_hdr_id IS NOT NULL AND ISNULL(ro.i_finish,0) <> 1) )
+                     THEN 1 ELSE 0 END AS need_fix_overlap
+            FROM dbo.sp_check_period_hdr chk
+            LEFT JOIN NMU_EIS..bg_reserve_money rm
+                   ON rm.bg_reserve_money_id = chk.bg_checking_money_id
+            LEFT JOIN NMU_EIS..bg_reserve_overlap ro
+                   ON ro.bg_reserve_overlap_id = chk.bg_reserve_overlap_id
+                  AND ro.c_code_overlap = chk.c_overlap
+                  AND ro.po_id = chk.sp_tor_contract_id
+                  AND ro.i_enable = 1
+            WHERE chk.sp_check_period_hdr_id = ?";
+        $res = sqlsrv_query($db->conn, $sqlDiag, array($chkId));
+        $diag = $res ? $db->Fetch($res) : null;
+        if (!$diag) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ไม่พบรายการตรวจรับ ID {$chkId}"));
+            exit;
+        }
+
+        if ($mode === "checkDoubleReserveOverlap") {
+            $db->RollBackTran();
+            echo json_encode(array("success" => true, "data" => $diag));
+            exit;
+        }
+
+        if (trim((string) $diag['c_overlap']) === '') {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ตรวจรับนี้ไม่ได้ใช้ใบกันเหลื่อม ไม่ต้องแก้"));
+            exit;
+        }
+        if (empty($diag['bg_reserve_overlap_id'])) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ยังไม่มีรายการตัดใบกันเหลื่อมของตรวจรับนี้ (bg_reserve_overlap) กรุณาเลือกใบกันให้เรียบร้อยก่อน"));
+            exit;
+        }
+        if (intval($diag['need_cancel_money']) !== 1 && intval($diag['need_fix_overlap']) !== 1) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "รายการนี้ถูกต้องอยู่แล้ว ไม่มีอะไรต้องแก้"));
+            exit;
+        }
+
+        $ok = true;
+        $done = array();
+        $userId = $_SESSION['user_id'];
+        if (intval($diag['need_cancel_money']) === 1) {
+            $sqlA = "UPDATE NMU_EIS..bg_reserve_money
+                        SET i_enable = 0, d_update = GETDATE(),
+                            c_comment = LEFT(N'ยกเลิก ' + CONVERT(varchar(10), GETDATE(), 23)
+                                + N' user ' + CAST(? AS nvarchar(20))
+                                + N': ใช้ใบกันเหลื่อม ' + ? + N' แทน (chk ' + CAST(? AS nvarchar(20)) + N')', 255)
+                      WHERE bg_reserve_money_id = ? AND i_enable = 1";
+            $r = sqlsrv_query($db->conn, $sqlA, array($userId, $diag['c_overlap'], $chkId, $diag['bg_reserve_money_id']));
+            if ($r === false || sqlsrv_rows_affected($r) !== 1) {
+                $ok = false;
+            } else {
+                $done[] = "ยกเลิกจองเงินปีปัจจุบัน bg_reserve_money_id " . $diag['bg_reserve_money_id'];
+            }
+        }
+        if ($ok && intval($diag['need_fix_overlap']) === 1) {
+            $sqlB = "UPDATE NMU_EIS..bg_reserve_overlap
+                        SET i_sys = 1,
+                            chk_id = ?,
+                            i_year = ISNULL(?, i_year),
+                            i_finish = CASE WHEN ? IS NOT NULL THEN 1 ELSE i_finish END,
+                            d_update = GETDATE()
+                      WHERE bg_reserve_overlap_id = ? AND i_enable = 1";
+            $r = sqlsrv_query($db->conn, $sqlB, array(
+                $chkId, $diag['i_yyyy_overlap'], $diag['po_working_hdr_id'], $diag['bg_reserve_overlap_id']));
+            if ($r === false || sqlsrv_rows_affected($r) !== 1) {
+                $ok = false;
+            } else {
+                $done[] = "แก้แถวตัดใบกัน bg_reserve_overlap_id " . $diag['bg_reserve_overlap_id'];
+            }
+        }
+
+        if (!$ok || !$db->CommitTran()) {
+            $db->RollBackTran();
+            $err = sqlsrv_errors();
+            echo json_encode(array("success" => false,
+                "msg" => "แก้ไขไม่สำเร็จ ยกเลิกทั้งหมด" . ($err ? " : " . $err[0]['message'] : "")));
+            exit;
+        }
+        echo json_encode(array("success" => true, "msg" => implode("<br>", $done)));
+        exit;
+
     case "enableReserveOverlap":
         $stmt2 = true;
         $stmt3 = true;
