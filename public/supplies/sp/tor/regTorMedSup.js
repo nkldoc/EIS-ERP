@@ -78,7 +78,7 @@ Ext.storeMedSupPoExpense = new Ext.data.JsonStore({
     fields: ["id", "c_name"],
 });
 
-// ประเภทหน่วยงานที่ใช้ออกเลข AP/ต่อท้ายเลข PR (APPS พัสดุ/APMD เภสัช/APMS เวชภัณฑ์) -
+// ประเภทหน่วยงานที่ใช้ออกเลข AP/ต่อท้ายเลข PR (APPS พัสดุ/APF เภสัช/APMSD เวชภัณฑ์) -
 // รูปแบบเดียวกับ Ext.storeApDeptTypePeriodBill ใน medSupPeriodBill.js
 Ext.storeMedSupApDeptType = new Ext.data.JsonStore({
     fields: ["id", "c_name"],
@@ -86,13 +86,13 @@ Ext.storeMedSupApDeptType = new Ext.data.JsonStore({
     autoLoad: false,
     data: [
         {id: "APPS", c_name: "APPS - พัสดุ", dc_cost_id: 38},
-        {id: "APMD", c_name: "APMD - เภสัช", dc_cost_id: 50},
-        {id: "APMS", c_name: "APMS - เวชภัณฑ์", dc_cost_id: 82},
+        {id: "APF", c_name: "APF - เภสัช", dc_cost_id: 50},
+        {id: "APMSD", c_name: "APMSD - เวชภัณฑ์", dc_cost_id: 82},
     ],
 });
 // แมพ "ประเภท" กับหน่วยงานจริงใน dc_cost (38 ฝ่ายพัสดุ / 50 ฝ่ายเภสัชกรรม / 82 งานเวชภัณฑ์ฯ)
 // แทนข้อความคงที่ - ชื่อดึงจาก dc_cost เมื่อโหลดเสร็จ
-Ext.MEDSUP_AP_DEPT_COST = {APPS: 38, APMD: 50, APMS: 82};
+Ext.MEDSUP_AP_DEPT_COST = {APPS: 38, APF: 50, APMSD: 82};
 Ext.storeMedSupCost.on("load", function (st) {
     Ext.storeMedSupApDeptType.each(function (r) {
         var idx = st.find("id", String(r.get("dc_cost_id")));
@@ -205,14 +205,14 @@ function winAddMedSupPr(rec) {
         triggerAction: "all", forceSelection: true, typeAhead: false,
         emptyText: "กรุณาเลือกค่าใช้จ่าย...",
         // เภสัช/เวชภัณฑ์ ล็อกค่าใช้จ่ายเป็นค่าเริ่มต้นด้านล่าง (ไม่มี dropdown) - พัสดุ/admin เลือกเองได้
-        readOnly: userApDept === "APMD" || userApDept === "APMS",
-        hideTrigger: userApDept === "APMD" || userApDept === "APMS",
+        readOnly: userApDept === "APF" || userApDept === "APMSD",
+        hideTrigger: userApDept === "APF" || userApDept === "APMSD",
     });
 
     // ค่าเริ่มต้น "030300090001 : ค่ายาและเวชภัณฑ์ อวัยวะเทียม" (bg_expense_id 133) สำหรับ
     // เภสัช/เวชภัณฑ์ - เฉพาะโหมดสร้างใหม่ (โหมดแก้ไขใช้ค่าเดิมของ PR) ต้องรอ store โหลดเสร็จ
     // ก่อน ไม่งั้น combo จะโชว์เป็นเลข id ดิบ
-    if (!isEdit && (userApDept === "APMD" || (userApDept || "APMS") === "APMS")) {
+    if (!isEdit && (userApDept === "APF" || (userApDept || "APMSD") === "APMSD")) {
         var setDefaultExpense = function () {
             var r = Ext.storeMedSupPoExpense.getById("133");
             if (r && !po_expense_idFld.getValue()) {
@@ -231,8 +231,8 @@ function winAddMedSupPr(rec) {
         store: Ext.storeMedSupApDeptType, mode: "local", valueField: "id", displayField: "c_name",
         triggerAction: "all", forceSelection: true, typeAhead: false, editable: false,
         // ผู้ใช้ของ พัสดุ/เภสัช/เวชภัณฑ์ ล็อกประเภทตามหน่วยงานตัวเอง (ไม่มี dropdown ให้เลือก)
-        // ผู้ใช้หน่วยงานอื่น (เช่น admin) ยังเลือกเองได้ โดยเริ่มที่ APMS เหมือนเดิม
-        value: userApDept || "APMS",
+        // ผู้ใช้หน่วยงานอื่น (เช่น admin) ยังเลือกเองได้ โดยเริ่มที่ APMSD (เวชภัณฑ์) เหมือนเดิม
+        value: userApDept || "APMSD",
         readOnly: !!userApDept, hideTrigger: !!userApDept,
         // ผู้ใช้ที่ถูกล็อกจะเหลือรายการเดียวคือของหน่วยงานตัวเอง (admin/หน่วยงานอื่นเห็นครบ 3 รายการ)
         listeners: {
@@ -522,7 +522,7 @@ function winAddMedSupPr(rec) {
         labelWidth: 150,
         defaults: {labelWidth: 150, labelSeparator: ":", anchor: "60%"},
         items: [
-            // "ประเภท" (APPS/APMD/APMS) ย้ายมาไว้บนสุด เหนือ "ประเภท PR" ตามที่ขอ
+            // "ประเภท" (APPS/APMSD/APMS) ย้ายมาไว้บนสุด เหนือ "ประเภท PR" ตามที่ขอ
             c_ap_dept_typeFld,
             i_type_bgFld,
             i_budget_yearFld,
@@ -592,7 +592,7 @@ function winAddMedSupPr(rec) {
         i_product_typeFld.setValue(rec.get("i_product_type") || 1);
         po_expense_idFld.setValue(rec.get("po_expense_id"));
         po_expense_idFld.setRawValue(rec.get("c_expense_name"));
-        c_ap_dept_typeFld.setValue(rec.get("c_ap_dept_type") || "APMS");
+        c_ap_dept_typeFld.setValue(rec.get("c_ap_dept_type") || "APMSD");
         dc_expense_budget_type_idFld.setValue(rec.get("dc_expense_budget_type_id"));
         dc_expense_budget_type_idFld.setRawValue(rec.get("c_fund_source"));
         f_fund_amtFld.setValue(String(rec.get("f_fund_amt") || "0").replace(/,/g, ""));

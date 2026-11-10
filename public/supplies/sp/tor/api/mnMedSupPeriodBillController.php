@@ -158,7 +158,7 @@ switch ($mode) {
             // COST_ID; เขียนทับไปแล้วที่ด้านบนไฟล์สำหรับทุก mode) default เป็นเวชภัณฑ์
             // (82) ถ้าไม่ได้เลือกมา
             "dc_cost_id" => !empty($_REQUEST["dc_cost_id"]) ? intval($_REQUEST["dc_cost_id"]) : MEDSUP_DC_COST_ID,
-            "c_ap_dept_type" => $data["c_ap_dept_type"] ?? "APMS",
+            "c_ap_dept_type" => $data["c_ap_dept_type"] ?? "APMSD",
             // ประเภท PR (dbo.sp_type_bg) - ค่าเริ่มต้น 1 = "PR ปกติ" ถ้าไม่ได้ส่งมา
             "i_type_bg" => isset($data["i_type_bg"]) && $data["i_type_bg"] !== "" ? intval($data["i_type_bg"]) : 1,
             "po_expense_id" => $data["po_expense_id"] ?? null,
@@ -204,7 +204,7 @@ switch ($mode) {
         $newPeriodBillId = intval($newRow["sp_tor_period_bill_id"]);
 
         // ออกเลขที่ PR ผ่าน stored procedure ตัวเดียวกับเมนู PR ทั่วไป (SP_GEN_CODE) แล้ว
-        // ต่อท้ายด้วยรหัสหน่วยงาน (APPS/APMD/APMS) ตามที่เลือกในฟอร์ม - ใช้
+        // ต่อท้ายด้วยรหัสหน่วยงาน (APPS/APMSD/APMS) ตามที่เลือกในฟอร์ม - ใช้
         // sp_tor_period_bill_id (เพิ่งสร้างเสร็จ) เป็น reference_id ให้ SP_GEN_CODE
         $bcm = date('Ym', strtotime(date('Y-m-d') . "+543 years"));
         $stmtCode = $db->QueryParam(
@@ -279,7 +279,7 @@ switch ($mode) {
             // เก็บเป็น ค.ศ. เหมือน ADD_PR ด้านบน (ดูคำอธิบายที่นั่น)
             "i_budget_year" => isset($data["i_budget_year"]) && $data["i_budget_year"] !== "" ? intval($data["i_budget_year"]) - 543 : null,
             "dc_cost_id" => !empty($_REQUEST["dc_cost_id"]) ? intval($_REQUEST["dc_cost_id"]) : MEDSUP_DC_COST_ID,
-            "c_ap_dept_type" => $data["c_ap_dept_type"] ?? "APMS",
+            "c_ap_dept_type" => $data["c_ap_dept_type"] ?? "APMSD",
             "i_type_bg" => isset($data["i_type_bg"]) && $data["i_type_bg"] !== "" ? intval($data["i_type_bg"]) : 1,
             "po_expense_id" => $data["po_expense_id"] ?? null,
             "c_expense_name" => $data["c_expense_name"] ?? null,
@@ -576,7 +576,7 @@ function reserveMedSupFundSource($hdrId, $slot, $level = "contract") {
     }
     $poId = !empty($row["sp_tor_contract_id"]) ? intval($row["sp_tor_contract_id"]) : $ownHdrId;
 
-    $apDeptCostMap = array("APPS" => 38, "APMD" => 50, "APMS" => 82);
+    $apDeptCostMap = array("APPS" => 38, "APF" => 50, "APMSD" => 82);
     $iPrType = intval($row["i_pr_type{$suffix}"] ?? 1);
     if ($iPrType < 1) {
         $iPrType = 1;
@@ -592,7 +592,7 @@ function reserveMedSupFundSource($hdrId, $slot, $level = "contract") {
         "i_year" => $yearRaw > 2400 ? $yearRaw - 543 : $yearRaw,
         "i_pr_type" => $iPrType, // 1 = แบบแผน / 2 = แบบงวด
         "i_reserve" => 1,
-        // งบผูกกับหน่วยงานตาม "ประเภท" ของรายการ (APPS พัสดุ=38 / APMD เภสัช=50 / APMS เวชภัณฑ์=82)
+        // งบผูกกับหน่วยงานตาม "ประเภท" ของรายการ (APPS พัสดุ=38 / APF เภสัช=50 / APMSD เวชภัณฑ์=82)
         // ห้ามใช้ dc_cost_id ที่เก็บในแถว (เมนูนี้เก็บ 82 คงที่) - งบค่ายา/เวชภัณฑ์ 133 แหล่งเงิน กทม.
         // ปี 2026 อยู่ใต้หน่วยงาน 50 เท่านั้น
         "dc_cost_id" => ($apDeptCostMap[$src["c_ap_dept_type"] ?? ""] ?? intval($src["dc_cost_id"])),
@@ -707,7 +707,7 @@ function reserveMedSupFundSource($hdrId, $slot, $level = "contract") {
 // pr_id ที่ส่งให้ API งบ (คอลัมน์ตัวเลขล้วน) ต้องไม่ชนกับ tor_id ของ PR จริงใน ERP (ลำดับ 1,2,3...
 // ที่ API/รายงานงบใช้จับคู่ PR ตาม pr_id + i_sys - ถ้าส่งเลขลำดับแถวของเราตรงๆ จะไปตรงกับ PR เก่าของ
 // ERP แล้วรายงานแสดงชื่อ/เลข PR/วันที่ผิดตัว)
-//  - มีเลข PR ของเรา: ใช้ "ตัวเลข" ในเลข PR (PR25690900013-APMD -> 25690900013) - ยึดเลขรันเดียวกับ
+//  - มีเลข PR ของเรา: ใช้ "ตัวเลข" ในเลข PR (PR25690900013-APMSD -> 25690900013) - ยึดเลขรันเดียวกับ
 //    ที่ออกผ่าน SP_GEN_CODE ของ ERP ที่ไม่ซ้ำอยู่แล้ว (ตัวอักษรใน bigint ใส่ไม่ได้ จึงเอาแค่ตัวเลข)
 //  - ไม่มีเลข PR (สัญญาที่จองที่หน้าสัญญาเลย): 9900000000 + hdr_id ของสัญญา (ช่วงเลขที่ ERP ไม่ใช้)
 function medSupBgPrId($prCode, $hdrId) {

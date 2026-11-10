@@ -79,6 +79,80 @@ Ext.fnRefreshPlanList = function () {
     var seqCmp = Ext.getCmp("plan_seqID");
     var codeCmp = Ext.getCmp("plan_codeID");
     listCmp.setValue(Ext.fnPlanListHtml(seqCmp ? seqCmp.getValue() : "", codeCmp ? codeCmp.getValue() : ""));
+    Ext.fnLoadPlanBudget();
+};
+// "วงเงินงบประมาณเริ่มต้น" ของรหัสแผนของ PR (เฉพาะหน้า ST0001.1 จัดสรรเงินงบประมาณ) + สถานะใต้ช่อง
+//   ได้รับเรื่องครบแล้ว = ยอด PR ทั้งหมดที่ผูกรหัสแผนเหล่านี้ถึงวงเงินแผนรวม / รอดำเนินการ = ยังไม่ถึง
+// (1 PR มีได้หลายรหัสแผน และ 1 รหัสแผนมีได้หลาย PR - แสดงรายรหัสพร้อม PR ที่ผูกอยู่ให้ตรวจ)
+// ข้อมูลวงเงินแผนอยู่ที่ NMU_ERP.dbo.sp_plan_budget (แผน 05/06) ดึงผ่าน tor/api/mnTorPlan.php mode BUDGET
+Ext.fnPlanBudgetEnabled = function () {
+    return typeof Ext.menu_code !== "undefined" && Ext.menu_code === "ST0001.1";
+};
+Ext.fnPlanBudgetHtml = function (j) {
+    var esc = function (v) {
+        return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    };
+    var fmt = function (n) {
+        return (Number(n) || 0).toLocaleString("th-TH", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    };
+    var pill = function (txt, color, bg) {
+        return '<span style="display:inline-block;padding:1px 10px;border-radius:10px;font-weight:bold;color:' + color +
+            ';background:' + bg + ';border:1px solid ' + color + ';">' + txt + '</span>';
+    };
+    if (!j || !j.success || !j.plans || !j.plans.length) {
+        return '<span style="color:#888;">ยังไม่ได้ระบุรหัสแผน</span>';
+    }
+    if (!j.found_count) {
+        return '<span style="color:#888;">ไม่พบรหัสแผนนี้ในตารางวงเงินแผน (มีเฉพาะแผน 05/06)</span>';
+    }
+    var html = '<div><b style="font-size:16px;">' + fmt(j.budget_total) + '</b> บาท' +
+        ' <span style="color:#777;">(รวม ' + j.found_count + ' รหัสแผน)</span></div>';
+    if (j.complete) {
+        html += '<div style="margin-top:3px;">' + pill("ได้รับเรื่องครบแล้ว", "#2e7d32", "#e8f5e9") +
+            ' <span style="color:#555;">ยอด PR ที่ผูก ' + fmt(j.alloc_total) + ' บาท (' + j.pr_count + ' PR)' +
+            (j.remain < -0.005 ? ' <span style="color:#c62828;">เกินวงเงิน ' + fmt(-j.remain) + ' บาท</span>' : '') + '</span></div>';
+    } else {
+        html += '<div style="margin-top:3px;">' + pill("รอดำเนินการ", "#e65100", "#fff3e0") +
+            ' <span style="color:#555;">ยอด PR ที่ผูก ' + fmt(j.alloc_total) + ' บาท (' + j.pr_count + ' PR) · คงเหลือ ' +
+            fmt(j.remain) + ' บาท</span></div>';
+    }
+    if (j.missing && j.missing.length) {
+        html += '<div style="margin-top:3px;color:#c62828;">ไม่พบวงเงินของรหัสแผน: ' + esc(j.missing.join(", ")) + '</div>';
+    }
+    // รายรหัสแผน: วงเงิน + PR ที่ผูกอยู่ (ใช้ตรวจว่ารหัสแผนนี้มีหลาย PR / PR นี้มีหลายรหัสแผน)
+    html += '<div style="margin-top:6px;font-size:12px;color:#555;">' + j.plans.map(function (p) {
+        var prs = (p.prs || []).map(function (r) {
+            return (r.self ? '<b>' + esc(r.c_code) + ' (ใบนี้)</b>' : esc(r.c_code)) + ' ' + fmt(r.amount);
+        });
+        return '<div style="margin-bottom:3px;"><b>' + esc(p.plan_code) + '</b> ' +
+            (p.found ? 'วงเงิน ' + fmt(p.budget) : '<span style="color:#c62828;">ไม่พบวงเงิน</span>') +
+            ' · PR ที่ผูก ' + prs.length + ' ใบ' + (prs.length ? ': ' + prs.join(" / ") : '') + '</div>';
+    }).join("") + '</div>';
+    return html;
+};
+Ext.fnLoadPlanBudget = function () {
+    if (!Ext.fnPlanBudgetEnabled() || !Ext.selectRow || !Ext.selectRow.get || !Ext.selectRow.get("id")) { return; }
+    // ถูกเรียกซ้ำจากหลายจุด (เปิดฟอร์ม/โหลดรหัสแผน/บันทึกรหัสแผน) - รวมเป็นครั้งเดียว
+    if (Ext.fnLoadPlanBudget.timer) { clearTimeout(Ext.fnLoadPlanBudget.timer); }
+    Ext.fnLoadPlanBudget.timer = setTimeout(function () {
+        var cmp = Ext.getCmp("plan_budgetID");
+        if (!cmp) { return; }
+        Ext.Ajax.request({
+            url: "tor/api/mnTorPlan.php",
+            method: "POST",
+            params: {mode: "BUDGET", tor_id: Ext.selectRow.get("id")},
+            success: function (result) {
+                var j;
+                try { j = Ext.util.JSON.decode(result.responseText); } catch (e) { return; }
+                var c = Ext.getCmp("plan_budgetID");
+                if (c) { c.setValue(Ext.fnPlanBudgetHtml(j)); }
+            },
+            failure: function () {
+                var c = Ext.getCmp("plan_budgetID");
+                if (c) { c.setValue('<span style="color:#c62828;">ดึงวงเงินแผนไม่สำเร็จ</span>'); }
+            },
+        });
+    }, 150);
 };
 
 // หน้าต่างจัดการรหัสแผนหลายรายการต่อ 1 PR (ยอดเงินขึ้นที่แผนที่ 1 ทั้งใบ จึงไม่ต้องกรอกยอดต่อแผน) (เก็บที่ dbo.sp_tor_plan ผ่าน tor/api/mnTorPlan.php)
@@ -944,6 +1018,7 @@ Ext.getBodyMultiBudget = function (rec, status) {
                     Ext.getCmp('plan_seqID').setVisible(v == 1);
                     Ext.getCmp('plan_seqID').setDisabled(v != 1);
                     Ext.getCmp('plan_listID').setVisible(v == 1);
+                    if (Ext.getCmp('plan_budgetID')) Ext.getCmp('plan_budgetID').setVisible(v == 1 && Ext.fnPlanBudgetEnabled());
                     Ext.getCmp('plan_addBtnID').setVisible(v == 1 && Ext.fnCanEditPlan());
                 },
                 change: function (grp, radio) {
@@ -952,6 +1027,9 @@ Ext.getBodyMultiBudget = function (rec, status) {
                     if (addBtn) addBtn.setVisible(on && Ext.fnCanEditPlan());
                     if (Ext.getCmp('plan_listID')) {
                         Ext.getCmp('plan_listID').setVisible(on);
+                    }
+                    if (Ext.getCmp('plan_budgetID')) {
+                        Ext.getCmp('plan_budgetID').setVisible(on && Ext.fnPlanBudgetEnabled());
                     }
                     ['plan_codeID', 'plan_seqID'].forEach(function (id) {
                         var c = Ext.getCmp(id);
@@ -994,8 +1072,18 @@ Ext.getBodyMultiBudget = function (rec, status) {
             listeners: {
                 afterrender: function () {
                     Ext.fnLoadPlanList();
+                    Ext.fnLoadPlanBudget();
                 },
             },
+        },
+        {
+            // วงเงินงบประมาณเริ่มต้นของรหัสแผน + สถานะ "ได้รับเรื่องครบแล้ว / รอดำเนินการ" (เฉพาะหน้า ST0001.1)
+            xtype: 'displayfield',
+            fieldLabel: 'วงเงินงบประมาณเริ่มต้น',
+            id: 'plan_budgetID',
+            anchor: '80%',
+            hidden: Ext.selectRow.get('plan_status') != 1 || !Ext.fnPlanBudgetEnabled(),
+            value: '<span style="color:#888;">กำลังตรวจสอบ...</span>',
         },
         {
             // 1 PR มีได้หลายรหัสแผน: กดเพื่อเปิดหน้าต่างจัดการรหัสแผน (ลำดับที่/รหัสแผน/จำนวนเงิน ต่อแผน)

@@ -304,7 +304,7 @@ function imp_validate($db, $inputRows)
         $expenseMap[imp_str($r["c_code"])] = array("id" => intval($r["bg_expense_id"]), "name" => imp_str($r["c_code"]) . " : " . imp_str($r["c_name"]));
     }
 
-    $deptOk = array("APPS", "APMD", "APMS");
+    $deptOk = array("APPS", "APF", "APMSD");
     $typeOk = array("จัดซื้อจะขาย", "ใบสั่งซื้อ", "สัญญา");
     // c_overlap = เลขใบกันเหลื่อมของแหล่งเงินที่ 1 (ระดับสัญญา - คอลัมน์ c_overlap เดียวกับที่ ST00092 บันทึก
     // ตอนเลือกใบกันเหลื่อม การจองเงินส่งเลขนี้ให้ API งบ) ว่าง = งบปีต่อปี
@@ -484,7 +484,7 @@ function imp_validate($db, $inputRows)
 
         $c["c_ap_dept_type"] = strtoupper($h["dept"]);
         if (!in_array($c["c_ap_dept_type"], $deptOk, true)) {
-            $cErrs[] = "ประเภทต้องเป็น APPS / APMD / APMS";
+            $cErrs[] = "ประเภทต้องเป็น APPS (พัสดุ) / APF (เภสัช) / APMSD (เวชภัณฑ์)";
         }
         $exp = $expenseMap[$h["expense_code"]] ?? null;
         if (!$exp) {

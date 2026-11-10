@@ -38,6 +38,29 @@ function List_QueryParam()
 		$dc_condition_plan     = "AND bb.dc_cost_id = 38";        // ← แก้ alias: bb (detail) ไม่ใช่ aa (header)
 	}
 
+	// หน้า "งบประมาณ พัสดุ แยกตาม ครุภัณฑ์" (asset_only=1):
+	// เหลือเฉพาะ PR ที่รหัสแผน (sp_tor_plan.plan_code) ขึ้นต้น 05- หรือ 06- และลงท้ายปีที่เลือก เช่น 06-OPH-000-001-2570
+	// และตัด PR ของโครงการหลายปี (ชื่อมีช่วงปี เช่น 2568-2571)
+	$asset_only = !empty($_REQUEST["asset_only"]);
+	$asset_filter_sql = "";
+	if ($asset_only) {
+		$asset_filter_sql = "
+DELETE FROM #temp_bg_reserve_money
+WHERE NOT (
+	i_sys = 1
+	AND EXISTS (
+		SELECT 1
+		FROM NMU_ERP..sp_tor t
+			INNER JOIN NMU_ERP..sp_tor_plan p ON p.tor_id = t.tor_id AND p.i_enabled = 1
+		WHERE t.tor_id = #temp_bg_reserve_money.pr_id
+			AND (p.plan_code LIKE '05-%' OR p.plan_code LIKE '06-%')
+			AND p.plan_code LIKE '%-{$yearTh}'
+			AND ISNULL(t.c_name,'') NOT LIKE '%25[0-9][0-9]%[-–]%25[0-9][0-9]%'
+	)
+)
+";
+	}
+
 	$sqlMain = "SET NOCOUNT ON
 -- ===== สร้าง Temp Table สำหรับ bg_reserve_money =====
 SELECT
@@ -103,9 +126,9 @@ WHERE i_last = i_last_max
 			AND aa.i_sys = a.i_sys
 			AND aa.pr_id = a.pr_id
 			AND aa.i_pr_type = a.i_pr_type
-			AND aa.dc_budget_type_id = a.dc_budget_type_id 
+			AND aa.dc_budget_type_id = a.dc_budget_type_id
 	)
-
+{$asset_filter_sql}
 -- ===== สร้าง Temp Table สำหรับ SP_BG_BUDGET_SUM =====
 DECLARE @TEMP_SP_BG_BUDGET_SUM TABLE (
 	i_year bigint,
@@ -448,6 +471,133 @@ foreach (${$root} as &$item) {
 unset($item);
 
 	}  // ← ปิด if ($stmt)
+
+	// asset_only: ยอดจอง/ตรวจรับ/เบิกจ่ายถูกกรองตามรหัสแผนไปแล้วใน SQL (ดู $asset_filter_sql)
+	// ตรงนี้ตัดหมวดงบที่ไม่มี PR ของแผน 05/06 เลยออก และไม่นับ D1 (po_working) เพราะผูกกับ PR ไม่ได้
+	if ($asset_only) {
+		${$root} = array_values(array_filter(${$root}, function ($r) {
+			return ($r["f_pr_total"] + $r["f_po_total"] + $r["f_reserve_check_total"] + $r["f_paid_total"]) != 0;
+		}));
+		foreach (${$root} as &$r) {
+			$r["f_d1_not_finish"] = 0;
+			// งบรวมของหน้านี้ใช้ "งบตามแผน 06" (ด้านล่าง) ไม่ใช่งบจริงของหมวดค่าใช้จ่ายที่มี PR จึงตัดงบของแถวเดิมทิ้ง
+			// เหลือไว้แต่ยอดจอง/ตรวจรับ/เบิกจ่ายของ PR (กันนับงบซ้ำ)
+			$r["f_budget_real"] = 0;
+			$r["f_budget_display"] = 0;
+		}
+		unset($r);
+
+		// งบประมาณรวม = ผลรวมวงเงินแผน 06 ทั้งหมด (NMU_ERP..sp_plan_budget ทุกสถานะ) แยกตามแหล่งเงินของแผน
+		// เพิ่มเป็นแถวงบ 1 แถวต่อแหล่งเงิน (ยอดจองเป็น 0) ให้โดนัท/การ์ดสรุปรวมงบเท่ากับยอดแผน 06
+		// แผนที่ยังไม่ได้ระบุแหล่งเงิน (dc_expense_budget_type_id เป็น NULL) ไม่ถูกนับในแหล่งเงินไหน
+		$sqlPlanFund = "SET NOCOUNT ON
+SELECT b.dc_expense_budget_type_id AS fund_id
+	, (SELECT TOP 1 c_name FROM NMU_DATACENTER..dc_expense_budget_type WHERE dc_expense_budget_type_id = b.dc_expense_budget_type_id) AS fund_name
+	, SUM(ISNULL(b.f_budget, 0)) AS f_total
+FROM NMU_ERP..sp_plan_budget b
+WHERE b.i_enabled = 1 AND b.i_year = {$yearTh} AND b.plan_code LIKE '06-%'
+	AND b.dc_expense_budget_type_id IS NOT NULL
+GROUP BY b.dc_expense_budget_type_id";
+		$planFundRows = array();   // fund_id => array(fund_name, total)
+		$stmtPlan = $db->QueryParam($sqlPlanFund, array());
+		if ($stmtPlan) {
+			while ($pf = $db->Fetch($stmtPlan)) {
+				$planFundRows[intval($pf["fund_id"])] = array("fund_name" => $pf["fund_name"], "total" => (float) $pf["f_total"]);
+			}
+		}
+
+		// แผนที่ยังไม่ระบุแหล่งเงิน (หรือใช้หลายแหล่งเงิน เช่น Excel ช่องแหล่งเงินเป็น "1, 3"): แบ่งตามแหล่งเงินที่ PR จองเงินไว้จริง
+		// ใช้เฉพาะเมื่อ PR ที่ผูกรหัสแผนเดียว (ไม่นับ PR หลายรหัสแผน กันนับซ้ำ) จองเงินรวม >= วงเงินแผน (ยอดครอบคลุมเต็ม)
+		// ยอดที่แบ่งให้แต่ละแหล่ง = ยอดจองของแหล่งนั้น ปรับสัดส่วนให้รวมเท่าวงเงินแผนพอดี
+		$sqlNullFund = "SET NOCOUNT ON
+SELECT b.plan_code, b.f_budget, r.dc_budget_type_id AS fund_id, SUM(ISNULL(r.f_amt, 0)) AS amt
+	, (SELECT TOP 1 c_name FROM NMU_DATACENTER..dc_expense_budget_type WHERE dc_expense_budget_type_id = r.dc_budget_type_id) AS fund_name
+FROM NMU_ERP..sp_plan_budget b
+	-- PR ของแผน: ผูกในตารางผูกแผน (sp_tor_plan) หรือ ถ้ายังไม่ผูก ใช้เลข PR ที่ระบุไว้ในข้อมูลแผน (c_pr_code)
+	INNER JOIN NMU_ERP..sp_tor t ON t.i_enabled = 1
+		AND (t.tor_id IN (SELECT p.tor_id FROM NMU_ERP..sp_tor_plan p WHERE p.plan_code = b.plan_code AND p.i_enabled = 1)
+			OR t.c_code = b.c_pr_code)
+	INNER JOIN NMU_EIS..bg_reserve_money r
+		ON r.pr_id = t.tor_id AND r.i_sys = 1 AND r.i_enable = 1 AND r.i_reserve = 1 AND ISNULL(r.i_last, 0) = 1
+WHERE b.i_enabled = 1 AND b.i_year = {$yearTh} AND b.plan_code LIKE '06-%' AND b.dc_expense_budget_type_id IS NULL
+	AND (SELECT COUNT(*) FROM NMU_ERP..sp_tor_plan q WHERE q.tor_id = t.tor_id AND q.i_enabled = 1) <= 1
+GROUP BY b.plan_code, b.f_budget, r.dc_budget_type_id";
+		$nullPlans = array();   // plan_code => array(budget, funds => array(fund_id => amt), names => array)
+		// รายการแผนที่ยังไม่ระบุแหล่งเงินทั้งหมด (รวมแผนที่ยังไม่มีการจองเงินเลย ซึ่งวงเงินจะเข้าช่อง "ไม่ระบุแหล่งเงิน")
+		$stmtNullList = $db->QueryParam("SET NOCOUNT ON
+SELECT plan_code, f_budget FROM NMU_ERP..sp_plan_budget
+WHERE i_enabled = 1 AND i_year = {$yearTh} AND plan_code LIKE '06-%' AND dc_expense_budget_type_id IS NULL AND ISNULL(f_budget, 0) > 0", array());
+		if ($stmtNullList) {
+			while ($nl = $db->Fetch($stmtNullList)) {
+				$nullPlans[$nl["plan_code"]] = array("budget" => (float) $nl["f_budget"], "funds" => array(), "names" => array());
+			}
+		}
+		$stmtNull = $db->QueryParam($sqlNullFund, array());
+		if ($stmtNull) {
+			while ($nf = $db->Fetch($stmtNull)) {
+				$pc = $nf["plan_code"];
+				if (!isset($nullPlans[$pc])) {
+					$nullPlans[$pc] = array("budget" => (float) $nf["f_budget"], "funds" => array(), "names" => array());
+				}
+				$nullPlans[$pc]["funds"][intval($nf["fund_id"])] = (float) $nf["amt"];
+				$nullPlans[$pc]["names"][intval($nf["fund_id"])] = $nf["fund_name"];
+			}
+		}
+		// ยอดที่จองไปแล้วลงแหล่งเงินตามจริง (ถ้าจองรวมเกินวงเงินแผน ปรับสัดส่วนให้รวมเท่าวงเงิน)
+		// ส่วนที่เหลือของวงเงินที่ไม่รู้แหล่งเงิน ไม่เดา แยกเป็นช่อง "ไม่ระบุแหล่งเงิน" (fund_id 0) เพื่อให้ยอดรวมครบไม่ตกหล่น
+		foreach ($nullPlans as $np) {
+			$sumRes = array_sum($np["funds"]);
+			$scale = ($sumRes > $np["budget"] && $sumRes > 0) ? $np["budget"] / $sumRes : 1.0;
+			$allocated = 0.0;
+			foreach ($np["funds"] as $fid => $amt) {
+				$part = $amt * $scale;
+				$allocated += $part;
+				if (!isset($planFundRows[$fid])) {
+					$planFundRows[$fid] = array("fund_name" => $np["names"][$fid], "total" => 0.0);
+				}
+				$planFundRows[$fid]["total"] += $part;
+			}
+			$unknown = $np["budget"] - $allocated;
+			if ($unknown > 0.005) {
+				if (!isset($planFundRows[0])) {
+					$planFundRows[0] = array("fund_name" => "ไม่ระบุแหล่งเงิน", "total" => 0.0);
+				}
+				$planFundRows[0]["total"] += $unknown;
+			}
+		}
+
+		foreach ($planFundRows as $fundId => $pf) {
+			{
+				${$root}[] = array(
+					"no"                         => 0,
+					"c_name"                     => $pf["fund_name"],
+					"bg_expense"                 => "งบตามแผน 06",
+					"bg_expense_id"              => 0,
+					"dc_expense_budget_type_id"  => intval($fundId),
+					"f_plan_begin"               => 0,
+					"f_reserve_budget"           => 0,
+					"f_budget_display"           => (float) $pf["total"],
+					"f_reserve_actual"           => 0,
+					"f_plan_cut_total"           => 0,
+					"f_period_cut_total"         => 0,
+					"f_plan_transfer"            => 0,
+					"f_total_pay"                => 0,
+					"f_return_all"               => 0,
+					"f_total_cut"                => 0,
+					"f_return_cut"               => 0,
+					"budget_year"                => $yearTh,
+					"f_pr_total"                 => 0,
+					"f_po_total"                 => 0,
+					"f_reserve_check_total"      => 0,
+					"f_paid_total"               => 0,
+					"f_reserve_total"            => 0,
+					"f_budget_real"              => (float) $pf["total"],
+					"f_d1_not_finish"            => 0,
+				);
+			}
+		}
+		$i = count(${$root});
+	}
 
 	echo json_encode(array(
 		$root        => ${$root},
