@@ -4527,7 +4527,7 @@ Ext.editHistoryAp = (statusx) => {
                                         // Ext.getCmp("modeEditID(intval($row["i_period"]) ==  1  && intval($row["i_is_last"]) == 1  )").getValue()
                                         // var  arrEdit = Ext.getCmp("modeEditID").getValue()
                                         // if()
-                                        if (Number(Ext.session.dc_center_user) === 1 && Number(Ext.selectRow.data.i_status_chk) === 8 && Ext.getCmp("modeEditID")) {
+                                        if (Number(Ext.session.dc_center_user) === 1 && [5, 8].includes(Number(Ext.selectRow.data.i_status_chk)) && Ext.getCmp("modeEditID")) {
                                                 Ext.arrEdit = Ext.getCmp("modeEditID").getValue().split(",");
                                         } else if (Ext.selectRow.data.po_working_hdr_id_edit == "0") {
                                                 Ext.arrEdit = Ext.getCmp("modeEditID").getValue().split(",");
@@ -12669,7 +12669,7 @@ Ext.AppUx = function (app, menu) {
                                                                 // 1,2,3,9 แก้ไขได้
                                                                 // 4,5,6 แก้ไขไม่ได้
                                                                 // [1,2,3,9].includes(Ext.selectRow.data.i_send_gl_dr)
-                                                        } else if (statusx === "editMaingrid" && Number(Ext.session.dc_center_user) === 1 && Number(Ext.selectRow.data.i_status_chk) === 8) {
+                                                        } else if (statusx === "editMaingrid" && Number(Ext.session.dc_center_user) === 1 && [5, 8].includes(Number(Ext.selectRow.data.i_status_chk))) {
                                                                 Ext.winEditHistory(statusx).show();
                                                         } else if (statusx === "editMaingrid" && Ext.selectRow.data.po_working_hdr_id_edit == "0" && [null, 0, 1, 2, 3, 9].includes(Ext.selectRow.data.i_send_gl_dr)) {
                                                                 console.log('po_working_hdr_id_edit null, 0, 1, 2, 3, 9', 99);

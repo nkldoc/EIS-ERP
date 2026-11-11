@@ -225,7 +225,7 @@ function overlapScopeAllowed($db, $chkId) {
     return !empty($row);
 }
 
-// Paid checking documents can only be changed by the same administrator
+// Locked disbursements and paid checking documents can only be changed by the administrator
 // identity used by the existing checking admin tools. Resolve item IDs on the
 // server; do not trust a header ID supplied alongside an item.
 function requirePaidCheckingAdmin($db, $id, $itemId = false) {
@@ -236,7 +236,7 @@ function requirePaidCheckingAdmin($db, $id, $itemId = false) {
     }
     $join = $itemId ? 'INNER JOIN dbo.sp_tranf_item t ON t.sp_check_period_hdr_id = h.sp_check_period_hdr_id' : '';
     $where = $itemId ? 't.sp_tranf_item_id = ?' : 'h.sp_check_period_hdr_id = ?';
-    $result = sqlsrv_query($db->conn, "SELECT TOP 1 CASE WHEN p.i_enable = 1 AND p.i_status_last = 11 THEN 1 ELSE 0 END AS is_paid FROM dbo.sp_check_period_hdr h $join LEFT JOIN " . DB_NMU_EIS . "po_working_hdr p ON p.po_working_hdr_id = h.po_working_hdr_id WHERE $where", array((int) $id));
+    $result = sqlsrv_query($db->conn, "SELECT TOP 1 CASE WHEN p.i_enable = 1 AND (p.i_status_last = 11 OR p.i_sub_status NOT IN ('3.00', '0.30')) THEN 1 ELSE 0 END AS is_paid FROM dbo.sp_check_period_hdr h $join LEFT JOIN " . DB_NMU_EIS . "po_working_hdr p ON p.po_working_hdr_id = h.po_working_hdr_id WHERE $where", array((int) $id));
     $row = $result ? $db->Fetch($result) : false;
     if (!$row) {
         http_response_code(400);
@@ -245,7 +245,7 @@ function requirePaidCheckingAdmin($db, $id, $itemId = false) {
     }
     if ((int) $row['is_paid'] === 1 && (int) ($_SESSION['dc_center_user'] ?? 0) !== 1) {
         http_response_code(403);
-        echo json_encode(array('success' => false, 'msg' => 'รายการจ่ายแล้วแก้ไขได้เฉพาะผู้ดูแลระบบ'), JSON_UNESCAPED_UNICODE);
+        echo json_encode(array('success' => false, 'msg' => 'รายการที่เบิกแล้วหรือจ่ายแล้วแก้ไขได้เฉพาะผู้ดูแลระบบ'), JSON_UNESCAPED_UNICODE);
         exit;
     }
 }
