@@ -225,6 +225,31 @@ function overlapScopeAllowed($db, $chkId) {
     return !empty($row);
 }
 
+// Paid checking documents can only be changed by the same administrator
+// identity used by the existing checking admin tools. Resolve item IDs on the
+// server; do not trust a header ID supplied alongside an item.
+function requirePaidCheckingAdmin($db, $id, $itemId = false) {
+    if ((int) $id <= 0) {
+        http_response_code(400);
+        echo json_encode(array('success' => false, 'msg' => 'ไม่พบรายการตรวจรับ'));
+        exit;
+    }
+    $join = $itemId ? 'INNER JOIN dbo.sp_tranf_item t ON t.sp_check_period_hdr_id = h.sp_check_period_hdr_id' : '';
+    $where = $itemId ? 't.sp_tranf_item_id = ?' : 'h.sp_check_period_hdr_id = ?';
+    $result = sqlsrv_query($db->conn, "SELECT TOP 1 CASE WHEN p.i_enable = 1 AND p.i_status_last = 11 THEN 1 ELSE 0 END AS is_paid FROM dbo.sp_check_period_hdr h $join LEFT JOIN " . DB_NMU_EIS . "po_working_hdr p ON p.po_working_hdr_id = h.po_working_hdr_id WHERE $where", array((int) $id));
+    $row = $result ? $db->Fetch($result) : false;
+    if (!$row) {
+        http_response_code(400);
+        echo json_encode(array('success' => false, 'msg' => 'ไม่สามารถตรวจสอบสถานะรายการตรวจรับ'));
+        exit;
+    }
+    if ((int) $row['is_paid'] === 1 && (int) ($_SESSION['dc_center_user'] ?? 0) !== 1) {
+        http_response_code(403);
+        echo json_encode(array('success' => false, 'msg' => 'รายการจ่ายแล้วแก้ไขได้เฉพาะผู้ดูแลระบบ'), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 switch ($mode) {
     case "UPDATE_MISSING_WITHDRAW_EMP":
         header("Content-Type: application/json; charset=utf-8");
@@ -2469,6 +2494,7 @@ switch ($mode) {
         exit();
         break;
     case "INSERT_CHECKING_DTL":
+        requirePaidCheckingAdmin($db, $_REQUEST['sp_check_period_hdr_id'] ?? 0);
         $hdr_id = $data['sp_tranf_hdr_id'] ?? null;
         $i_product_type = $data['i_product_type'] ?? null; //
         if ($hdr_id > 0) {
@@ -2784,6 +2810,7 @@ switch ($mode) {
 
         break;
     case "DEL_CHECKING_DTL":
+        requirePaidCheckingAdmin($db, $_REQUEST['id'] ?? 0, true);
 //         print_r($_REQUEST);
 //         exit();
         $ret_id = $_REQUEST['id'] ?? null;
@@ -2811,6 +2838,7 @@ switch ($mode) {
         $stmt = $db->QueryParam($sql, $arrParam);
         break;
     case "GENCHECKINGCODE":
+        requirePaidCheckingAdmin($db, $data['id'] ?? 0);
         $ret_id = $data["id"];
         $data["dc_user_update_id"] = $_SESSION["user_id"] ?? 0;
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"] ?? 0;
@@ -3034,6 +3062,15 @@ switch ($mode) {
         break;
 
     case "UPDATE_DCACC":
+        $checkingItems = json_decode($_REQUEST['dc_acc_arr'] ?? '', true);
+        if (!is_array($checkingItems)) {
+            http_response_code(400);
+            echo json_encode(array('success' => false, 'msg' => 'ไม่พบรายการบัญชี'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        foreach ($checkingItems as $checkingItem) {
+            requirePaidCheckingAdmin($db, $checkingItem['sp_tranf_item_id'] ?? 0, true);
+        }
         $root = "data";
         $data = array();
         $msg = "";
