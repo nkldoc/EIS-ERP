@@ -6992,6 +6992,17 @@ switch ($mode) {
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"];
         $data["d_update"] = date("Y-m-d H:i:s");
 
+        // กันสร้างซ้ำ: ถ้ามีแถวค้าง (ยังไม่ตรวจรับ) ของสัญญาเดียวกันอยู่แล้ว ใช้แถวเดิมแทนการ INSERT ใหม่
+        if (empty($_REQUEST['sp_mn_contract_hdr_id'])) {
+            $dupKeyCol = !empty($data["sp_contract_id"]) ? "sp_contract_id" : "sp_po_id";
+            $dupVal = $data[$dupKeyCol] ?? null;
+            if (!empty($dupVal)) {
+                $dupId = $db->GetDataBySQL("SELECT TOP 1 sp_mn_contract_hdr_id FROM sp_mn_contract_hdr WHERE {$dupKeyCol} = ? AND i_status_checking IS NULL ORDER BY sp_mn_contract_hdr_id", array($dupVal));
+                if (intval($dupId) > 0) {
+                    $_REQUEST['sp_mn_contract_hdr_id'] = intval($dupId);
+                }
+            }
+        }
         if (@$_REQUEST['sp_mn_contract_hdr_id'] > 0) { // ****** EDIT ******
             foreach ($data as $fldA => $value) {
                 $arrValue[] = ($value != "") ? $value : null;
@@ -7097,6 +7108,17 @@ switch ($mode) {
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"];
         $data["d_update"] = date("Y-m-d H:i:s");
 
+        // กันสร้างซ้ำ: ถ้ามีแถวค้าง (ยังไม่ตรวจรับ) ของสัญญาเดียวกันอยู่แล้ว ใช้แถวเดิมแทนการ INSERT ใหม่
+        if (empty($_REQUEST['sp_mn_contract_hdr_id'])) {
+            $dupKeyCol = !empty($data["sp_contract_id"]) ? "sp_contract_id" : "sp_po_id";
+            $dupVal = $data[$dupKeyCol] ?? null;
+            if (!empty($dupVal)) {
+                $dupId = $db->GetDataBySQL("SELECT TOP 1 sp_mn_contract_hdr_id FROM sp_mn_contract_hdr WHERE {$dupKeyCol} = ? AND i_status_checking IS NULL ORDER BY sp_mn_contract_hdr_id", array($dupVal));
+                if (intval($dupId) > 0) {
+                    $_REQUEST['sp_mn_contract_hdr_id'] = intval($dupId);
+                }
+            }
+        }
         if (@$_REQUEST['sp_mn_contract_hdr_id'] > 0) { // ****** EDIT ******
             foreach ($data as $fldA => $value) {
                 $arrValue[] = ($value != "") ? $value : null;
