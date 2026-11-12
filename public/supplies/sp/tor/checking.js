@@ -4565,7 +4565,7 @@ Ext.editHistoryAp = (statusx) => {
                                                 var cm = myGrid.getColumnModel();
                                                 var idx = cm.getIndexById("griddel"); // find column index by its id
                                                 // cm.setHidden(idx, true);  // hide the column
-                                                if (Ext.arrEdit.includes("Edit_i_product_type") && Ext.getCmp("fsHdrItemsID")) {
+                                                if ((Ext.arrEdit || []).includes("Edit_i_product_type") && Ext.getCmp("fsHdrItemsID")) {
                                                         Ext.getCmp("ButtonsproductID").show();
                                                         Ext.getCmp("gridSub4ID").setDisabled(false);
                                                         Ext.getCmp("formProductType").setDisabled(false);
@@ -4575,12 +4575,12 @@ Ext.editHistoryAp = (statusx) => {
                                                         Ext.getCmp("groupProductTypeID").expand();
                                                         Ext.getCmp("groupProductTypeID").doLayout();
                                                 }
-                                                if (Ext.arrEdit.includes("Edit_i_fine_amt") && Ext.getCmp("fscheckBgID")) {
+                                                if ((Ext.arrEdit || []).includes("Edit_i_fine_amt") && Ext.getCmp("fscheckBgID")) {
                                                         Ext.getCmp("fscheckBgID").expand();
                                                         Ext.getCmp("fscheckBgID").doLayout();
                                                         Ext.getCmp("panelBgID").setDisabled(false);
                                                 }
-                                                if (Ext.arrEdit.includes("Edit_bg") && Ext.getCmp("fscheckBgID")) {
+                                                if ((Ext.arrEdit || []).includes("Edit_bg") && Ext.getCmp("fscheckBgID")) {
                                                         Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                         console.log("at line setep ", Ext.stempDbClickRow, "booking_store Edit_bg load start", "dc_cost_id =", Ext.selectRow.data.dc_cost_id);
                                                         Ext.stempDbClickRow++;
@@ -4598,12 +4598,12 @@ Ext.editHistoryAp = (statusx) => {
                                                                 },
                                                         });
                                                 }
-                                                if (Ext.arrEdit.includes("editPDF") && Ext.getCmp("groupUploadID")) {
+                                                if ((Ext.arrEdit || []).includes("editPDF") && Ext.getCmp("groupUploadID")) {
                                                         Ext.getCmp("groupUploadID").expand();
                                                         Ext.getCmp("upload_pdf1").show();
                                                         Ext.getCmp("groupUploadID").doLayout();
                                                 }
-                                                if (Ext.arrEdit.includes("Edit_glID")) {
+                                                if ((Ext.arrEdit || []).includes("Edit_glID")) {
                                                         Ext.getCmp("groupUploadID").expand();
                                                         Ext.getCmp("upload_pdf1").hide();
                                                         Ext.getCmp("groupUploadID").doLayout();
@@ -4616,7 +4616,7 @@ Ext.editHistoryAp = (statusx) => {
                                                         Ext.getCmp("groupProductTypeID").expand();
                                                         Ext.getCmp("groupProductTypeID").doLayout();
                                                 }
-                                                if (Ext.arrEdit.includes("showID")) {
+                                                if ((Ext.arrEdit || []).includes("showID")) {
                                                         console.log(9);
                                                         Ext.getCmp("groupUploadID").expand();
                                                         Ext.getCmp("upload_pdf1").show();
@@ -17623,7 +17623,7 @@ Ext.AppUx = function (app, menu) {
                                                         } //End IF
 
                                                         console.log("Edit_bg", Ext.arrEdit);
-                                                        if (Ext.arrEdit.includes("Edit_bg")) {
+                                                        if ((Ext.arrEdit || []).includes("Edit_bg")) {
                                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                                 console.log("c_overlap_close 1");
                                                                 Ext.c_overlap_close(Ext.selectRow.data, "c_overlap_book", "edit_bg");
