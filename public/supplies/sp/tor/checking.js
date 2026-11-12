@@ -9421,6 +9421,9 @@ Ext.showUserOverlapCheck = function (chkId, onDone) {
         var win = null;
 
         var statusOf = function (r) {
+                if (Number(r.wd_pending) === 1) {
+                        return { bad: true, txt: '<span style="color:#c00;font-weight:bold">ใบเบิก ' + esc(r.c_po_working || "") + ' หักใบกันแล้ว<br>แต่ตรวจรับยังไม่บันทึก (กดแก้ไขเพื่อปรับให้ตรง)</span>' };
+                }
                 if (Number(r.no_overlap_row) === 1) {
                         return { bad: false, txt: '<span style="color:#b45f06">ยังไม่ได้ตัดเงินใบกัน</span>' };
                 }
@@ -9445,6 +9448,13 @@ Ext.showUserOverlapCheck = function (chkId, onDone) {
                 var html = '<div style="padding:10px;font-size:13px;line-height:1.6;">'
                         + '<div><b>สัญญา</b> ' + esc(h.c_contract_code || '-') + ' &nbsp; ' + esc(h.c_contract_name || '') + '</div>'
                         + '<div><b>PR</b> ' + esc(h.c_tor_code || '-') + ' &nbsp; ' + esc(h.c_tor_name || '') + '</div>';
+                if (res.note_current) {
+                        var nc = res.note_current;
+                        html += '<div style="margin-top:8px;padding:8px 10px;background:#eaf3ff;border:1px solid #9cc2f0;color:#0b3d7a;">'
+                                + 'ตรวจรับ <b>' + esc(nc.c_code || '') + '</b> ใช้เงินปีปัจจุบัน: ใบเบิก <b>' + esc(nc.wd_code || '') + '</b> ตัดเงินปีงบ '
+                                + (Number(nc.wd_year) > 0 ? (Number(nc.wd_year) + 543) : '-') + ' จำนวน ' + fmt(nc.wd_amt) + ' บาท ไปแล้ว<br>'
+                                + 'เนื่องจากออกเลข AP โดยไม่เช็คเงิน จึงไม่มีรายการจองเงินระดับตรวจรับ (ยอดจองระดับสัญญายังเป็นไปตามเดิม)</div>';
+                }
 
                 html += '<div style="margin-top:10px;font-weight:bold;">ยอดใบกันเหลื่อมของสัญญานี้</div>';
                 if (!ovs.length) {
@@ -9521,6 +9531,7 @@ Ext.showUserOverlapCheck = function (chkId, onDone) {
                 next(0);
         };
 
+        var autoSyncTried = false;
         var load = function () {
                 var target = win ? win.getEl() : Ext.getBody();
                 target.mask('กำลังตรวจสอบ...');
@@ -9533,6 +9544,37 @@ Ext.showUserOverlapCheck = function (chkId, onDone) {
                                 var res = Ext.decode(response.responseText);
                                 if (!res.success) {
                                         Ext.Msg.alert('แจ้งเตือน', res.msg || 'ตรวจสอบไม่สำเร็จ');
+                                        return;
+                                }
+                                // ใบเบิกหักใบกันเหลื่อมไปแล้ว แต่ตรวจรับยังไม่มีเลขใบกัน -> ปรับข้อมูลตรวจรับให้ตรงกับใบเบิกให้เลย (ครั้งเดียวต่อการเปิดหน้าต่าง) แล้วแจ้งเตือน
+                                var pend = [];
+                                Ext.each(res.rows || [], function (r) {
+                                        if (Number(r.wd_pending) === 1) {
+                                                pend.push(r);
+                                        }
+                                });
+                                if (pend.length && !autoSyncTried) {
+                                        autoSyncTried = true;
+                                        var tgt = win ? win.getEl() : Ext.getBody();
+                                        tgt.mask('กำลังปรับข้อมูลตรวจรับให้ตรงกับใบเบิก...');
+                                        fixAll(pend, function (ok, fail) {
+                                                tgt.unmask();
+                                                var lines = [];
+                                                Ext.each(pend, function (r) {
+                                                        lines.push('รายการเลข AP <b>' + esc(r.c_code || r.c_arrive_code || '') + '</b> ใบเบิก <b>' + esc(r.c_po_working || '')
+                                                                + '</b> ได้หักเงินกันเหลื่อม <b>' + esc(r.c_overlap || '') + '</b> ไปแล้ว');
+                                                });
+                                                var msg = lines.join('<br>') + (ok.length ? '<br><br>ปรับข้อมูลตรวจรับให้ตรงกับใบเบิกแล้ว (การใช้เงิน = ใช้เงินกันเหลื่อม, ใบเบิกร่างแสดงเลขใบกัน)' : '');
+                                                if (fail.length) {
+                                                        msg += '<br><br><span style="color:#c00">ปรับไม่สำเร็จ:<br>' + fail.join('<br>') + '</span>';
+                                                }
+                                                Ext.Msg.alert('แจ้งเตือน', msg, function () {
+                                                        load();
+                                                        if (onDone) {
+                                                                onDone();
+                                                        }
+                                                });
+                                        });
                                         return;
                                 }
                                 var out = render(res);
@@ -11061,11 +11103,67 @@ var updateMissingWithdrawEmp = function (grid, record, button) {
 };
 
 
+// ใบเบิกหักใบกันเหลื่อมไปแล้ว แต่ตรวจรับยังไม่มีเลขใบกัน: ปรับข้อมูลตรวจรับให้ตรง แล้วแจ้งเตือนผู้ใช้
+// (เลขใบกัน/การใช้เงิน=ใช้เงินกันเหลื่อม/ตรวจใบกัน/ใบเบิกร่าง จะตามข้อมูลที่ปรับ และยกเลิกการจองเงินปีปัจจุบันที่ค้าง)
+Ext.syncOverlapFromWithdrawal = function (row, onDone) {
+        if (Ext.overlapSyncBusy) {
+                return;
+        }
+        Ext.overlapSyncBusy = true;
+        var chkId = row.get("sp_check_period_hdr_id");
+        var wdCode = row.get("wd_code") || "";
+        var wdBooking = row.get("wd_booking") || "";
+        var done = function () {
+                Ext.overlapSyncBusy = false;
+                if (onDone) {
+                        onDone();
+                }
+        };
+        Ext.getBody().mask("กำลังตรวจสอบใบกัน...");
+        Ext.Ajax.request({
+                url: "tor/api/mnCheckingController.php",
+                method: "POST",
+                params: { mode: "syncOverlapFromWithdrawal", chk_id: chkId },
+                success: function (resp) {
+                        Ext.getBody().unmask();
+                        var o = {};
+                        try {
+                                o = Ext.decode(resp.responseText);
+                        } catch (e) { }
+                        var esc = Ext.util.Format.htmlEncode;
+                        if (o.success && o.synced) {
+                                Ext.Msg.alert("แจ้งเตือน",
+                                        "รายการเลข AP <b>" + esc(o.c_code || row.get("c_checking_code") || "") + "</b> (" + esc(o.c_arrive_code || "") + ")<br>"
+                                        + "ใบเบิก <b>" + esc(o.wd_code) + "</b> ได้หักเงินกันเหลื่อม <b>" + esc(o.c_booking) + "</b> ไปแล้ว<br><br>"
+                                        + "ระบบปรับข้อมูลตรวจรับให้ตรงกับใบเบิกแล้ว: การใช้เงิน = ใช้เงินกันเหลื่อม, จองใบกันแล้ว, ใบเบิกร่างแสดงเลขใบกัน"
+                                        + (Number(o.money_cancelled) > 0 ? "<br>และยกเลิกการจองเงินปีปัจจุบันที่ค้างอยู่ (กันตัดเงินซ้ำ)" : ""), done);
+                        } else if (o.success && (o.status === "OVERLAP_NOT_FOUND" || o.status === "ERROR")) {
+                                Ext.Msg.alert("แจ้งเตือน",
+                                        "ใบเบิก <b>" + esc(o.wd_code || wdCode) + "</b> ใช้ใบกัน <b>" + esc(o.c_booking || wdBooking) + "</b><br>"
+                                        + (o.status === "ERROR" ? "ปรับข้อมูลไม่สำเร็จ: " + esc(o.err_msg || "") : "แต่ไม่พบข้อมูลใบกันนี้ในระบบงบประมาณ กรุณาติดต่อแอดมิน"), done);
+                        } else {
+                                done();
+                        }
+                },
+                failure: function () {
+                        Ext.getBody().unmask();
+                        done();
+                },
+        });
+};
 var cellClick = function (grid, rowIndex, columnIndex, e) {
         if (e.getTarget("button.check-overlap-user")) {
                 e.stopEvent();
                 var ovRow = grid.getStore().getAt(rowIndex);
                 Ext.showUserOverlapCheck(ovRow.get("sp_check_period_hdr_id"), function () {
+                        grid.getStore().reload();
+                });
+                return;
+        }
+        var wdRow = grid.getStore().getAt(rowIndex);
+        if (wdRow && Number(wdRow.get("wd_pending")) === 1) {
+                e.stopEvent();
+                Ext.syncOverlapFromWithdrawal(wdRow, function () {
                         grid.getStore().reload();
                 });
                 return;
@@ -11697,6 +11795,12 @@ Ext.AppUx = function (app, menu) {
                         { name: "pr_dc_expense_budget_type2_id" },
                         { name: "pr_dc_expense_budget_type3_id" },
                         { name: "c_overlap" },
+                        { name: "wd_pending" },
+                        { name: "wd_code" },
+                        { name: "wd_booking" },
+                        { name: "cur_note" },
+                        { name: "cur_wd_code" },
+                        { name: "cur_wd_year" },
                         { name: "dc_cost_id" },
                         { name: "bg_reserve_money_id" },
                         { name: "bg_checking_money_id" },
@@ -12115,12 +12219,16 @@ Ext.AppUx = function (app, menu) {
                                         dataIndex: "c_overlap",
                                         width: 170,
                                         renderer: function (value, metaData, record, rowIndex, colIndex, store) {
+                                                // ใบเบิกหักใบกันไปแล้วแต่ตรวจรับยังไม่บันทึก -> แสดงเลขใบกันของใบเบิกพร้อมเครื่องหมายเตือน (คลิกแถวเพื่อปรับให้ตรง)
+                                                if (Number(record.get("wd_pending")) === 1 && record.get("wd_booking")) {
+                                                        metaData.attr = 'ext:qtip="ใบเบิก ' + Ext.util.Format.htmlEncode(record.get("wd_code") || "") + ' หักใบกันนี้แล้ว คลิกแถวเพื่อปรับข้อมูลตรวจรับให้ตรง"';
+                                                        return '<span style="color:#c60;font-weight:bold;">⚠ ' + Ext.util.Format.htmlEncode(record.get("wd_booking")) + "</span>";
+                                                }
                                                 if (record.data.c_overlap != null) {
                                                         return value;
                                                 } else {
                                                         return "-";
                                                 }
-                                                return value;
                                         },
                                 },
                                 {
@@ -12129,6 +12237,17 @@ Ext.AppUx = function (app, menu) {
                                         align: "center",
                                         dataIndex: "i_chk_bgTxt",
                                         width: 170,
+                                        renderer: function (value, metaData, record) {
+                                                if (Number(record.get("wd_pending")) === 1) {
+                                                        return '<span style="color:#c60;font-weight:bold;">ใช้เงินกันเหลื่อม (ใบเบิก ' + Ext.util.Format.htmlEncode(record.get("wd_code") || "") + " หักแล้ว)</span>";
+                                                }
+                                                // เงินปีปัจจุบัน ออก AP โดยไม่เช็คเงิน -> ไม่มีรายการจองระดับตรวจรับ แต่ใบเบิกตัดเงินแล้ว
+                                                if (Number(record.get("cur_note")) === 1) {
+                                                        metaData.attr = 'ext:qtip="ออกเลข AP โดยไม่เช็คเงิน จึงไม่มีรายการจองเงินระดับตรวจรับ เงินปีปัจจุบันตัดที่ใบเบิก ' + Ext.util.Format.htmlEncode(record.get("cur_wd_code") || "") + '"';
+                                                        return value + '<div style="color:#666;font-size:11px;font-weight:normal;">ใบเบิก ' + Ext.util.Format.htmlEncode(record.get("cur_wd_code") || "") + " ตัดเงินแล้ว (ออก AP ไม่เช็คเงิน)</div>";
+                                                }
+                                                return value;
+                                        },
                                 },
                                 {
                                         header: "ของในงวด",

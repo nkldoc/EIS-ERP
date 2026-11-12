@@ -250,6 +250,14 @@ function requirePaidCheckingAdmin($db, $id, $itemId = false) {
     }
 }
 
+// เรียกโพรซีเจอร์ sp_sync_overlap_from_withdrawal (dc/scriptBaseUpdate): $apply = 0 ตรวจอย่างเดียว, 1 ปรับข้อมูลจริง
+// คืน array(status, chk_id, wd_code, c_booking, i_year_overlap, bg_reserve_overlap_id, money_cancelled, err_msg) หรือ null ถ้าไม่ได้ติดตั้งโพรซีเจอร์
+function runOverlapSync($db, $chkId, $apply) {
+    $res = @sqlsrv_query($db->conn, "IF OBJECT_ID('dbo.sp_sync_overlap_from_withdrawal') IS NOT NULL EXEC dbo.sp_sync_overlap_from_withdrawal @chk_id = ?, @apply = ?;", array(intval($chkId), $apply ? 1 : 0));
+    $row = $res ? $db->Fetch($res) : null;
+    return $row ?: null;
+}
+
 switch ($mode) {
     case "UPDATE_MISSING_WITHDRAW_EMP":
         header("Content-Type: application/json; charset=utf-8");
@@ -1705,6 +1713,13 @@ switch ($mode) {
                     $i_chk_bgTxt = "โครงการต่อเนื่อง ใช้เงินปีงบปัจจุบัน";
                     break;
             };
+            // ตรวจรับนี้ตัดใบกันเหลื่อมแล้ว (ที่หน้าตรวจรับ หรือปรับตามใบเบิก) แต่ระดับสัญญา/PR ยังเป็นเงินปีปัจจุบัน
+            // -> แสดงว่าใช้เงินกันเหลื่อม (ไม่เปลี่ยนค่า i_chk_bg ที่ใช้ควบคุมขั้นตอนอื่น)
+            if (in_array(intval($row["i_chk_bg"]), array(1, 5), true) && trim((string) ($row["c_overlap"] ?? "")) !== ""
+                    && intval($row["i_overlapcheck"] ?? 0) === 2) {
+                $i_chk_bg = "color:#CD8114";
+                $i_chk_bgTxt = "ใช้เงินกันเหลื่อม - จองใบกันแล้ว";
+            }
             $i_product_type = null;
             switch (intval($row["i_product_type"])) {
                 case 0:
@@ -1929,6 +1944,64 @@ switch ($mode) {
             );
 
             ${$root}[] = $temp;
+        }
+        // ใบเบิกหักใบกันเหลื่อมไปแล้ว (เลือกใบกันที่หน้าใบเบิก) แต่ตรวจรับยังไม่มีเลขใบกัน -> ทำเครื่องหมายให้หน้าจอแจ้งเตือน
+        $wdIds = array();
+        foreach (${$root} as $wdRow) {
+            if (!empty($wdRow["sp_check_period_hdr_id"]) && trim((string) ($wdRow["c_overlap"] ?? "")) === "") {
+                $wdIds[] = intval($wdRow["sp_check_period_hdr_id"]);
+            }
+        }
+        if ($wdIds) {
+            $wdMap = array();
+            $wdRes = sqlsrv_query($db->conn, "SELECT chk.sp_check_period_hdr_id, d.c_code AS wd_code, LTRIM(RTRIM(d.c_booking)) AS wd_booking
+                FROM dbo.sp_check_period_hdr chk
+                INNER JOIN NMU_EIS..po_working_hdr h ON h.po_working_hdr_id = chk.po_working_hdr_id AND h.i_enable = 1
+                INNER JOIN NMU_EIS..po_working_dtl d ON d.po_working_hdr_id = h.po_working_hdr_id
+                WHERE chk.sp_check_period_hdr_id IN (" . implode(",", $wdIds) . ")
+                  AND ISNULL(chk.c_overlap, '') = '' AND ISNULL(d.c_booking, '') <> ''
+                  AND d.i_budget_year_overlap IS NOT NULL AND d.i_budget_year_overlap <> d.i_budget_year");
+            while ($wdRes && ($wdR = $db->Fetch($wdRes))) {
+                $wdMap[intval($wdR["sp_check_period_hdr_id"])] = $wdR;
+            }
+            foreach (${$root} as $wdK => $wdRow) {
+                $wdId = intval($wdRow["sp_check_period_hdr_id"] ?? 0);
+                if (isset($wdMap[$wdId])) {
+                    ${$root}[$wdK]["wd_pending"] = 1;
+                    ${$root}[$wdK]["wd_code"] = $wdMap[$wdId]["wd_code"];
+                    ${$root}[$wdK]["wd_booking"] = $wdMap[$wdId]["wd_booking"];
+                }
+            }
+        }
+        // เงินปีปัจจุบัน: ออกเลข AP โดยติ๊ก "ไม่เช็คเงิน" (ไม่มีรายการจองระดับตรวจรับ) แต่ใบเบิกตัดเงินไปแล้ว -> แจ้งเตือนบนหน้าจอ
+        $curIds = array();
+        foreach (${$root} as $curRow) {
+            if (!empty($curRow["sp_check_period_hdr_id"]) && trim((string) ($curRow["c_overlap"] ?? "")) === "" && empty($curRow["wd_pending"])) {
+                $curIds[] = intval($curRow["sp_check_period_hdr_id"]);
+            }
+        }
+        if ($curIds) {
+            $curMap = array();
+            $curRes = sqlsrv_query($db->conn, "SELECT chk.sp_check_period_hdr_id, wd.c_code AS wd_code, wd.i_budget_year AS wd_year
+                FROM dbo.sp_check_period_hdr chk
+                INNER JOIN NMU_EIS..po_working_hdr h ON h.po_working_hdr_id = chk.po_working_hdr_id AND h.i_enable = 1
+                CROSS APPLY (SELECT TOP 1 d.c_code, d.i_budget_year FROM NMU_EIS..po_working_dtl d
+                             WHERE d.po_working_hdr_id = h.po_working_hdr_id ORDER BY d.po_working_dtl_id) wd
+                WHERE chk.sp_check_period_hdr_id IN (" . implode(",", $curIds) . ")
+                  AND ISNULL(chk.i_skip_bg_check, 0) = 1 AND chk.bg_checking_money_id IS NULL AND ISNULL(chk.c_overlap, '') = ''
+                  AND NOT EXISTS (SELECT 1 FROM NMU_EIS..po_working_dtl d2 WHERE d2.po_working_hdr_id = h.po_working_hdr_id
+                                  AND ISNULL(d2.c_booking, '') <> '' AND d2.i_budget_year_overlap <> d2.i_budget_year)");
+            while ($curRes && ($curR = $db->Fetch($curRes))) {
+                $curMap[intval($curR["sp_check_period_hdr_id"])] = $curR;
+            }
+            foreach (${$root} as $curK => $curRow) {
+                $curId = intval($curRow["sp_check_period_hdr_id"] ?? 0);
+                if (isset($curMap[$curId])) {
+                    ${$root}[$curK]["cur_note"] = 1;
+                    ${$root}[$curK]["cur_wd_code"] = $curMap[$curId]["wd_code"];
+                    ${$root}[$curK]["cur_wd_year"] = $curMap[$curId]["wd_year"];
+                }
+            }
         }
         $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
         $totalCount = $db->GetDataBySQL($sqlCount, $arrCountParam);
@@ -4061,18 +4134,27 @@ switch ($mode) {
         $sqlRows = "
             SELECT chk.sp_check_period_hdr_id, p.i_period, chk.c_arrive_code, chk.c_code,
                    CONVERT(varchar(10), chk.d_checking_date, 23) AS d_checking_date, chk.f_total,
-                   chk.c_overlap, chk.i_yyyy_overlap,
+                   ISNULL(NULLIF(chk.c_overlap, ''), wd.wd_booking) AS c_overlap, chk.i_yyyy_overlap,
+                   CASE WHEN ISNULL(chk.c_overlap, '') = '' AND wd.wd_booking IS NOT NULL THEN 1 ELSE 0 END AS wd_pending,
                    (SELECT TOP 1 d.c_code FROM NMU_EIS..po_working_dtl d WHERE d.po_working_hdr_id = chk.po_working_hdr_id) AS c_po_working,
                    CASE WHEN ro.bg_reserve_overlap_id IS NULL THEN 1 ELSE 0 END AS no_overlap_row,
                    CASE WHEN rm.i_enable = 1 AND ro.bg_reserve_overlap_id IS NOT NULL THEN 1 ELSE 0 END AS need_cancel_money,
                    CASE WHEN ro.bg_reserve_overlap_id IS NOT NULL
                              AND ( ro.i_sys <> 1
                                 OR ISNULL(ro.chk_id,0) <> chk.sp_check_period_hdr_id
-                                OR ISNULL(ro.i_year,0) <> ISNULL(chk.i_yyyy_overlap, ro.i_year)
+                                OR (ISNULL(ro.i_year,0) <> ISNULL(TRY_CONVERT(int, NULLIF(chk.i_yyyy_overlap,'')), ro.i_year)
+                                    AND ISNULL(ro.i_year,0) <> ISNULL(TRY_CONVERT(int, NULLIF(chk.i_yyyy,'')), -1))
                                 OR (chk.po_working_hdr_id IS NOT NULL AND ISNULL(ro.i_finish,0) <> 1) )
                         THEN 1 ELSE 0 END AS need_fix_overlap
             FROM dbo.sp_check_period_hdr chk
             LEFT JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id = chk.sp_tor_hdr_period_id
+            OUTER APPLY (SELECT TOP 1 LTRIM(RTRIM(d.c_booking)) AS wd_booking
+                         FROM NMU_EIS..po_working_hdr h
+                         INNER JOIN NMU_EIS..po_working_dtl d ON d.po_working_hdr_id = h.po_working_hdr_id
+                         WHERE h.po_working_hdr_id = chk.po_working_hdr_id AND h.i_enable = 1
+                           AND ISNULL(d.c_booking, '') <> '' AND d.i_budget_year_overlap IS NOT NULL
+                           AND d.i_budget_year_overlap <> d.i_budget_year
+                         ORDER BY d.po_working_dtl_id) wd
             LEFT JOIN NMU_EIS..bg_reserve_money rm ON rm.bg_reserve_money_id = chk.bg_checking_money_id
             LEFT JOIN NMU_EIS..bg_reserve_overlap ro
                    ON ro.bg_reserve_overlap_id = chk.bg_reserve_overlap_id
@@ -4081,7 +4163,7 @@ switch ($mode) {
                   AND ro.i_enable = 1
             WHERE chk.sp_tor_contract_id = ?
               AND ISNULL(chk.i_enabled,1) = 1
-              AND ISNULL(chk.c_overlap,'') <> ''
+              AND (ISNULL(chk.c_overlap,'') <> '' OR wd.wd_booking IS NOT NULL)
             ORDER BY p.i_period, chk.sp_check_period_hdr_id";
         $rows = array();
         $res = sqlsrv_query($db->conn, $sqlRows, array($head['sp_tor_contract_id']));
@@ -4102,16 +4184,58 @@ switch ($mode) {
             WHERE o.c_code_ref IN (
                 SELECT c_overlap FROM dbo.sp_check_period_hdr WHERE sp_tor_contract_id = ? AND ISNULL(c_overlap,'') <> ''
                 UNION SELECT c_overlap FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ? AND ISNULL(c_overlap,'') <> ''
-                UNION SELECT c_overlap2 FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ? AND ISNULL(c_overlap2,'') <> '')
+                UNION SELECT c_overlap2 FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ? AND ISNULL(c_overlap2,'') <> ''
+                UNION SELECT LTRIM(RTRIM(d.c_booking)) FROM dbo.sp_check_period_hdr cc
+                      INNER JOIN NMU_EIS..po_working_hdr hh ON hh.po_working_hdr_id = cc.po_working_hdr_id AND hh.i_enable = 1
+                      INNER JOIN NMU_EIS..po_working_dtl d ON d.po_working_hdr_id = hh.po_working_hdr_id
+                      WHERE cc.sp_tor_contract_id = ? AND ISNULL(d.c_booking,'') <> ''
+                        AND d.i_budget_year_overlap IS NOT NULL AND d.i_budget_year_overlap <> d.i_budget_year)
             ORDER BY o.c_code_ref";
         $bal = array();
         $cid = $head['sp_tor_contract_id'];
-        $res = sqlsrv_query($db->conn, $sqlBal, array($cid, $cid, $cid));
+        $res = sqlsrv_query($db->conn, $sqlBal, array($cid, $cid, $cid, $cid));
         while ($res && ($r = $db->Fetch($res))) {
             $bal[] = $r;
         }
+        // ข้อความสำหรับตรวจรับที่เปิดอยู่: เงินปีปัจจุบัน ออก AP โดยไม่เช็คเงิน แต่ใบเบิกตัดเงินแล้ว
+        $note = null;
+        $noteRes = sqlsrv_query($db->conn, "SELECT TOP 1 chk.c_code, wd.c_code AS wd_code, wd.i_budget_year AS wd_year, wd.f_total AS wd_amt
+            FROM dbo.sp_check_period_hdr chk
+            INNER JOIN NMU_EIS..po_working_hdr h ON h.po_working_hdr_id = chk.po_working_hdr_id AND h.i_enable = 1
+            CROSS APPLY (SELECT TOP 1 d.c_code, d.i_budget_year, d.f_total FROM NMU_EIS..po_working_dtl d
+                         WHERE d.po_working_hdr_id = h.po_working_hdr_id ORDER BY d.po_working_dtl_id) wd
+            WHERE chk.sp_check_period_hdr_id = ? AND ISNULL(chk.i_skip_bg_check, 0) = 1 AND chk.bg_checking_money_id IS NULL
+              AND ISNULL(chk.c_overlap, '') = ''
+              AND NOT EXISTS (SELECT 1 FROM NMU_EIS..po_working_dtl d2 WHERE d2.po_working_hdr_id = h.po_working_hdr_id
+                              AND ISNULL(d2.c_booking, '') <> '' AND d2.i_budget_year_overlap <> d2.i_budget_year)", array($chkId));
+        $noteRow = $noteRes ? $db->Fetch($noteRes) : null;
+        if ($noteRow) {
+            $note = array("c_code" => $noteRow["c_code"], "wd_code" => $noteRow["wd_code"], "wd_year" => $noteRow["wd_year"], "wd_amt" => $noteRow["wd_amt"]);
+        }
         $db->RollBackTran();
-        echo json_encode(array("success" => true, "head" => $head, "rows" => $rows, "overlaps" => $bal));
+        echo json_encode(array("success" => true, "head" => $head, "rows" => $rows, "overlaps" => $bal, "note_current" => $note));
+        exit;
+
+    case "syncOverlapFromWithdrawal":
+        // ใบเบิกหักใบกันเหลื่อมไปแล้ว -> ปรับข้อมูลตรวจรับให้ตรง (เลขใบกัน/รายการตัดใบกัน/ยกเลิกจองเงินปีปัจจุบันที่ค้าง)
+        header("Content-Type: application/json; charset=utf-8");
+        $chkId = filter_var($_REQUEST['chk_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!$chkId || $chkId < 1 || !overlapScopeAllowed($db, $chkId)) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ไม่พบรายการตรวจรับ หรือไม่มีสิทธิ์"));
+            exit;
+        }
+        $sync = runOverlapSync($db, $chkId, true);
+        $codeRes = sqlsrv_query($db->conn, "SELECT c_code, c_arrive_code FROM dbo.sp_check_period_hdr WHERE sp_check_period_hdr_id = ?", array($chkId));
+        $codeRow = $codeRes ? $db->Fetch($codeRes) : array();
+        if ($sync && $sync['status'] === 'SYNCED' && $db->CommitTran()) {
+            echo json_encode(array("success" => true, "synced" => true, "wd_code" => $sync['wd_code'], "c_booking" => $sync['c_booking'],
+                "money_cancelled" => intval($sync['money_cancelled']), "c_code" => $codeRow['c_code'] ?? "", "c_arrive_code" => $codeRow['c_arrive_code'] ?? ""));
+            exit;
+        }
+        $db->RollBackTran();
+        echo json_encode(array("success" => true, "synced" => false, "status" => $sync ? $sync['status'] : "NO_PROC",
+            "wd_code" => $sync['wd_code'] ?? "", "c_booking" => $sync['c_booking'] ?? "", "err_msg" => $sync['err_msg'] ?? ""));
         exit;
 
     case "checkDoubleReserveOverlap":
@@ -4133,7 +4257,7 @@ switch ($mode) {
 
         $sqlDiag = "
             SELECT
-                chk.sp_check_period_hdr_id, chk.c_code, chk.c_overlap, chk.i_overlap, chk.i_yyyy_overlap,
+                chk.sp_check_period_hdr_id, chk.c_code, chk.c_overlap, chk.i_overlap, chk.i_yyyy_overlap, chk.i_yyyy,
                 chk.sp_tor_contract_id, chk.po_working_hdr_id, chk.f_total AS f_check_total,
                 rm.bg_reserve_money_id, rm.i_year AS rm_year, rm.i_reserve AS rm_reserve,
                 rm.i_finish AS rm_finish, rm.i_enable AS rm_enable, rm.f_amt AS rm_amt,
@@ -4144,7 +4268,8 @@ switch ($mode) {
                 CASE WHEN ro.bg_reserve_overlap_id IS NOT NULL
                           AND ( ro.i_sys <> 1
                              OR ISNULL(ro.chk_id,0) <> chk.sp_check_period_hdr_id
-                             OR ISNULL(ro.i_year,0) <> ISNULL(chk.i_yyyy_overlap, ro.i_year)
+                             OR (ISNULL(ro.i_year,0) <> ISNULL(TRY_CONVERT(int, NULLIF(chk.i_yyyy_overlap,'')), ro.i_year)
+                                 AND ISNULL(ro.i_year,0) <> ISNULL(TRY_CONVERT(int, NULLIF(chk.i_yyyy,'')), -1))
                              OR (chk.po_working_hdr_id IS NOT NULL AND ISNULL(ro.i_finish,0) <> 1) )
                      THEN 1 ELSE 0 END AS need_fix_overlap
             FROM dbo.sp_check_period_hdr chk
@@ -4171,8 +4296,16 @@ switch ($mode) {
         }
 
         if (trim((string) $diag['c_overlap']) === '') {
+            // ใบเบิกหักใบกันเหลื่อมไปแล้ว แต่ตรวจรับยังไม่มีเลขใบกัน -> ปรับข้อมูลตรวจรับให้ตรงกับใบเบิก
+            $sync = runOverlapSync($db, $chkId, true);
+            if ($sync && $sync['status'] === 'SYNCED' && $db->CommitTran()) {
+                echo json_encode(array("success" => true, "msg" => "ปรับข้อมูลตรวจรับให้ตรงกับใบเบิก " . $sync['wd_code']
+                    . "<br>บันทึกใบกัน " . $sync['c_booking'] . ($sync['money_cancelled'] ? "<br>ยกเลิกการจองเงินปีปัจจุบันที่ค้างอยู่" : "")));
+                exit;
+            }
             $db->RollBackTran();
-            echo json_encode(array("success" => false, "msg" => "ตรวจรับนี้ไม่ได้ใช้ใบกันเหลื่อม ไม่ต้องแก้"));
+            echo json_encode(array("success" => false, "msg" => ($sync && $sync['status'] === 'ERROR')
+                ? "ปรับข้อมูลไม่สำเร็จ: " . $sync['err_msg'] : "ตรวจรับนี้ไม่ได้ใช้ใบกันเหลื่อม ไม่ต้องแก้"));
             exit;
         }
         if (empty($diag['bg_reserve_overlap_id'])) {
@@ -4207,12 +4340,14 @@ switch ($mode) {
             $sqlB = "UPDATE NMU_EIS..bg_reserve_overlap
                         SET i_sys = 1,
                             chk_id = ?,
-                            i_year = ISNULL(?, i_year),
+                            i_year = CASE WHEN i_year IN (TRY_CONVERT(int, NULLIF(?, '')), TRY_CONVERT(int, NULLIF(?, ''))) THEN i_year
+                                          ELSE ISNULL(TRY_CONVERT(int, NULLIF(?, '')), i_year) END,
                             i_finish = CASE WHEN ? IS NOT NULL THEN 1 ELSE i_finish END,
                             d_update = GETDATE()
                       WHERE bg_reserve_overlap_id = ? AND i_enable = 1";
             $r = sqlsrv_query($db->conn, $sqlB, array(
-                $chkId, $diag['i_yyyy_overlap'], $diag['po_working_hdr_id'], $diag['bg_reserve_overlap_id']));
+                $chkId, (string) $diag['i_yyyy_overlap'], (string) $diag['i_yyyy'], (string) $diag['i_yyyy_overlap'],
+                $diag['po_working_hdr_id'], $diag['bg_reserve_overlap_id']));
             if ($r === false || sqlsrv_rows_affected($r) !== 1) {
                 $ok = false;
             } else {
