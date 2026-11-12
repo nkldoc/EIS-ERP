@@ -6621,15 +6621,13 @@ switch ($mode) {
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"];
         $data["d_update"] = date("Y-m-d H:i:s");
         $data["i_is_join_venture"] = $_REQUEST["i_is_join_venture"] ?? null;
-        //>>>>>>>>>>>>>>>>>>>>>>
-
         if (@$_REQUEST["i_is_bank_warranty0"] == 1) {
             $data["i_is_warranty"] = null;
             $data["cashiercheque_on"] = null;
             $data["i_is_warranty_book"] = null;
         } else {
             $data["i_is_warranty"] = @$_REQUEST["i_is_bank_warranty"];
-            $data["cashiercheque_on"] = @$_REQUEST["i_is_cashiercheque_warrantyID"];
+            $data["cashiercheque_on"] = @$_REQUEST["i_is_cashiercheque_warranty"];
             $data["i_is_warranty_book"] = @$_REQUEST["i_is_bank_warranty1"];
         }
 
@@ -6640,7 +6638,7 @@ switch ($mode) {
         }
 
         if (@$_REQUEST["i_is_bank_warranty"] == 1) {
-            $data["book_no"] = $_REQUEST["c_books_receipt"];
+            $data["book_no"] = $_REQUEST["c_books_receipt"] ?? null;
             $data["book_seq"] = $_REQUEST["c_receipt_no"];
             $data["d_book_date"] = !empty($_REQUEST['d_book_date']) ? $date->bc_to_ad($_REQUEST['d_book_date']) : null;
             $data["f_warranty_amt"] = str_replace(',', '', $_REQUEST["f_warranty_amt"]);
@@ -6655,8 +6653,8 @@ switch ($mode) {
         }
 
         if (@$_REQUEST["i_is_cashiercheque_warranty"] == 1) {
-            $data["cashiercheque_on"] = $_REQUEST["c_books_cashiercheque"];
-            $data["cashiercheque_seq"] = $_REQUEST["c_receipt_cashiercheque"];
+            $data["cashiercheque_on"] = $_REQUEST["c_books_cashiercheque"] ?? ($_REQUEST["c_receipt_cashiercheque"] ?? 1);
+            $data["cashiercheque_seq"] = $_REQUEST["c_receipt_cashiercheque"] ?? null;
             $data["d_cashiercheque_data"] = !empty($_REQUEST['d_cashiercheque_date']) ? $date->bc_to_ad($_REQUEST['d_cashiercheque_date']) : null;
             $data["f_warranty_cashiercheque"] = str_replace(',', '', $_REQUEST["f_cashiercheque_warranty_amt2"]);
             $data["c_remark_cashiercheque"] = $_REQUEST["c_comment2"];
