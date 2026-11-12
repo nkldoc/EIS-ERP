@@ -5128,7 +5128,53 @@ Ext.AppUx = function (app, menu) {
       {
         name: "i_type_guarantee",
       },
+      // ---- ข้อมูลหลักประกันสัญญา (contract guarantee) ----
+      { name: "i_is_warranty" },
+      { name: "i_is_warranty_book" },
+      { name: "cashiercheque_on" },
+      { name: "c_books_cashiercheque" },
+      { name: "c_receipt_cashiercheque" },
+      { name: "d_cashiercheque_date" },
+      { name: "f_cashiercheque_warranty_amt2" },
+      { name: "c_comment2" },
+      { name: "c_books_receipt" },
+      { name: "c_receipt_no" },
+      { name: "d_book_date" },
+      { name: "f_warranty_amt" },
+      { name: "c_doc_no" },
+      { name: "d_doc_date1" },
+      { name: "dc_bank_id" },
+      { name: "dc_bank_idID_Name" },
+      { name: "f_warranty_amt1" },
+      { name: "d_expire_warranty" },
+      { name: "c_comment1" },
     ],
+  });
+
+  // ---- ข้อมูลหลักประกันสัญญา : bank picker (หนังสือค้ำประกัน) ----
+  Ext.storeBankCNW = new Ext.data.JsonStore({
+    autoLoad: true,
+    storeId: "cnw_storeBank",
+    url: "api/All_ArCombo.php",
+    baseParams: { type: "storeBank" },
+    root: "data",
+    idProperty: "id",
+    totalProperty: "totalCount",
+    fields: ["no", "id", "c_code", "c_name"],
+  });
+  Ext.PopBankCNW = new Ext.ux.Poplov({
+    text: "ชื่อธนาคาร",
+    id: "cnw_dc_bank_idID",
+    iconCls: "page_magnify",
+    valueHidden: "dc_bank_id",
+    store: Ext.storeBankCNW,
+    headerGrid: [
+      { header: "ID System", sortable: true, hidden: true, dataIndex: "id" },
+      { header: "รหัส", sortable: true, dataIndex: "c_code" },
+      { header: "ชื่อ", sortable: true, id: "c_name", dataIndex: "c_name" },
+    ],
+    widthText: 280,
+    fieldLabel: "ชื่อธนาคาร ",
   });
 
   Ext.store_year = new Ext.data.JsonStore({
@@ -6558,6 +6604,301 @@ Ext.AppUx = function (app, menu) {
                           ],
                         },
                         {
+                          bodyStyle: "padding-left:0px;",
+                          items: {
+                            xtype: "fieldset",
+                            id: "cnw_fieldsetID",
+                            title: "ข้อมูลหลักประกันสัญญา ",
+                            autoHeight: true,
+                            items: [
+                              {
+                                xtype: "checkbox",
+                                id: "cnw_i_is_bank_warranty0ID",
+                                name: "i_is_bank_warranty0",
+                                height: 20,
+                                boxLabel: "ไม่มีการค้ำประกัน ",
+                                inputValue: "1",
+                                checked: true,
+                                listeners: {
+                                  check: function (checkbox, checked) {
+                                    if (checked) {
+                                      Ext.getCmp("cnw_i_warranty_typeID").hide();
+                                      Ext.getCmp("cnw_c_receipt_noID").hide();
+                                      Ext.getCmp("cnw_d_book_dateID").hide();
+                                      Ext.getCmp("cnw_c_commentID").hide();
+                                      Ext.getCmp("cnw_i_cashiercheque_typeID").hide();
+                                      Ext.getCmp("cnw_c_receipt_cashierchequeID").hide();
+                                      Ext.getCmp("cnw_d_cashiercheque_dateID").hide();
+                                      Ext.getCmp("cnw_c_comment2ID").hide();
+                                      Ext.getCmp("cnw_i_warranty_type1ID").hide();
+                                      Ext.getCmp("cnw_c_doc_noID").hide();
+                                      Ext.getCmp("cnw_d_doc_date1ID").hide();
+                                      Ext.getCmp("cnw_c_comment1ID").hide();
+                                      Ext.getCmp("cnw_d_expire_warrantyID").hide();
+                                      Ext.getCmp("cnw_frmPopBankID").hide();
+
+                                      Ext.getCmp("cnw_i_is_bank_warranty1ID").setValue(null);
+                                      Ext.getCmp("cnw_i_is_bank_warrantyID").setValue(null);
+                                      Ext.getCmp("cnw_i_is_cashiercheque_warrantyID").setValue(null);
+                                    }
+                                  },
+                                },
+                              },
+                              {
+                                xtype: "checkbox",
+                                id: "cnw_i_is_bank_warrantyID",
+                                name: "i_is_bank_warranty",
+                                height: 20,
+                                boxLabel: "เงินสด ",
+                                inputValue: "1",
+                                listeners: {
+                                  check: function (checkbox, checked) {
+                                    if (checked) {
+                                      Ext.getCmp("cnw_i_warranty_typeID").show();
+                                      Ext.getCmp("cnw_c_receipt_noID").show();
+                                      Ext.getCmp("cnw_d_book_dateID").show();
+                                      Ext.getCmp("cnw_c_commentID").show();
+                                      Ext.getCmp("cnw_i_is_bank_warranty0ID").setValue(null);
+                                    } else {
+                                      Ext.getCmp("cnw_i_warranty_typeID").hide();
+                                      Ext.getCmp("cnw_c_receipt_noID").hide();
+                                      Ext.getCmp("cnw_d_book_dateID").hide();
+                                      Ext.getCmp("cnw_c_commentID").hide();
+                                    }
+                                  },
+                                },
+                              },
+                              {
+                                fieldLabel: "ใบเสร็จเลขที่",
+                                id: "cnw_c_receipt_noID",
+                                name: "c_receipt_no",
+                                xtype: "textfield",
+                                hidden: true,
+                                width: 200,
+                              },
+                              {
+                                fieldLabel: "วันที่รับเงิน ",
+                                id: "cnw_d_book_dateID",
+                                name: "d_book_date",
+                                hidden: true,
+                                xtype: "datefield",
+                                width: 180,
+                              },
+                              {
+                                fieldLabel: "วงเงินค้ำประกัน ",
+                                layout: "column",
+                                hidden: true,
+                                id: "cnw_i_warranty_typeID",
+                                items: [
+                                  {
+                                    fieldLabel: "วงเงินในสัญญา ",
+                                    id: "cnw_f_warranty_amtID",
+                                    name: "f_warranty_amt",
+                                    xtype: "textfield",
+                                    style: "color:blue; text-align: right;",
+                                    listeners: {
+                                      blur: function () {
+                                        var f_total = parseFloat(this.getValue().replace(/,/g, "") / 1);
+                                        this.setValue(Ext.floatRenderer(f_total));
+                                      },
+                                    },
+                                  },
+                                  {
+                                    xtype: "displayfield",
+                                    value: "บาท ",
+                                    cls: "my-label-style",
+                                  },
+                                ],
+                              },
+                              {
+                                fieldLabel: "หมายเหตุ",
+                                id: "cnw_c_commentID",
+                                hidden: true,
+                                name: "c_remark",
+                                xtype: "textarea",
+                                height: 60,
+                                width: 430,
+                              },
+                              {
+                                xtype: "checkbox",
+                                id: "cnw_i_is_cashiercheque_warrantyID",
+                                name: "i_is_cashiercheque_warranty",
+                                height: 20,
+                                boxLabel: "แคชเชียร์เช็ค ",
+                                inputValue: "1",
+                                listeners: {
+                                  check: function (checkbox, checked) {
+                                    if (checked) {
+                                      Ext.getCmp("cnw_i_cashiercheque_typeID").show();
+                                      Ext.getCmp("cnw_c_receipt_cashierchequeID").show();
+                                      Ext.getCmp("cnw_d_cashiercheque_dateID").show();
+                                      Ext.getCmp("cnw_c_comment2ID").show();
+                                      Ext.getCmp("cnw_i_is_bank_warranty0ID").setValue(null);
+                                    } else {
+                                      Ext.getCmp("cnw_i_cashiercheque_typeID").hide();
+                                      Ext.getCmp("cnw_c_receipt_cashierchequeID").hide();
+                                      Ext.getCmp("cnw_d_cashiercheque_dateID").hide();
+                                      Ext.getCmp("cnw_c_comment2ID").hide();
+                                    }
+                                  },
+                                },
+                              },
+                              {
+                                fieldLabel: "เลขที่แคชเชียร์เช็ค:",
+                                id: "cnw_c_receipt_cashierchequeID",
+                                name: "c_receipt_cashiercheque",
+                                xtype: "textfield",
+                                hidden: true,
+                                width: 200,
+                              },
+                              {
+                                fieldLabel: "วันที่แคชเชียร์เช็ค ",
+                                id: "cnw_d_cashiercheque_dateID",
+                                name: "d_cashiercheque_date",
+                                hidden: true,
+                                xtype: "datefield",
+                                width: 180,
+                              },
+                              {
+                                fieldLabel: "วงเงินค้ำประกัน ",
+                                layout: "column",
+                                hidden: true,
+                                id: "cnw_i_cashiercheque_typeID",
+                                items: [
+                                  {
+                                    fieldLabel: "วงเงินในสัญญา ",
+                                    id: "cnw_f_cashiercheque_warranty_amt2ID",
+                                    name: "f_cashiercheque_warranty_amt2",
+                                    xtype: "textfield",
+                                    style: "color:blue; text-align: right;",
+                                    listeners: {
+                                      blur: function () {
+                                        var f_total = parseFloat(this.getValue().replace(/,/g, "") / 1);
+                                        this.setValue(Ext.floatRenderer(f_total));
+                                      },
+                                    },
+                                  },
+                                  {
+                                    xtype: "displayfield",
+                                    value: "บาท ",
+                                    cls: "my-label-style",
+                                  },
+                                ],
+                              },
+                              {
+                                fieldLabel: "หมายเหตุ",
+                                id: "cnw_c_comment2ID",
+                                hidden: true,
+                                name: "c_comment2",
+                                xtype: "textarea",
+                                height: 60,
+                                width: 430,
+                              },
+                              {
+                                xtype: "checkbox",
+                                id: "cnw_i_is_bank_warranty1ID",
+                                name: "i_is_bank_warranty1",
+                                height: 20,
+                                boxLabel: "หนังสือค้ำประกัน",
+                                inputValue: "1",
+                                listeners: {
+                                  check: function (checkbox, checked) {
+                                    if (checked) {
+                                      Ext.getCmp("cnw_i_warranty_type1ID").show();
+                                      Ext.getCmp("cnw_c_doc_noID").show();
+                                      Ext.getCmp("cnw_d_doc_date1ID").show();
+                                      Ext.getCmp("cnw_c_comment1ID").show();
+                                      Ext.getCmp("cnw_d_expire_warrantyID").show();
+                                      Ext.getCmp("cnw_frmPopBankID").show();
+                                      Ext.getCmp("cnw_i_is_bank_warranty0ID").setValue(null);
+                                    } else {
+                                      Ext.getCmp("cnw_i_warranty_type1ID").hide();
+                                      Ext.getCmp("cnw_c_doc_noID").hide();
+                                      Ext.getCmp("cnw_d_doc_date1ID").hide();
+                                      Ext.getCmp("cnw_c_comment1ID").hide();
+                                      Ext.getCmp("cnw_d_expire_warrantyID").hide();
+                                      Ext.getCmp("cnw_frmPopBankID").hide();
+                                    }
+                                  },
+                                },
+                              },
+                              {
+                                fieldLabel: "เลขที่หนังสือค้ำประกัน ",
+                                id: "cnw_c_doc_noID",
+                                name: "c_doc_no",
+                                xtype: "textfield",
+                                hidden: true,
+                                width: 200,
+                              },
+                              {
+                                fieldLabel: "วันที่หนังสือค้ำประกัน  ",
+                                id: "cnw_d_doc_date1ID",
+                                name: "d_doc_date1",
+                                xtype: "datefield",
+                                hidden: true,
+                                width: 180,
+                              },
+                              {
+                                layout: "column",
+                                id: "cnw_frmPopBankID",
+                                hidden: true,
+                                border: false,
+                                items: [
+                                  {
+                                    columnWidth: 1,
+                                    layout: "form",
+                                    border: false,
+                                    items: [Ext.PopBankCNW.mini],
+                                  },
+                                ],
+                              },
+                              {
+                                fieldLabel: "วงเงินค้ำประกัน",
+                                layout: "column",
+                                hidden: true,
+                                id: "cnw_i_warranty_type1ID",
+                                items: [
+                                  {
+                                    fieldLabel: "วงเงินในสัญญา ",
+                                    id: "cnw_f_warranty_amt1ID",
+                                    name: "f_warranty_amt1",
+                                    xtype: "textfield",
+                                    style: "color:blue; text-align: right;",
+                                    listeners: {
+                                      blur: function () {
+                                        var f_total = parseFloat(this.getValue().replace(/,/g, "") / 1);
+                                        this.setValue(Ext.floatRenderer(f_total));
+                                      },
+                                    },
+                                  },
+                                  {
+                                    xtype: "displayfield",
+                                    value: "บาท ",
+                                    cls: "my-label-style",
+                                  },
+                                ],
+                              },
+                              {
+                                fieldLabel: "วันหมดอายุหนังสือค้ำประกัน  ",
+                                id: "cnw_d_expire_warrantyID",
+                                name: "d_expire_warranty",
+                                xtype: "datefield",
+                                hidden: true,
+                                width: 180,
+                              },
+                              {
+                                fieldLabel: "หมายเหตุ",
+                                id: "cnw_c_comment1ID",
+                                name: "c_comment1",
+                                xtype: "textarea",
+                                hidden: true,
+                                height: 60,
+                                width: 430,
+                              },
+                            ],
+                          },
+                        },
+                        {
                           xtype: "radiogroup",
                           columns: [180],
                           fieldLabel: "โหมดการบันทึก",
@@ -7812,6 +8153,57 @@ Ext.AppUx = function (app, menu) {
       Ext.getCmp("winChequeID").items.items[0].getForm().loadRecord(rec);
       //After Load Trigger
       Ext.getCmp("d_due_dateMianID").fn();
+
+      // ---- prefill ข้อมูลหลักประกันสัญญา (contract guarantee) ----
+      (function () {
+        var d = Ext.selectRow.data;
+        var cmp = function (id) {
+          return Ext.getCmp(id);
+        };
+        var setChk = function (id, on) {
+          var c = cmp(id);
+          if (c) c.setValue(on ? true : null);
+        };
+        var toggle = function (id, on) {
+          var c = cmp(id);
+          if (c) {
+            if (on) c.show();
+            else c.hide();
+          }
+        };
+
+        var hasCash = d.i_is_warranty == 1;
+        var hasCheque =
+          (d.cashiercheque_on != null && d.cashiercheque_on !== "") ||
+          (d.c_receipt_cashiercheque != null && d.c_receipt_cashiercheque !== "");
+        var hasBook = d.i_is_warranty_book == 1;
+        var none = !hasCash && !hasCheque && !hasBook;
+
+        setChk("cnw_i_is_bank_warranty0ID", none);
+        setChk("cnw_i_is_bank_warrantyID", hasCash);
+        setChk("cnw_i_is_cashiercheque_warrantyID", hasCheque);
+        setChk("cnw_i_is_bank_warranty1ID", hasBook);
+
+        toggle("cnw_c_receipt_noID", hasCash);
+        toggle("cnw_d_book_dateID", hasCash);
+        toggle("cnw_i_warranty_typeID", hasCash);
+        toggle("cnw_c_commentID", hasCash);
+
+        toggle("cnw_c_receipt_cashierchequeID", hasCheque);
+        toggle("cnw_d_cashiercheque_dateID", hasCheque);
+        toggle("cnw_i_cashiercheque_typeID", hasCheque);
+        toggle("cnw_c_comment2ID", hasCheque);
+
+        toggle("cnw_c_doc_noID", hasBook);
+        toggle("cnw_d_doc_date1ID", hasBook);
+        toggle("cnw_frmPopBankID", hasBook);
+        toggle("cnw_i_warranty_type1ID", hasBook);
+        toggle("cnw_d_expire_warrantyID", hasBook);
+        toggle("cnw_c_comment1ID", hasBook);
+
+        if (cmp("cnw_dc_bank_idID")) cmp("cnw_dc_bank_idID").setValue(d.dc_bank_id || "");
+        if (cmp("cnw_dc_bank_idID_Name")) cmp("cnw_dc_bank_idID_Name").setValue(d.dc_bank_idID_Name || "");
+      })();
 
       Ext.HDR_ID = Ext.selectRow.data.po_working_hdr_id;
       Ext.DC_CREDITOR_ID = Ext.selectRow.data.dc_creditor_id; ////i_yyyy dc_expense_budget_type_id po_expense_id
