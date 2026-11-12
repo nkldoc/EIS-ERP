@@ -388,7 +388,7 @@ function imp_validate($db, $inputRows)
                 "rowNo" => $rowNo, "i_period" => $period, "c_doc_ref" => $pRaw["doc_ref"],
                 "d_doc_dateSub" => $due ?: null, "c_detail" => $pRaw["detail"],
                 "c_fund_source_dtl" => $periodFund, "f_fund_amt_dtl" => $periodAmt,
-                "raw" => $pRaw, "receives" => array(), "rowIdx" => array(),
+                "raw" => $pRaw, "receives" => array(), "rowIdx" => array(), "debt" => "",
                 "ref" => array("pr_id" => "", "po_id" => "", "chk_id" => ""),
             );
         } else {
@@ -418,6 +418,15 @@ function imp_validate($db, $inputRows)
         }
         if (imp_len(imp_str($in["c_overlap"] ?? "")) > 100) {
             $errs[] = "c_overlap (เลขใบกันเหลื่อม) ยาวเกิน 100 ตัวอักษร";
+        }
+        // รหัสบัญชีตั้งหนี้ (ไม่บังคับ): ต้องเป็นบัญชีค่าใช้จ่ายรหัสขึ้นต้น 5 ว่าง = ใช้การจับคู่หมวดเดิม
+        $debtIn = imp_str($in["debt_acc"] ?? "");
+        if ($debtIn !== "") {
+            if (!preg_match('/^5\d*$/', $debtIn)) {
+                $errs[] = "รหัสบัญชีตั้งหนี้ \"{$debtIn}\" ต้องเป็นบัญชีค่าใช้จ่าย (ขึ้นต้นด้วย 5)";
+            } elseif (($groups[$seq]["periods"][$pIdx]["debt"] ?? "") === "") {
+                $groups[$seq]["periods"][$pIdx]["debt"] = $debtIn;
+            }
         }
         $p = $groups[$seq]["periods"][$pIdx];
 
@@ -817,6 +826,7 @@ switch ($mode) {
                     // เลขใบกันเหลื่อมของแหล่งเงินที่ 1 (ว่าง = ปีต่อปี)
                     "c_overlap" => ($c["c_overlap"] ?? "") !== "" ? $c["c_overlap"] : null,
                     "i_budget_year_overlap" => $c["i_budget_year_overlap"] ?? null,
+                    "c_debt_acc_code" => ($p["debt"] ?? "") !== "" ? $p["debt"] : null,
                 );
                 if ($hasRefBill) {
                     foreach (array("pr_id", "po_id", "chk_id") as $rk) {
