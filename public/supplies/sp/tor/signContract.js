@@ -1914,7 +1914,7 @@ Ext.AppUx = function (app, menu) {
     url: "tor/api/mnTorController.php",
     baseParams: { mode: "LIST_POP_CREDITOR_VICTORY" },
     root: "data",
-    idProperty: "id",
+    idProperty: "dc_creditor_id",
     totalProperty: "totalCount",
     fields: [{ name: "no" }, { name: "dc_creditor_id" }, { name: "c_tax_number_imp" }, { name: "c_name" }, { name: "f_total_price" }],
   });
@@ -2226,7 +2226,7 @@ Ext.AppUx = function (app, menu) {
       url: "tor/api/mnTorController.php",
       root: "data",
       baseParams: { mode: "LISTCREDITOR", i_read: user_right_read }, //Permission i_read
-      idProperty: "id",
+      idProperty: "sp_tor_contract_id",
       totalProperty: "totalCount",
       fields: [
         { name: "no" },
@@ -2269,6 +2269,7 @@ Ext.AppUx = function (app, menu) {
         { name: "i_is_expense_monthly" },
         { name : "i_day"},
         { name: "i_enabled", type: "int" },
+        { name: "reasion_cancle", type: "string" },
         { name: "dc_user_create_id" },
         { name: "dc_user_create_cost_id" },
         { name: "d_create" },
@@ -2375,6 +2376,16 @@ Ext.AppUx = function (app, menu) {
         renderer: function (value, metaData, record, row, col, store, gridView) {
           return "<b>" + value + "</b>";
         },
+      },
+      {
+        header: "สถานะสัญญา",
+        dataIndex: "i_enabled",
+        width: 45,
+        renderer: function (value, metaData, record) {
+          if (value !== 2) return "ใช้งาน";
+          var reason = Ext.util.Format.htmlEncode(record.get("reasion_cancle") || "");
+          return '<span style="color:#c00000;font-weight:bold">ไม่ใช้งาน (สัญญาถูกยกเลิก)' + (reason ? ' : ' + reason : '') + '</span>';
+        }
       },
       {
         header: "ชื่อคู่สัญญา",
@@ -3658,6 +3669,8 @@ function d_period_dateID_change() {
                               return;
                         } else {
                           Ext.SelectStore = null;
+                          Ext.storeCreditor.setBaseParam("id", Ext.HDR_ID);
+                          Ext.storeCreditor.load({ params: { start: 0, limit: 20 } });
                           Ext.cntContract();
                           var i_edit_type = document.getElementsByName("i_edit_type");
                           i_edit_type[0].checked = true;
@@ -3667,6 +3680,46 @@ function d_period_dateID_change() {
                           // }
                         }
                       },
+                    },
+                    {
+                      text: "ยกเลิกสัญญา",
+                      iconCls: "icon-delete",
+                      handler: function () {
+                        var record = Ext.getCmp("gridSub1ID").getSelectionModel().getSelected();
+                        if (!record) {
+                          Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกสัญญาที่ต้องการยกเลิก");
+                          return;
+                        }
+                        if (Number(record.get("i_enabled")) === 2) {
+                          Ext.Msg.alert("แจ้งเตือน", "สัญญานี้ถูกยกเลิกแล้ว");
+                          return;
+                        }
+                        Ext.Msg.show({
+                          title: "ยกเลิกสัญญา",
+                          msg: "ระบุเหตุผลในการยกเลิกสัญญา " + Ext.util.Format.htmlEncode(record.get("c_code") || "") + " (ไม่เกิน 1,000 ตัวอักษร)",
+                          buttons: Ext.Msg.OKCANCEL,
+                          multiline: true,
+                          fn: function (button, reason) {
+                            if (button !== "ok") return;
+                            reason = (reason || "").replace(/^\s+|\s+$/g, "");
+                            if (!reason || reason.length > 1000) {
+                              Ext.Msg.alert("แจ้งเตือน", "กรุณาระบุเหตุผลการยกเลิกไม่เกิน 1,000 ตัวอักษร");
+                              return;
+                            }
+                            Ext.Ajax.request({
+                              url: "tor/api/cancelContract.php",
+                              method: "POST",
+                              params: { sp_tor_contract_id: record.get("sp_tor_contract_id"), reason: reason },
+                              callback: function (options, success, response) {
+                                var result;
+                                try { result = Ext.decode(response.responseText); } catch (e) {}
+                                if (success && result && result.success) Ext.store2.reload();
+                                Ext.Msg.alert("แจ้งเตือน", result && result.msg ? Ext.util.Format.htmlEncode(result.msg) : "ไม่สามารถเชื่อมต่อระบบได้");
+                              }
+                            });
+                          }
+                        });
+                      }
                     },
                   ],
                   listeners: {
@@ -4989,6 +5042,7 @@ function d_period_dateID_change() {
                       }
                       this.thisCick = function (grid, rowIndex, columnIndex, e) {
                         var record = grid.getStore().getAt(rowIndex);
+                        if (record.get("i_enabled") === 2) return;
                         Ext.SelectStore = Ext.store2.getAt(rowIndex);
                         Ext.store2.setBaseParam("tor_id", Ext.HDR_ID);
                         if (columnIndex === grid.getColumnModel().getIndexById("detailPeriod")) {
@@ -5078,7 +5132,15 @@ function d_period_dateID_change() {
                     },
                   },
                   columns: colCnt, //colCnt
-                  viewConfig: { forceFit: true },
+                  viewConfig: {
+                    forceFit: true,
+                    getRowClass: function (record, rowIndex, rowParams) {
+                      if (record.get("i_enabled") === 2) {
+                        rowParams.tstyle = "color:#c00000;background-color:#fff0f0;";
+                      }
+                      return "";
+                    }
+                  },
                 },
               ],
             }),

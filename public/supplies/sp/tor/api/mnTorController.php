@@ -2888,6 +2888,8 @@ switch ($mode) {
                         , (SELECT inv_name FROM NMU.dbo.dc_creditor aa WHERE aa.dc_creditor_id = a.dc_creditor_id) AS creditor_name
                         , (SELECT c_tax_number_imp FROM NMU.dbo.dc_creditor aa WHERE aa.dc_creditor_id = a.dc_creditor_id) AS c_tax_number_imp
                         , b.c_code
+                        , b.i_enabled
+                        , b.reasion_cancle
                         , b.sp_tor_contract_id
                         , b.c_doc_ref
                         , b.i_is_po
@@ -2924,9 +2926,9 @@ switch ($mode) {
 
                     FROM dbo.sp_tor_victory a
                     INNER JOIN dbo.sp_tor_contract b ON b.sp_tor_id=a.sp_tor_id AND b.dc_creditor_id = a.dc_creditor_id
-                    WHERE b.i_enabled =1 and a.sp_tor_id=?
+                    WHERE b.i_enabled IN (1, 2) and a.sp_tor_id=?
 
-                    UNION  all
+                    UNION
 
 					SELECT b.sp_tor_id
                         , b.dc_creditor_id
@@ -2934,6 +2936,8 @@ switch ($mode) {
                         , (SELECT inv_name FROM NMU.dbo.dc_creditor aa WHERE aa.dc_creditor_id = b.dc_creditor_id) AS creditor_name
                         , (SELECT c_tax_number_imp FROM NMU.dbo.dc_creditor aa WHERE aa.dc_creditor_id = b.dc_creditor_id) AS c_tax_number_imp
                         , b.c_code
+                        , b.i_enabled
+                        , b.reasion_cancle
                         , b.sp_tor_contract_id
                         , b.c_doc_ref
                         , b.i_is_po
@@ -2969,8 +2973,8 @@ switch ($mode) {
                         , (select top 1  CONVERT(VARCHAR, d_create , 120) from sp_doc_gen where ref_id = b.sp_tor_id  ) as d_start_contract
 
                     FROM dbo.sp_tor_contract b
-                    WHERE b.i_enabled =1 and b.sp_tor_id= {$_REQUEST['tor_id']} "; // . $wh . $util->viewDepartment('a', $_SESSION["dc_department_id"]);
-        $stmt = $db->QueryParam($sqlMain, array($_REQUEST['tor_id']));
+                    WHERE b.i_enabled IN (1, 2) and b.sp_tor_id= ? "; // . $wh . $util->viewDepartment('a', $_SESSION["dc_department_id"]);
+        $stmt = $db->QueryParam($sqlMain, array($_REQUEST['tor_id'], $_REQUEST['tor_id']));
         $i = @$start + 1;
 
         while ($row = $db->Fetch($stmt)) {
@@ -2979,6 +2983,8 @@ switch ($mode) {
                 "sp_tor_contract_id" => intval($row["sp_tor_contract_id"]),
                 "id" => intval($row["dc_creditor_id"]),
                 "c_code" => $row["c_code"] == null ? '' : $row["c_code"],
+                "i_enabled" => intval($row["i_enabled"]),
+                "reasion_cancle" => $row["reasion_cancle"],
                 "c_doc_ref" => $row["c_doc_ref"],
                 "d_doc_date" => $row["d_doc_date"] == '' ? $date->extDateBuddha(date('Y-m-d')) : $date->extDateBuddha($row["d_doc_date"]),
                 "d_contract_date" => $row["d_doc_date"] == '' ? $date->extDateBuddha(date('Y-m-d')) : $date->extDateBuddha($row["d_doc_date"]),
@@ -5381,6 +5387,36 @@ switch ($mode) {
         // echo $sql .'/*'; print_r($arrValue); echo '*/'; exit;
         $stmt = $db->QueryParam($sql, $arrValue);
         break;
+    case "CANCEL_SIGNED_CONTRACT":
+        header('Content-Type: application/json; charset=utf-8');
+        $contractId = (int)($_POST['sp_tor_contract_id'] ?? 0);
+        $torId = (int)($_POST['tor_id'] ?? 0);
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$contractId || !$torId || $reason === '' || mb_strlen($reason, 'UTF-8') > 1000) {
+            echo json_encode(['success' => false, 'msg' => 'กรุณาระบุเหตุผลการยกเลิกไม่เกิน 1,000 ตัวอักษร']);
+            exit;
+        }
+        $updateSql = "UPDATE dbo.sp_tor_contract
+                         SET i_enabled = 2, reasion_cancle = ?, d_update = GETDATE()
+                       WHERE sp_tor_contract_id = ? AND i_enabled = 1";
+        $stmt = sqlsrv_query($db->conn, $updateSql, [$reason, $contractId]);
+        $result = false;
+        if ($stmt !== false) {
+            sqlsrv_free_stmt($stmt);
+            $check = sqlsrv_query($db->conn, "SELECT i_enabled FROM dbo.sp_tor_contract WHERE sp_tor_contract_id = ?", [$contractId]);
+            $row = $check ? sqlsrv_fetch_array($check, SQLSRV_FETCH_ASSOC) : false;
+            if ($check) sqlsrv_free_stmt($check);
+            $result = ['updated' => ($row && (int)$row['i_enabled'] === 2) ? 1 : 0,
+                       'success' => ($row && (int)$row['i_enabled'] === 2) ? 1 : 0];
+        }
+        if (!$result) {
+            error_log('CANCEL_SIGNED_CONTRACT ' . $contractId . ': ' . json_encode(sqlsrv_errors()));
+        }
+        $messages = [50001 => 'ยังไม่ได้เพิ่มคอลัมน์เหตุผลยกเลิกสัญญา'];
+        $ok = $result && (int)$result['success'] === 1 && (int)$result['updated'] === 1;
+        echo json_encode(['success' => $ok, 'updated' => (int)($result['updated'] ?? 0), 'error_code' => $ok ? null : 'CONTRACT_NOT_UPDATED', 'msg' => $ok ? 'ยกเลิกสัญญาเรียบร้อยแล้ว' : 'ไม่สามารถปรับสถานะสัญญาเป็นไม่ใช้งานได้ กรุณาตรวจสอบเลขสัญญาและโหลดข้อมูลใหม่']);
+        exit;
+
     case "UP_SP_TOR_CONTRACT":
 
         //  print_r($data);
@@ -5490,6 +5526,7 @@ switch ($mode) {
                 $data['d_doc_date'] = '2026-10-01';
             }
             // ---------------------------------------------------------------------------
+            $data["i_enabled"] = 1;
             $data["dc_cost_id"] = $db->GetDataBySQL('SELECT dc_cost_id FROM sp_tor WHERE tor_id = ?', array($_REQUEST["sp_tor_id"]));
             $data["sp_emp_id"] = $_SESSION["sp_emp_id"];
             $data["dc_user_create_id"] = $_SESSION["user_id"];
