@@ -10341,7 +10341,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                         items: [{ region: "center", xtype: "panel", autoScroll: true,
                                 bodyStyle: "background:#555;text-align:center;padding:12px",
                                 html: "<img src='" + src + "?_dc=" + new Date().getTime() + "' style='max-width:100%;height:auto;background:white' alt='ภาพทักท้วง'>"
-                        }, { region: "south", xtype: "panel", height: 105, frame: true,
+                        }, { region: "south", xtype: "panel", height: 105, frame: true, autoScroll: true,
                                 bodyStyle: "padding:8px;font-size:13px",
                                 html: "<b>เจ้าพนักงาน:</b> " + Ext.util.Format.htmlEncode(data.c_officer_name || "-") +
                                       " &nbsp; <b>เวลารับ:</b> " + Ext.util.Format.htmlEncode(data.d_receive || "-") +
@@ -10361,7 +10361,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                         items: [{ region: "center", xtype: "panel", autoScroll: true,
                                 bodyStyle: "background:#555;text-align:center;padding:12px",
                                 html: "<img src='" + src + "?_dc=" + new Date().getTime() + "' style='max-width:100%;height:auto;background:white'>"
-                        }, { region: "south", xtype: "panel", height: 95, frame: true, bodyStyle: "padding:8px",
+                        }, { region: "south", xtype: "panel", height: 95, frame: true, autoScroll: true, bodyStyle: "padding:8px",
                                 html: "<b>ผู้ยืนยัน:</b> " + Ext.util.Format.htmlEncode(data.c_resolved_officer_name || "-") +
                                       " &nbsp; <b>วันที่ยืนยัน:</b> " + Ext.util.Format.htmlEncode(data.d_resolved || "-") +
                                       "<br><b>รายละเอียดการแก้ไข:</b> " + Ext.util.Format.htmlEncode(data.c_resolved_note || "-")
