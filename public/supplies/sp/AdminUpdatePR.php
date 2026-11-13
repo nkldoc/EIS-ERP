@@ -41,6 +41,25 @@ if (!isset($_SESSION['user_id'])) {
                 border: 5px solid #afd;
             }
 
+            /* Employee directory toolbar actions (Ext JS 3 button markup). */
+            .employee-action { margin: 0 3px; }
+            .employee-action td { background: none !important; }
+            .employee-action button {
+                min-height: 30px;
+                padding: 5px 13px !important;
+                border: 1px solid #b9cce3;
+                border-radius: 5px;
+                background: #fff;
+                color: #245487;
+                font-weight: bold;
+                cursor: pointer;
+            }
+            .employee-action-secondary button:hover { background: #edf5ff; border-color: #7da6d3; }
+            .employee-action-primary button { background: #245da3; border-color: #245da3; color: #fff; }
+            .employee-action-primary button:hover { background: #1b4c89; border-color: #1b4c89; }
+            .employee-action button:focus { outline: 2px solid #7fb2ee; outline-offset: 2px; }
+            .employee-action.x-item-disabled button { background: #e8edf3; border-color: #ccd6e2; color: #8796a8; cursor: default; }
+
             .row-highlight .x-grid3-cell {
                 background: #ffe48d !important;
                 font-weight: bold;

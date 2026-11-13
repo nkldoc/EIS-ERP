@@ -230,12 +230,12 @@ function createEmployeeManagementTab() {
             }}, {text: 'ยกเลิก', handler: function () { window.close(); }}]});
         window.show();
     }
-    var editButton = new Ext.Button({text: 'แก้ไขพนักงาน/สายงาน', disabled: true, handler: edit});
+    var editButton = new Ext.Button({text: 'แก้ไขพนักงาน/สายงาน', cls: 'employee-action employee-action-primary', disabled: true, handler: edit});
     adminEnableForPermission(editButton, 'can_manage_employees');
     departments.load(); employees.load();
     return new Ext.Panel({title: 'จัดการพนักงานและสายงาน', layout: 'border',
         tbar: ['ค้นหาพนักงาน:', query, 'สายงาน:', lineFilter, {text: 'ค้นหา', handler: searchEmployees},
-            {text: 'แสดงทั้งหมด', handler: function () { query.setValue(''); lineFilter.clearValue(); searchEmployees(); }},
+            {text: 'แสดงทั้งหมด', cls: 'employee-action employee-action-secondary', handler: function () { query.setValue(''); lineFilter.clearValue(); searchEmployees(); }},
             '-', editButton],
         items: [grid]});
 }
