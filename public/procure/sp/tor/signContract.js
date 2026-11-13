@@ -1071,6 +1071,11 @@ DeleteNoTor_dtl = function (record) {
     //    }
 };
 goToMapping = () => {
+    var selectedCode = Ext.getCmp("c_contrac_codeID");
+    if (!selectedCode || !selectedCode.getValue() || selectedCode.store.findExact("c_code", selectedCode.getValue()) < 0) {
+        Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกเลขสัญญาที่จองไว้จากรายการ");
+        return;
+    }
     var date_Ymd = Ext.util.Format.date(Ext.getCmp("d_start_dateID").getValue(), "Ymd");
     var date_Ym = Ext.selectRow.get("i_yyyy") / 1 + 543; //date_Ymd.substr(0, 4) / 1 + 543;
     var date_dd = date_Ymd.substr(4);
@@ -3645,7 +3650,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                         url: "api/All_spAlert.php",
                                                                                                          baseParams: {type: "sp_type_mapping_code", sp_emp_id: Ext.selectRow.data.sp_emp_id},
                                                                                                         root: "data",
-                                                                                                        idProperty: "id",
+                                                                                                        idProperty: "c_code",
                                                                                                         fields: ["id", "c_code", "c_gen"]
                                                                                                     }),
                                                                                                     width: 300,
@@ -3657,7 +3662,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                     valueField: "c_code",
                                                                                                     displayField: "c_code",
                                                                                                     triggerAction: "all",
-                                                                                                    forceSelection: false,
+                                                                                                    forceSelection: true,
                                                                                                     selectOnFocus: true,
                                                                                                     typeAhead: false,
                                                                                                     emptyText: "กรุณาเลือก",
@@ -3667,12 +3672,10 @@ Ext.AppUx = function (app, menu) {
                                                                                                         },
                                                                                                         afterrender: function ()
                                                                                                         {
-                                                                                                            //setLoad&&callback
                                                                                                             this.store.load({
-                                                                                                                'callback': function (record, operation, success) {
-                                                                                                                    if (success)
-                                                                                                                    {
-                                                                                                                        Ext.getCmp('c_contrac_codeID').setValue(this.data.items[0].get('c_code'));
+                                                                                                                callback: function (records, operation, success) {
+                                                                                                                    if (!success) {
+                                                                                                                        Ext.Msg.alert("แจ้งเตือน", "ไม่สามารถโหลดเลขสัญญาที่จองไว้ได้ กรุณาลองอีกครั้ง");
                                                                                                                     }
                                                                                                                 }
                                                                                                             });
