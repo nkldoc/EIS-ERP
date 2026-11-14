@@ -24,6 +24,8 @@ function List_QueryParam()
 	$yearTh     = isset($_REQUEST["year_en"]) ? intval($_REQUEST["year_en"]) : (date('Y') + 543);
 	$yearEn     = $yearTh - 543;       // เช่น 2026
 	$yearEnPrev = $yearEn - 1;         // เช่น 2025
+	$fiscalStart = sprintf('%04d-10-01', $yearEnPrev);
+	$fiscalEnd   = sprintf('%04d-10-01', $yearEn);
 
 	// Filter staff
 	if (!empty($_REQUEST['staff'])) {
@@ -117,7 +119,7 @@ function List_QueryParam()
 
 	// สร้าง CASE expression สำหรับ d_create และ act_date_dt
 	$monthIdxCreate  = sprintf($monthIdxExpr, ...array_fill(0, 12, 'b.d_create'));
-	$monthIdxActDate = sprintf($monthIdxExpr, ...array_fill(0, 12, 'MAX(ti.act_date_dt)'));
+	$monthIdxActDate = sprintf($monthIdxExpr, ...array_fill(0, 12, 'MIN(ti.act_date_dt)'));
 
 	if ($data_type == 'entry') {
 		if ($month_idx != 12) {
@@ -132,19 +134,16 @@ function List_QueryParam()
 		}
 		$where .= " AND EXISTS (
 			SELECT 1 FROM NMU_ERP..sp_tor_item ti 
-			WHERE ti.tor_id = b.tor_id AND ti.sp_status_hdr_id = 25
+			WHERE ti.tor_id = b.tor_id AND ti.sp_status_hdr_id = 26
+			  AND ti.act_date_dt >= '$fiscalStart' AND ti.act_date_dt < '$fiscalEnd'
 			GROUP BY ti.tor_id
 			$monthCondition
 		)";
 	}
 
-	// ✅ กรองปีงบประมาณ: i_yyyy เก็บเป็น ค.ศ.
-	// ต.ค.–ธ.ค. ของปีก่อน + ม.ค.–ก.ย. ของปีนี้
-	$where .= " AND (
-		(b.i_yyyy = $yearEnPrev AND MONTH(b.d_create) IN (10, 11, 12))
-		OR
-		(b.i_yyyy = $yearEn AND MONTH(b.d_create) BETWEEN 1 AND 9)
-	)";
+	// i_yyyy เป็นปีงบประมาณ ค.ศ. และวันที่รับ PR ต้องอยู่ในช่วงปีงบจริง
+	$where .= " AND b.i_yyyy = $yearEn
+		AND b.d_create >= '$fiscalStart' AND b.d_create < '$fiscalEnd'";
 
 	$sqlMain = "SET NOCOUNT ON 
 		SELECT 
@@ -160,7 +159,7 @@ function List_QueryParam()
 			(SELECT c_name FROM " . DB_NMU_ERP . "sp_emp WHERE sp_emp_id = b.sp_emp_id)    AS sp_emp,
 			(SELECT c_name FROM " . DB_NMU_ERP . "sp_status_hdr WHERE sp_status_hdr_id = b.tor_status_id) AS sp_status_hdr,
 			(SELECT c_name FROM " . DB_NMU_ERP . "sp_department WHERE dc_department_id = b.dc_department_id) AS dc_department,
-			CONVERT(VARCHAR, (SELECT TOP 1 act_date_dt FROM sp_tor_item WHERE tor_id = b.tor_id AND sp_status_hdr_id = 26 ORDER BY id DESC), 120) AS d_act_date_dt26,
+			CONVERT(VARCHAR, (SELECT MIN(act_date_dt) FROM sp_tor_item WHERE tor_id = b.tor_id AND sp_status_hdr_id = 26), 120) AS d_act_date_dt26,
 			CONVERT(VARCHAR, (SELECT TOP 1 act_date_dt FROM sp_tor_item WHERE tor_id = b.tor_id AND sp_status_hdr_id = 25 ORDER BY id DESC), 120) AS d_act_date_dt24,
 			CASE CAST(pb.i_sub_status AS FLOAT)
 				WHEN 0.3  THEN N'รอผู้ดำเนินการลงนาม'

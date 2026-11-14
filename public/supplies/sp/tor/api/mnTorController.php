@@ -241,6 +241,82 @@ $f_total_amt = !empty($data["f_total_amt"]) ? str_replace(',', '', $data["f_tota
 $data['dc_cost_id'] = $data['dc_cost_id'] ?? 38;
 $data["c_comment"] = $data["c_comment"] ?? NULL;
 switch ($mode) {
+    case "GET_PROGRESS_MENU_MAP":
+        $menuCode = trim($_REQUEST["menu_code"] ?? "");
+        $result = array("success" => true, "data" => null);
+        if ($menuCode !== "") {
+            $sqlMap = "IF OBJECT_ID('dbo.sp_progress_menu_map', 'U') IS NOT NULL
+                       SELECT TOP 1 menu_code, menu_name, event_type
+                       FROM dbo.sp_progress_menu_map WHERE menu_code = ? AND i_enabled = 1";
+            $stmtMap = $db->QueryParam($sqlMap, array($menuCode));
+            if ($stmtMap && ($rowMap = $db->Fetch($stmtMap))) {
+                $result["data"] = array(
+                    "menu_code" => $rowMap["menu_code"],
+                    "menu_name" => $rowMap["menu_name"],
+                    "event_type" => strval($rowMap["event_type"])
+                );
+            }
+        }
+        $db->CommitTran();
+        echo json_encode($result, JSON_UNESCAPED_UNICODE);
+        exit;
+
+    case "SAVE_PROGRESS_MENU_MAP":
+        if (intval($_SESSION["dc_center_user"] ?? 0) !== 1 && intval($_SESSION["user_id"] ?? 0) !== 1) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "เฉพาะผู้ดูแลระบบเท่านั้น"));
+            exit;
+        }
+        $menuCode = trim($_REQUEST["menu_code"] ?? "");
+        $menuName = trim($_REQUEST["menu_name"] ?? "");
+        $eventType = intval($_REQUEST["event_type"] ?? 0);
+        if ($menuCode === "" || $eventType <= 0) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ข้อมูล Mapping ไม่ครบ"));
+            exit;
+        }
+        $sqlMap = "SET NOCOUNT ON;
+                   IF OBJECT_ID('dbo.sp_progress_menu_map', 'U') IS NULL
+                   BEGIN
+                     CREATE TABLE dbo.sp_progress_menu_map (
+                       sp_progress_menu_map_id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+                       menu_code VARCHAR(30) NOT NULL,
+                       menu_name NVARCHAR(250) NULL,
+                       event_type INT NOT NULL,
+                       i_enabled INT NOT NULL CONSTRAINT DF_sp_progress_menu_map_enabled DEFAULT (1),
+                       dc_user_create_id INT NULL,
+                       d_create DATETIME NULL,
+                       dc_user_update_id INT NULL,
+                       d_update DATETIME NULL,
+                       CONSTRAINT UQ_sp_progress_menu_map_code UNIQUE (menu_code)
+                     );
+                   END;
+                   BEGIN
+                     UPDATE dbo.sp_progress_menu_map
+                     SET menu_name=?, event_type=?, i_enabled=1, dc_user_update_id=?, d_update=GETDATE()
+                     WHERE menu_code=?;
+                     IF @@ROWCOUNT=0
+                       INSERT INTO dbo.sp_progress_menu_map
+                         (menu_code,menu_name,event_type,i_enabled,dc_user_create_id,d_create,dc_user_update_id,d_update)
+                       VALUES (?,?,?,1,?,GETDATE(),?,GETDATE());
+                     SELECT CAST(1 AS INT) AS saved
+                   END";
+        $mapParams = array(
+            $menuName, $eventType, $_SESSION["user_id"], $menuCode,
+            $menuCode, $menuName, $eventType, $_SESSION["user_id"], $_SESSION["user_id"]
+        );
+        $stmtMap = $db->QueryParam($sqlMap, $mapParams);
+        $saved = 0;
+        if ($stmtMap && ($rowMap = $db->Fetch($stmtMap))) $saved = intval($rowMap["saved"]);
+        if ($saved === 1) {
+            $db->CommitTran();
+            echo json_encode(array("success" => true, "msg" => "บันทึก Mapping สถานะเรียบร้อยแล้ว"), JSON_UNESCAPED_UNICODE);
+        } else {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "สร้างตารางหรือบันทึก Mapping ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์ฐานข้อมูล"), JSON_UNESCAPED_UNICODE);
+        }
+        exit;
+
     case "Save_Event_Notor":
         $addField = null;
         $addValue = null;
@@ -249,14 +325,15 @@ switch ($mode) {
         // // print_r($_SESSION);
         // exit;
         // ============== //
-        $data["sp_tor_id"] = $_REQUEST["id"] ?? null;
-        $data["sp_tor_contract_id"] = $_REQUEST['sp_emp_id'] ?? null;
+        $data["sp_tor_id"] = $_REQUEST["sp_tor_id"] ?? ($_REQUEST["id"] ?? null);
+        $data["sp_tor_contract_id"] = $_REQUEST['sp_tor_contract_id'] ?? ($_REQUEST['sp_emp_id'] ?? null);
         $data["sp_status_hdr_id"] = $_REQUEST["tor_status_id"] ?? null;
         $data["sp_status_hdr_name"] = $_REQUEST["sp_status_hdr_name"] ?? null;
         $data["importance_level"] = $_REQUEST['importance_level'] ?? null;
         $data["event_title"] = $_REQUEST["event_title"] ?? null;
         $data["event_detail"] = $_REQUEST["event_detail"] ?? null;
-        $data["event_date"] = $date->bc_to_ad($_REQUEST['d_event_date']);  //d_event_date
+        $data["event_date"] = !empty($_REQUEST['d_event_date'])
+            ? $date->bc_to_ad($_REQUEST['d_event_date']) : date("Y-m-d");
         $data["event_type"] = $_REQUEST["event_type"] ?? null;
         $data["event_time_start"] = $_REQUEST["event_time_start"] ?? null;
         $data["event_time_end"] = $_REQUEST["event_time_end"] ?? null;

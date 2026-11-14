@@ -4362,6 +4362,17 @@ Ext.AppUx = function (app, menu) {
                                         },
                                     },
                                     {
+                                        text: "บันทึกความก้าวหน้า",
+                                        icon: "../images/icons/application_form_edit.png",
+                                        handler: function () {
+                                            Ext.openQuickProgress(Ext.selectRow, {
+                                                menuCode: "ST0003",
+                                                menuName: "ตรวจสอบเอกสาร",
+                                                store: Ext.storeDtl
+                                            });
+                                        }
+                                    },
+                                    {
                                         text: "จัดการข้อมูล View/Copy/Edit/Delete",
                                         icon: "../images/icons/application_edit.png",
                                         handler: function (e) {

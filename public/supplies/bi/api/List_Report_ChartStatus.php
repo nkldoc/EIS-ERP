@@ -14,12 +14,9 @@ function List_QueryParam()
     $yearTh = isset($_REQUEST['year_en']) ? intval($_REQUEST['year_en']) : (date('Y') + 543);
     $yearEn = $yearTh - 543; // แปลงเป็น ค.ศ. เช่น 2026
 
-    // ✅ ปีงบประมาณ 2569 = ต.ค. 2025 – ก.ย. 2026
-    // i_yyyy เก็บเป็น ค.ศ. → ต้องดึงทั้ง 2025 และ 2026
-    // แล้วกรองเดือนให้อยู่ในช่วงปีงบประมาณที่ถูกต้อง:
-    //   - i_yyyy = (yearEn-1) เฉพาะเดือน 10,11,12 (ต.ค.–ธ.ค.)
-    //   - i_yyyy = (yearEn)   เฉพาะเดือน 1–9     (ม.ค.–ก.ย.)
     $yearEnPrev = $yearEn - 1; // 2025
+    $fiscalStart = sprintf('%04d-10-01', $yearEnPrev);
+    $fiscalEnd   = sprintf('%04d-10-01', $yearEn);
 
     // month_idx: ต.ค.=0, พ.ย.=1, ธ.ค.=2, ม.ค.=3, ก.พ.=4, มี.ค.=5,
     //            เม.ย.=6, พ.ค.=7, มิ.ย.=8, ก.ค.=9, ส.ค.=10, ก.ย.=11
@@ -111,9 +108,11 @@ function List_QueryParam()
 
     FROM NMU_ERP..sp_tor a
     OUTER APPLY (
-        SELECT MAX(act_date_dt) AS act_date 
+        -- จ่ายงาน = มอบหมายผู้ปฏิบัติ (สถานะ 26) และนับวันที่มอบหมายครั้งแรก
+        SELECT MIN(act_date_dt) AS act_date
         FROM sp_tor_item 
-        WHERE tor_id = a.tor_id AND sp_status_hdr_id = 25
+        WHERE tor_id = a.tor_id AND sp_status_hdr_id = 26
+          AND act_date_dt >= '$fiscalStart' AND act_date_dt < '$fiscalEnd'
     ) t
     OUTER APPLY (
         SELECT TOP 1 beg.i_sub_status
@@ -129,13 +128,9 @@ function List_QueryParam()
     WHERE a.i_enabled = 1
       AND ISNULL(a.i_is_notor, 0) = 0
       AND ISNULL(a.i_parent, 0) = 0
-      AND (
-          -- ✅ ต.ค.–ธ.ค. ของปีก่อน (เช่น ต.ค.–ธ.ค. 2025)
-          (a.i_yyyy = $yearEnPrev AND MONTH(a.d_create) IN (10, 11, 12))
-          OR
-          -- ✅ ม.ค.–ก.ย. ของปีนี้ (เช่น ม.ค.–ก.ย. 2026)
-          (a.i_yyyy = $yearEn AND MONTH(a.d_create) BETWEEN 1 AND 9)
-      )";
+      -- i_yyyy เป็นปีงบประมาณ ค.ศ. และ d_create ต้องอยู่ในช่วงปีงบจริง
+      AND a.i_yyyy = $yearEn
+      AND a.d_create >= '$fiscalStart' AND a.d_create < '$fiscalEnd'";
 
     // Debug helper: return the SQL (with parameters interpolated) when ?debug=1 is provided
     if (isset($_REQUEST['debug']) && intval($_REQUEST['debug']) === 1) {

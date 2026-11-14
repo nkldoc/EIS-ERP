@@ -8530,6 +8530,17 @@ Ext.AppUx = function (app, menu) {
                                         scope: this,
                                     },
                                     {
+                                        text: "บันทึกความก้าวหน้า",
+                                        icon: "../images/icons/application_form_edit.png",
+                                        handler: function () {
+                                            Ext.openQuickProgress(Ext.selectRow, {
+                                                menuCode: "ST0009",
+                                                menuName: "บันทึกรายละเอียดในสัญญา",
+                                                store: Ext.storeDtl
+                                            });
+                                        }
+                                    },
+                                    {
                                         text: "ดูรายละเอียดทั้งหมด (PR / สัญญา / ตรวจรับ)",
                                         icon: "../images/icons/book_magnify.png",
                                         handler: function () {

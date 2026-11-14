@@ -210,6 +210,7 @@ $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
     <script type="text/javascript" src="../js/config_function.js?dc=<?= __VPRODUCT_ ?>"></script>
     <script type="text/javascript" src="./uiData/configStoreUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
     <script type="text/javascript" src="./tor/torUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
+    <script type="text/javascript" src="./tor/quickProgress.js?_dc=<?= filemtime(__DIR__ . '/tor/quickProgress.js'); ?>"></script>
     <script type="text/javascript" src="./tor/<?PHP echo $js; ?>"></script>
     <script type="text/javascript" src="./tor/pageStatus.js?_dc=<?= __VPRODUCT_; ?>"></script>
 </head>
