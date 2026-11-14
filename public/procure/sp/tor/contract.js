@@ -9897,18 +9897,6 @@ Ext.AppUx = function (app, menu) {
                                         scope: this,
                                     },
                                     {
-                                        text: "แก้ไขงบประมาณสัญญา",
-                                        icon: "../images/icons/money.png",
-                                        handler: function (e) {
-                                            if (Ext.selectRow && Ext.selectRow.data.sp_tor_contract_id) {
-                                                openEditContractBudget(Ext.selectRow.data.sp_tor_contract_id);
-                                            } else {
-                                                Ext.Msg.alert('แจ้งเตือน', 'ไม่พบ ID ของสัญญา');
-                                            }
-                                        },
-                                        scope: this,
-                                    },
-                                    {
                                         text: "จัดการข้อมูล View/Copy/Edit/Delete",
                                         icon: "../images/icons/application_edit.png",
                                         handler: function (e) {
