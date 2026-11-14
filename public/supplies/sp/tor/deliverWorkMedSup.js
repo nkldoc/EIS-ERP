@@ -21,7 +21,8 @@ Ext.storeDeliverMedSupList = new Ext.data.JsonStore({
         "dc_expense_budget_type_id_dtl", "c_fund_source_dtl", "f_fund_amt_dtl",
         "c_project_name", "c_contract_type", "po_expense_id", "c_expense_name", "i_budget_year",
         "c_overlap", "i_budget_year_overlap", "c_overlap2", "i_budget_year_overlap2", "c_overlap3", "i_budget_year_overlap3",
-        "c_po_no", "dc_creditor_id", "c_creditor_name", "c_tax_number_imp",
+        "c_po_no", "dc_creditor_id", "c_creditor_name", "c_tax_number_imp", "c_import_user", "c_ir_users",
+        "n_receive", "n_ir", "n_ap", "c_ir_codes", "c_ap_codes", "c_wd_codes", "b_locked_other",
     ],
 });
 
@@ -1540,6 +1541,14 @@ Ext.AppUx = function (app, menu) {
 
     function rowDblClick(grid, rowIndex) {
         var record = grid.getStore().getAt(rowIndex);
+        // งวดที่คนอื่นออกเลข IR ไปแล้ว (เภสัช) - ไม่ให้เข้าไปออก IR/ทำรายการซ้ำ บอกชื่อผู้ที่ทำรายการไว้
+        if (parseInt(record.get("b_locked_other"), 10) === 1) {
+            Ext.Msg.alert("ไม่สามารถทำรายการได้",
+                "ไม่สามารถออกเลข IR และทำรายการซ้ำได้<br>รายการนี้ออกเลข IR "
+                + Ext.util.Format.htmlEncode(record.get("c_ir_codes") || "") + " ไปแล้ว โดย <b>คุณ "
+                + Ext.util.Format.htmlEncode(record.get("c_ir_users") || "ผู้ใช้อื่น") + "</b> เป็นคนทำรายการ");
+            return;
+        }
         Ext.selectRow = record;
         winDeliverWorkMedSup(record);
     }
@@ -1594,6 +1603,31 @@ Ext.AppUx = function (app, menu) {
                 new Ext.grid.RowNumberer({header: "ที่", dataIndex: "no", width: 40}),
                 {header: "เลขที่สัญญา", dataIndex: "c_contract_code", width: 110},
                 {header: "งวดที่", dataIndex: "i_period", width: 55, align: "center"},
+                {
+                    // [ผู้ใช้ขอ] เภสัชทำงานกันหลายคน - บอกชัดว่างวดนี้ถูกดึงไปออกเลข IR / AP / ทำใบเบิกแล้วหรือยัง จะได้ไม่ทำซ้ำ
+                    header: "สถานะการทำงาน", dataIndex: "n_ir", width: 330,
+                    renderer: function (v, meta, rec) {
+                        var enc = Ext.util.Format.htmlEncode;
+                        var n = parseInt(rec.get("n_receive"), 10) || 0, ir = parseInt(rec.get("n_ir"), 10) || 0, ap = parseInt(rec.get("n_ap"), 10) || 0;
+                        var color = "#1565c0", bg = "#e3f2fd", label, sub = "";
+                        if (rec.get("c_wd_codes")) {
+                            color = "#c62828"; bg = "#ffebee"; label = "ทำใบเบิกแล้ว " + enc(rec.get("c_wd_codes")); sub = enc(rec.get("c_ap_codes") || "");
+                        } else if (ap > 0) {
+                            color = "#c62828"; bg = "#ffebee"; label = "ออกเลข AP แล้ว " + enc(rec.get("c_ap_codes") || ""); sub = "ยังไม่ทำใบเบิก";
+                        } else if (ir > 0) {
+                            color = "#ef6c00"; bg = "#fff3e0"; label = "ออกเลข IR แล้ว " + enc(rec.get("c_ir_codes") || ""); sub = "รอตรวจรับ/ออก AP";
+                        } else if (n === 0) {
+                            color = "#616161"; bg = "#eeeeee"; label = "ยังไม่มีรายการรับของ";
+                        } else {
+                            label = "รอออกเลข IR";
+                        }
+                        var by = rec.get("c_ir_users") ? " <span style=\"font-size:11px;color:#555\">(โดย " + enc(rec.get("c_ir_users")) + ")</span>" : "";
+                        return "<span style=\"display:inline-block;padding:1px 8px;border-radius:10px;white-space:nowrap;font-size:12px;color:" + color
+                            + ";background:" + bg + ";border:1px solid " + color + "\">" + label + "</span>" + by
+                            + (sub ? "<div style=\"font-size:11px;color:#777\">" + sub + "</div>" : "")
+                            + (rec.get("c_import_user") ? "<div style=\"font-size:11px;color:#1565c0\">นำเข้าโดย " + enc(rec.get("c_import_user")) + "</div>" : "");
+                    }
+                },
                 {header: "ปีงบประมาณ", dataIndex: "i_budget_year", width: 85, align: "center"},
                 {header: "ชื่อโครงการ", dataIndex: "c_project_name", width: 200},
                 {header: "ชื่อค่าใช้จ่าย", dataIndex: "c_expense_name", width: 200},
@@ -1604,6 +1638,9 @@ Ext.AppUx = function (app, menu) {
                 {header: "รายละเอียด", dataIndex: "c_detail", width: 200},
                 {header: "ผู้ขาย/ผู้รับจ้าง", dataIndex: "c_creditor_name", width: 180},
                 {header: "เลข PO", dataIndex: "c_po_no", width: 100},
+                // [ผู้ใช้ขอ] เห็นชัดว่าสัญญานี้ใครนำเข้า และใครออกเลข IR ไปแล้ว (เภสัชนำเข้าทีเดียวหลายร้อยรายการ แต่ออก IR กันคนละส่วน)
+                {header: "ผู้นำเข้า", dataIndex: "c_import_user", width: 160},
+                {header: "ผู้ออกเลข IR", dataIndex: "c_ir_users", width: 160},
             ];
 
             gridMain.superclass.constructor.call(this, {

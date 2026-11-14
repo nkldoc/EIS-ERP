@@ -58,6 +58,7 @@ function medsupIrUseYears($db, $ids)
     $placeholders = implode(",", array_fill(0, count($ids), "?"));
     $stmt = $db->QueryParam(
         "select distinct isnull(g.c_overlap, '') as c_overlap, isnull(g.i_budget_year_overlap, 0) as i_year_overlap
+                , isnull(g.i_budget_year, 0) as i_year_contract, isnull(g.c_ap_dept_type, 'APMSD') as c_dept
          from NMU_ERP.dbo.sp_tor_period_bill_receive r
          inner join NMU_ERP.dbo.sp_tor_period_bill g on g.sp_tor_period_bill_id = r.sp_tor_period_bill_id
          where r.sp_tor_period_bill_receive_id in ({$placeholders})",
@@ -72,6 +73,10 @@ function medsupIrUseYears($db, $ids)
             } elseif (preg_match('/^(\d{2})-/', trim((string) $row["c_overlap"]), $m)) {
                 $y = 2500 + intval($m[1]);
             }
+        } elseif ($row["c_dept"] === "APF" && intval($row["i_year_contract"]) > 0) {
+            // [ผู้ใช้ยืนยัน] สัญญาที่ไม่ใช้ใบกันเหลื่อมใช้ปีงบของสัญญา (ค.ศ. 2026 = 2569 -> IR50-69 / AP..69) เหมือนเวชภัณฑ์
+            // เพราะผู้ใช้ยังไม่ได้ทำปีงบปัจจุบัน (เดิมได้ปีปัจจุบัน 70)
+            $y = intval($row["i_year_contract"]) + 543;
         }
         $years[$y] = $y;
     }
@@ -96,6 +101,8 @@ function medsupGenIrCode($db, $deptType, $useYear = 0)
     $prefix = "IR" . $costId . "-" . substr((string) $fiscalYear, -2) . "-";
 
     $stmt = $db->QueryParam(
+        // นับทุกแถวรวมที่ยกเลิกแล้วด้วย (ห้ามเอาเลขที่ยกเลิกไปใช้ซ้ำ): ตาราง sp_tor_period_bill_checking มี UNIQUE (c_ir_code) แถวตรวจรับของเลขเก่าที่ถูกยกเลิก
+        // ยังถือเลขนั้นอยู่ ถ้าออกเลขซ้ำ การบันทึกตรวจรับจะไปอัปเดตแถวที่ยกเลิกแล้ว (i_enabled = 0) ข้อมูลเลยหายจากหน้าตรวจรับ
         "SELECT DISTINCT c_ir_code FROM NMU_ERP.dbo.sp_tor_period_bill_receive WHERE c_ir_code LIKE ? + '%'",
         array($prefix)
     );
