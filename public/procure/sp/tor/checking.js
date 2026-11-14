@@ -48,6 +48,16 @@ Ext.isBook = null;
 Ext.isOverlap = null;
 Ext.formSubmitHistory = [];
 
+// ฟังก์ชันเปิดหน้าแก้ไขงบประมาณสัญญา
+const openEditContractBudget = function (contractId) {
+    if (!contractId) {
+        Ext.Msg.alert('แจ้งเตือน', 'ไม่พบ ID ของสัญญา');
+        return;
+    }
+    var url = '../editContractBudget.php?id=' + contractId;
+    window.open(url, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+};
+
 Ext.showCheckingCategory = function (productType) {
         var asset = Ext.getCmp('am_mode_idID');
         var material = Ext.getCmp('inv_mode_idID');

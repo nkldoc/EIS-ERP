@@ -236,6 +236,45 @@ $f_total_amt = !empty($data["f_total_amt"]) ? str_replace(',', '', $data["f_tota
 $data['dc_cost_id'] = $data['dc_cost_id'] ?? 38;
 $data["c_comment"] = $data["c_comment"] ?? NULL;
 switch ($mode) {
+    case "ADMIN_SET_PR_NORMAL":
+        if (intval($_SESSION["dc_center_user"] ?? 0) !== 1 && intval($_SESSION["user_id"] ?? 0) !== 1) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "เฉพาะผู้ดูแลระบบเท่านั้น"), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $torId = intval($_REQUEST["tor_id"] ?? 0);
+        $reason = trim($_REQUEST["reason"] ?? "");
+        if ($torId <= 0 || $reason === "") {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "กรุณาระบุ PR และเหตุผล"), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $current = $db->GetDataBySQL("SELECT tor_id,c_code,i_type_bg FROM dbo.sp_tor WITH (UPDLOCK,HOLDLOCK) WHERE tor_id=? AND ISNULL(i_enabled,1)=1", array($torId));
+        if (!$current) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ไม่พบ PR ที่เลือก"), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $activeReserve = $db->GetDataBySQL("SELECT TOP 1 bg_reserve_money_id FROM NMU.dbo.bg_reserve_money WHERE pr_id=? AND i_sys=1 AND i_reserve=1 AND i_enable=1", array($torId));
+        if ($activeReserve && intval($current["i_type_bg"]) !== 1) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "PR นี้มีรายการจองเงินเดิมอยู่แล้ว ไม่สามารถเปลี่ยนประเภทซ้ำได้"), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $stmt = $db->QueryParam("IF OBJECT_ID('dbo.sp_pr_status_admin_log','U') IS NULL
+            BEGIN CREATE TABLE dbo.sp_pr_status_admin_log(log_id BIGINT IDENTITY(1,1) PRIMARY KEY,tor_id BIGINT NOT NULL,old_i_type_bg INT NULL,new_i_type_bg INT NOT NULL,reason NVARCHAR(1000) NOT NULL,dc_user_id INT NOT NULL,d_create DATETIME2 NOT NULL DEFAULT SYSDATETIME()); END;
+            INSERT dbo.sp_pr_status_admin_log(tor_id,old_i_type_bg,new_i_type_bg,reason,dc_user_id) VALUES(?,?,?,?,?);
+            UPDATE dbo.sp_tor SET i_type_bg=1,d_update=GETDATE(),dc_user_update_id=?,dc_user_update_cost_id=? WHERE tor_id=?;",
+            array($torId, intval($current["i_type_bg"]), 1, $reason, intval($_SESSION["user_id"]), intval($_SESSION["user_id"]), intval($_SESSION["dc_cost_id"]), $torId));
+        if (!$stmt) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "ปรับประเภท PR ไม่สำเร็จ"), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $db->CommitTran();
+        echo json_encode(array("success" => true, "msg" => "ปรับเป็น PR ปกติแล้ว สามารถจอง PR ใหม่ได้"), JSON_UNESCAPED_UNICODE);
+        exit;
+
     case "UPDATEFORMSPEMP":
         $arrParam[] = $data["sp_emp_id"];
         $arrParam[] = $data["c_comment"];

@@ -2213,6 +2213,74 @@ function showCustomEditForm(rec) {
                 { xtype: "hidden", name: "id", value: rec ? rec.data.id : "" },
                 { xtype: "textarea", fieldLabel: "รายการส่งเบิก", name: "c_name", value: rec && rec.data ? rec.data.c_name || "" : "", readOnly: true, height: 100, style: { background: "#EEEEEE", "font-weight": "bold", color: "black" } },
                 {
+                  xtype: "fieldset",
+                  title: "ปรับสถานะและจองเงิน PR",
+                  autoHeight: true,
+                  items: [
+                    {xtype: "displayfield", fieldLabel: "ประเภท PR ปัจจุบัน", id: "detail-pr-type-status", value: Number(rec.get("i_type_bg")) === 1 ? "PR ปกติ (เบิกปกติ)" : "รหัสประเภท PR: " + rec.get("i_type_bg")},
+                    {xtype: "textarea", fieldLabel: "เหตุผลการปรับสถานะ", id: "detail-pr-normal-reason", allowBlank: true, height: 55},
+                    {
+                      xtype: "compositefield",
+                      fieldLabel: "ดำเนินการ",
+                      items: [
+                        {
+                          xtype: "button", text: "1. ปรับเป็น PR เบิกปกติ", width: 155,
+                          handler: function () {
+                            var reason = String(Ext.getCmp("detail-pr-normal-reason").getValue() || "").replace(/^\s+|\s+$/g, "");
+                            if (!reason) { Ext.Msg.alert("แจ้งเตือน", "กรุณาระบุเหตุผลการปรับสถานะ"); return; }
+                            Ext.Ajax.request({url: "tor/api/mnTorController.php", method: "POST",
+                              params: {mode: "ADMIN_SET_PR_NORMAL", tor_id: rec.get("id"), reason: reason},
+                              success: function (response) {
+                                var result; try { result = Ext.decode(response.responseText); } catch (e) { result = null; }
+                                if (!result || !result.success) { Ext.Msg.alert("ข้อผิดพลาด", result && result.msg ? result.msg : "ปรับสถานะไม่สำเร็จ"); return; }
+                                rec.set("i_type_bg", 1); Ext.getCmp("detail-pr-type-status").setValue("PR ปกติ (เบิกปกติ)");
+                                Ext.Msg.alert("สำเร็จ", result.msg);
+                              }
+                            });
+                          }
+                        },
+                        {
+                          xtype: "button", text: "2. จอง PR ใหม่", width: 120,
+                          handler: function () {
+                            if (Number(rec.get("i_type_bg")) !== 1) { Ext.Msg.alert("แจ้งเตือน", "กรุณาปรับเป็น PR เบิกปกติก่อน"); return; }
+                            var pending = [], idx;
+                            for (idx = 1; idx <= 3; idx++) {
+                              var reserveId = Number(rec.get("bg_reserve_money_pr" + idx) || 0);
+                              var amount = Number(String(rec.get("f_amt_pr" + idx) || 0).replace(/,/g, ""));
+                              if (!reserveId && amount > 0) pending.push(idx);
+                            }
+                            if (!pending.length) { Ext.Msg.alert("แจ้งเตือน", "ไม่พบแหล่งเงินที่ยังไม่ได้จอง PR"); return; }
+                            Ext.Msg.confirm("ยืนยัน", "จอง PR ใหม่สำหรับแหล่งเงิน " + pending.join(", ") + " หรือไม่?", function (btn) {
+                              if (btn !== "yes") return;
+                              var run = function (pos) {
+                                if (pos >= pending.length) { Ext.Msg.alert("สำเร็จ", "จอง PR ใหม่ครบแล้ว", function () { if (Ext.storeDtl) Ext.storeDtl.reload(); }); return; }
+                                var n = pending[pos], suffix = n === 1 ? "" : n;
+                                Ext.Ajax.request({url: "tor/api/mnEditPRController.php", method: "POST",
+                                  params: {mode: "UPDATE_RESERVE_PR" + n, tor_id: rec.get("id"),
+                                    dc_budget_type_id: rec.get("dc_expense_budget_type" + suffix + "_id"),
+                                    i_pr_type: rec.get("i_pr_type_reserve" + n) || 1,
+                                    bg_expense_id: rec.get("bg_expense_id" + suffix + "_pr") || rec.get("po_expense_id"),
+                                    f_amt: rec.get("f_amt_pr" + n), dc_cost_id: rec.get("dc_cost_id"), bg_reserve_id: 0},
+                                  success: function (response) {
+                                    var result; try { result = Ext.decode(response.responseText); } catch (e) { result = null; }
+                                    if (!result || !(result.success === "Success" || result.success === true || result.reval === 0)) {
+                                      Ext.Msg.alert("จอง PR ไม่สำเร็จ", result && result.msg ? result.msg : "แหล่งเงินที่ " + n + " ไม่สำเร็จ"); return;
+                                    }
+                                    run(pos + 1);
+                                  },
+                                  failure: function (response) { Ext.Msg.alert("ข้อผิดพลาด", response.responseText || "เชื่อมต่อไม่สำเร็จ"); }
+                                });
+                              };
+                              run(0);
+                            });
+                          }
+                        }
+                      ]
+                    },
+                    {xtype: "displayfield", hideLabel: true, value: "ระบบจะจองเฉพาะแหล่งเงินที่ยังไม่มีเลขจอง PR และหยุดทันทีเมื่อพบข้อผิดพลาด", style: "color:#8a5500;padding-top:8px;"}
+                  ]
+                },
+                {
                   xtype: "textfield",
                   fieldLabel: "วันที่แก้ไข",
                   name: "d_update",

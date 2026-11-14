@@ -1843,7 +1843,7 @@ Ext.guarantee = new Ext.data.JsonStore({
 });
 Ext.storeedit = new Ext.data.JsonStore({
     storeId: "myStore2",
-    autoLoad: true,
+    autoLoad: false,
     url: "tor/api/mnTorController.php",
     root: "data",
     baseParams: {mode: "LIST_SP_EDIT_CONTRACT", i_read: user_right_read}, //Permission i_read
@@ -9893,6 +9893,18 @@ Ext.AppUx = function (app, menu) {
                                         hidden: Ext.session.dc_center_user == 1 ? false : true,
                                         handler: function (e) {
                                             win_request_end_contract(Ext.selectRow, "end"); // app,data.load
+                                        },
+                                        scope: this,
+                                    },
+                                    {
+                                        text: "แก้ไขงบประมาณสัญญา",
+                                        icon: "../images/icons/money.png",
+                                        handler: function (e) {
+                                            if (Ext.selectRow && Ext.selectRow.data.sp_tor_contract_id) {
+                                                openEditContractBudget(Ext.selectRow.data.sp_tor_contract_id);
+                                            } else {
+                                                Ext.Msg.alert('แจ้งเตือน', 'ไม่พบ ID ของสัญญา');
+                                            }
                                         },
                                         scope: this,
                                     },

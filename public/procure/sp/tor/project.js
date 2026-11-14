@@ -155,7 +155,7 @@ Ext.guarantee = new Ext.data.JsonStore({
 });
 Ext.storeedit = new Ext.data.JsonStore({
   storeId: "myStore2",
-  autoLoad: true,
+  autoLoad: false,
   url: "tor/api/mnTorController.php",
   root: "data",
   baseParams: { mode: "LIST_SP_EDIT_CONTRACT", i_read: user_right_read }, //Permission i_read
