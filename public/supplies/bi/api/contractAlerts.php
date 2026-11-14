@@ -256,18 +256,50 @@ if ($mode === 'scheduled') { $ownerSql=' AND u.dc_user_id = ?'; $ownerParams=[$u
 $today = new DateTimeImmutable('today', new DateTimeZone('Asia/Bangkok'));
 $endDate = (new DateTimeImmutable('today', new DateTimeZone('Asia/Bangkok')))->modify('+31 days')->format('Y-m-d');
 $items = [];
+$preferredOwnerId = $isTest ? $targetUserId : (!$isAdmin || $mode === 'scheduled' ? $userId : 0);
 
 $baseJoins = "
     INNER JOIN dbo.sp_tor t ON t.tor_id=c.sp_tor_id
     LEFT JOIN dbo.sp_emp e ON e.sp_emp_id=t.sp_emp_id
     LEFT JOIN dbo.sp_department dep ON dep.dc_department_id=e.dc_department_id
-    LEFT JOIN dbo.dc_user u ON u.dc_emp_id=e.dc_emp_id
+    OUTER APPLY (
+        SELECT TOP 1 du.dc_user_id
+        FROM dbo.dc_user du
+        WHERE du.dc_emp_id=e.dc_emp_id
+          AND ISNULL(du.i_enable,1)=1
+          AND ISNULL(du.i_delete,0)=0
+        ORDER BY CASE WHEN du.dc_user_id={$preferredOwnerId} THEN 0 ELSE 1 END,
+                 du.dc_user_id DESC
+    ) u
     LEFT JOIN NMU.dbo.dc_creditor creditor ON creditor.dc_creditor_id=c.dc_creditor_id";
 
 $queries = [
     'delivery' => [
         "SELECT p.sp_tor_hdr_period_id AS source_id, p.i_period, p.d_period_date AS deadline,
             h.c_arrive_code AS ir_code, h.c_code AS inspection_code, h.d_arrive_date,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM dbo.sp_check_period_hdr paid_check
+                INNER JOIN dbo.sp_withdraw paid_withdraw
+                    ON paid_withdraw.sp_check_period_hdr_id=paid_check.sp_check_period_hdr_id
+                   AND ISNULL(paid_withdraw.i_enable,1)=1
+                   AND ISNULL(paid_withdraw.i_delete,0)=0
+                INNER JOIN NMU_EIS.dbo.po_working_hdr paid_working
+                    ON paid_working.po_working_hdr_id=paid_withdraw.po_working_hdr_id
+                   AND ISNULL(paid_working.i_enable,1)=1
+                   AND ISNULL(paid_working.i_status_last,0)>=11
+                WHERE paid_check.sp_tor_hdr_period_id=p.sp_tor_hdr_period_id
+                  AND ISNULL(paid_check.i_enabled,1)=1
+            ) OR EXISTS (
+                SELECT 1
+                FROM dbo.sp_check_period_hdr paid_check
+                INNER JOIN NMU_EIS.dbo.po_working_hdr paid_working
+                    ON paid_working.po_working_hdr_id=paid_check.po_working_hdr_id
+                   AND ISNULL(paid_working.i_enable,1)=1
+                   AND ISNULL(paid_working.i_status_last,0)>=11
+                WHERE paid_check.sp_tor_hdr_period_id=p.sp_tor_hdr_period_id
+                  AND ISNULL(paid_check.i_enabled,1)=1
+            ) THEN 1 ELSE 0 END AS is_paid,
             c.sp_tor_contract_id, c.c_code AS contract_code, c.c_name AS contract_name,
             t.c_name AS project_name, creditor.c_name AS counterparty,
             e.c_name AS officer_name, dep.c_name AS department_name, dep.dc_department_id,
@@ -275,7 +307,14 @@ $queries = [
             DATEDIFF(day, CAST(GETDATE() AS date), CAST(p.d_period_date AS date)) AS days_remaining
         FROM dbo.sp_tor_hdr_period p
         INNER JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=p.sp_tor_contract_id AND c.i_enabled=1
-        LEFT JOIN dbo.sp_check_period_hdr h ON h.sp_tor_hdr_period_id=p.sp_tor_hdr_period_id AND h.i_enabled=1
+        OUTER APPLY (
+            SELECT TOP 1 check_hdr.c_arrive_code, check_hdr.c_code,
+                check_hdr.d_arrive_date, check_hdr.sp_check_period_hdr_id
+            FROM dbo.sp_check_period_hdr check_hdr
+            WHERE check_hdr.sp_tor_hdr_period_id=p.sp_tor_hdr_period_id
+              AND ISNULL(check_hdr.i_enabled,1)=1
+            ORDER BY check_hdr.sp_check_period_hdr_id DESC
+        ) h
         $baseJoins
         WHERE ISNULL(p.i_enabled,1)=1 AND p.d_period_date IS NOT NULL
             AND p.d_period_date < ?
@@ -383,6 +422,9 @@ try {
                 'line' => (string) ($row['department_name'] ?? ''),
                 'procurementHead' => '',
                 'status' => 'active',
+                'autoClosed' => $type === 'delivery' && !empty($row['is_paid']),
+                'closeReason' => $type === 'delivery' && !empty($row['is_paid'])
+                    ? 'ปิดอัตโนมัติ เนื่องจากงวดนี้เบิกจ่ายแล้ว' : '',
                 'urgent' => $days <= 7,
             ];
         }
@@ -412,6 +454,12 @@ try {
             $item['days'] = (int) $today->diff(new DateTimeImmutable($overrideDate))->format('%r%a');
             $item['urgent'] = $item['days'] <= 7;
         }
+    }
+    unset($item);
+    // Payment is authoritative for delivery-period alerts. Keep the item in
+    // the closed view for audit, but never schedule another notification.
+    foreach ($items as &$item) {
+        if (!empty($item['autoClosed'])) $item['status'] = 'closed';
     }
     unset($item);
     if ($mode === 'update') {
@@ -460,6 +508,14 @@ try {
         if (!$target || (!$isAdmin && (int) $target['ownerUserId'] !== $userId)) {
             http_response_code(403);
             echo json_encode(['success' => false, 'message' => 'ไม่มีสิทธิ์แก้ไขรายการนี้'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        if (!empty($target['autoClosed']) && in_array($action, ['close', 'reopen'], true)) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'งวดนี้ปิดแจ้งเตือนอัตโนมัติแล้ว เนื่องจากเบิกจ่ายสำเร็จ'
+            ], JSON_UNESCAPED_UNICODE);
             exit;
         }
         if ($action === 'close' && (int) $target['days'] >= 0) {
