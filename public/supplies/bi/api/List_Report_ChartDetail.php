@@ -134,7 +134,7 @@ function List_QueryParam()
 		}
 		$where .= " AND EXISTS (
 			SELECT 1 FROM NMU_ERP..sp_tor_item ti 
-			WHERE ti.tor_id = b.tor_id AND ti.sp_status_hdr_id = 26
+			WHERE ti.tor_id = b.tor_id AND ti.sp_status_hdr_id = 24
 			  AND ti.act_date_dt >= '$fiscalStart' AND ti.act_date_dt < '$fiscalEnd'
 			GROUP BY ti.tor_id
 			$monthCondition
@@ -160,7 +160,7 @@ function List_QueryParam()
 			(SELECT c_name FROM " . DB_NMU_ERP . "sp_status_hdr WHERE sp_status_hdr_id = b.tor_status_id) AS sp_status_hdr,
 			(SELECT c_name FROM " . DB_NMU_ERP . "sp_department WHERE dc_department_id = b.dc_department_id) AS dc_department,
 			CONVERT(VARCHAR, (SELECT MIN(act_date_dt) FROM sp_tor_item WHERE tor_id = b.tor_id AND sp_status_hdr_id = 26), 120) AS d_act_date_dt26,
-			CONVERT(VARCHAR, (SELECT TOP 1 act_date_dt FROM sp_tor_item WHERE tor_id = b.tor_id AND sp_status_hdr_id = 25 ORDER BY id DESC), 120) AS d_act_date_dt24,
+			CONVERT(VARCHAR, (SELECT MIN(act_date_dt) FROM sp_tor_item WHERE tor_id = b.tor_id AND sp_status_hdr_id = 24), 120) AS d_act_date_dt24,
 			CASE CAST(pb.i_sub_status AS FLOAT)
 				WHEN 0.3  THEN N'รอผู้ดำเนินการลงนาม'
 				WHEN 0.4  THEN N'รอผู้ขอเบิกลงนาม'

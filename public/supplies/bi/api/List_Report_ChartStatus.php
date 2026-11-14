@@ -108,10 +108,10 @@ function List_QueryParam()
 
     FROM NMU_ERP..sp_tor a
     OUTER APPLY (
-        -- จ่ายงาน = มอบหมายผู้ปฏิบัติ (สถานะ 26) และนับวันที่มอบหมายครั้งแรก
+        -- จ่ายงาน = มอบหมายผู้ปฏิบัติงาน (สถานะ 24) และนับวันที่มอบหมายครั้งแรก
         SELECT MIN(act_date_dt) AS act_date
         FROM sp_tor_item 
-        WHERE tor_id = a.tor_id AND sp_status_hdr_id = 26
+        WHERE tor_id = a.tor_id AND sp_status_hdr_id = 24
           AND act_date_dt >= '$fiscalStart' AND act_date_dt < '$fiscalEnd'
     ) t
     OUTER APPLY (

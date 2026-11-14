@@ -15,7 +15,7 @@ if ($i_year > 2400) $i_year -= 543;
 
 // Fiscal Year: Oct (Year-1) to Sep (Year)
 $start_date = ($i_year - 1) . "-10-01";
-$end_date   = $i_year . "-09-30";
+$end_date_exclusive = $i_year . "-10-01";
 
 $dc_cost_id = isset($_REQUEST['dc_cost_id']) ? intval($_REQUEST['dc_cost_id']) : 0;
 $sp_emp_id = isset($_REQUEST['sp_emp_id']) ? $_REQUEST['sp_emp_id'] : '0';
@@ -26,7 +26,13 @@ $use_kpi2 = isset($_REQUEST['use_kpi2']) ? intval($_REQUEST['use_kpi2']) : 1; //
 // Base Where Clause
 $wh = " AND c.c_code IS NOT NULL 
         AND a.i_type_bg = 1 
-        AND c.d_doc_date BETWEEN '$start_date' AND '$end_date' ";
+        AND c.d_doc_date >= '$start_date'
+        AND c.d_doc_date < '$end_date_exclusive'
+        AND a.i_enabled = 1
+        AND ISNULL(a.i_is_notor, 0) = 0
+        AND ISNULL(a.i_parent, 0) = 0
+        AND a.d_egp_date IS NOT NULL
+        AND CONVERT(date, a.d_egp_date) <= CONVERT(date, c.d_doc_date) ";
 
 if ($dc_cost_id > 0) {
     $wh .= " AND a.dc_cost2_id = $dc_cost_id ";

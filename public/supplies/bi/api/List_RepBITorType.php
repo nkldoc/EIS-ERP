@@ -28,15 +28,16 @@ function Get_ChartTorType()
 
     // ✅ แก้: เปลี่ยน WHERE ให้ตรงกับ ChartStatus
     //    เดิมใช้ i_pr_year = yearEn → ผิดปีงบ + รวมรายการยกเลิก
-    //    ใหม่ใช้ i_yyyy + d_create + กรอง i_enabled, i_is_notor, i_parent
-    $where = "AND t.i_enabled = 1
+    //    ใหม่ใช้ i_yyyy + ช่วง d_create ของปีงบ และแยก i_enabled=2 เป็นสถานะยกเลิก
+    $fiscalStart = sprintf('%04d-10-01', $yearEnPrev);
+    $fiscalEnd   = sprintf('%04d-10-01', $yearEn);
+
+    $where = "AND t.i_enabled IN (1, 2)
               AND ISNULL(t.i_is_notor, 0) = 0
               AND ISNULL(t.i_parent, 0) = 0
-              AND (
-                  (t.i_yyyy = {$yearEnPrev} AND MONTH(t.d_create) IN (10, 11, 12))
-                  OR
-                  (t.i_yyyy = {$yearEn} AND MONTH(t.d_create) BETWEEN 1 AND 9)
-              )";
+              AND t.i_yyyy = {$yearEn}
+              AND t.d_create >= '{$fiscalStart}'
+              AND t.d_create <  '{$fiscalEnd}'";
 
     $sqlMain = "SET NOCOUNT ON;
     DECLARE @TEMP_SP_USER_COST_SYS TABLE (dc_cost_id BIGINT);
@@ -99,11 +100,10 @@ function Get_ChartTorType()
             CASE
                 WHEN ISNULL(f.i_status_last,0) >= 11
                      AND ISNULL(e.po_working_hdr_id,0) > 0   THEN 'PAID'
-                WHEN ISNULL(e.po_working_hdr_id,0) = 0
-                     AND e.c_code IS NOT NULL                 THEN 'BILLING'
-                WHEN c.c_code IS NOT NULL                     THEN 'INSPECT'
-                WHEN c.c_code IS NULL
-                     AND t.tor_status_id IN (20,21,10034)     THEN 'MANAGE'
+                WHEN ISNULL(e.po_working_hdr_id,0) > 0        THEN 'BILLING'
+                WHEN ISNULL(e.sp_check_period_hdr_id,0) > 0
+                     OR e.c_code IS NOT NULL                  THEN 'INSPECT'
+                WHEN c.c_code IS NOT NULL                     THEN 'MANAGE'
                 ELSE 'PROCESS'
             END AS bill_step
         FROM sp_tor_contract c
@@ -114,7 +114,9 @@ function Get_ChartTorType()
         LEFT JOIN NMU_EIS..po_working_hdr f ON e.po_working_hdr_id = f.po_working_hdr_id
         WHERE c.sp_tor_id = t.tor_id
         -- ✅ เรียงลำดับให้ได้สัญญาล่าสุด
-        ORDER BY c.sp_tor_contract_id DESC
+        ORDER BY c.sp_tor_contract_id DESC,
+                 ISNULL(d.sp_tor_hdr_period_id, 0) DESC,
+                 ISNULL(e.sp_check_period_hdr_id, 0) DESC
     ) sp
     WHERE 1 = 1
       AND t.c_code IS NOT NULL
@@ -132,9 +134,7 @@ function Get_ChartTorType()
             $enabled      = $row["i_enabled"];
 
             if ($enabled == 2) {
-                $status_group = 9;  // ยกเลิก
-            } elseif (in_array($tor_status, [24, 25, 26, 13])) {
-                $status_group = 8;  // รอดำเนินการ
+                $status_group = 14; // ยกเลิก (แยกจากสถานะกำลังดำเนินการ)
             } elseif ($bill_step == 'PAID') {
                 $status_group = 13; // เบิกจ่ายแล้ว
             } elseif ($bill_step == 'BILLING') {
@@ -143,6 +143,10 @@ function Get_ChartTorType()
                 $status_group = 11; // ตรวจรับ
             } elseif ($bill_step == 'MANAGE') {
                 $status_group = 10; // บริหารสัญญา
+            } elseif (in_array($tor_status, [24, 25, 26])) {
+                $status_group = 8;  // รอรับ/รอมอบหมายผู้ปฏิบัติงาน
+            } elseif (in_array($tor_status, [20, 21, 10034])) {
+                $status_group = 10; // สถานะสัญญา แต่ยังไม่พบเลขสัญญาในตาราง
             } else {
                 $status_group = 9;  // อยู่ระหว่างดำเนินการ
             }

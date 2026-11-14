@@ -171,6 +171,7 @@
     11: "ตรวจรับพัสดุ",
     12: "ขออนุมัติเบิกจ่ายเงิน",
     13: "เบิกจ่ายเงินแล้ว",
+    14: "ยกเลิก",
   };
 
   // --- Core Logic: Aggregate & Render ---
@@ -251,7 +252,7 @@
     const statusMap = {};
 
     // Initialize all known statuses to ensure order/presence
-    [8, 9, 10, 11, 12, 13].forEach((id) => {
+    [8, 9, 10, 11, 12, 13, 14].forEach((id) => {
       statusMap[id] = {
         id: id,
         name: STATUS_NAMES[id] || "Unknown",
