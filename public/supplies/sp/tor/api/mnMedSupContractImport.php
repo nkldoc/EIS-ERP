@@ -5,6 +5,17 @@ include("../../../lib/database/apiUtil.php");
 include("../../../lib/date/i_date.class.php");
 include(__DIR__ . "/medsupContractCode.php");
 
+// เจ้าหน้าที่ฝ่ายเภสัช (รายชื่อเดียวกับ medsupOwnFilter ใน List_MedSupPeriodBill.php และ NMU_EIS po/api/List_poReg.php) ดูประวัติ/รายการชุดนำเข้าของกันและกันได้
+// (เห็นอย่างเดียว - ยกเลิกชุดนำเข้ายังทำได้เฉพาะผู้นำเข้าเองหรือผู้ดูแลระบบ)
+function medsupPharmacyUserIds()
+{
+    return array(60373, 60374, 60375, 60377, 60378, 60379, 60380, 60381, 60552);
+}
+function medsupIsPharmacyUser($uid)
+{
+    return in_array(intval($uid), medsupPharmacyUserIds(), true);
+}
+
 // เมนู "นำเข้าสัญญา (เวชภัณฑ์)" (ST00097 - medSupContractImport.js) นำเข้าสัญญา/งวดจากไฟล์
 // Excel ทีละหลายสัญญา - ไฟล์ถูกอ่านที่ฝั่งเบราว์เซอร์ (SheetJS) แล้วส่งแถวมาเป็น JSON:
 //   PREVIEW = ตรวจสอบ + แปลงรหัส/ชื่อเป็น id จริง แล้วคืนรายละเอียดทุกแถวให้ดูก่อนบันทึก
@@ -643,10 +654,11 @@ function imp_validate($db, $inputRows)
             $ov = $db->GetDataBySQL(
                 "select top 1 i_year, dc_expense_budget_type_id from " . DB_NMU_EIS . "vw_bg_budget_overlap
                   where c_code_ref = ? and dc_cost_id = ? order by i_year desc",
-                array($c["c_overlap"], MEDSUP_DC_COST_ID)
+                // ใบกันเป็นของหน่วยงานตามประเภทสัญญา (เวชภัณฑ์ 82 / เภสัช 50 / พัสดุ 38) ไม่ใช่เฉพาะเวชภัณฑ์
+                array($c["c_overlap"], ($c["c_ap_dept_type"] === "APF" ? 50 : MEDSUP_DC_COST_ID))
             );
             if (!$ov) {
-                $cErrs[] = "ไม่พบใบกันเหลื่อมเลขที่ {$c["c_overlap"]} ของหน่วยงานเวชภัณฑ์ในระบบงบประมาณ";
+                $cErrs[] = "ไม่พบใบกันเหลื่อมเลขที่ {$c["c_overlap"]} ของหน่วยงาน {$c["c_ap_dept_type"]} ในระบบงบประมาณ";
             } else {
                 $c["i_budget_year_overlap"] = intval($ov["i_year"]);
                 if (!empty($c["dc_expense_budget_type_id"]) && intval($ov["dc_expense_budget_type_id"]) !== intval($c["dc_expense_budget_type_id"])) {
@@ -815,7 +827,8 @@ switch ($mode) {
                     "c_fund_source_dtl" => $p["c_fund_source_dtl"],
                     "f_fund_amt_dtl" => $p["f_fund_amt_dtl"],
                     "f_period_amt" => $p["f_fund_amt_dtl"],
-                    "dc_cost_id" => MEDSUP_DC_COST_ID,
+                    // เภสัช (APF) เจ้าของสัญญา = 50 เพื่อให้ใบเบิก EIS หาใบกันเหลื่อมของเภสัชเจอ (เดิมเป็น 82 ทุกประเภท ทำให้ขึ้น "จำนวนเงินไม่เพียงพอ")
+                    "dc_cost_id" => ($c["c_ap_dept_type"] === "APF") ? 50 : MEDSUP_DC_COST_ID,
                     "i_enabled" => 1,
                     "dc_user_create_id" => $_SESSION["user_id"] ?? null,
                     "dc_user_create_cost_id" => $_SESSION["dc_cost_id"] ?? null,
@@ -891,7 +904,8 @@ switch ($mode) {
         $data = array();
         // ผู้ดูแลระบบ (user 1 / i_type_user 2) เห็นทุกชุดนำเข้า ผู้ใช้ทั่วไปเห็นเฉพาะชุดที่ตัวเองนำเข้า (เงื่อนไขเดียวกับ medsupOwnFilter)
         $listUid = intval($_SESSION["user_id"] ?? 0);
-        $listOwn = ($listUid === 1 || intval($_SESSION["i_type_user"] ?? 0) === 2) ? "" : " and i.dc_user_create_id = " . $listUid;
+        $listOwn = ($listUid === 1 || intval($_SESSION["i_type_user"] ?? 0) === 2) ? ""
+            : (medsupIsPharmacyUser($listUid) ? " and i.dc_user_create_id in (" . implode(",", medsupPharmacyUserIds()) . ")" : " and i.dc_user_create_id = " . $listUid);
         $stmt = $db->QueryParam(
             "select i.sp_tor_period_bill_import_id, i.c_import_name, i.c_file_name, i.i_contract_count, i.i_row_count, i.f_total_amt
                 , convert(varchar, i.d_create, 120) as d_create
@@ -899,6 +913,16 @@ switch ($mode) {
                 , (select count(*) from NMU_ERP.dbo.sp_tor_period_bill_receive r
                    inner join NMU_ERP.dbo.sp_tor_period_bill b on b.sp_tor_period_bill_id = r.sp_tor_period_bill_id
                    where b.sp_tor_period_bill_import_id = i.sp_tor_period_bill_import_id and r.i_enabled = 1) as i_receive_count
+                , (select count(*) from NMU_ERP.dbo.sp_tor_period_bill_receive r
+                   inner join NMU_ERP.dbo.sp_tor_period_bill b on b.sp_tor_period_bill_id = r.sp_tor_period_bill_id
+                   where b.sp_tor_period_bill_import_id = i.sp_tor_period_bill_import_id and r.i_enabled = 1 and r.c_ir_code is not null) as i_ir_count
+                , (select count(*) from NMU_ERP.dbo.sp_tor_period_bill_receive r
+                   inner join NMU_ERP.dbo.sp_tor_period_bill b on b.sp_tor_period_bill_id = r.sp_tor_period_bill_id
+                   where b.sp_tor_period_bill_import_id = i.sp_tor_period_bill_import_id and r.i_enabled = 1 and r.c_ap_code is not null) as i_ap_count
+                , (select count(*) from NMU_ERP.dbo.sp_tor_period_bill_receive r
+                   inner join NMU_ERP.dbo.sp_tor_period_bill b on b.sp_tor_period_bill_id = r.sp_tor_period_bill_id
+                   where b.sp_tor_period_bill_import_id = i.sp_tor_period_bill_import_id and r.i_enabled = 1 and r.c_ir_code is not null
+                     and exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_checking c where c.c_ir_code = r.c_ir_code and c.i_enabled = 1 and c.d_checking is not null)) as i_chk_count
              from NMU_ERP.dbo.sp_tor_period_bill_import i
              where i.i_enabled = 1{$listOwn}
              order by i.sp_tor_period_bill_import_id desc",
@@ -912,6 +936,9 @@ switch ($mode) {
                 "i_contract_count" => intval($r["i_contract_count"]),
                 "i_row_count" => intval($r["i_row_count"]),
                 "i_receive_count" => intval($r["i_receive_count"]),
+                "i_ir_count" => intval($r["i_ir_count"]),
+                "i_ap_count" => intval($r["i_ap_count"]),
+                "i_chk_count" => intval($r["i_chk_count"]),
                 "f_total_amt" => number_format(floatval($r["f_total_amt"]), 2),
                 "d_create" => empty($r["d_create"]) ? "" : $date->extDateBuddha($r["d_create"]) . " " . substr($r["d_create"], 11, 5),
                 "c_user_name" => $r["c_user_name"],
@@ -932,7 +959,8 @@ switch ($mode) {
         // ดูรายการในชุดนำเข้า: ผู้ใช้ทั่วไปดูได้เฉพาะชุดที่ตัวเองนำเข้า (ผู้ดูแลระบบดูได้ทุกชุด)
         $rowsUid = intval($_SESSION["user_id"] ?? 0);
         $rowsOwn = ($rowsUid === 1 || intval($_SESSION["i_type_user"] ?? 0) === 2) ? ""
-            : " and exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_import i2 where i2.sp_tor_period_bill_import_id = b.sp_tor_period_bill_import_id and i2.dc_user_create_id = " . $rowsUid . ")";
+            : " and exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_import i2 where i2.sp_tor_period_bill_import_id = b.sp_tor_period_bill_import_id and i2.dc_user_create_id "
+                . (medsupIsPharmacyUser($rowsUid) ? "in (" . implode(",", medsupPharmacyUserIds()) . ")" : "= " . $rowsUid) . ")";
         $stmt = $db->QueryParam(
             "select b.sp_tor_period_bill_hdr_id, b.c_contract_code, b.c_ap_dept_type, b.c_project_name, b.c_contract_type, b.c_creditor_name, b.i_budget_year
                 , b.i_period, b.c_doc_ref, convert(varchar, b.d_doc_dateSub, 120) as d_doc_dateSub, b.c_detail, b.c_fund_source_dtl, b.f_fund_amt_dtl

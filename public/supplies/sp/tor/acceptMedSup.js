@@ -152,6 +152,13 @@ function currentFiscalYearTh() {
 // เริ่มต้นของ "หน่วยงานเจ้าของเรื่อง" เสมอ
 var MEDSUP_DC_COST_ID = 82;
 
+// [ผู้ใช้ยืนยัน] หน่วยงานเจ้าของเรื่อง/ใบกันเหลื่อมตามประเภทของสัญญา: เวชภัณฑ์ APMSD=82 / เภสัช APF=50 / พัสดุ APPS=38
+// (เดิมล็อก 82 เสมอ เภสัชจึงขึ้นเป็นฝ่ายเวชภัณฑ์การแพทย์)
+function medsupDeptCostId(rec) {
+    var t = rec && rec.get ? rec.get("c_ap_dept_type") : "";
+    return t === "APF" ? 50 : MEDSUP_DC_COST_ID;
+}
+
 // หน้าต่างดูรายละเอียดรายการย่อยจริงภายใต้เลข IR หนึ่งๆ (อ่านอย่างเดียว - แก้ไข/ลบทำที่
 // เมนู "ส่งมอบงาน (เวชภัณฑ์)" เท่านั้น)
 function winAcceptMedSupDetail(rec) {
@@ -587,7 +594,7 @@ function winCheckingDetailTab(rec) {
     // กัน) ต้องแปลงกลับเป็น ค.ศ. ก่อนส่งไปเป็น i_yyyy_overlap ไม่งั้นเทียบปีไม่ตรงกันเลย
     // สักปี ได้ผลลัพธ์ว่างเปล่าเสมอ (ต้นเหตุที่ dropdown นี้ไม่เคยมีรายการให้เลือก)
     if (isOverlap) {
-        var overlapReqParams = {dc_cost_id: MEDSUP_DC_COST_ID, i_yyyy_overlap: overlapYear - 543, b_include_all: 1};
+        var overlapReqParams = {dc_cost_id: medsupDeptCostId(rec), i_yyyy_overlap: overlapYear - 543, b_include_all: 1};
         console.log("โหลดใบกันเหลื่อม (ตรวจรับ) params =", overlapReqParams);
         storeOverlapBookingAccept.load({
             params: overlapReqParams,
@@ -623,7 +630,7 @@ function winCheckingDetailTab(rec) {
         store: Ext.dc_cost, mode: "local", valueField: "id", displayField: "c_name",
         triggerAction: "all", forceSelection: true, typeAhead: false,
         emptyText: "กรุณาเลือกหน่วยงาน...",
-        value: MEDSUP_DC_COST_ID,
+        value: medsupDeptCostId(rec),
     });
 
     // ใช้เงินปีงบประมาณเก่ากว่าปีปัจจุบัน -> เลขที่ EGP = "-" (ล็อก ไม่บังคับ) · ปีปัจจุบัน -> กรอกได้และบังคับกรอก

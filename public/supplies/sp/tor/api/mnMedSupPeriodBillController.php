@@ -65,7 +65,8 @@ foreach (array("", "2", "3") as $fundSuffix) {
 // เสมอสำหรับ "เจ้าของสัญญา" ไม่ใช้ dc_cost_id ของผู้ใช้ที่ล็อกอินอยู่ เพราะเจ้าหน้าที่
 // จากหน่วยงานอื่น (เช่นฝ่ายพัสดุ) ก็อาจเข้ามาบันทึกรายการแทนได้ - ส่วน dc_user_create/
 // update_cost_id ยังคงเก็บหน่วยงานจริงของผู้ทำรายการไว้ (audit trail ไม่ควรถูกแก้)
-$data["dc_cost_id"] = MEDSUP_DC_COST_ID;
+// เภสัช (APF) เจ้าของสัญญา = 50 (ให้ใบเบิก EIS หาใบกันเหลื่อมของเภสัชเจอ) ประเภทอื่นคง 82 เหมือนเดิม
+$data["dc_cost_id"] = (($data["c_ap_dept_type"] ?? "") === "APF") ? 50 : MEDSUP_DC_COST_ID;
 $data["dc_user_create_id"] = $_SESSION["user_id"] ?? null;
 $data["dc_user_create_cost_id"] = $_SESSION["dc_cost_id"] ?? null;
 $data["d_create"] = date("Y-m-d H:i:s");

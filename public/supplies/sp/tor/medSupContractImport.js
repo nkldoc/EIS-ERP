@@ -60,7 +60,8 @@ Ext.MEDSUP_IMPORT_COLUMNS = [
     {key: "pr_id", label: "pr_id"},
     {key: "po_id", label: "po_id"},
     {key: "chk_id", label: "chk_id"},
-    {key: "c_overlap", label: "c_overlap"},
+    // alias "เลขที่กันเหลื่อมปี" = หัวคอลัมน์ในไฟล์ของฝ่ายเภสัช (เดิมไม่ตรงชื่อ ระบบข้ามคอลัมน์นี้เงียบๆ เลขใบกันเลยไม่ถูกบันทึก)
+    {key: "c_overlap", label: "c_overlap", alias: ["เลขที่กันเหลื่อมปี", "เลขที่ใบกันเหลื่อม"]},
     // รหัสบัญชีตั้งหนี้ของงวด (ไม่บังคับ) ว่าง = ใช้การจับคู่หมวดค่าใช้จ่ายเดิม
     {key: "debt_acc", label: "รหัสบัญชีตั้งหนี้"},
 ];
@@ -218,7 +219,7 @@ Ext.storeMedSupImportList = new Ext.data.JsonStore({
     root: "data",
     idProperty: "id",
     totalProperty: "totalCount",
-    fields: ["id", "c_import_name", "c_file_name", "i_contract_count", "i_row_count", "i_receive_count", "f_total_amt", "d_create", "c_user_name"],
+    fields: ["id", "c_import_name", "c_file_name", "i_contract_count", "i_row_count", "i_receive_count", "i_ir_count", "i_ap_count", "i_chk_count", "f_total_amt", "d_create", "c_user_name"],
 });
 
 // รายละเอียดสัญญา/งวดที่นำเข้าในครั้งนั้น (ดับเบิลคลิกแถวประวัติ)
@@ -1045,8 +1046,28 @@ function winMedSupImportNew() {
                     }
                     Ext.storeMedSupImportList.reload();
                     win.destroy();
-                    Ext.Msg.alert("สำเร็จ", "นำเข้าสัญญา " + res.contract_count + " รายการ (รับของ " + res.receive_count + " รายการ) เรียบร้อยแล้ว<br>เลขที่สัญญา: "
-                        + res.codes.map(Ext.util.Format.htmlEncode).join(", "));
+                    // สรุปผลการนำเข้า: ตัวเลขเด่น ๆ + รายการเลขที่สัญญาอยู่ในกล่องเลื่อนได้ (ไฟล์หลายร้อยสัญญาไม่ล้นจอ)
+                    var chips = res.codes.map(function (c) {
+                        return "<span style=\"display:inline-block;margin:2px 3px;padding:1px 8px;border-radius:10px;background:#ffebee;border:1px solid #c62828;color:#c62828;font-size:12px;white-space:nowrap\">"
+                            + Ext.util.Format.htmlEncode(c) + "</span>";
+                    }).join("");
+                    var stat = function (n, label, color) {
+                        return "<td style=\"text-align:center;padding:6px 14px\"><div style=\"font-size:26px;font-weight:bold;color:" + color + "\">" + n
+                            + "</div><div style=\"font-size:12px;color:#555\">" + label + "</div></td>";
+                    };
+                    Ext.Msg.show({
+                        title: "นำเข้าสำเร็จ",
+                        width: 640,
+                        buttons: Ext.Msg.OK,
+                        icon: Ext.Msg.INFO,
+                        msg: "<div style=\"font-weight:bold;margin-bottom:6px\">นำเข้าเรียบร้อยแล้ว</div>"
+                            + "<table style=\"border-collapse:collapse;margin:0 auto 8px\"><tr>"
+                            + stat(res.contract_count, "สัญญา", "#2e7d32") + stat(res.receive_count, "รายการรับของ", "#1565c0")
+                            + "</tr></table>"
+                            + "<div style=\"font-size:12px;color:#555;margin-bottom:4px\">ขั้นต่อไป: ไปที่เมนู ส่งมอบงาน (ST00095) เพื่อออกเลข IR ของรายการที่ตัวเองรับผิดชอบ</div>"
+                            + "<div style=\"font-size:12px;font-weight:bold;margin:6px 0 2px\">เลขที่สัญญาที่นำเข้า (" + res.codes.length + ")</div>"
+                            + "<div style=\"max-height:220px;overflow:auto;border:1px solid #ccc;border-radius:4px;padding:4px;background:#fff\">" + chips + "</div>"
+                    });
                 },
                 failure: function () {
                     mask.hide();
@@ -1115,6 +1136,13 @@ function winMedSupImportNew() {
     });
 }
 
+Ext.util.CSS.createStyleSheet(
+    "#tabpanel1 .medsup-imp-done, #tabpanel1 .medsup-imp-done td {background-color:#ffebee !important;}"
+    + "#tabpanel1 .x-grid3-row-over.medsup-imp-done, #tabpanel1 .x-grid3-row-over.medsup-imp-done td {background-color:#ffcdd2 !important;}"
+    + "#tabpanel1 .x-grid3-row-selected.medsup-imp-done, #tabpanel1 .x-grid3-row-selected.medsup-imp-done td {background-color:#ef9a9a !important;}",
+    "medsup-imp-done-css"
+);
+
 Ext.AppUx = function (app, menu) {
     Ext.user_right_add = user_right_add;
     Ext.user_right_edit = user_right_edit;
@@ -1135,7 +1163,8 @@ Ext.AppUx = function (app, menu) {
                 stripeRows: true,
                 loadMask: true,
                 layout: "fit",
-                viewConfig: {emptyText: "ยังไม่มีประวัติการนำเข้า..", deferEmptyText: true},
+                // [ผู้ใช้ขอ] ชุดที่นำเข้าแล้วทั้งแถวเป็นสีแดง (กันนำเข้า/ออกเลขซ้ำ) - แถวที่เลือกเป็นแดงเข้มขึ้น
+                viewConfig: {emptyText: "ยังไม่มีประวัติการนำเข้า..", deferEmptyText: true, getRowClass: function () { return "medsup-imp-done"; }},
                 listeners: {
                     afterrender: function () {
                         this.on("rowdblclick", function (grid, rowIndex) {
@@ -1169,6 +1198,28 @@ Ext.AppUx = function (app, menu) {
                 columns: [
                     new Ext.grid.RowNumberer({header: "ที่", width: 40}),
                     {header: "ชื่อรายการ", dataIndex: "c_import_name", width: 260},
+                    {
+                        // [ผู้ใช้ขอ] สีบอกว่าชุดนี้นำเข้าแล้ว และทำไปถึงขั้นไหนแล้ว (กันนำเข้า/ออกเลขซ้ำ) - นับเป็นจำนวน "รายการรับของ"
+                        header: "สถานะ / ความคืบหน้า", dataIndex: "i_receive_count", width: 330,
+                        renderer: function (v, meta, rec) {
+                            var n = parseInt(rec.get("i_receive_count"), 10) || 0, ir = parseInt(rec.get("i_ir_count"), 10) || 0,
+                                ap = parseInt(rec.get("i_ap_count"), 10) || 0, chk = parseInt(rec.get("i_chk_count"), 10) || 0;
+                            var color = "#1565c0", bg = "#e3f2fd", label;
+                            if (n === 0) {
+                                color = "#616161"; bg = "#eeeeee"; label = "นำเข้าแล้ว · ยังไม่มีรายการรับของ";
+                            } else if (ap >= n) {
+                                color = "#c62828"; bg = "#ffebee"; label = "ออกเลข AP ครบแล้ว - ห้ามทำซ้ำ (" + ap + "/" + n + ")";
+                            } else if (ap > 0) {
+                                color = "#e65100"; bg = "#fff3e0"; label = "ออกเลข AP แล้ว " + ap + "/" + n + " · ที่เหลือรอตรวจรับ";
+                            } else if (ir > 0) {
+                                color = "#ef6c00"; bg = "#fff8e1"; label = "ออกเลข IR แล้ว " + ir + "/" + n + (chk > 0 ? " · ตรวจรับแล้ว " + chk : " · รอตรวจรับ");
+                            } else {
+                                label = "นำเข้าแล้ว · รอออกเลข IR (0/" + n + ")";
+                            }
+                            return "<span style=\"display:inline-block;padding:1px 8px;border-radius:10px;white-space:nowrap;font-size:12px;color:" + color
+                                + ";background:" + bg + ";border:1px solid " + color + "\">" + label + "</span>";
+                        }
+                    },
                     {header: "ไฟล์", dataIndex: "c_file_name", width: 220},
                     {header: "จำนวนสัญญา", dataIndex: "i_contract_count", width: 90, align: "right"},
                     {header: "จำนวนงวด", dataIndex: "i_row_count", width: 80, align: "right"},

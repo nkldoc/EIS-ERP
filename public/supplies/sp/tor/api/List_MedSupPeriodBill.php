@@ -33,10 +33,21 @@ function get($a) {
 // ที่ตัวเองเป็นคนสร้าง (dc_user_create_id) ไม่ปนกับของเจ้าหน้าที่คนอื่นแม้จะอยู่หน่วยงานเดียวกัน
 // ใช้กับทุกรายการหลักของเมนูเวชภัณฑ์ (PR / สัญญา / งวด / รับของ) - $alias = ตัวย่อตารางที่มี
 // คอลัมน์ dc_user_create_id ของแถวสัญญา/PR (sp_tor_period_bill)
-function medsupOwnFilter($alias) {
+function medsupOwnFilter($alias, $strictOwn = false) {
     $uid = intval($_SESSION["user_id"] ?? 0);
     if ($uid === 1 || intval($_SESSION["i_type_user"] ?? 0) === 2) {
         return "";
+    }
+    // [ผู้ใช้ยืนยัน] เจ้าหน้าที่ฝ่ายเภสัช (9 คนด้านล่าง) เห็นรายการสัญญาเภสัช (APF) ของทุกคนที่ ST00095 ส่งมอบงาน (ดูว่าใครนำเข้า/ออก IR ไปแล้ว)
+    // แต่พอไปถึงขั้นตรวจรับ/ออกเลข AP ($strictOwn = ST00096) และทำใบเบิกที่ EIS ต่างคนต่างเห็นของตัวเอง = เลข IR ที่ตัวเองเป็นคนกดยืนยันยอด
+    // (ยังไม่มีผู้ยืนยัน = ตกเป็นของผู้สร้างสัญญา) ส่วนเวชภัณฑ์/ฝ่ายอื่นยังเป็น "ใครของมัน" เหมือนเดิม - ถ้าเพิ่ม/ลดเจ้าหน้าที่ แก้รายชื่อนี้ และ NMU_EIS po/api/List_poReg.php
+    // 60373 sittisak / 60374 pojanee / 60375 nittaya.t / 60377 patita / 60378 chaturong / 60379 noppdol.kam / 60380 fontong / 60381 napapar / 60552 pasitra
+    if (in_array($uid, array(60373, 60374, 60375, 60377, 60378, 60379, 60380, 60381, 60552), true)) {
+        if ($strictOwn) {
+            return " and (exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_receive ro where ro.c_ir_code = r.c_ir_code and ro.i_enabled = 1 and ro.dc_user_ir_confirm_id = {$uid})"
+                . " or ({$alias}.dc_user_create_id = {$uid} and not exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_receive ro2 where ro2.c_ir_code = r.c_ir_code and ro2.i_enabled = 1 and ro2.dc_user_ir_confirm_id is not null)))";
+        }
+        return " and ({$alias}.dc_user_create_id = {$uid} or {$alias}.c_ap_dept_type = 'APF')";
     }
     return " and {$alias}.dc_user_create_id = {$uid}";
 }
@@ -219,6 +230,11 @@ if ($type == "medsup_period_bill") {
                      from NMU_ERP.dbo.sp_tor_period_bill s
                      where 1=1 {$wh}";
 
+    // คอลัมน์เลขใบเบิก (c_code_ref) มาจากสคริปต์ sp_tor_period_bill_checking_withdraw.sql - ไม่มีก็แสดงว่าง
+    $flatHasWd = intval($db->GetDataBySQL("select case when col_length('NMU_ERP.dbo.sp_tor_period_bill_checking', 'c_code_ref') is not null then 1 else 0 end", array()));
+    $flatWdSel = $flatHasWd
+        ? "stuff((select distinct ', ' + c.c_code_ref from NMU_ERP.dbo.sp_tor_period_bill_checking c where c.c_ir_code in (select r3.c_ir_code from NMU_ERP.dbo.sp_tor_period_bill_receive r3 where r3.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r3.i_enabled = 1 and r3.c_ir_code is not null) and c.i_enabled = 1 and c.c_code_ref is not null for xml path('')), 1, 2, '')"
+        : "cast(null as varchar(200))";
     $arrParam[] = $start;
     $arrParam[] = $limit;
     $sqlMain = "select a.row
@@ -247,6 +263,20 @@ if ($type == "medsup_period_bill") {
                     , g.dc_creditor_id
                     , g.c_creditor_name
                     , g.c_tax_number_imp
+                    , (select top 1 c_full_name from dbo.dc_user where dc_user_id = g.dc_user_create_id) as c_import_user
+                    , stuff((select distinct ', ' + u.c_full_name
+                             from NMU_ERP.dbo.sp_tor_period_bill_receive r2
+                             inner join dbo.dc_user u on u.dc_user_id = isnull(r2.dc_user_ir_confirm_id, r2.dc_user_update_id)
+                             where r2.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r2.i_enabled = 1 and r2.c_ir_code is not null
+                             for xml path('')), 1, 2, '') as c_ir_users
+                    , (select count(*) from NMU_ERP.dbo.sp_tor_period_bill_receive r4 where r4.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r4.i_enabled = 1) as n_receive
+                    , (select count(*) from NMU_ERP.dbo.sp_tor_period_bill_receive r4 where r4.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r4.i_enabled = 1 and r4.c_ir_code is not null) as n_ir
+                    , (select count(*) from NMU_ERP.dbo.sp_tor_period_bill_receive r4 where r4.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r4.i_enabled = 1 and r4.c_ap_code is not null) as n_ap
+                    , stuff((select distinct ', ' + r5.c_ir_code from NMU_ERP.dbo.sp_tor_period_bill_receive r5 where r5.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r5.i_enabled = 1 and r5.c_ir_code is not null for xml path('')), 1, 2, '') as c_ir_codes
+                    , stuff((select distinct ', ' + r6.c_ap_code from NMU_ERP.dbo.sp_tor_period_bill_receive r6 where r6.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r6.i_enabled = 1 and r6.c_ap_code is not null for xml path('')), 1, 2, '') as c_ap_codes
+                    , " . $flatWdSel . " as c_wd_codes
+                    , g.c_ap_dept_type
+                    , stuff((select distinct ',' + cast(isnull(r7.dc_user_ir_confirm_id, r7.dc_user_update_id) as varchar(20)) from NMU_ERP.dbo.sp_tor_period_bill_receive r7 where r7.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r7.i_enabled = 1 and r7.c_ir_code is not null for xml path('')), 1, 1, '') as c_ir_user_ids
                 "
                 . " from ({$sqlTempTable}) a "
                 . " inner join NMU_ERP.dbo.sp_tor_period_bill g on g.sp_tor_period_bill_id = a.sp_tor_period_bill_id"
@@ -289,6 +319,17 @@ if ($type == "medsup_period_bill") {
             "dc_creditor_id" => intval($row["dc_creditor_id"]),
             "c_creditor_name" => $row["c_creditor_name"],
             "c_tax_number_imp" => $row["c_tax_number_imp"],
+            "c_import_user" => $row["c_import_user"],
+            "c_ir_users" => $row["c_ir_users"],
+            "n_receive" => intval($row["n_receive"]),
+            "n_ir" => intval($row["n_ir"]),
+            "n_ap" => intval($row["n_ap"]),
+            "c_ir_codes" => $row["c_ir_codes"],
+            "c_ap_codes" => $row["c_ap_codes"],
+            "c_wd_codes" => $row["c_wd_codes"],
+            // [ผู้ใช้ขอ] เภสัช (APF): งวดที่คนอื่นออกเลข IR ไปแล้ว คนอื่นเข้าไปออก IR/ทำรายการซ้ำไม่ได้ (ผู้ดูแลระบบและเจ้าของ IR เข้าได้ปกติ)
+            "b_locked_other" => (!medsupIsAdmin() && $row["c_ap_dept_type"] === "APF" && !empty($row["c_ir_user_ids"])
+                && !in_array(strval(intval($_SESSION["user_id"] ?? 0)), explode(",", $row["c_ir_user_ids"]), true)) ? 1 : 0,
         );
         ${$root}[] = $temp;
     }
@@ -414,7 +455,7 @@ if ($type == "medsup_period_bill") {
     // กว่าจะยืนยันใหม่) ยกเว้น IR ที่ออกเลข AP ไปแล้ว ให้ขึ้นเสมอ (ไม่ให้หายจากประวัติ)
     $wh .= " and (r.c_ap_code is not null or not exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_receive rc
                 where rc.c_ir_code = r.c_ir_code and rc.i_enabled = 1 and isnull(rc.b_ir_confirm, 0) = 0))";
-    $wh .= medsupOwnFilter("g"); // user ใครuser มัน (admin เห็นทั้งหมด)
+    $wh .= medsupOwnFilter("g", true); // ตรวจรับ: เภสัช = ของ IR ที่ตัวเองยืนยันยอด / ฝ่ายอื่นของใครของมัน (admin เห็นทั้งหมด)
     // ค้นหาโดยเลขที่สัญญา (ค่าเริ่มต้น) หรือฟิลด์อื่นตามที่เลือกใน "ค้นหาโดย" - เผื่อ
     // ความเข้ากันได้แบบเดิม (SEARCH + c_contract_code) ให้ยังใช้ได้เหมือนเดิมด้วย
     // หมายเหตุ: ST0013 มี "เลขที่ตรวจรับ"/"เลขที่ใบเบิก" ในตัวเลือกนี้ด้วย แต่เมนูนี้ไม่มี
@@ -446,7 +487,9 @@ if ($type == "medsup_period_bill") {
         // g.i_budget_year ที่เก็บเป็น ค.ศ.
         // IR ที่ใช้ใบกันเหลื่อม ปีงบประมาณของเอกสาร = ปีงบ (1 ต.ค.) ของวันที่ออกเลข IR (ปีที่ใช้เงินเป็นปีของใบกัน
         // ดูตัวกรอง "ปีที่ใช้ประมาณ") ส่วนที่ไม่ใช่กันเหลื่อมใช้ปีงบของสัญญาเหมือนเดิม
-        $wh .= " and (case when isnull(g.c_overlap,'') <> '' or isnull(g.c_overlap2,'') <> '' or isnull(g.c_overlap3,'') <> ''"
+        // [ผู้ใช้ยืนยัน] ทุก IR (ใช้ใบกันและไม่ใช้) ใช้ปีงบของวันที่ออกเลข IR เหมือนกัน ไม่งั้น IR ของสัญญาปีงบเก่าจะหายเมื่อหน้าเปิดมาที่ปีปัจจุบัน
+        // เภสัช (APF) ใช้ปีงบของวันที่ออกเลข IR กับทุก IR - เวชภัณฑ์/พัสดุคงกฎเดิม (ใช้ใบกัน = ปีของวันที่ออก IR / ไม่ใช้ใบกัน = ปีงบของสัญญา)
+        $wh .= " and (case when g.c_ap_dept_type = 'APF' or isnull(g.c_overlap,'') <> '' or isnull(g.c_overlap2,'') <> '' or isnull(g.c_overlap3,'') <> ''"
             . " then year(dateadd(month, 3, r.d_ir_issue)) else g.i_budget_year end) = " . (intval($_REQUEST['i_budget_year']) - 543);
     }
     if (!empty($_REQUEST['c_fund_source'])) {
@@ -544,7 +587,7 @@ if ($type == "medsup_period_bill") {
             "c_expense_name" => $row["c_expense_name"],
             "i_period" => intval($row["i_period"]),
             // ใช้ใบกันเหลื่อม = ปีงบประมาณของเอกสารเป็นปีงบของวันที่ออกเลข IR (ปีของใบกันดู i_budget_year_overlap)
-            "i_budget_year" => (!empty($row["c_overlap"]) || !empty($row["c_overlap2"]) || !empty($row["c_overlap3"])) && !empty($row["d_ir_issue"])
+            "i_budget_year" => (!empty($row["c_overlap"]) || !empty($row["c_overlap2"]) || !empty($row["c_overlap3"]) || $row["c_ap_dept_type"] === "APF") && !empty($row["d_ir_issue"])
                 ? (intval(date("Y", strtotime($row["d_ir_issue"]))) + (intval(date("n", strtotime($row["d_ir_issue"]))) >= 10 ? 1 : 0) + 543)
                 : (empty($row["i_budget_year"]) ? "" : intval($row["i_budget_year"]) + 543),
             "c_ap_dept_type" => empty($row["c_ap_dept_type"]) ? "APMSD" : $row["c_ap_dept_type"],
