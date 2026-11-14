@@ -41,8 +41,8 @@ function medsupOwnFilter($alias, $strictOwn = false) {
     // [ผู้ใช้ยืนยัน] เจ้าหน้าที่ฝ่ายเภสัช (9 คนด้านล่าง) เห็นรายการสัญญาเภสัช (APF) ของทุกคนที่ ST00095 ส่งมอบงาน (ดูว่าใครนำเข้า/ออก IR ไปแล้ว)
     // แต่พอไปถึงขั้นตรวจรับ/ออกเลข AP ($strictOwn = ST00096) และทำใบเบิกที่ EIS ต่างคนต่างเห็นของตัวเอง = เลข IR ที่ตัวเองเป็นคนกดยืนยันยอด
     // (ยังไม่มีผู้ยืนยัน = ตกเป็นของผู้สร้างสัญญา) ส่วนเวชภัณฑ์/ฝ่ายอื่นยังเป็น "ใครของมัน" เหมือนเดิม - ถ้าเพิ่ม/ลดเจ้าหน้าที่ แก้รายชื่อนี้ และ NMU_EIS po/api/List_poReg.php
-    // 60373 sittisak / 60374 pojanee / 60375 nittaya.t / 60377 patita / 60378 chaturong / 60379 noppdol.kam / 60380 fontong / 60381 napapar / 60552 pasitra
-    if (in_array($uid, array(60373, 60374, 60375, 60377, 60378, 60379, 60380, 60381, 60552), true)) {
+    // 60373 sittisak / 60374 pojanee / 60375 nittaya.t / 60377 patita / 60378 chaturong / 60379 noppdol.kam / 60380 fontong / 60381 napapar / 60552 pasitra / 61721 suchada.th
+    if (in_array($uid, array(60373, 60374, 60375, 60377, 60378, 60379, 60380, 60381, 60552, 61721), true)) {
         if ($strictOwn) {
             return " and (exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_receive ro where ro.c_ir_code = r.c_ir_code and ro.i_enabled = 1 and ro.dc_user_ir_confirm_id = {$uid})"
                 . " or ({$alias}.dc_user_create_id = {$uid} and not exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_receive ro2 where ro2.c_ir_code = r.c_ir_code and ro2.i_enabled = 1 and ro2.dc_user_ir_confirm_id is not null)))";

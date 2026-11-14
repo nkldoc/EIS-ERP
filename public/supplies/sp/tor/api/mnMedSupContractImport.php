@@ -9,7 +9,7 @@ include(__DIR__ . "/medsupContractCode.php");
 // (เห็นอย่างเดียว - ยกเลิกชุดนำเข้ายังทำได้เฉพาะผู้นำเข้าเองหรือผู้ดูแลระบบ)
 function medsupPharmacyUserIds()
 {
-    return array(60373, 60374, 60375, 60377, 60378, 60379, 60380, 60381, 60552);
+    return array(60373, 60374, 60375, 60377, 60378, 60379, 60380, 60381, 60552, 61721);
 }
 function medsupIsPharmacyUser($uid)
 {
