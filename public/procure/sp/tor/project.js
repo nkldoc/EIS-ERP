@@ -8201,8 +8201,34 @@ Ext.AppUx = function (app, menu) {
         toggle("cnw_d_expire_warrantyID", hasBook);
         toggle("cnw_c_comment1ID", hasBook);
 
-        if (cmp("cnw_dc_bank_idID")) cmp("cnw_dc_bank_idID").setValue(d.dc_bank_id || "");
-        if (cmp("cnw_dc_bank_idID_Name")) cmp("cnw_dc_bank_idID_Name").setValue(d.dc_bank_idID_Name || "");
+        // Keep the hidden bank id and its display text from the same master row.
+        // Using dc_bank_idID_Name from the contract response directly can show a
+        // stale/legacy bank code whose meaning no longer matches dc_bank_id.
+        var setContractBank = function () {
+          var bankId = d.dc_bank_id == null ? "" : String(d.dc_bank_id);
+          var bankText = "";
+
+          if (bankId !== "" && Ext.storeBankCNW) {
+            var bankIndex = Ext.storeBankCNW.findExact("id", bankId);
+            if (bankIndex < 0) bankIndex = Ext.storeBankCNW.find("id", new RegExp("^" + bankId + "$"));
+
+            if (bankIndex >= 0) {
+              var bankRecord = Ext.storeBankCNW.getAt(bankIndex);
+              bankText = bankRecord.get("c_code") + " " + bankRecord.get("c_name");
+            }
+          }
+
+          if (cmp("cnw_dc_bank_idID")) cmp("cnw_dc_bank_idID").setValue(bankId);
+          if (cmp("cnw_dc_bank_idID_Name")) {
+            cmp("cnw_dc_bank_idID_Name").setValue(bankText || d.dc_bank_idID_Name || "");
+          }
+        };
+
+        if (Ext.storeBankCNW.getCount() > 0) {
+          setContractBank();
+        } else {
+          Ext.storeBankCNW.on("load", setContractBank, null, { single: true });
+        }
       })();
 
       Ext.HDR_ID = Ext.selectRow.data.po_working_hdr_id;

@@ -225,7 +225,7 @@ $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
     </script> 
     <script type="text/javascript" src="./uiData/configStoreUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
     <script type="text/javascript" src="./tor/torUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
-    <script type="text/javascript" src="./tor/<?PHP echo $js; ?>"></script>
+    <script type="text/javascript" src="./tor/<?PHP echo $js; ?>?_dc=<?= __VPRODUCT_; ?>"></script>
     <script type="text/javascript" src="./tor/pageStatus.js?_dc=<?= __VPRODUCT_; ?>"></script>
 </head>
 
