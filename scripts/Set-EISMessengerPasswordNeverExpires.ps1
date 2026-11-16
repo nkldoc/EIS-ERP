@@ -18,13 +18,21 @@ if ($env:COMPUTERNAME -ine $expectedComputerName) {
 }
 
 $account = Get-LocalUser -Name $accountName -ErrorAction Stop
+$adsiAccount = [ADSI]"WinNT://$expectedComputerName/$accountName,user"
+$passwordNeverExpiresFlag = 0x10000
+$currentUserFlags = [int]$adsiAccount.UserFlags.Value
+$currentPasswordNeverExpires = ($currentUserFlags -band $passwordNeverExpiresFlag) -ne 0
 
 Write-Output 'Current account settings:'
-$account |
-    Select-Object Name, Enabled, PasswordLastSet, PasswordExpires, PasswordNeverExpires |
-    Format-List
+[pscustomobject]@{
+    Name                 = $account.Name
+    Enabled              = $account.Enabled
+    PasswordLastSet      = $account.PasswordLastSet
+    PasswordExpires      = $account.PasswordExpires
+    PasswordNeverExpires = $currentPasswordNeverExpires
+} | Format-List
 
-if ($account.PasswordNeverExpires) {
+if ($currentPasswordNeverExpires) {
     Write-Output "$expectedComputerName\$accountName already has PasswordNeverExpires enabled. No change was required."
     exit 0
 }
@@ -34,13 +42,20 @@ if ($PSCmdlet.ShouldProcess("$expectedComputerName\$accountName", 'Set PasswordN
 }
 
 $updatedAccount = Get-LocalUser -Name $accountName -ErrorAction Stop
+$adsiAccount.RefreshCache()
+$updatedUserFlags = [int]$adsiAccount.UserFlags.Value
+$updatedPasswordNeverExpires = ($updatedUserFlags -band $passwordNeverExpiresFlag) -ne 0
 
 Write-Output 'Updated account settings:'
-$updatedAccount |
-    Select-Object Name, Enabled, PasswordLastSet, PasswordExpires, PasswordNeverExpires |
-    Format-List
+[pscustomobject]@{
+    Name                 = $updatedAccount.Name
+    Enabled              = $updatedAccount.Enabled
+    PasswordLastSet      = $updatedAccount.PasswordLastSet
+    PasswordExpires      = $updatedAccount.PasswordExpires
+    PasswordNeverExpires = $updatedPasswordNeverExpires
+} | Format-List
 
-if (-not $updatedAccount.PasswordNeverExpires) {
+if (-not $updatedPasswordNeverExpires) {
     throw "Verification failed: PasswordNeverExpires is not enabled for $expectedComputerName\$accountName."
 }
 
