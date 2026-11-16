@@ -865,7 +865,7 @@ Ext.AppUx = function (app, menu) {
       cancel_tor("reverse");
       return;
     } else if (columnIndex === grid.getColumnModel().getIndexById("processcancelID")) {
-      cancel_tor("cancel");
+      request_cancel_tor();
       return;
     } else if (columnIndex === grid.getColumnModel().getIndexById("linelID")) {
       cancel_tor("line", "sp/tor/st0004.js");
@@ -5527,7 +5527,7 @@ Ext.AppUx = function (app, menu) {
                   if (Ext.selectRow.data.sp_bg_edit == 1  && Ext.selectRow.data.c_comment_edit1==null) {
                     Ext.MessageBox.alert("แจ้งเตือน", "อยู่ระหว่างการแก้ไขแหล่งเงินไม่สามารถแก้ไขรายการได้ 3");
                   } else {
-                    cancel_tor("cancel");
+                    request_cancel_tor();
                   }
                 },
                 scope: this,

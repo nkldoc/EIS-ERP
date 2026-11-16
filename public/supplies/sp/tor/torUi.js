@@ -2576,6 +2576,43 @@ const edit_tor = function (status, menu) {
         }).show();
     }
 };
+// ขอยกเลิก PR จากหน้าตรวจสอบเอกสาร (ทุกสถานะ) : ไม่ยกเลิกทันที แต่ส่งคำขอ + สาเหตุ ไปให้ผู้ใช้ "จัดสรรงบประมาณพัสดุ" อนุมัติ
+// เมื่ออนุมัติ ระบบยกเลิก PR และคืนเงินจองเข้างบประมาณให้ทันที (ดู sp/tor/api/mnTorCancelReq.php)
+const request_cancel_tor = function () {
+    if (Ext.isEmpty(Ext.selectRow)) {
+        Ext.Msg.alert("แจ้งเตือน", "กรุณา click เลือกข้อมูลที่จะยกเลิกรายการ");
+        return;
+    }
+    var row = Ext.selectRow.data;
+    Ext.Msg.show({
+        title: "ขอยกเลิก PR " + row.c_code,
+        msg: "<b>" + row.c_name + "</b><br>กรุณาระบุสาเหตุที่จะยกเลิก PR นี้ (ส่งให้ฝ่ายจัดสรรงบประมาณพัสดุอนุมัติ)",
+        width: 480,
+        buttons: Ext.MessageBox.OKCANCEL,
+        multiline: 90,
+        fn: function (btn, text) {
+            if (btn != "ok") {
+                return;
+            }
+            if (Ext.isEmpty(text) || !text.trim()) {
+                Ext.example.msg("แจ้งเตือน", "กรุณากรอกสาเหตุที่จะยกเลิก", 1);
+                return request_cancel_tor();
+            }
+            Ext.Ajax.request({
+                url: "tor/api/mnTorCancelReq.php",
+                method: "POST",
+                params: {mode: "REQUEST", id: row.id, reason: text.trim()},
+                success: function (result) {
+                    var res = Ext.util.JSON.decode(result.responseText);
+                    Ext.MessageBox.alert(res.success ? "Success" : "แจ้งเตือน", res.msg);
+                },
+                failure: function (result) {
+                    Ext.MessageBox.alert("Failed", result.responseText);
+                },
+            });
+        },
+    });
+};
 const cancel_tor = function (status, menu) {
     console.log(Ext.selectRow);
 
