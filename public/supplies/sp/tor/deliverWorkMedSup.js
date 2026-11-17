@@ -184,6 +184,27 @@ Ext.medsupIsAdmin = false;
 
 // ปลดล็อกเลข IR ที่ออกเลขตรวจรับแล้ว ด้วย "ID ปลดล็อก" (เฉพาะผู้ดูแลระบบ) - ใช้ทั้งเมนู
 // "ปลดล็อกเลขตรวจรับ (Admin)" และปุ่ม "ปลดล็อก" ในกล่อง ID กลางจอ
+// ปลดล็อก "เพื่อยกเลิก" งวดที่ออกเลข AP แล้ว (แยกจากการปลดล็อกแก้ VAT) - เฉพาะผู้ดูแลระบบ
+function medsupUnlockCancel(unlockId) {
+    Ext.Ajax.request({
+        url: "tor/api/mnMedSupPeriodBillReceiveController.php",
+        method: "POST",
+        params: {mode: "UNLOCK_CANCEL", unlock_id: unlockId},
+        success: function (resp) {
+            var r = Ext.decode(resp.responseText);
+            if (r.reval === 0) {
+                Ext.Msg.alert("สำเร็จ", "ปลดล็อกเพื่อยกเลิกเลข AP <b>" + Ext.util.Format.htmlEncode(r.c_ap_code || "") + "</b> เรียบร้อยแล้ว"
+                    + "<br>ตอนนี้ยกเลิกงวดนี้ได้ (กดยกเลิกงวดที่เลือก)");
+            } else {
+                Ext.Msg.alert("แจ้งเตือน", r.msg || "ปลดล็อกไม่สำเร็จ");
+            }
+        },
+        failure: function () {
+            Ext.Msg.alert("แจ้งเตือน", "ปลดล็อกไม่สำเร็จ");
+        }
+    });
+}
+
 function medsupUnlockAp(unlockId) {
     Ext.Ajax.request({
         url: "tor/api/mnMedSupPeriodBillReceiveController.php",
@@ -1553,6 +1574,77 @@ Ext.AppUx = function (app, menu) {
         winDeliverWorkMedSup(record);
     }
 
+    // [ผู้ใช้ขอ] ยกเลิกงวดที่ข้อมูลผิด เพื่อให้นำเข้าใหม่
+    // - ออกใบขอเบิก D แล้ว = ยกเลิกไม่ได้ (แจ้งเตือน)
+    // - ออกเลข IR (ยังไม่มี AP) = ผู้ใช้ยกเลิกได้
+    // - ออกเลข AP แล้ว = ผู้ดูแลระบบปลดล็อกก่อนแล้วยกเลิกได้
+    // เซิร์ฟเวอร์เช็กกติกาเดียวกันซ้ำเสมอ (mode CANCEL_PERIOD)
+    function cancelSelectedPeriod() {
+        var grid = Ext.getCmp("tabpanel1");
+        var rec = grid && grid.getSelectionModel().getSelected();
+        if (!rec) {
+            Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกงวดที่จะยกเลิกก่อน");
+            return;
+        }
+        var enc = Ext.util.Format.htmlEncode;
+        var label = enc(rec.get("c_contract_code")) + " งวดที่ " + enc(rec.get("i_period"));
+        if (rec.get("c_wd_codes")) {
+            Ext.Msg.alert("ไม่สามารถยกเลิกรายการได้", "ไม่สามารถยกเลิกรายการได้ เนื่องจากออกเลขใบขอเบิกไปแล้ว (" + enc(rec.get("c_wd_codes")) + ")");
+            return;
+        }
+        // ตรวจกติกาที่เซิร์ฟเวอร์ก่อน (ยังไม่เขียนข้อมูล) ถ้าไม่ผ่านจะแสดง ID ปลดล็อกให้ผู้ใช้แจ้ง admin
+        Ext.Ajax.request({
+            url: "tor/api/mnMedSupPeriodBillReceiveController.php",
+            method: "POST",
+            params: {mode: "CANCEL_PERIOD", check_only: 1, sp_tor_period_bill_id: rec.get("sp_tor_period_bill_id")},
+            success: function (res) {
+                var c = Ext.util.JSON.decode(res.responseText);
+                if (c.reval !== 0) {
+                    Ext.Msg.alert("แจ้งเตือน", c.msg || "ยกเลิกไม่ได้");
+                    return;
+                }
+                askReasonAndCancel(rec, label);
+            },
+            failure: function () {
+                Ext.Msg.alert("แจ้งเตือน", "ตรวจสอบรายการไม่สำเร็จ");
+            }
+        });
+    }
+
+    function askReasonAndCancel(rec, label) {
+        Ext.Msg.prompt("ยกเลิกรายการ " + label, "กรุณาระบุเหตุผลที่ยกเลิก (ข้อมูลผิด ต้องนำเข้าใหม่):", function (btn, text) {
+            if (btn !== "ok") {
+                return;
+            }
+            if (!text || !String(text).trim()) {
+                Ext.Msg.alert("แจ้งเตือน", "กรุณาระบุเหตุผล");
+                return;
+            }
+            Ext.Msg.confirm("ยืนยัน", "ยกเลิก <b>" + label + "</b> ใช่หรือไม่? หลังยกเลิกต้องนำเข้าใหม่", function (b) {
+                if (b !== "yes") {
+                    return;
+                }
+                Ext.Ajax.request({
+                    url: "tor/api/mnMedSupPeriodBillReceiveController.php",
+                    method: "POST",
+                    params: {mode: "CANCEL_PERIOD", sp_tor_period_bill_id: rec.get("sp_tor_period_bill_id"), c_reason: String(text).trim()},
+                    success: function (result) {
+                        var r = Ext.util.JSON.decode(result.responseText);
+                        if (r.reval !== 0) {
+                            Ext.Msg.alert("แจ้งเตือน", r.msg || "ยกเลิกไม่สำเร็จ");
+                            return;
+                        }
+                        Ext.Msg.alert("สำเร็จ", "ยกเลิก " + label + " เรียบร้อยแล้ว ให้ผู้ใช้นำเข้าใหม่ได้");
+                        Ext.storeDeliverMedSupList.reload();
+                    },
+                    failure: function () {
+                        Ext.Msg.alert("แจ้งเตือน", "ยกเลิกไม่สำเร็จ");
+                    }
+                });
+            });
+        });
+    }
+
     var MenuButton = function () {
         var menuList = new Ext.menu.Menu({id: "mainMenu", border: false});
         var tb = new Ext.Toolbar({text: " รายการเมนู ", border: false, iconCls: "menu", menu: menuList});
@@ -1582,9 +1674,18 @@ Ext.AppUx = function (app, menu) {
                 }
                 Ext.medsupIsAdmin = true;
                 menuList.addSeparator();
-                menuList.add({text: "ปลดล็อกเลขตรวจรับ (Admin)", icon: "../images/icons/lock_open.png"})
+                menuList.add({text: "ปลดล็อกเพื่อยกเลิก (Admin)", icon: "../images/icons/lock_open.png"})
                     .on("click", function () {
-                        Ext.Msg.prompt("ปลดล็อกเลขตรวจรับ (Admin)", "ใส่ ID ปลดล็อกที่ผู้ใช้แจ้งมา", function (btn, text) {
+                        Ext.Msg.prompt("ปลดล็อกเพื่อยกเลิก (Admin)", "ใส่ ID ปลดล็อกที่ผู้ใช้แจ้งมา (งวดที่ออกเลข AP แล้ว)", function (btn, text) {
+                            if (btn !== "ok" || !String(text).trim()) {
+                                return;
+                            }
+                            medsupUnlockCancel(String(text).trim());
+                        });
+                    });
+                menuList.add({text: "ปลดล็อกแก้ VAT (Admin)", icon: "../images/icons/lock_open.png"})
+                    .on("click", function () {
+                        Ext.Msg.prompt("ปลดล็อกแก้ VAT (Admin)", "ใส่ ID ปลดล็อกที่ผู้ใช้แจ้งมา (ปลดล็อกเพื่อแก้ VAT เท่านั้น ไม่ใช่การยกเลิก)", function (btn, text) {
                             if (btn !== "ok" || !String(text).trim()) {
                                 return;
                             }
@@ -1593,6 +1694,7 @@ Ext.AppUx = function (app, menu) {
                     });
             }
         });
+        tb.add("-", {text: "ยกเลิกงวดที่เลือก", iconCls: "icon-table_delete", handler: cancelSelectedPeriod});
         tb.doLayout();
         return tb;
     };

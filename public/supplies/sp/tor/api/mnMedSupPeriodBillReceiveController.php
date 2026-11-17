@@ -242,6 +242,40 @@ switch ($mode) {
         $responseExtra["c_ap_code"] = $rowUnlock["c_ap_code"];
         break;
 
+    case "UNLOCK_CANCEL":
+        // [ผู้ดูแลระบบ] ปลดล็อก "เพื่อยกเลิก" งวดที่ออกเลข AP แล้ว ด้วย ID ปลดล็อกเดิม (id แถวรับของ)
+        // ไม่เกี่ยวกับการปลดล็อกแก้ VAT (UNLOCK_AP) - ตั้งสถานะ b_cancel_unlock ทั้งงวด แล้วแอดมินยกเลิกงวดได้
+        if (!medsupIsAdmin()) {
+            $stmt = false;
+            $errMsg = "เฉพาะผู้ดูแลระบบเท่านั้นที่ปลดล็อกเพื่อยกเลิกได้";
+            break;
+        }
+        $unlockCancelId = intval($_REQUEST["unlock_id"] ?? 0);
+        $billOfUnlock = $unlockCancelId > 0 ? $db->GetDataBySQL(
+            "select sp_tor_period_bill_id, c_ap_code from NMU_ERP.dbo.sp_tor_period_bill_receive
+              where sp_tor_period_bill_receive_id = ? and i_enabled = 1",
+            array($unlockCancelId)
+        ) : null;
+        if (empty($billOfUnlock) || !is_array($billOfUnlock)) {
+            $stmt = false;
+            $errMsg = "ไม่พบ ID ปลดล็อก {$unlockCancelId}";
+            break;
+        }
+        if (empty($billOfUnlock["c_ap_code"])) {
+            // ใช้ได้เฉพาะเมื่องวดนี้มีเลข AP
+            $stmt = false;
+            $errMsg = "ID {$unlockCancelId} ยังไม่ได้ออกเลขตรวจรับ (AP) จึงไม่ต้องปลดล็อกเพื่อยกเลิก";
+            break;
+        }
+        $stmt = $db->QueryParam(
+            "update NMU_ERP.dbo.sp_tor_period_bill_receive
+                set b_cancel_unlock = 1, d_cancel_unlock = GETDATE(), dc_user_cancel_unlock_id = ?
+              where i_enabled = 1 and sp_tor_period_bill_id = ?",
+            array($_SESSION["user_id"] ?? null, $billOfUnlock["sp_tor_period_bill_id"])
+        );
+        $responseExtra["c_ap_code"] = $billOfUnlock["c_ap_code"];
+        break;
+
     case "CONFIRM_IR":
         // [ผู้ใช้ยืนยัน] ปุ่ม "ยืนยันยอด" ท้ายแถว IR ที่ ST00095 - ยอด VAT รวมของ IR = ผลรวม
         // รายการย่อย ต้องถูกต้องก่อน (ทุกรายการบันทึก VAT แล้วและจำนวนเงินไม่ถูกแก้ภายหลัง)
@@ -832,6 +866,200 @@ switch ($mode) {
         }
         $responseExtra["c_ir_code"] = $irCode;
         $responseExtra["c_ap_code"] = $apCodeForIr;
+        break;
+
+    case "CANCEL_PERIOD":
+        // [ผู้ใช้ขอ] ยกเลิกงวดที่ข้อมูลผิด (ST00095) เพื่อให้นำเข้าใหม่ได้ กติกา:
+        //  - ออกใบขอเบิก D แล้ว = ยกเลิกไม่ได้เลย
+        //  - ออกเลข IR แล้ว (ยังไม่ออก AP) = ผู้ใช้ยกเลิกได้
+        //  - ออกเลข AP แล้ว = ต้องให้ผู้ดูแลระบบปลดล็อกก่อน (UNLOCK_AP) แล้วผู้ดูแลระบบเป็นคนยกเลิก
+        //  - IR/AP ที่ใช้ร่วมกับงวดอื่น = ยกเลิกอัตโนมัติไม่ได้
+        // ยกเลิกแบบ soft delete (i_enabled = 0) ไม่ลบถาวร ปล่อยการจองเงินคืนงบด้วย (เหมือน Cancel_Tor)
+        $billId = intval($_REQUEST["sp_tor_period_bill_id"] ?? 0);
+        $reason = trim((string) ($_REQUEST["c_reason"] ?? ""));
+        if ($billId <= 0) {
+            $stmt = false;
+            $errMsg = "ไม่พบงวดที่จะยกเลิก";
+            break;
+        }
+        $checkOnly = !empty($_REQUEST["check_only"]); // ตรวจกติกาอย่างเดียว (ก่อนถามเหตุผลที่หน้าจอ)
+        if ($reason === "" && !$checkOnly) {
+            $stmt = false;
+            $errMsg = "กรุณาระบุเหตุผลที่ยกเลิก";
+            break;
+        }
+        $bill = $db->GetDataBySQL(
+            "select sp_tor_period_bill_id, sp_tor_period_bill_import_id, c_contract_code, i_period,
+                    bg_reserve_money_id, bg_reserve_money_id2, bg_reserve_money_id3,
+                    pr_bg_reserve_money_id, pr_bg_reserve_money_id2, pr_bg_reserve_money_id3
+               from NMU_ERP.dbo.sp_tor_period_bill where sp_tor_period_bill_id = ? and i_enabled = 1",
+            array($billId)
+        );
+        if (empty($bill) || !is_array($bill)) {
+            $stmt = false;
+            $errMsg = "ไม่พบงวดนี้ (อาจถูกยกเลิกไปแล้ว) กรุณารีเฟรชหน้า";
+            break;
+        }
+
+        // รายการรับของของงวดนี้ (IR/AP/สถานะปลดล็อก)
+        $rcvRows = array();
+        $stmtRcv = $db->QueryParam(
+            "select sp_tor_period_bill_receive_id, c_ir_code, c_ap_code, isnull(b_cancel_unlock, 0) as b_cancel_unlock
+               from NMU_ERP.dbo.sp_tor_period_bill_receive where sp_tor_period_bill_id = ? and i_enabled = 1",
+            array($billId)
+        );
+        while ($stmtRcv && ($rr = $db->Fetch($stmtRcv))) {
+            $rcvRows[] = $rr;
+        }
+        $irCodes = array();
+        $apCodes = array();
+        $apLocked = false; // ยังไม่ได้ปลดล็อกเพื่อยกเลิก (b_cancel_unlock)
+        foreach ($rcvRows as $rr) {
+            if (!empty($rr["c_ir_code"])) {
+                $irCodes[$rr["c_ir_code"]] = true;
+            }
+            if (!empty($rr["c_ap_code"])) {
+                $apCodes[$rr["c_ap_code"]] = true;
+                if (intval($rr["b_cancel_unlock"]) !== 1) {
+                    $apLocked = true;
+                }
+            }
+        }
+        $irCodes = array_keys($irCodes);
+        $apCodes = array_keys($apCodes);
+        // ID ปลดล็อก = id แถวรับของที่มีเลข AP (ตรงกับที่ admin ใส่ในเมนู "ปลดล็อกเลขตรวจรับ (Admin)")
+        $unlockIdAp = 0;
+        foreach ($rcvRows as $rr) {
+            if (!empty($rr["c_ap_code"]) && ($unlockIdAp === 0 || intval($rr["sp_tor_period_bill_receive_id"]) < $unlockIdAp)) {
+                $unlockIdAp = intval($rr["sp_tor_period_bill_receive_id"]);
+            }
+        }
+        $irPh = implode(",", array_fill(0, max(1, count($irCodes)), "?"));
+
+        // 1) ใบขอเบิก D: มีแม้แถวเดียว = ยกเลิกไม่ได้ (คอลัมน์ c_code_ref มาจาก sp_tor_period_bill_checking_withdraw.sql)
+        $hasWdCol = intval($db->GetDataBySQL("select case when col_length('NMU_ERP.dbo.sp_tor_period_bill_checking', 'c_code_ref') is not null then 1 else 0 end", array()));
+        if ($hasWdCol && !empty($irCodes)) {
+            $wdCount = intval($db->GetDataBySQL(
+                "select count(*) from NMU_ERP.dbo.sp_tor_period_bill_checking
+                  where i_enabled = 1 and isnull(c_code_ref, '') <> '' and c_ir_code in ({$irPh})",
+                $irCodes
+            ));
+            if ($wdCount > 0) {
+                $stmt = false;
+                $errMsg = "ไม่สามารถยกเลิกรายการได้ เนื่องจากออกเลขใบขอเบิกไปแล้ว";
+                break;
+            }
+        }
+
+        // 2) เลข AP: ต้องเป็นผู้ดูแลระบบ และต้องปลดล็อกเลข AP แล้ว
+        if (!empty($apCodes)) {
+            // ผู้ดูแลระบบปลดล็อกเพื่อยกเลิกแล้ว (b_cancel_unlock = 1) -> ผู้ใช้ทั่วไปยกเลิกเองได้
+            if ($apLocked) {
+                $stmt = false;
+                $errMsg = "งวดนี้ออกเลขตรวจรับ (AP) " . implode(", ", $apCodes) . " แล้ว กรุณาแจ้ง <b>ID ปลดล็อก: {$unlockIdAp}</b> ให้ผู้ดูแลระบบ เพื่อปลดล็อกเพื่อยกเลิกก่อน จึงจะยกเลิกได้";
+                break;
+            }
+        }
+
+        // 3) IR/AP ที่ใช้ร่วมกับงวดอื่น: ยกเลิกอัตโนมัติไม่ได้
+        $conds = array();
+        $params = array($billId);
+        if (!empty($irCodes)) {
+            $conds[] = "c_ir_code in ({$irPh})";
+            $params = array_merge($params, $irCodes);
+        }
+        if (!empty($apCodes)) {
+            $apPh = implode(",", array_fill(0, count($apCodes), "?"));
+            $conds[] = "c_ap_code in ({$apPh})";
+            $params = array_merge($params, $apCodes);
+        }
+        if (!empty($conds)) {
+            $shared = intval($db->GetDataBySQL(
+                "select count(*) from NMU_ERP.dbo.sp_tor_period_bill_receive
+                  where i_enabled = 1 and sp_tor_period_bill_id <> ? and (" . implode(" or ", $conds) . ")",
+                $params
+            ));
+            if ($shared > 0) {
+                $stmt = false;
+                $errMsg = "เลข IR/AP ของงวดนี้ใช้ร่วมกับงวดอื่น ยกเลิกอัตโนมัติไม่ได้ กรุณาแจ้งผู้ดูแลระบบ";
+                break;
+            }
+        }
+
+        if ($checkOnly) {
+            $stmt = true; // ผ่านกติกา ยังไม่เขียนข้อมูล
+            break;
+        }
+
+        // 4) การจองเงินของงวดนี้
+        $rsvIds = array();
+        foreach (array("bg_reserve_money_id", "bg_reserve_money_id2", "bg_reserve_money_id3",
+                       "pr_bg_reserve_money_id", "pr_bg_reserve_money_id2", "pr_bg_reserve_money_id3") as $k) {
+            $v = intval($bill[$k] ?? 0);
+            if ($v > 0) {
+                $rsvIds[$v] = $v;
+            }
+        }
+        $uidCancel = $_SESSION["user_id"] ?? null;
+        $ucostCancel = $_SESSION["dc_cost_id"] ?? null;
+
+        // ตรวจรับ -> รายการรับ -> งวด -> คืนการจองเงิน -> ปรับประวัติการนำเข้า -> เหตุผล
+        if (!empty($irCodes)) {
+            $stmt = $db->QueryParam(
+                "update NMU_ERP.dbo.sp_tor_period_bill_checking set i_enabled = 0
+                  where i_enabled = 1 and c_ir_code in ({$irPh})",
+                $irCodes
+            );
+        }
+        $stmt = $db->QueryParam(
+            "update NMU_ERP.dbo.sp_tor_period_bill_receive
+                set i_enabled = 0, dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = GETDATE()
+              where i_enabled = 1 and sp_tor_period_bill_id = ?",
+            array($uidCancel, $ucostCancel, $billId)
+        );
+        $stmt = $db->QueryParam(
+            "update NMU_ERP.dbo.sp_tor_period_bill
+                set i_enabled = 0, dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = GETDATE()
+              where i_enabled = 1 and sp_tor_period_bill_id = ?",
+            array($uidCancel, $ucostCancel, $billId)
+        );
+        if (!empty($rsvIds)) {
+            $rsvPh = implode(",", array_fill(0, count($rsvIds), "?"));
+            $stmt = $db->QueryParam(
+                "update " . DB_NMU_EIS . "bg_reserve_money set i_enable = 2
+                  where i_enable = 1 and bg_reserve_money_id in ({$rsvPh})",
+                array_values($rsvIds)
+            );
+        }
+        $importId = intval($bill["sp_tor_period_bill_import_id"] ?? 0);
+        if ($importId > 0) {
+            $stmt = $db->QueryParam(
+                "update i set i.i_contract_count = x.c, i.i_row_count = x.r, i.f_total_amt = x.t,
+                        i.i_enabled = case when x.c = 0 then 0 else i.i_enabled end
+                   from NMU_ERP.dbo.sp_tor_period_bill_import i
+                  cross apply (select count(distinct b2.sp_tor_period_bill_hdr_id) as c, count(*) as r,
+                                      isnull(sum(b2.f_fund_amt_dtl), 0) as t
+                                 from NMU_ERP.dbo.sp_tor_period_bill b2
+                                where b2.sp_tor_period_bill_import_id = i.sp_tor_period_bill_import_id and b2.i_enabled = 1) x
+                  where i.sp_tor_period_bill_import_id = ?",
+                array($importId)
+            );
+        }
+        // เหตุผลการยกเลิก (คอลัมน์มีเมื่อรัน sp_tor_period_bill_import_cancel.sql แล้ว)
+        if ($importId > 0) {
+            $noteReason = "[" . date("d/m/Y H:i") . " ยกเลิกงวดที่ " . intval($bill["i_period"]) . " " . $bill["c_contract_code"] . "] " . $reason;
+            $stmt = $db->QueryParam(
+                "IF COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_import', 'c_cancel_reason') IS NOT NULL
+                    EXEC sp_executesql N'UPDATE NMU_ERP.dbo.sp_tor_period_bill_import
+                            SET c_cancel_reason = LEFT(CASE WHEN ISNULL(c_cancel_reason, N'''') <> N'''' THEN c_cancel_reason + N'' | '' ELSE N'''' END + @r, 500)
+                              , dc_user_cancel_id = @u, d_cancel = GETDATE()
+                          WHERE sp_tor_period_bill_import_id = @id',
+                        N'@r nvarchar(500), @u int, @id int', @r = ?, @u = ?, @id = ?;
+                 SELECT 1 AS done;",
+                array($noteReason, $uidCancel, $importId)
+            );
+        }
+        $responseExtra["c_cancel_period"] = intval($billId);
         break;
 
     default:
