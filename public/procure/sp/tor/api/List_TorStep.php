@@ -1312,7 +1312,8 @@ if ($type == "ownnerPr") {
         }
         if ($searchEmployee > 0) {
             $wh .= " and a.sp_emp_id = " . $searchEmployee;
-        } elseif ((int) ($_SESSION['i_level'] ?? 0) !== 1) {
+        } elseif ((int) ($_SESSION['i_type_user'] ?? 0) !== 2 && (int) ($_SESSION['i_level'] ?? 0) !== 1) {
+            // admin (i_type_user = 2) ค้นได้ทุกฝ่าย ไม่ถูกจำกัดด้วยฝ่ายของผู้ล็อกอิน
             $wh .= " and a.dc_department_id = " . (int) ($_SESSION['dc_department_id'] ?? 0);
         }
         $wh .= " and a.i_enabled = 1";
