@@ -214,7 +214,10 @@ Ext.dc_cost = new Ext.data.JsonStore({
   autoLoad: true,
   url: "api/All_PoWorkingImpHdr.php",
   baseParams: {
-    type: "dc_cost",
+    // AdminUpdatePR must resolve historical/current department IDs from every unit.
+    // The scoped dc_cost endpoint only returns units visible to the logged-in cost
+    // centre, leaving other valid values rendered as their numeric IDs.
+    type: "dc_cost_all",
   },
 
   root: "data",

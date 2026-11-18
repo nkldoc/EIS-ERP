@@ -128,6 +128,23 @@ for ($i = 1; $i <= 5; $i++) {
         $funds[] = array('source' => $budgetName($id), 'amount' => $amount);
     }
 }
+$prReservations = array();
+for ($i = 1; $i <= 3; $i++) {
+    $reservationId = intval($pr[0]['bg_reserve_money' . $i . '_id'] ?? 0);
+    if ($reservationId <= 0) continue;
+    $reservationRows = $fetch('SELECT r.bg_reserve_money_id, r.d_create, r.i_year, r.i_pr_type,
+        r.dc_budget_type_id, r.bg_expense_id, r.f_amt, r.i_enable, r.i_finish,
+        budget.c_name AS source_name, expense.c_code AS expense_code, expense.c_name AS expense_name
+        FROM ' . DB_NMU_EIS . 'bg_reserve_money r
+        LEFT JOIN ' . DB_CENTER . 'dc_expense_budget_type budget
+            ON budget.dc_expense_budget_type_id=r.dc_budget_type_id
+        LEFT JOIN ' . DB_NMU_EIS . 'bg_expense expense ON expense.bg_expense_id=r.bg_expense_id
+        WHERE r.bg_reserve_money_id=?', array($reservationId));
+    if ($reservationRows) {
+        $reservationRows[0]['source_no'] = $i;
+        $prReservations[] = $reservationRows[0];
+    }
+}
 $contractFunds = array();
 foreach ($contracts as $contract) {
     for ($i = 1; $i <= 3; $i++) {
@@ -282,4 +299,5 @@ echo json_encode(array('success' => true, 'can_admin_edit' => $canManageEdit,
     'bidders' => $bidders, 'contracts' => $contracts, 'periods' => $periods,
     'periodItems' => $periodItems, 'checks' => $checks, 'checkItems' => $checkItems,
     'debtItems' => $debtItems, 'bidderGuarantees' => $bidderGuarantees,
+    'prReservations' => $prReservations,
     'contractFunds' => $contractFunds), JSON_UNESCAPED_UNICODE);

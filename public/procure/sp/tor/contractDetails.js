@@ -105,7 +105,8 @@
                 monthText += ' ' + (month >= 10 ? year - 1 : year);
             }
         }
-        return details([['ประเภท PR', pr.pr_type_name], ['ปีงบประมาณ', pr.i_yyyy, 'year'],
+        return details([['ประเภท PR', pr.pr_type_name], ['ปีที่ใช้งบประมาณ', pr.i_yyyy, 'year'],
+            ['ปีที่ทำรายการ', pr.i_pr_year, 'year'],
             ['ช่วงปีงบประมาณ', timing], ['เดือน (ก่อนปีงบประมาณ)', monthText]]);
     }
     function guaranteeDetails(rows) {
@@ -132,6 +133,30 @@
         return section('รายละเอียดการจองเงินตามสัญญา', table(items, [['contract_code', 'เลขสัญญา'], ['source_no', 'แหล่งเงินที่'], ['source_name', 'แหล่งเงิน'],
             ['amount', 'จำนวนเงินจากแหล่งเงิน', 'money'], ['booking_type', 'ขอดำเนินการ'],
             ['reservation_id', 'รหัสการจองเงิน'], ['booking_status', 'สถานะการจองเงิน']]));
+    }
+    function prReservationDetails(rows) {
+        if (!rows.length) {
+            return section('ข้อมูลการจองเงิน PR', '<p style="padding:10px;color:#666">ยังไม่มีข้อมูลการจองเงิน PR</p>');
+        }
+        var html = '<style>.pr-reservation-detail summary{cursor:pointer;padding:10px 12px;background:#eaf1f9;color:#15428b;font-weight:bold;border:1px solid #bacce0}.pr-reservation-detail[open] summary{background:#dceaf8}.pr-reservation-detail>div{padding:10px;border:1px solid #bacce0;border-top:0}</style>';
+        Ext.each(rows, function (row, index) {
+            var expense = [row.expense_code, row.expense_name].filter(function (value) { return !!value; }).join(' : ');
+            var booking = Number(row.i_pr_type) === 1 ? 'จองแผน' : (Number(row.i_pr_type) === 2 ? 'จองงวด' : '-');
+            var status = Number(row.i_enable) === 1 ? (Number(row.i_finish) === 1 ? 'ดำเนินการเสร็จสิ้น' : 'ใช้งาน') : 'ยกเลิก';
+            html += '<details class="pr-reservation-detail" style="margin:8px 0"' + (index === 0 ? ' open' : '') + '>' +
+                '<summary>ข้อมูลรายละเอียดการจองเงิน PR ' + encode(row.source_no) +
+                ' — ' + encode(row.source_name || 'ไม่ระบุแหล่งเงิน') +
+                ' — ' + encode(display(row.f_amt, 'money')) + ' บาท</summary><div>' +
+                details([['รหัสการจองเงิน', row.bg_reserve_money_id],
+                    ['วันที่สร้าง', row.d_create, 'date'],
+                    ['ปีที่ใช้งบประมาณ', row.i_year, 'year'],
+                    ['แหล่งเงิน', row.source_name],
+                    ['ประเภทการจอง', booking],
+                    ['รายการย่อย', expense],
+                    ['จำนวนเงิน PR', row.f_amt, 'money'],
+                    ['สถานะ', status]]) + '</div></details>';
+        });
+        return section('ข้อมูลการจองเงิน PR (' + rows.length + ' แหล่ง)', html);
     }
     function contractTerms(contract) {
         var fineType = null;
@@ -426,7 +451,11 @@
                         ? table(data.bidders, bidderColumns) : parentCreditorHtml) +
                     guaranteeDetails(data.bidderGuarantees || []) + section('ผู้ชนะการเสนอราคา', winners.length || !parentCreditorHtml
                         ? table(winners, bidderColumns) : parentCreditorHtml));
-                var contractHtml = overviewFunding;
+                var contractPr = data.pr[0] || {};
+                var contractHtml = overviewFunding + section('ปีงบประมาณของรายการ', details([
+                    ['ปีที่ใช้งบประมาณ', contractPr.i_yyyy, 'year'],
+                    ['ปีที่ทำรายการ', contractPr.i_pr_year, 'year']
+                ]));
                 Ext.each(data.contracts, function (contract) {
                     var contractEdit = data.can_admin_edit
                         ? '<div style="text-align:right;margin:6px 0"><button type="button" class="contract-period-edit" data-contract-id="' + String(contract.sp_tor_contract_id || contract.id || '') + '">แก้ไขสัญญา / งวด (Admin)</button></div>'
@@ -434,6 +463,7 @@
                     contractHtml += section('รายละเอียดสัญญา', contractEdit + fundBadge('การใช้เงินสัญญา', contract, data.pr[0]) + table([contract], [['c_code', 'เลขสัญญา'], ['creditor_name', 'คู่สัญญา'], ['owner_department_name', 'หน่วยงานเจ้าของเรื่อง']]) + contractTerms(contract));
                 });
                 if (!data.contracts.length) contractHtml += section('รายละเอียดสัญญา', '<p style="padding:10px;color:#666">PR นี้ยังไม่มีสัญญา</p>');
+                contractHtml += prReservationDetails(data.prReservations || []);
                 contractHtml += contractBookingDetails(data.contractFunds || []);
                 var contractPanel = tabs.items.get(2);
                 contractPanel.overviewData = data;
