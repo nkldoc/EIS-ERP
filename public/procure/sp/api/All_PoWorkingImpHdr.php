@@ -42,17 +42,26 @@ if ($_REQUEST["type"] == "dc_cost_all") {
 } else if ($_REQUEST["type"] == "dc_cost") {
 
     $costCondition = "(dc_cost_acc_id = 77 OR dc_cost_id = ?)";
+    $levelCondition = "i_last = 1 AND i_enable = 1 AND i_delete = 2";
     // หน่วยงานเพิ่มเติมที่บัญชีนี้เลือกเป็นหน่วยงานเจ้าของเรื่องได้ นอกเหนือจากกลุ่มเดียวกัน
-    $extraOwnerByUser = array(60687 => 119); // suphatsorn.sam (dc_user_id ใน EIS_PROCURE) => กองทุนวิจัย
+    $extraOwnerByUser = array(
+        60687 => 119, // suphatsorn.sam (dc_user_id ใน EIS_PROCURE) => กองทุนวิจัย
+        60681 => 115, // paradee.che => มหาวิทยาลัยนวมินทราธิราช (ส่วนกลาง) รหัส 01020000
+    );
     $extraOwnerId = $extraOwnerByUser[(int) ($_SESSION["user_id"] ?? 0)] ?? null;
     if (($_REQUEST['scope'] ?? '') === 'owner') {
-        $costCondition = "(c_sub = (SELECT NULLIF(c_sub, '') FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = ?)"
-            . ($extraOwnerId !== null ? " OR dc_cost_id = ?" : "") . ")";
+        $sameGroup = "c_sub = (SELECT NULLIF(c_sub, '') FROM " . DB_CENTER . "dc_cost WHERE dc_cost_id = ?)";
+        if ($extraOwnerId !== null) {
+            // หน่วยงานเพิ่มเติมไม่ถูกกรองด้วยระดับล่างสุด (i_last) เพื่อให้เลือกหน่วยงานระดับบนได้
+            $costCondition = "((i_last = 1 AND i_enable = 1 AND i_delete = 2 AND {$sameGroup}) OR (i_enable = 1 AND i_delete = 2 AND dc_cost_id = ?))";
+            $levelCondition = "1 = 1";
+        } else {
+            $costCondition = $sameGroup;
+        }
     }
     $sqlMain = "
 		SELECT * FROM " . DB_CENTER . "dc_cost
-		WHERE i_last = 1 AND i_enable = 1 AND i_delete = 2
-			AND {$costCondition}
+		WHERE {$levelCondition} AND {$costCondition}
 		ORDER BY c_code";
     $arrParam = array((int) ($_SESSION["dc_cost_id"] ?? 0));
     if (($_REQUEST['scope'] ?? '') === 'owner' && $extraOwnerId !== null) {

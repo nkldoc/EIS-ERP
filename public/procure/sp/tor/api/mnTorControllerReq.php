@@ -1960,15 +1960,21 @@ switch ($mode) {
             }
             $mainList = implode(",", $mainIds);   // เช่น "91,113"
             $accList = implode(",", $accIds);    // เช่น "75,114"
-            $incost = " AND  a.dc_cost2_id in(" . $mainList . ")";
+            // ผู้สร้างหรือผู้แก้ไขล่าสุดเห็นรายการของตนเองเสมอ
+            $incost = " AND (a.dc_cost2_id in(" . $mainList . ") OR a.dc_user_create_id = " . (int) ($_SESSION["user_id"] ?? 0)
+                . " OR a.dc_user_update_id = " . (int) ($_SESSION["user_id"] ?? 0) . ")";
             // print_r($cost);
             // exit;
         } else if ($_REQUEST["i_read"] == 4) {
             $wh .= "  ";
         } else if ($_REQUEST["i_read"] == 3) {
-            $wh .= " and (select dc_cost_acc_id from " . DB_CENTER . "dc_cost where  dc_cost_id =  a.dc_cost2_id ) = " . $_SESSION["dc_cost_acc_id"];
+            $wh .= " and ((select dc_cost_acc_id from " . DB_CENTER . "dc_cost where  dc_cost_id =  a.dc_cost2_id ) = " . $_SESSION["dc_cost_acc_id"]
+                . " OR a.dc_user_create_id = " . (int) ($_SESSION["user_id"] ?? 0)
+                . " OR a.dc_user_update_id = " . (int) ($_SESSION["user_id"] ?? 0) . ")";
         } else {
-            $wh .= " and a.dc_cost2_id  = " . $dc_cost_id;
+            $wh .= " and (a.dc_cost2_id  = " . $dc_cost_id
+                . " OR a.dc_user_create_id = " . (int) ($_SESSION["user_id"] ?? 0)
+                . " OR a.dc_user_update_id = " . (int) ($_SESSION["user_id"] ?? 0) . ")";
         }
         $arrParam = array();
         $arrCountParam = array();
