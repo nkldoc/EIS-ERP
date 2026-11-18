@@ -7063,11 +7063,14 @@ Ext.AppUx = function (app, menu) {
                                                 };
                                                 var booking = Number(row.i_pr_type) === 1 ? "จองแผน" : (Number(row.i_pr_type) === 2 ? "จองงวด" : "-");
                                                 var expense = [row.expense_code, row.expense_name].filter(function (value) { return !!value; }).join(" : ");
+                                                var bookingDepartment = [row.booking_department_code, row.booking_department_name].filter(function (value) { return !!value; }).join(" : ");
                                                 var created = row.d_create ? String(row.d_create).substring(0, 10) : "-";
                                                 html += '<details style="margin:5px 0;border:1px solid #b7c8dd"' + (index === 0 ? ' open' : '') + '>' +
                                                     '<summary style="cursor:pointer;padding:8px;background:#eaf1f9;color:#15428b;font-weight:bold">ข้อมูลรายละเอียดการจองเงิน PR ' + encode(row.source_no) + '</summary>' +
                                                     '<table style="border-collapse:collapse;width:100%;background:#fff">' +
                                                     '<tr><th style="width:35%;text-align:left;padding:6px;border:1px solid #c5d4e5">รหัสการจองเงิน</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(row.bg_reserve_money_id) + '</td></tr>' +
+                                                    '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">ระบบที่จอง (i_sys)</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(row.i_sys) + '</td></tr>' +
+                                                    '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">หน่วยงานที่จองเงิน</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(bookingDepartment) + '</td></tr>' +
                                                     '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">วันที่สร้าง</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(created) + '</td></tr>' +
                                                     '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">แหล่งเงิน</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(row.source_name) + '</td></tr>' +
                                                     '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">ประเภทการจอง</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(booking) + '</td></tr>' +

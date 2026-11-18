@@ -132,10 +132,12 @@ $prReservations = array();
 for ($i = 1; $i <= 3; $i++) {
     $reservationId = intval($pr[0]['bg_reserve_money' . $i . '_id'] ?? 0);
     if ($reservationId <= 0) continue;
-    $reservationRows = $fetch('SELECT r.bg_reserve_money_id, r.d_create, r.i_year, r.i_pr_type,
-        r.dc_budget_type_id, r.bg_expense_id, r.f_amt, r.i_enable, r.i_finish,
+    $reservationRows = $fetch('SELECT r.bg_reserve_money_id, r.d_create, r.i_year, r.i_pr_type, r.i_sys,
+        r.dc_cost_id, r.dc_budget_type_id, r.bg_expense_id, r.f_amt, r.i_enable, r.i_finish,
+        cost.c_code AS booking_department_code, cost.c_name AS booking_department_name,
         budget.c_name AS source_name, expense.c_code AS expense_code, expense.c_name AS expense_name
         FROM ' . DB_NMU_EIS . 'bg_reserve_money r
+        LEFT JOIN ' . DB_CENTER . 'dc_cost cost ON cost.dc_cost_id=r.dc_cost_id
         LEFT JOIN ' . DB_CENTER . 'dc_expense_budget_type budget
             ON budget.dc_expense_budget_type_id=r.dc_budget_type_id
         LEFT JOIN ' . DB_NMU_EIS . 'bg_expense expense ON expense.bg_expense_id=r.bg_expense_id

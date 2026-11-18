@@ -141,6 +141,7 @@
         var html = '<style>.pr-reservation-detail summary{cursor:pointer;padding:10px 12px;background:#eaf1f9;color:#15428b;font-weight:bold;border:1px solid #bacce0}.pr-reservation-detail[open] summary{background:#dceaf8}.pr-reservation-detail>div{padding:10px;border:1px solid #bacce0;border-top:0}</style>';
         Ext.each(rows, function (row, index) {
             var expense = [row.expense_code, row.expense_name].filter(function (value) { return !!value; }).join(' : ');
+            var bookingDepartment = [row.booking_department_code, row.booking_department_name].filter(function (value) { return !!value; }).join(' : ');
             var booking = Number(row.i_pr_type) === 1 ? 'จองแผน' : (Number(row.i_pr_type) === 2 ? 'จองงวด' : '-');
             var status = Number(row.i_enable) === 1 ? (Number(row.i_finish) === 1 ? 'ดำเนินการเสร็จสิ้น' : 'ใช้งาน') : 'ยกเลิก';
             html += '<details class="pr-reservation-detail" style="margin:8px 0"' + (index === 0 ? ' open' : '') + '>' +
@@ -148,6 +149,8 @@
                 ' — ' + encode(row.source_name || 'ไม่ระบุแหล่งเงิน') +
                 ' — ' + encode(display(row.f_amt, 'money')) + ' บาท</summary><div>' +
                 details([['รหัสการจองเงิน', row.bg_reserve_money_id],
+                    ['ระบบที่จอง (i_sys)', row.i_sys],
+                    ['หน่วยงานที่จองเงิน', bookingDepartment],
                     ['วันที่สร้าง', row.d_create, 'date'],
                     ['ปีที่ใช้งบประมาณ', row.i_year, 'year'],
                     ['แหล่งเงิน', row.source_name],
