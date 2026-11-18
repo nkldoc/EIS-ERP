@@ -453,17 +453,18 @@
                     if (!contractPanel.overviewData.can_admin_edit) return;
                     var contractId = String(button.getAttribute('data-contract-id') || '');
                     var contract = children(contractPanel.overviewData.contracts, 'sp_tor_contract_id', contractId)[0] || {};
+                    var period = children(contractPanel.overviewData.periods, 'sp_tor_contract_id', contractId)[0] || {};
                     var check = children(contractPanel.overviewData.checks, 'linked_contract_id', contractId)[0] || contractPanel.overviewData.checks[0] || {};
-                    if (typeof win_edir_alldata !== 'function' || !check.sp_check_period_hdr_id) {
+                    if (typeof win_edir_alldata !== 'function') {
                         Ext.Msg.alert('แก้ไขข้อมูล', 'ไม่พบเครื่องมือแก้ไขสัญญา/งวดสำหรับรายการนี้');
                         return;
                     }
                     var record = { get: function (name) {
                         if (name === 'sp_tor_contract_id') return contract.sp_tor_contract_id || contract.id || contractId;
                         if (name === 'sp_tor_id') return (contractPanel.overviewData.pr[0] || {}).tor_id || contractPanel.overviewData.sp_tor_id;
-                        return check[name];
+                        return typeof check[name] !== 'undefined' ? check[name] : period[name];
                     }};
-                    win_edir_alldata(record);
+                    win_edir_alldata(record, {use_selected: true, search_code: ''});
                 }, null, {delegate: '.contract-period-edit'});
                 contractPanel.body.on('click', function (event, button) {
                     event.stopEvent();
