@@ -3039,7 +3039,7 @@ switch ($mode) {
                 WHERE tor_id = ?;
             ";
 
-            $arrValue1 = array(1, $id, 2026, $i_pr_types, 1, $dc_cost_id, $dc_budget_type_id, $bg_expense_id, 0, 1, $f_amt, 1, date("Y-m-d H:i:s"), date("Y-m-d H:i:s"), $dc_cost_acc_id, $id);
+            $arrValue1 = array(3, $id, 2026, $i_pr_types, 1, $dc_cost_id, $dc_budget_type_id, $bg_expense_id, 0, 1, $f_amt, 1, date("Y-m-d H:i:s"), date("Y-m-d H:i:s"), $dc_cost_acc_id, $id);
             //   echo $sql1; print_r($arrValue1);
             $stmt1 = $db->QueryParam($sql1, $arrValue1);
         }
@@ -3117,7 +3117,7 @@ switch ($mode) {
                 WHERE tor_id = ?;
             ";
 
-            $arrValue1 = array(1, $id, 2026, $i_pr_types, 1, $dc_cost_id, $dc_budget_type_id, $bg_expense_id, 0, 1, $f_amt, 1, date("Y-m-d H:i:s"), date("Y-m-d H:i:s"), $dc_cost_acc_id, $id);
+            $arrValue1 = array(3, $id, 2026, $i_pr_types, 1, $dc_cost_id, $dc_budget_type_id, $bg_expense_id, 0, 1, $f_amt, 1, date("Y-m-d H:i:s"), date("Y-m-d H:i:s"), $dc_cost_acc_id, $id);
             //   echo $sql1; print_r($arrValue1);
             $stmt1 = $db->QueryParam($sql1, $arrValue1);
         }
@@ -3195,7 +3195,7 @@ switch ($mode) {
                 WHERE tor_id = ?;
             ";
 
-            $arrValue1 = array(1, $id, 2026, $i_pr_types, 1, $dc_cost_id, $dc_budget_type_id, $bg_expense_id, 0, 1, $f_amt, 1, date("Y-m-d H:i:s"), date("Y-m-d H:i:s"), $dc_cost_acc_id, $id);
+            $arrValue1 = array(3, $id, 2026, $i_pr_types, 1, $dc_cost_id, $dc_budget_type_id, $bg_expense_id, 0, 1, $f_amt, 1, date("Y-m-d H:i:s"), date("Y-m-d H:i:s"), $dc_cost_acc_id, $id);
             //   echo $sql1; print_r($arrValue1);
             $stmt1 = $db->QueryParam($sql1, $arrValue1);
         }
