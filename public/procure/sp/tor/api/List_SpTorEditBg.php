@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 include("../../../conf/config.php");
 include("../../../lib/database/DatabaseServer.php");
@@ -196,25 +196,25 @@ if ($type == "Sp_Tor_Edit_Bg") {
             (select top 1 sp_tor_bg_log_id from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 2 ORDER BY d_create  desc ) as sp_tor_bg_log_id2,
             (select top 1 sp_tor_bg_log_id from sp_tor_bg_log where a.tor_id = sp_tor_id and  i_number_bg = 3 ORDER BY d_create  desc ) as sp_tor_bg_log_id3,
             
-            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve1 , 
-            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve2 , 
-            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 3 and i_enable = 1 and i_sys = 1 ) as bg_reserve_money_i_reserve3 , 
+            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 3 ) as bg_reserve_money_i_reserve1 ,
+            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 3 ) as bg_reserve_money_i_reserve2 ,
+            (select top 1 isnull(bg_reserve_money_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 3 and i_enable = 1 and i_sys = 3 ) as bg_reserve_money_i_reserve3 ,
             (select top 1 i_pr_type from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 1 and i_edit = 1  ) as i_pr_type_edit1 ,
             (select top 1 i_pr_type from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 2 and i_edit = 1  ) as i_pr_type_edit2 ,
             (select top 1 i_pr_type from sp_tor_bg_log where sp_Tor_id =b.tor_id and  i_number_bg = 3 and i_edit = 1  ) as i_pr_type_edit3 ,
-            (select top 1 isnull(dc_budget_type_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1  ) as dc_budget_type_bg_id , 
-            (select top 1 isnull(bg_expense_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as bg_expense_bg_id , 
-            (select top 1 isnull(dc_budget_type_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1  ) as dc_budget_type_bg_id2 , 
-            (select top 1 isnull(bg_expense_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as bg_expense_bg_id2 , 
+            (select top 1 isnull(dc_budget_type_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 3  ) as dc_budget_type_bg_id ,
+            (select top 1 isnull(bg_expense_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 3 ) as bg_expense_bg_id ,
+            (select top 1 isnull(dc_budget_type_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 3  ) as dc_budget_type_bg_id2 ,
+            (select top 1 isnull(bg_expense_id,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 3 ) as bg_expense_bg_id2 ,
 
-            (select top 1 isnull(f_amt,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as f_amt_reserve1 , 
-            (select top 1 isnull(f_amt,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as f_amt_reserve2 , 
-            (select top 1 i_year from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  i_year_reserve1 , 
-            (select top 1 i_year from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  i_year_reserve2 , 
-            (select top 1 i_pr_type from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  i_pr_type_reserve1 , 
-            (select top 1 i_pr_type from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  i_pr_type_reserve2 , 
-            (select top 1 FORMAT(d_create,'dd MMM yyyy','th-TH') from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 1 ) as  d_create_reserve1 , 
-            (select top 1 FORMAT(d_create,'dd MMM yyyy','th-TH') from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 1 ) as  d_create_reserve2 , 
+            (select top 1 isnull(f_amt,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 3 ) as f_amt_reserve1 ,
+            (select top 1 isnull(f_amt,0) from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 3 ) as f_amt_reserve2 ,
+            (select top 1 i_year from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 3 ) as  i_year_reserve1 ,
+            (select top 1 i_year from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 3 ) as  i_year_reserve2 ,
+            (select top 1 i_pr_type from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 3 ) as  i_pr_type_reserve1 ,
+            (select top 1 i_pr_type from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 3 ) as  i_pr_type_reserve2 ,
+            (select top 1 FORMAT(d_create,'dd MMM yyyy','th-TH') from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 1 and i_enable = 1 and i_sys = 3 ) as  d_create_reserve1 ,
+            (select top 1 FORMAT(d_create,'dd MMM yyyy','th-TH') from nmu.dbo.bg_reserve_money where pr_id = b.tor_id and i_reserve = 2 and i_enable = 1 and i_sys = 3 ) as  d_create_reserve2 ,
             FORMAT(c.d_doc_date,'dd MMM yyyy','th-TH') as d_doc_th ,
             FORMAT(c.d_due_date,'dd MMM yyyy','th-TH') as d_due_th ,
             (SELECT TOP 1 c_name FROM dbo.sp_type_status WHERE sp_type_status_id = b.tor_type_id)  AS c_type_name , 
