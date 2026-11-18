@@ -7023,6 +7023,68 @@ Ext.AppUx = function (app, menu) {
                             value: Ext.selectRow.get("f_total_amt"),
                         },
                         {
+                            xtype: "displayfield",
+                            id: "prReservationTotalID",
+                            fieldLabel: "เงินการจองเงิน PR",
+                            value: "กำลังโหลดข้อมูล...",
+                            style: "font-weight:bold;color:#15428b;",
+                        },
+                        {
+                            xtype: "panel",
+                            id: "prReservationSummaryID",
+                            border: false,
+                            autoHeight: true,
+                            bodyStyle: "padding:0 0 10px 0;background:transparent;",
+                            html: '<div style="padding:8px;color:#666">กำลังโหลดข้อมูลการจองเงิน PR...</div>',
+                            listeners: {
+                                afterrender: function (panel) {
+                                    Ext.Ajax.request({
+                                        url: "tor/api/contractDetails.php",
+                                        method: "GET",
+                                        params: {
+                                            sp_tor_contract_id: Ext.selectRow.get("sp_tor_contract_id"),
+                                        },
+                                        callback: function (options, success, response) {
+                                            if (!panel || panel.isDestroyed) return;
+                                            var result = null;
+                                            try { result = Ext.decode(response.responseText); } catch (ignore) {}
+                                            if (!success || !result || !result.success) {
+                                                Ext.getCmp("prReservationTotalID").setValue("-");
+                                                panel.update('<div style="padding:8px;color:#a12828">ไม่สามารถโหลดข้อมูลการจองเงิน PR ได้</div>');
+                                                return;
+                                            }
+                                            var rows = result.prReservations || [];
+                                            var total = 0;
+                                            var html = '<div style="border:2px solid #d84a3a;padding:8px;background:#f8fbff">';
+                                            Ext.each(rows, function (row, index) {
+                                                total += Number(row.f_amt || 0);
+                                                var encode = function (value) {
+                                                    return Ext.util.Format.htmlEncode(value === null || value === undefined || value === '' ? '-' : String(value));
+                                                };
+                                                var booking = Number(row.i_pr_type) === 1 ? "จองแผน" : (Number(row.i_pr_type) === 2 ? "จองงวด" : "-");
+                                                var expense = [row.expense_code, row.expense_name].filter(function (value) { return !!value; }).join(" : ");
+                                                var created = row.d_create ? String(row.d_create).substring(0, 10) : "-";
+                                                html += '<details style="margin:5px 0;border:1px solid #b7c8dd"' + (index === 0 ? ' open' : '') + '>' +
+                                                    '<summary style="cursor:pointer;padding:8px;background:#eaf1f9;color:#15428b;font-weight:bold">ข้อมูลรายละเอียดการจองเงิน PR ' + encode(row.source_no) + '</summary>' +
+                                                    '<table style="border-collapse:collapse;width:100%;background:#fff">' +
+                                                    '<tr><th style="width:35%;text-align:left;padding:6px;border:1px solid #c5d4e5">รหัสการจองเงิน</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(row.bg_reserve_money_id) + '</td></tr>' +
+                                                    '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">วันที่สร้าง</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(created) + '</td></tr>' +
+                                                    '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">แหล่งเงิน</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(row.source_name) + '</td></tr>' +
+                                                    '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">ประเภทการจอง</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(booking) + '</td></tr>' +
+                                                    '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">รายการย่อย</th><td style="padding:6px;border:1px solid #c5d4e5">' + encode(expense) + '</td></tr>' +
+                                                    '<tr><th style="text-align:left;padding:6px;border:1px solid #c5d4e5">จำนวนเงิน PR</th><td style="padding:6px;border:1px solid #c5d4e5;color:blue;font-weight:bold;text-align:right">' + Ext.util.Format.number(Number(row.f_amt || 0), "0,000.00") + '</td></tr>' +
+                                                    '</table></details>';
+                                            });
+                                            html += rows.length ? '</div>' : '<div style="padding:8px;color:#666">ยังไม่มีข้อมูลการจองเงิน PR</div></div>';
+                                            Ext.getCmp("prReservationTotalID").setValue(Ext.util.Format.number(total, "0,000.00"));
+                                            panel.update(html);
+                                            panel.doLayout();
+                                        },
+                                    });
+                                },
+                            },
+                        },
+                        {
                             xtype: "hidden",
                             name: "sp_tor_contract_id",
                             id: "sp_tor_contract_idID",
