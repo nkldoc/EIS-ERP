@@ -3777,7 +3777,7 @@ formAdd = function (args) {
                     },
                   }),
                   new Ext.form.ComboBox({
-                    fieldLabel: "หน่วยงานที่รับผิดชอบ : " + Ext.select_row.dc_cost2_id + " ",
+                    fieldLabel: "หน่วยงานเจ้าของเรื่อง : " + Ext.select_row.dc_cost2_id + " ",
                     id: "dc_cost2_id",
                     name: "dc_cost2_id",
                     mode: "local",
