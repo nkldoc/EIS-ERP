@@ -270,6 +270,7 @@ $js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
     <script type="text/javascript" src="./tor/torUi.js?_dc=<?= __VPRODUCT_; ?>"></script>
     <script type="text/javascript" src="./tor/<?PHP echo $js; ?>"></script>
     <script type="text/javascript" src="./tor/contractNew.js?_dc=<?= __VPRODUCT_; ?>"></script>
+    <script type="text/javascript" src="./tor/admin-relation-editor.js?_dc=<?= filemtime(__DIR__ . '/tor/admin-relation-editor.js'); ?>"></script>
     <script type="text/javascript" src="./tor/contractDetails.js?_dc=<?= filemtime(__DIR__ . '/tor/contractDetails.js'); ?>"></script>
     <script type="text/javascript" src="./tor/quickProgress.js?_dc=<?= filemtime(__DIR__ . '/tor/quickProgress.js'); ?>"></script>
     <script type="text/javascript" src="../js/show_nat.js?dc=<?= __VPRODUCT_ ?>"></script>
