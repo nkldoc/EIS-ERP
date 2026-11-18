@@ -1,4 +1,12 @@
 /* global Ext, user_right_add, user_right_edit, user_right_delete */ ///
+// แสดงชื่อหน่วยงานเจ้าของเรื่องแทนรหัส เมื่อรายการของผู้ใช้คนนี้ไม่มีหน่วยงานที่บันทึกไว้
+Ext.applyOwnerName = function () {
+  var cb = Ext.getCmp("dc_cost2_idID");
+  var p = Ext.pendingOwner;
+  if (!cb || !p || !p.txt) return;
+  if (String(cb.getValue()) !== p.id) return;
+  if (cb.getStore().find("id", p.id) < 0) cb.setRawValue(p.txt);
+};
 AddTor = function (record, butt) {
   Ext.DTL = null;
   if (butt == "ADD") {
@@ -1155,6 +1163,7 @@ Ext.AppUx = function (app, menu) {
         var ownerCost = Ext.getCmp("dc_cost2_idID");
         if (ownerCost && ownerCost.getStore() === t) {
           ownerCost.setValue(ownerCost.getValue());
+          Ext.applyOwnerName();
         }
       },
     },
@@ -1245,7 +1254,10 @@ Ext.AppUx = function (app, menu) {
     listeners: {
       load: function (store) {
         var owner = Ext.getCmp("dc_cost2_idID");
-        if (owner && owner.getStore() === store) owner.setValue(owner.getValue());
+        if (owner && owner.getStore() === store) {
+          owner.setValue(owner.getValue());
+          Ext.applyOwnerName();
+        }
       }
     }
   });
@@ -1764,6 +1776,8 @@ Ext.AppUx = function (app, menu) {
       Ext.selectRow.set("f_bg_amt[2]", Ext.selectRow.get("f_type_amt2"));
 
       Ext.getCmp("winChequeID").items.items[0].getForm().loadRecord(Ext.selectRow);
+      Ext.pendingOwner = { id: String(Ext.selectRow.get("dc_cost2_id")), txt: Ext.selectRow.get("dc_cost2_idTxt") };
+      Ext.applyOwnerName();
       winApp.show();
       // ส่งรายการแล้วจะอัพเดทไม่ได้
       if (Ext.selectRow.get("tor_status_id") > 0) {
@@ -2125,7 +2139,11 @@ Ext.AppUx = function (app, menu) {
         Ext.getCmp("dc_expense_budget_type_idID").setValue(record.data.dc_expense_budget_type_id);
         Ext.getCmp("po_expense_id_ID").setValue(record.data.po_expense_id);
         Ext.getCmp("dc_cost_idID").setValue(record.data.dc_cost_id);
+        // หน่วยงานเจ้าของที่บันทึกไว้อาจไม่อยู่ในรายการของผู้ใช้คนนี้ ให้เพิ่มชื่อเข้ารายการเพื่อแสดงชื่อแทนรหัส
         Ext.getCmp("dc_cost2_idID").setValue(record.data.dc_cost2_id);
+        // หน่วยงานเจ้าของที่บันทึกไว้อาจไม่อยู่ในรายการของผู้ใช้คนนี้ ให้แสดงชื่อแทนรหัส
+        Ext.pendingOwner = { id: String(record.data.dc_cost2_id), txt: record.data.dc_cost2_idTxt };
+        Ext.applyOwnerName();
         Ext.getCmp("i_purchaseID").setValue(record.data.i_purchase);
         Ext.getCmp("tor_type_idID").setValue(record.data.tor_type_id);
         Ext.getCmp("i_hire_typeID").setValue(record.data.i_hire_type);
@@ -3165,6 +3183,8 @@ Ext.AppUx = function (app, menu) {
                                   //
                                 }
                                 Ext.getCmp("winChequeID").items.items[0].getForm().loadRecord(Ext.selectRow);
+                                Ext.pendingOwner = { id: String(Ext.selectRow.get("dc_cost2_id")), txt: Ext.selectRow.get("dc_cost2_idTxt") };
+                                Ext.applyOwnerName();
                               }
                             },
                           },
