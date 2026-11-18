@@ -17654,6 +17654,14 @@ Ext.AppUx = function (app, menu) {
                                                                 // ===== จบส่วนที่เพิ่ม =====
 
                                                                 var msg = ""; // ← ต้องมีบรรทัดนี้ต่อทันที
+                                                                // Existing IR/CHK records are edits even when this window was
+                                                                // opened from a detail/history route that omitted submodeID.
+                                                                var existingCheckingCode = Ext.selectRow
+                                                                        ? String(Ext.selectRow.get("c_checking_code") || "").replace(/^\s+|\s+$/g, "")
+                                                                        : "";
+                                                                if (existingCheckingCode && Ext.getCmp("submodeID")) {
+                                                                        Ext.getCmp("submodeID").setValue("modeEditAp");
+                                                                }
                                                                 let jsonArr = [];
                                                                 let Arr_month_group = [];
                                                                 let sto = Ext.storeTransf.data.items;
