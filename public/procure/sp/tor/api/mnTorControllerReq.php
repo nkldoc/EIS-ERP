@@ -1919,9 +1919,10 @@ switch ($mode) {
         if ($dc_cost_id == 97 || $_SESSION['i_level'] == 1 || $dc_cost_id == 3) {
             $wh .= "  ";
         } else if ($_REQUEST["i_read"] == 1) {
-            // ผู้สร้างรายการเห็นรายการที่ตนเองบันทึกเสมอ แม้หน่วยงานเจ้าของอยู่คนละกลุ่มบัญชี
+            // ผู้สร้างหรือผู้แก้ไขรายการล่าสุดเห็นรายการนั้นเสมอ แม้หน่วยงานเจ้าของอยู่คนละกลุ่มบัญชี
             $wh .= " and ((select dc_cost_acc_id from " . DB_CENTER . "dc_cost where  dc_cost_id =  a.dc_cost2_id ) = " . $_SESSION["dc_cost_acc_id"]
-                . " OR a.dc_user_create_id = " . (int) ($_SESSION["user_id"] ?? 0) . ")";
+                . " OR a.dc_user_create_id = " . (int) ($_SESSION["user_id"] ?? 0)
+                . " OR a.dc_user_update_id = " . (int) ($_SESSION["user_id"] ?? 0) . ")";
         } else if ($_REQUEST["i_read"] == 2) {
             $accIds = [];
             $cost = " SET NOCOUNT ON
