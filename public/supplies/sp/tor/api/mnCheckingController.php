@@ -2913,6 +2913,17 @@ switch ($mode) {
     case "GENCHECKINGCODE":
         requirePaidCheckingAdmin($db, $data['id'] ?? 0);
         $ret_id = $data["id"];
+
+        // The database is authoritative for edit/create mode. An existing IR/CHK
+        // must not fall back to the create-number flow if the UI omitted submode.
+        $existingChecking = $db->GetDataBySQL(
+            "SELECT TOP 1 c_checking_code FROM dbo.sp_check_period_hdr WHERE sp_check_period_hdr_id = ?",
+            array($ret_id)
+        );
+        if (!empty($existingChecking['c_checking_code'])) {
+            $data['submode'] = 'modeEditAp';
+        }
+
         $data["dc_user_update_id"] = $_SESSION["user_id"] ?? 0;
         $data["dc_user_update_cost_id"] = $_SESSION["dc_cost_id"] ?? 0;
         $data["d_update"] = date("Y-m-d H:i:s");

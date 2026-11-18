@@ -3002,7 +3002,10 @@ switch ($mode) {
 
             $id = $_REQUEST['tor_id'];
             $i_pr_types = $_REQUEST["i_pr_type"];
-            $dc_cost_id = $_REQUEST['dc_cost_id'];
+            // PR reservations belong to the owner department (sp_tor.dc_cost2_id).
+            // Resolve it on the server so a stale/tampered client value cannot book
+            // against the procurement operator's department (sp_tor.dc_cost_id).
+            $dc_cost_id = intval($db->GetDataBySQL('SELECT dc_cost2_id FROM dbo.sp_tor WHERE tor_id = ?', array($id)));
             $dc_budget_type_id = $_REQUEST['dc_budget_type_id'];
             $bg_expense_id = $_REQUEST['bg_expense_id'];
             $f_amt = str_replace(',', '', $_REQUEST['f_amt']);
@@ -3080,7 +3083,7 @@ switch ($mode) {
 
             $id = $_REQUEST['tor_id'];
             $i_pr_types = $_REQUEST["i_pr_type"];
-            $dc_cost_id = $_REQUEST['dc_cost_id'];
+            $dc_cost_id = intval($db->GetDataBySQL('SELECT dc_cost2_id FROM dbo.sp_tor WHERE tor_id = ?', array($id)));
             $dc_budget_type_id = $_REQUEST['dc_budget_type_id'];
             $bg_expense_id = $_REQUEST['bg_expense_id'];
             $f_amt = str_replace(',', '', $_REQUEST['f_amt']);
@@ -3158,7 +3161,7 @@ switch ($mode) {
 
             $id = $_REQUEST['tor_id'];
             $i_pr_types = $_REQUEST["i_pr_type"];
-            $dc_cost_id = $_REQUEST['dc_cost_id'];
+            $dc_cost_id = intval($db->GetDataBySQL('SELECT dc_cost2_id FROM dbo.sp_tor WHERE tor_id = ?', array($id)));
             $dc_budget_type_id = $_REQUEST['dc_budget_type_id'];
             $bg_expense_id = $_REQUEST['bg_expense_id'];
             $f_amt = str_replace(',', '', $_REQUEST['f_amt']);

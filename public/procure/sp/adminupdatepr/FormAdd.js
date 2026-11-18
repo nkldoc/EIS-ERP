@@ -1348,7 +1348,7 @@ function showCustomEditForm(rec) {
                                         i_pr_type: Ext.getCmp("i_pr_type").getValue().inputValue,
                                         bg_expense_id: Ext.getCmp("bg_expense_bg_id_pr").getValue(),
                                         f_amt: Ext.getCmp("f_total_pr").getValue(),
-                                        dc_cost_id: rec.get("dc_cost_id"),
+                                        dc_cost_id: rec.get("dc_cost2_id"),
                                         bg_reserve_id: rec.get("bg_reserve_money_pr1"),
                                       },
                                       success: function (response) {
@@ -1692,7 +1692,7 @@ function showCustomEditForm(rec) {
                                         i_pr_type: Ext.getCmp("i_pr_type2").getValue().inputValue,
                                         bg_expense_id: Ext.getCmp("bg_expense_bg_id_pr").getValue(),
                                         f_amt: Ext.getCmp("f_total_pr2").getValue(),
-                                        dc_cost_id: rec.get("dc_cost_id"),
+                                        dc_cost_id: rec.get("dc_cost2_id"),
                                         bg_reserve_id: rec.get("bg_reserve_money_pr2"),
                                       },
                                       success: function (response) {
@@ -1999,7 +1999,7 @@ function showCustomEditForm(rec) {
                                         i_pr_type: Ext.getCmp("i_pr_type3").getValue().inputValue,
                                         bg_expense_id: Ext.getCmp("bg_expense_bg_id_pr").getValue(),
                                         f_amt: Ext.getCmp("f_total_pr3").getValue(),
-                                        dc_cost_id: rec.get("dc_cost_id"),
+                                        dc_cost_id: rec.get("dc_cost2_id"),
                                         bg_reserve_id: rec.get("bg_reserve_money_pr3"),
                                       },
                                       success: function (response) {
@@ -2260,7 +2260,7 @@ function showCustomEditForm(rec) {
                                     dc_budget_type_id: rec.get("dc_expense_budget_type" + suffix + "_id"),
                                     i_pr_type: rec.get("i_pr_type_reserve" + n) || 1,
                                     bg_expense_id: rec.get("bg_expense_id" + suffix + "_pr") || rec.get("po_expense_id"),
-                                    f_amt: rec.get("f_amt_pr" + n), dc_cost_id: rec.get("dc_cost_id"), bg_reserve_id: 0},
+                                    f_amt: rec.get("f_amt_pr" + n), dc_cost_id: rec.get("dc_cost2_id"), bg_reserve_id: 0},
                                   success: function (response) {
                                     var result; try { result = Ext.decode(response.responseText); } catch (e) { result = null; }
                                     if (!result || !(result.success === "Success" || result.success === true || result.reval === 0)) {
@@ -3777,7 +3777,7 @@ formAdd = function (args) {
                     },
                   }),
                   new Ext.form.ComboBox({
-                    fieldLabel: "หน่วยงานที่รับผิดชอบ : " + Ext.select_row.dc_cost2_id + " ",
+                    fieldLabel: "หน่วยงานเจ้าของเรื่อง : " + Ext.select_row.dc_cost2_id + " ",
                     id: "dc_cost2_id",
                     name: "dc_cost2_id",
                     mode: "local",
