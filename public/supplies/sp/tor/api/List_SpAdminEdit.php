@@ -223,7 +223,8 @@ if ($type == "po_working_dtl1") {
             c.i_delivery,
             d.sp_mn_contract_hdr_id,
             c.sp_tor_contract_id,
-            c.i_enabled AS i_enabled_contract
+            c.i_enabled AS i_enabled_contract,
+            (SELECT TOP 1 c2.c_code FROM sp_tor_contract c2 WHERE c2.sp_tor_id = b.tor_id AND c2.i_enabled = 1 ORDER BY c2.sp_tor_contract_id DESC) AS c_code_po_active
 		FROM #TemData a
 			INNER JOIN dbo.sp_tor b ON a.tor_id = b.tor_id
             LEFT JOIN sp_tor_contract c on a.tor_id = c.sp_tor_id
@@ -266,6 +267,7 @@ if ($type == "po_working_dtl1") {
             "c_code"                        => $row["c_code"],
             "sp_tor_contract_id"            => intval($row["sp_tor_contract_id"]),
             "i_enabled_contract"           => isset($row["i_enabled_contract"]) ? intval($row["i_enabled_contract"]) : null,
+            "c_code_po_active"             => $row["c_code_po_active"] ?? null,
             "c_code_po"                     => $row["c_code_po"],
             "i_is_upload"                   => $row["i_is_upload"],
             "c_name_status"                 => $row["c_name_status"],
