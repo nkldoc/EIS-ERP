@@ -26,9 +26,13 @@ if ($keyword !== "") {
 
 $sql = "SELECT TOP 2000
             s.tor_id, s.c_code AS pr_code, s.c_name, s.i_yyyy,
+            CONVERT(VARCHAR, s.d_tor_date, 120) AS procurement_start_date,
+            CONVERT(VARCHAR, s.d_egp_date, 120) AS announcement_date,
             ISNULL(s.f_total_amt, 0) AS pr_amount,
             con.sp_tor_contract_id, con.c_code AS contract_code,
             ISNULL(con.f_total_amt, 0) AS contract_amount,
+            CONVERT(VARCHAR, con.d_doc_date, 120) AS contract_date,
+            CONVERT(VARCHAR, con.d_due_date, 120) AS contract_due_date,
             ev.sp_tor_event_id, ev.event_title, ev.event_detail,
             CONVERT(VARCHAR, ev.event_date, 120) AS event_date,
             CONVERT(VARCHAR, ev.d_create, 120) AS progress_created,
@@ -73,7 +77,7 @@ $sql = "SELECT TOP 2000
                 ELSE N'รอดำเนินการ'
             END AS current_progress
         FROM dbo.sp_tor s
-        OUTER APPLY (SELECT TOP 1 c.sp_tor_contract_id, c.c_code, c.f_total_amt,
+        OUTER APPLY (SELECT TOP 1 c.sp_tor_contract_id, c.c_code, c.f_total_amt, c.d_doc_date, c.d_due_date,
                             c.i_overlap, c.c_overlap, c.bg_reserve_overlap_id
                      FROM dbo.sp_tor_contract c WHERE c.sp_tor_id = s.tor_id
                      ORDER BY c.sp_tor_contract_id DESC) con
