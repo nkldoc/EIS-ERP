@@ -11,7 +11,7 @@ if (empty($_SESSION['user_id'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
-    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261119">
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261119-2">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -72,11 +72,26 @@ if (empty($_SESSION['user_id'])) {
         <div id="warningCards" class="warning-grid"></div>
     </section>
     <section id="personalTab" class="tab-pane">
-        <div class="tab-title"><div><h2>♧ รายงานส่วนบุคคล</h2><p>ภาพรวมภาระงานและ KPI แยกตามเจ้าหน้าที่</p></div><select id="personalOwnerFilter"><option value="">เลือกเจ้าหน้าที่</option></select></div>
-        <div id="personalSummary" class="metric-grid compact-metrics"></div>
-        <article class="panel"><div class="table-scroll detail-table"><table><thead><tr><th>เลข PR</th><th>รายการ</th><th>ประเภท</th><th>ขั้นตอนล่าสุด</th><th>ระดับปัญหา</th><th>กำหนดแล้วเสร็จ</th></tr></thead><tbody id="personalRows"></tbody></table></div></article>
+        <section class="personal-hero">
+            <div class="personal-identity"><span class="personal-avatar">♧</span><div><h2 id="personalOwnerName">กรุณาเลือกเจ้าหน้าที่</h2><p>เจ้าหน้าที่พัสดุ</p></div></div>
+            <select id="personalOwnerFilter"><option value="">เลือกเจ้าหน้าที่</option></select>
+        </section>
+        <div id="personalSummary" class="personal-summary"></div>
+        <div class="ratio-grid personal-ratios">
+            <article class="panel ratio-card"><div><b>▣ สัดส่วนการบริหารสัญญา (เทียบกับงานทั้งหมด)</b><strong id="personalContractPercent">0%</strong></div><div class="progress purple-bar"><span id="personalContractBar"></span></div><footer><span>บริหารสัญญา: <b id="personalContractJobs">0</b> รายการ</span><span>งานทั้งหมด: <b id="personalTotalJobs">0</b> รายการ</span></footer></article>
+            <article class="panel ratio-card"><div><b>◉ ความคืบหน้าการเบิกจ่าย (เทียบกับงานบริหารสัญญา)</b><strong class="green-text" id="personalPaymentPercent">0%</strong></div><div class="progress green-bar"><span id="personalPaymentBar"></span></div><footer><span>เบิกจ่ายแล้ว: <b id="personalPaidJobs">0</b> รายการ</span><span>บริหารสัญญา: <b id="personalManagedJobs">0</b> รายการ</span></footer></article>
+        </div>
+        <div id="personalIssues" class="issue-grid personal-issues"></div>
+        <div class="personal-chart-grid">
+            <article class="panel"><div class="panel-heading"><h2>⌁ สัดส่วนสถานะงานของ <span id="personalStatusOwner">-</span></h2></div><div class="personal-chart"><canvas id="personalStatusChart"></canvas></div><div id="personalStatusTable" class="personal-mini-table"></div></article>
+            <article class="panel"><div class="panel-heading"><h2>⌁ ความสัมพันธ์สถานะของ <span id="personalRadarOwner">-</span> (Radar Chart)</h2></div><div class="personal-chart"><canvas id="personalRadarChart"></canvas></div><div id="personalRadarTable" class="personal-mini-table"></div></article>
+        </div>
+        <article class="panel personal-duration-panel"><div class="panel-heading"><h2>◷ ค่าเฉลี่ยระยะเวลาการดำเนินงานของ <span id="personalDurationOwner">-</span></h2></div><div id="personalDurations" class="personal-duration-grid"></div></article>
+        <section class="personal-kpi-section"><h2>◎ สรุปสถานะการประเมิน KPI</h2><div id="personalKpiSummary" class="personal-kpi-grid"></div></section>
+        <section class="personal-work-section"><h2>⌁ ตารางติดตามสถานะการดำเนินงาน (Gantt Chart)</h2><div id="personalMethodGroups" class="personal-accordions"></div></section>
+        <section class="personal-work-section"><h2>☷ รายการงานทั้งหมดของ <span id="personalListOwner">-</span></h2><div id="personalTypeGroups" class="personal-accordions"></div></section>
     </section>
 </main>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261119"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261119-2"></script>
 </body></html>
