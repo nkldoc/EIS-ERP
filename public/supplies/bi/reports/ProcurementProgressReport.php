@@ -11,7 +11,7 @@ if (empty($_SESSION['user_id'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
-    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261119-2">
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261119-3">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -54,6 +54,22 @@ if (empty($_SESSION['user_id'])) {
         <article class="panel"><div class="panel-heading"><h2>สัดส่วนสถานะงาน</h2><select id="statusOwnerFilter"><option value="">รวมทุกเจ้าหน้าที่</option></select></div><div class="donut-holder"><canvas id="statusChart"></canvas></div><p class="chart-note">สถานะคำนวณจากขั้นตอนล่าสุดของแต่ละ PR</p></article>
         <article class="panel status-table-panel"><div class="panel-heading"><div><h2>ตารางสรุปสถานะและใบกันเหลื่อม</h2><p class="muted">อ้างอิง PR, สัญญา และใบกันเหลื่อมจาก NMU_EIS</p></div></div><div class="table-scroll"><table><thead><tr><th>สถานะ</th><th class="overlap-head no-debt">ยังไม่ก่อหนี้<br><small>อ้างอิง PR</small></th><th class="overlap-head debt">ก่อหนี้แล้ว<br><small>อ้างอิงสัญญา</small></th><th class="overlap-head saved">บันทึกใบกันเหลื่อมแล้ว<br><small>NMU_EIS</small></th><th>รวม</th></tr></thead><tbody id="statusRows"></tbody></table></div></article>
     </section>
+    <section class="panel overview-extra cross-panel">
+        <div class="panel-heading"><h2>⌁ สัดส่วนสถานะงาน (แยกตามเจ้าหน้าที่)</h2><select id="ownerMatrixFilter"><option value="">รวมทุกเจ้าหน้าที่</option></select></div>
+        <div class="cross-chart"><canvas id="ownerStatusChart"></canvas></div><p class="chart-note">คลิกที่กราฟเพื่อกรองรายละเอียดในตาราง</p>
+        <div id="ownerStatusMatrix" class="table-scroll cross-table"></div>
+    </section>
+    <section class="panel overview-extra cross-panel">
+        <div class="panel-heading"><h2>⌁ สัดส่วนสถานะงาน (แยกตามหน่วยงาน)</h2><select id="departmentMatrixFilter"><option value="">รวมทุกหน่วยงาน</option></select></div>
+        <div class="cross-chart"><canvas id="departmentStatusChart"></canvas></div><p class="chart-note">คลิกที่กราฟเพื่อกรองรายละเอียดในตาราง</p>
+        <div id="departmentStatusMatrix" class="table-scroll cross-table"></div>
+    </section>
+    <section class="panel overview-extra relation-panel">
+        <div class="panel-heading"><h2>♧ ความสัมพันธ์สถานะกับเจ้าหน้าที่</h2></div>
+        <div id="relationOwnerButtons" class="relation-buttons"></div><p class="chart-note">เลือกเจ้าหน้าที่เพื่อแสดงเส้นเปรียบเทียบ หรือเลือกรวมทั้งหมด</p>
+        <div class="relation-chart"><canvas id="ownerRelationChart"></canvas></div>
+        <div id="ownerRelationMatrix" class="table-scroll cross-table"></div>
+    </section>
     <section id="detailSection" class="panel overview-extra">
         <div class="panel-heading detail-heading"><div><h2>ตารางสรุปภาพรวมทั้งหมด</h2><p class="muted">แสดงสถานะล่าสุดและกระบวนการเบิกจ่ายของแต่ละ PR</p></div><input id="keywordFilter" placeholder="ค้นหาเลข PR / โครงการ / เจ้าหน้าที่"></div>
         <div class="table-scroll detail-table"><table><thead><tr><th>เลข PR</th><th>โครงการ/รายการ</th><th>เจ้าหน้าที่</th><th>แหล่งเงิน</th><th>ประเภท</th><th>สถานะล่าสุด</th><th>สถานะใบกันเหลื่อม</th><th>ระดับปัญหา</th><th>งวด</th><th>รับของ</th><th>ตรวจรับ</th><th>เบิกสมบูรณ์</th></tr></thead><tbody id="detailRows"></tbody></table></div>
@@ -93,5 +109,5 @@ if (empty($_SESSION['user_id'])) {
     </section>
 </main>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261119-2"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261119-3"></script>
 </body></html>
