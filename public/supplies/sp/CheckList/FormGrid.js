@@ -1590,6 +1590,57 @@ Ext.AppUx = function (app, menu) {
     });
     Ext.buAct = null;
 
+    function showProgressHistory(record) {
+        var historyStore = new Ext.data.JsonStore({
+            url: "tor/api/mnTorCheckList.php",
+            baseParams: {mode: "sp_tor_even", id: record.get("id")},
+            root: "data",
+            totalProperty: "totalCount",
+            idProperty: "id",
+            fields: ["id", "event_type", "event_detail", "event_date", "importance_level", "sp_status_hdr_name", "dc_user_create_id", "d_create"]
+        });
+        var problemLevel = function (value) {
+            value = Number(value || 0);
+            if (value === 1) return '<span style="color:#d98200;font-weight:bold;">1 - มีปัญหาเล็กน้อย / ดำเนินการต่อได้</span>';
+            if (value === 2) return '<span style="color:#c62828;font-weight:bold;">2 - มีปัญหา / ไม่สามารถดำเนินการต่อได้</span>';
+            return '<span style="color:#2e7d32;">0 - ปกติ</span>';
+        };
+        var historyGrid = new Ext.grid.GridPanel({
+            store: historyStore,
+            border: false,
+            stripeRows: true,
+            loadMask: true,
+            autoExpandColumn: "progressHistoryDetail",
+            columns: [
+                {header: "ล่าสุด", width: 48, align: "center", renderer: function (value, meta, row, rowIndex) {
+                    return rowIndex === 0 ? '<span style="color:#1565c0;font-weight:bold;">ล่าสุด</span>' : "";
+                }},
+                {header: "วันที่บันทึก", dataIndex: "d_create", width: 130},
+                {header: "ประเภทความก้าวหน้า", dataIndex: "event_type", width: 170},
+                {header: "ระดับปัญหา", dataIndex: "importance_level", width: 260, renderer: problemLevel},
+                {id: "progressHistoryDetail", header: "ความก้าวหน้า", dataIndex: "event_detail", width: 260},
+                {header: "ผู้บันทึก", dataIndex: "dc_user_create_id", width: 140}
+            ],
+            viewConfig: {emptyText: "ยังไม่มีประวัติความก้าวหน้า", deferEmptyText: false}
+        });
+        var historyWindow = new Ext.Window({
+            title: "ประวัติสถานะทั้งหมด - " + (record.get("c_code") || "รายการ PR"),
+            width: 980,
+            height: 450,
+            minWidth: 720,
+            minHeight: 320,
+            modal: true,
+            resizable: true,
+            maximizable: true,
+            layout: "fit",
+            constrainHeader: true,
+            items: [historyGrid],
+            buttons: [{text: "ปิด", handler: function () { historyWindow.close(); }}]
+        });
+        historyWindow.show();
+        historyStore.load();
+    }
+
     function cellClick(grid, rowIndex, columnIndex, e) {
         if (columnIndex === grid.getColumnModel().getIndexById("contract_detailsID")) {
             var overviewRecord = grid.getStore().getAt(rowIndex);
@@ -1598,6 +1649,10 @@ Ext.AppUx = function (app, menu) {
         }
         var record = grid.getStore().getAt(rowIndex);
         Ext.selectRow = record;
+        if (columnIndex === grid.getColumnModel().getIndexById("event_type_historyID")) {
+            showProgressHistory(record);
+            return;
+        }
         if (columnIndex === grid.getColumnModel().getIndexById("processDueID")) {
             if (Ext.selectRow.data.i_is_upload == 0) {
                 Ext.MessageBox.alert("แจ้งเตือน", "กรุณาอัพโหลดเอกสารก่อนผ่านรายการ");
@@ -4147,6 +4202,11 @@ Ext.AppUx = function (app, menu) {
                         // hidden: true,
                         align: "left",
                         dataIndex: "event_type",
+                        id: "event_type_historyID",
+                        renderer: function (value, metaData) {
+                            metaData.attr = 'style="cursor:pointer;color:#1565c0;text-decoration:underline;" title="คลิกเพื่อดูประวัติสถานะทั้งหมด"';
+                            return Ext.isEmpty(value) ? "-" : Ext.util.Format.htmlEncode(String(value));
+                        },
 
                     },
                     {

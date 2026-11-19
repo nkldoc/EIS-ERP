@@ -406,9 +406,9 @@ switch ($mode) {
                             , (SELECT TOP 1 c_name FROM NMU_DATACENTER.dbo.dc_cost WHERE dc_cost_id=s.dc_user_update_cost_id) AS c_cost_update_name
                             , CONVERT(VARCHAR, s.d_update, 120) AS d_update
                             , (Select c_name from  " . DB_NMU_ERP . "sp_type_event ac where ac.sp_type_event_id =
-                                    (SELECT TOP 1 event_type from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id
-                                    ORDER BY d_create desc )) as event_type
-                            , (SELECT TOP 1 event_detail from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id ORDER BY d_create desc ) as sp_event_detail
+                                    (SELECT TOP 1 event_type from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id AND i_enabled = 1
+                                    ORDER BY d_create desc, sp_tor_event_id desc )) as event_type
+                            , (SELECT TOP 1 event_detail from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id AND i_enabled = 1 ORDER BY d_create desc, sp_tor_event_id desc ) as sp_event_detail
                             "
                 . $vendorSelect
                 . " FROM ({$sqlTempTable}) a "
@@ -1309,9 +1309,9 @@ switch ($mode) {
                             , (SELECT TOP 1 c_name FROM NMU_DATACENTER.dbo.dc_cost WHERE dc_cost_id=s.dc_user_update_cost_id) AS c_cost_update_name
                             , CONVERT(VARCHAR, s.d_update, 120) AS d_update
                             , (Select c_name from  " . DB_NMU_ERP . "sp_type_event ac where ac.sp_type_event_id =
-                                    (SELECT TOP 1 event_type from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id
-                                    ORDER BY d_create desc )) as event_type
-                            , (SELECT TOP 1 event_detail from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id ORDER BY d_create desc ) as sp_event_detail
+                                    (SELECT TOP 1 event_type from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id AND i_enabled = 1
+                                    ORDER BY d_create desc, sp_tor_event_id desc )) as event_type
+                            , (SELECT TOP 1 event_detail from  " . DB_NMU_ERP . "sp_tor_event where sp_tor_id = s.tor_id AND i_enabled = 1 ORDER BY d_create desc, sp_tor_event_id desc ) as sp_event_detail
                             , CASE
                                 WHEN s.i_enabled = 2 THEN 15
                                 WHEN s.tor_status_id = 21 AND ISNULL(d.po_working_hdr_id, 0) > 0 AND ISNULL(f.i_status_last, 0) >= 11 THEN 13
