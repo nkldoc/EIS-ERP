@@ -387,6 +387,9 @@ if ($type == "medsup_period_bill") {
     // ================= รายการ "รับของ" ย่อยของงวดที่เลือก ================= //
     // ใช้กับเมนู "ส่งมอบงาน (เวชภัณฑ์)" - 1 งวดรับของทยอยได้หลายครั้ง (หลายแถว)
     $arrParam[] = $_REQUEST['sp_tor_period_bill_id'] ?? null;
+    // เลขคุมตรวจรับ EGP ที่นำเข้ามากับไฟล์ (คอลัมน์จาก sp_tor_period_bill_receive_egp_no.sql - ยังไม่รัน = ว่าง)
+    $egpCol = intval($db->GetDataBySQL("select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_egp_no') is null then 0 else 1 end", array())) === 1
+        ? ", c_egp_no" : ", cast(null as varchar(50)) as c_egp_no";
     $sqlMain = "select sp_tor_period_bill_receive_id, sp_tor_period_bill_id
                     , c_receive_code
                     , convert(varchar, d_receive_date, 120) as d_receive_date
@@ -394,7 +397,7 @@ if ($type == "medsup_period_bill") {
                     , convert(varchar, d_ir_issue, 120) as d_ir_issue
                     , c_ap_code
                     , convert(varchar, d_ap_issue, 120) as d_ap_issue
-                    , c_erp_stock_code
+                    , c_erp_stock_code {$egpCol}
                     , draft_f_total_vat, draft_b_vat, draft_f_vat_percent
                     , draft_b_wht, draft_f_wht_percent, draft_f_penalty
                     , draft_b_guarantee, draft_f_guarantee_percent, draft_f_other
@@ -418,6 +421,7 @@ if ($type == "medsup_period_bill") {
             "c_ap_code" => $row["c_ap_code"],
             "d_ap_issue" => empty($row["d_ap_issue"]) ? "" : $date->extDateBuddha($row["d_ap_issue"]),
             "c_erp_stock_code" => $row["c_erp_stock_code"],
+            "c_egp_no" => $row["c_egp_no"],
             "draft_f_total_vat" => is_null($row["draft_f_total_vat"]) ? "" : number_format($row["draft_f_total_vat"], 2),
             "draft_b_vat" => intval($row["draft_b_vat"]),
             "draft_f_vat_percent" => $row["draft_f_vat_percent"],
@@ -715,8 +719,18 @@ if ($type == "medsup_period_bill") {
                 where c_ir_code = ? and i_enabled = 1";
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     $row = $db->Fetch($stmt);
+    // เลขคุมตรวจรับ EGP ที่นำเข้าจากไฟล์ (เก็บที่รายการรับของ sp_tor_period_bill_receive.c_egp_no)
+    // ฟอร์มใช้เติมช่อง "เลขที่ EGP" ให้อัตโนมัติ - ยังไม่รัน sp_tor_period_bill_receive_egp_no.sql = ว่าง
+    $egpImport = "";
+    if (intval($db->GetDataBySQL("select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_egp_no') is null then 0 else 1 end", array())) === 1) {
+        $egpImport = strval($db->GetDataBySQL(
+            "select top 1 c_egp_no from NMU_ERP.dbo.sp_tor_period_bill_receive
+             where c_ir_code = ? and i_enabled = 1 and isnull(c_egp_no, '') <> ''
+             order by sp_tor_period_bill_receive_id", array($_REQUEST['c_ir_code'] ?? null)));
+    }
     if ($row) {
         ${$root}[] = array(
+            "c_egp_no_import" => $egpImport,
             "c_ir_code" => $row["c_ir_code"],
             "d_doc_complete" => empty($row["d_doc_complete"]) ? "" : $date->extDateBuddha($row["d_doc_complete"]),
             "d_checking" => empty($row["d_checking"]) ? "" : $date->extDateBuddha($row["d_checking"]),
@@ -755,6 +769,7 @@ if ($type == "medsup_period_bill") {
         $m = medsupIrMoney($db, $_REQUEST['c_ir_code'] ?? null);
         if ($m !== null && $m["has_draft"]) {
             ${$root}[] = array(
+                "c_egp_no_import" => $egpImport,
                 "c_ir_code" => $_REQUEST['c_ir_code'] ?? null,
                 "f_total_vat" => number_format($m["f_total_vat"], 2, ".", ""),
                 "b_vat" => intval($m["b_vat"]),

@@ -117,6 +117,11 @@ function medsupGenIrCode($db, $deptType, $useYear = 0)
 }
 
 $mode = $_REQUEST["mode"] ?? null;
+// มีคอลัมน์เลขคุมตรวจรับ EGP ที่รายการรับของหรือยัง (scriptBaseUpdate/sp_tor_period_bill_receive_egp_no.sql)
+function medsupReceiveHasEgpCol($db)
+{
+    return intval($db->GetDataBySQL("select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_egp_no') is null then 0 else 1 end", array())) === 1;
+}
 $stmt = true;
 $errMsg = "check statement";
 // ค่าเสริมที่บาง mode (ISSUE_AP/SAVE_CHECKING) อยากส่งกลับไปให้ client โชว์เลย เช่น
@@ -136,10 +141,16 @@ switch ($mode) {
             $_SESSION["user_id"] ?? null,
             $_SESSION["dc_cost_id"] ?? null,
         );
+        // เลขคุมตรวจรับ EGP (ไม่บังคับ) - เก็บเฉพาะเมื่อกรอกมาและมีคอลัมน์แล้ว
+        $addEgp = trim((string) ($_REQUEST["c_egp_no"] ?? ""));
+        $addEgpCol = ($addEgp !== "" && medsupReceiveHasEgpCol($db));
+        if ($addEgpCol) {
+            $arrParam[] = $addEgp;
+        }
         $sql = "SET NOCOUNT ON;
                 INSERT INTO NMU_ERP.dbo.sp_tor_period_bill_receive
-                    (sp_tor_period_bill_id, c_receive_code, d_receive_date, c_detail, f_amt, c_erp_stock_code, i_enabled, dc_user_create_id, dc_user_create_cost_id, d_create)
-                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, GETDATE());
+                    (sp_tor_period_bill_id, c_receive_code, d_receive_date, c_detail, f_amt, c_erp_stock_code, i_enabled, dc_user_create_id, dc_user_create_cost_id, d_create" . ($addEgpCol ? ", c_egp_no" : "") . ")
+                VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, GETDATE()" . ($addEgpCol ? ", ?" : "") . ");
                 SELECT SCOPE_IDENTITY() AS new_id;";
         $stmt = $db->QueryParam($sql, $arrParam);
         break;
@@ -158,6 +169,12 @@ switch ($mode) {
             $_SESSION["dc_cost_id"] ?? null,
             $_REQUEST["sp_tor_period_bill_receive_id"] ?? null,
         );
+        // เลขคุมตรวจรับ EGP - แก้เมื่อ client ส่ง c_egp_no มา (ว่าง = ล้างเลข) ผู้เรียกอื่นที่ไม่ส่งค่านี้ไม่กระทบ
+        $updEgp = isset($_REQUEST["c_egp_no"]) && medsupReceiveHasEgpCol($db);
+        if ($updEgp) {
+            $egpVal = trim((string) $_REQUEST["c_egp_no"]);
+            array_splice($arrParam, 5, 0, array($egpVal !== "" ? $egpVal : null));   // ต่อจาก c_erp_stock_code ตามลำดับ ? ใน SQL
+        }
         // จำนวนเงินเปลี่ยน = ยอด VAT ของ IR ที่ยืนยันไว้ใช้ไม่ได้แล้ว ต้องล้างสถานะยืนยัน
         // (แก้แค่เลขที่/วันที่/รายละเอียด ไม่กระทบยอด ไม่ต้องล้าง)
         $oldAmt = $db->GetDataBySQL(
@@ -172,7 +189,7 @@ switch ($mode) {
             break;
         }
         $sql = "UPDATE NMU_ERP.dbo.sp_tor_period_bill_receive
-                SET c_receive_code = ?, d_receive_date = ?, c_detail = ?, f_amt = ?, c_erp_stock_code = ?
+                SET c_receive_code = ?, d_receive_date = ?, c_detail = ?, f_amt = ?, c_erp_stock_code = ?" . ($updEgp ? ", c_egp_no = ?" : "") . "
                     , dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = GETDATE()
                 WHERE sp_tor_period_bill_receive_id = ?";
         $stmt = $db->QueryParam($sql, $arrParam);

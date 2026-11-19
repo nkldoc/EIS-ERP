@@ -62,6 +62,9 @@ Ext.MEDSUP_IMPORT_COLUMNS = [
     {key: "chk_id", label: "chk_id"},
     // alias "เลขที่กันเหลื่อมปี" = หัวคอลัมน์ในไฟล์ของฝ่ายเภสัช (เดิมไม่ตรงชื่อ ระบบข้ามคอลัมน์นี้เงียบๆ เลขใบกันเลยไม่ถูกบันทึก)
     {key: "c_overlap", label: "c_overlap", alias: ["เลขที่กันเหลื่อมปี", "เลขที่ใบกันเหลื่อม"]},
+    // เลขคุมตรวจรับ EGP (ไม่บังคับ) เก็บที่รายการรับของ แล้วเติมให้ในช่อง "เลขที่ EGP" ตอนออกเลขตรวจรับ (ST00096)
+    // user ไม่ต้องพิมพ์/ก๊อปปี้เอง (ต้องรัน scriptBaseUpdate/sp_tor_period_bill_receive_egp_no.sql ก่อน ไม่งั้นระบบข้ามคอลัมน์นี้)
+    {key: "egp_no", label: "เลขคุมตรวจรับ egp", alias: ["เลขคุมตรวจรับ EGP", "เลขคุมตรวจรับ"]},
     // รหัสบัญชีตั้งหนี้ของงวด (ไม่บังคับ) ว่าง = ใช้การจับคู่หมวดค่าใช้จ่ายเดิม
     {key: "debt_acc", label: "รหัสบัญชีตั้งหนี้"},
 ];
@@ -255,6 +258,7 @@ function winMedSupImportRows(rec) {
         {header: "po_id", key: "po_id"},
         {header: "chk_id", key: "chk_id"},
         {header: "c_overlap", key: "c_overlap"},
+        {header: "เลขคุมตรวจรับ egp", key: "egp_no"},
         {header: "สถานะจองเงิน (ระบบงบ)", key: "rsv_status", render: Ext.fnImportRsvStatus},
     ];
     var tablePanel = new Ext.Panel({border: false, autoScroll: true, html: "<div class=\"medsup-imp-empty\">กำลังโหลด..</div>"});

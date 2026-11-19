@@ -634,9 +634,23 @@ function winCheckingDetailTab(rec) {
     });
 
     // ใช้เงินปีงบประมาณเก่ากว่าปีปัจจุบัน -> เลขที่ EGP = "-" (ล็อก ไม่บังคับ) · ปีปัจจุบัน -> กรอกได้และบังคับกรอก
+    // เลขคุมตรวจรับ EGP ที่นำเข้ามากับไฟล์ (ST00097) - ถ้ามี เติมให้ในช่อง ไม่ต้องให้ user พิมพ์/ก๊อปปี้เอง
+    var egpImported = "";
     function applyEgpRule() {
         var useYear = parseInt(i_budget_year_useFld.getValue(), 10) || 0;
-        if (useYear > 0 && useYear < currentFiscalYearTh()) {
+        var curEgp = String(c_egp_noFld.getValue() || "");
+        if (egpImported !== "" && (curEgp === "" || curEgp === "-")) {
+            // ยังไม่เคยบันทึกเลข EGP จริง -> ใช้เลขที่นำเข้ามา (แก้ไขได้ ไม่ล็อก) ใช้ได้ทั้งปีปัจจุบันและกันเหลื่อมปีเก่า
+            c_egp_noFld.setValue(egpImported);
+            c_egp_noFld.setReadOnly(false);
+            c_egp_noFld.allowBlank = false;
+            egpHintFld.hide();
+        } else if (egpImported !== "" && curEgp !== "-") {
+            // มีเลข EGP จริงอยู่แล้ว (บันทึกไว้/ผู้ใช้แก้เอง) -> คงค่านั้นไว้ ไม่ล็อกเป็น "-"
+            c_egp_noFld.setReadOnly(false);
+            c_egp_noFld.allowBlank = false;
+            egpHintFld.hide();
+        } else if (useYear > 0 && useYear < currentFiscalYearTh()) {
             c_egp_noFld.setValue("-");
             c_egp_noFld.setReadOnly(true);
             c_egp_noFld.allowBlank = true;
@@ -923,6 +937,7 @@ function winCheckingDetailTab(rec) {
         if (hasVal(d.c_egp_no)) {
             c_egp_noFld.setValue(d.c_egp_no);
         }
+        egpImported = hasVal(d.c_egp_no_import) ? String(d.c_egp_no_import) : "";
         if (hasVal(d.c_disburse_detail)) {
             c_disburse_detailFld.setValue(d.c_disburse_detail);
         }
