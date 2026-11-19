@@ -261,6 +261,52 @@ switch ($mode) {
         echo json_encode($result, JSON_UNESCAPED_UNICODE);
         exit;
 
+    case "LIST_PROGRESS_MENU_MAP":
+        if (intval($_SESSION["dc_center_user"] ?? 0) !== 1 && intval($_SESSION["user_id"] ?? 0) !== 1) {
+            $db->RollBackTran();
+            echo json_encode(array("success" => false, "msg" => "เฉพาะผู้ดูแลระบบเท่านั้น", "data" => array()), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $sqlMap = "IF OBJECT_ID('dbo.sp_progress_menu_map', 'U') IS NULL
+                   BEGIN
+                     SELECT CAST(NULL AS INT) AS sp_progress_menu_map_id,
+                            CAST(NULL AS VARCHAR(30)) AS menu_code,
+                            CAST(NULL AS NVARCHAR(250)) AS menu_name,
+                            CAST(NULL AS INT) AS event_type,
+                            CAST(NULL AS NVARCHAR(250)) AS event_type_name,
+                            CAST(NULL AS INT) AS i_enabled,
+                            CAST(NULL AS VARCHAR(19)) AS d_update
+                     WHERE 1=0;
+                   END
+                   ELSE
+                   BEGIN
+                     SELECT m.sp_progress_menu_map_id, m.menu_code, m.menu_name,
+                            m.event_type, ISNULL(t.c_name, N'ไม่พบประเภทความก้าวหน้า') AS event_type_name,
+                            m.i_enabled,
+                            CONVERT(VARCHAR(19), ISNULL(m.d_update, m.d_create), 120) AS d_update
+                     FROM dbo.sp_progress_menu_map m
+                     LEFT JOIN dbo.sp_type_event t ON t.sp_type_event_id = m.event_type
+                     ORDER BY m.menu_code;
+                   END";
+        $stmtMap = $db->Query($sqlMap);
+        $mapRows = array();
+        if ($stmtMap) {
+            while ($rowMap = $db->Fetch($stmtMap)) {
+                $mapRows[] = array(
+                    "id" => intval($rowMap["sp_progress_menu_map_id"]),
+                    "menu_code" => $rowMap["menu_code"],
+                    "menu_name" => $rowMap["menu_name"],
+                    "event_type" => intval($rowMap["event_type"]),
+                    "event_type_name" => $rowMap["event_type_name"],
+                    "i_enabled" => intval($rowMap["i_enabled"]),
+                    "d_update" => $rowMap["d_update"]
+                );
+            }
+        }
+        $db->CommitTran();
+        echo json_encode(array("success" => true, "data" => $mapRows, "total" => count($mapRows)), JSON_UNESCAPED_UNICODE);
+        exit;
+
     case "SAVE_PROGRESS_MENU_MAP":
         if (intval($_SESSION["dc_center_user"] ?? 0) !== 1 && intval($_SESSION["user_id"] ?? 0) !== 1) {
             $db->RollBackTran();
@@ -329,7 +375,8 @@ switch ($mode) {
         $data["sp_tor_contract_id"] = $_REQUEST['sp_tor_contract_id'] ?? ($_REQUEST['sp_emp_id'] ?? null);
         $data["sp_status_hdr_id"] = $_REQUEST["tor_status_id"] ?? null;
         $data["sp_status_hdr_name"] = $_REQUEST["sp_status_hdr_name"] ?? null;
-        $data["importance_level"] = $_REQUEST['importance_level'] ?? null;
+        $importanceLevel = isset($_REQUEST['importance_level']) ? intval($_REQUEST['importance_level']) : 0;
+        $data["importance_level"] = in_array($importanceLevel, array(0, 1, 2), true) ? $importanceLevel : 0;
         $data["event_title"] = $_REQUEST["event_title"] ?? null;
         $data["event_detail"] = $_REQUEST["event_detail"] ?? null;
         $data["event_date"] = !empty($_REQUEST['d_event_date'])

@@ -9,50 +9,89 @@ if (empty($_SESSION['user_id'])) {
 <html lang="th">
 <head>
     <meta charset="utf-8">
-    <title>รายงานข้อมูลซื้อจ้างและความก้าวหน้า</title>
-    <style>
-        body{font-family:Tahoma,Arial,sans-serif;margin:0;background:#f4f6f9;color:#263238;font-size:13px}
-        .wrap{padding:16px}.head{font-size:20px;font-weight:bold;margin-bottom:12px}
-        .filters{background:#fff;padding:12px;border:1px solid #d7dde5;border-radius:5px;margin-bottom:12px}
-        input,button{font:inherit;padding:7px 9px;margin-right:6px}button{cursor:pointer;background:#3f51b5;color:#fff;border:0;border-radius:3px}
-        .table-wrap{overflow:auto;background:#fff;border:1px solid #d7dde5;max-height:calc(100vh - 145px)}
-        table{border-collapse:collapse;width:100%;min-width:1450px}th,td{border-bottom:1px solid #e4e7eb;padding:7px;vertical-align:top}
-        th{position:sticky;top:0;background:#e8eef9;text-align:left;z-index:1}.num{text-align:right}.muted{color:#777}.badge{padding:3px 7px;border-radius:10px;background:#e8eef9;color:#304ffe;white-space:nowrap}
-        #summary{margin-left:10px}.empty{text-align:center;padding:30px;color:#777}
-    </style>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261119-2">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
-<body><div class="wrap">
-    <div class="head">รายงานข้อมูลซื้อจ้างและความก้าวหน้าจนถึงเบิก</div>
-    <div class="filters">
-        ปีงบประมาณ <input id="year" type="number" style="width:90px" placeholder="ทั้งหมด">
-        ค้นหา <input id="keyword" style="width:280px" placeholder="เลข PR / โครงการ / เลขสัญญา">
-        <button onclick="loadReport()">แสดงข้อมูล</button>
-        <button onclick="exportCsv()">Export CSV</button><span id="summary"></span>
-    </div>
-    <div class="table-wrap"><table><thead><tr>
-        <th>ปีงบ</th><th>เลข PR</th><th>โครงการ/รายการ</th><th>วงเงิน PR</th><th>เลขสัญญา</th><th>วงเงินสัญญา</th>
-        <th>สถานะปัจจุบัน</th><th>ช่วงเมนูที่บันทึก</th><th>ประเภทความก้าวหน้า</th><th>ความก้าวหน้าล่าสุด</th><th>วันที่บันทึก</th>
-    </tr></thead><tbody id="rows"><tr><td class="empty" colspan="11">กำลังโหลด...</td></tr></tbody></table></div>
-</div>
-<script>
-var reportRows=[];
-function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-function money(v){return Number(v||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function loadReport(){
-    var q='?year='+encodeURIComponent(document.getElementById('year').value)+'&keyword='+encodeURIComponent(document.getElementById('keyword').value);
-    fetch('../api/List_ProcurementProgress.php'+q,{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
-        reportRows=j.data||[]; var out='';
-        reportRows.forEach(function(r){out+='<tr><td>'+esc(r.i_yyyy)+'</td><td>'+esc(r.pr_code)+'</td><td>'+esc(r.c_name)+'</td><td class="num">'+money(r.pr_amount)+'</td><td>'+esc(r.contract_code)+'</td><td class="num">'+money(r.contract_amount)+'</td><td><span class="badge">'+esc(r.current_progress)+'</span></td><td>'+esc(r.menu_name)+'</td><td>'+esc(r.progress_type||r.event_title)+'</td><td>'+esc(r.event_detail)+'</td><td>'+esc(r.progress_created||r.event_date)+'</td></tr>';});
-        document.getElementById('rows').innerHTML=out||'<tr><td class="empty" colspan="11">ไม่พบข้อมูล</td></tr>';
-        document.getElementById('summary').textContent='ทั้งหมด '+reportRows.length.toLocaleString('th-TH')+' รายการ';
-    }).catch(function(){document.getElementById('rows').innerHTML='<tr><td class="empty" colspan="11">โหลดข้อมูลไม่สำเร็จ</td></tr>';});
-}
-function exportCsv(){
-    var cols=['i_yyyy','pr_code','c_name','pr_amount','contract_code','contract_amount','current_progress','menu_name','progress_type','event_detail','progress_created'];
-    var csv='\ufeffปีงบ,เลข PR,โครงการ,วงเงิน PR,เลขสัญญา,วงเงินสัญญา,สถานะ,ช่วงเมนู,ประเภทความก้าวหน้า,ความก้าวหน้าล่าสุด,วันที่บันทึก\r\n';
-    reportRows.forEach(function(r){csv+=cols.map(function(k){return '"'+String(r[k]==null?'':r[k]).replace(/"/g,'""')+'"';}).join(',')+'\r\n';});
-    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='procurement-progress.csv';a.click();URL.revokeObjectURL(a.href);
-}
-document.getElementById('keyword').addEventListener('keydown',function(e){if(e.key==='Enter')loadReport();});loadReport();
-</script></body></html>
-
+<body>
+<main class="dashboard-shell">
+    <header class="dashboard-header">
+        <div><h1><span class="title-icon">▧</span> Dashboard ติดตามงานจัดซื้อจัดจ้าง</h1><p>รายงานภาพรวมและระบบแจ้งเตือน (KPI) จากข้อมูลระบบจัดซื้อจัดจ้างของ EIS</p></div>
+        <div class="header-actions">
+            <label>ปีงบประมาณ <select id="yearFilter"><option value="">ทั้งหมด</option></select></label>
+            <label>แหล่งเงิน <select id="fundFilter"><option value="">รวมทั้งหมด</option></select></label>
+            <button id="refreshButton" class="primary-button">↻ ดึงข้อมูลใหม่</button>
+        </div>
+    </header>
+    <nav class="dashboard-tabs" aria-label="เมนูรายงาน">
+        <button class="active" data-tab="overview">⌘ ภาพรวมจัดซื้อ (Overview)</button><button data-tab="kpi">◎ รายงาน KPI (รวมทุกประเภท)</button><button data-tab="calendar">▧ ปฏิทินเฝ้าระวัง KPI</button><button data-tab="personal">♧ รายงานส่วนบุคคล</button>
+    </nav>
+    <section id="overviewSection">
+        <div class="metric-grid">
+            <article class="metric-card"><div><span>จำนวนงานทั้งหมด</span><strong id="totalJobs">0</strong><small>รายการ</small></div><i class="blue">▧</i></article>
+            <article class="metric-card"><div><span>จำนวนงานที่เข้าเกณฑ์ KPI</span><strong id="kpiJobs">0</strong><small class="purple-text">เข้าเกณฑ์ประเมิน KPI</small></div><i class="purple">◎</i></article>
+            <article class="metric-card"><div><span>เบิกจ่าย/เสร็จสิ้นแล้ว</span><strong id="completedJobs">0</strong><small id="completedPercent" class="green-text">0% สำเร็จแล้ว</small></div><i class="green">◴</i></article>
+        </div>
+        <article class="panel chart-panel">
+            <div class="panel-heading"><h2>♧ ภาระงานแยกตามเจ้าหน้าที่</h2><div class="segmented" id="groupButtons"><button class="active" data-group="fund_source">แยกตามแหล่งเงิน</button><button data-group="procurement_type">แยกตามประเภท</button><button data-group="method_name">แยกตามวิธีจัดหา</button></div></div>
+            <div class="chart-holder"><canvas id="workloadChart"></canvas></div>
+        </article>
+        <div class="ratio-grid">
+            <article class="panel ratio-card"><div><b>▧ สัดส่วนการบริหารสัญญา (ภาพรวม)</b><strong id="contractPercent">0%</strong></div><div class="progress purple-bar"><span id="contractBar"></span></div><footer><span>บริหารสัญญา: <b id="contractJobs">0</b> รายการ</span><span>งานทั้งหมด: <b id="ratioTotal">0</b> รายการ</span></footer></article>
+            <article class="panel ratio-card"><div><b>◴ ความคืบหน้าการเบิกจ่าย (ภาพรวม)</b><strong class="green-text" id="paymentPercent">0%</strong></div><div class="progress green-bar"><span id="paymentBar"></span></div><footer><span>เบิกจ่ายสมบูรณ์: <b id="paidJobs">0</b> รายการ</span><span>รวมที่ต้องจัดการ: <b id="managedJobs">0</b> รายการ</span></footer></article>
+        </div>
+    </section>
+    <section id="issueSection" class="issue-grid overview-extra">
+        <article class="issue-card normal"><div><b>◴ ปกติ</b><small>ดำเนินการตามแผน</small></div><strong id="issue0">0</strong></article>
+        <article class="issue-card warning"><div><b>◎ มีปัญหาเล็กน้อย /<br>ดำเนินการต่อได้</b></div><strong id="issue1">0</strong></article>
+        <article class="issue-card danger"><div><b>✕ มีปัญหา / ไม่สามารถ<br>ดำเนินการต่อได้</b></div><strong id="issue2">0</strong></article>
+    </section>
+    <section id="pipelineSection" class="panel overview-extra">
+        <div class="panel-heading"><h2>ความคืบหน้าจาก งวด → รับของ → ตรวจรับ → เบิกจ่ายสมบูรณ์</h2><span class="muted">คำนวณจาก period_id / check_id / po_working_id และสถานะเบิกจ่ายจริง</span></div><div class="pipeline-grid" id="pipelineGrid"></div>
+    </section>
+    <section class="status-grid overview-extra">
+        <article class="panel"><div class="panel-heading"><h2>สัดส่วนสถานะงาน</h2><select id="statusOwnerFilter"><option value="">รวมทุกเจ้าหน้าที่</option></select></div><div class="donut-holder"><canvas id="statusChart"></canvas></div><p class="chart-note">สถานะคำนวณจากขั้นตอนล่าสุดของแต่ละ PR</p></article>
+        <article class="panel status-table-panel"><div class="panel-heading"><div><h2>ตารางสรุปสถานะและใบกันเหลื่อม</h2><p class="muted">อ้างอิง PR, สัญญา และใบกันเหลื่อมจาก NMU_EIS</p></div></div><div class="table-scroll"><table><thead><tr><th>สถานะ</th><th class="overlap-head no-debt">ยังไม่ก่อหนี้<br><small>อ้างอิง PR</small></th><th class="overlap-head debt">ก่อหนี้แล้ว<br><small>อ้างอิงสัญญา</small></th><th class="overlap-head saved">บันทึกใบกันเหลื่อมแล้ว<br><small>NMU_EIS</small></th><th>รวม</th></tr></thead><tbody id="statusRows"></tbody></table></div></article>
+    </section>
+    <section id="detailSection" class="panel overview-extra">
+        <div class="panel-heading detail-heading"><div><h2>ตารางสรุปภาพรวมทั้งหมด</h2><p class="muted">แสดงสถานะล่าสุดและกระบวนการเบิกจ่ายของแต่ละ PR</p></div><input id="keywordFilter" placeholder="ค้นหาเลข PR / โครงการ / เจ้าหน้าที่"></div>
+        <div class="table-scroll detail-table"><table><thead><tr><th>เลข PR</th><th>โครงการ/รายการ</th><th>เจ้าหน้าที่</th><th>แหล่งเงิน</th><th>ประเภท</th><th>สถานะล่าสุด</th><th>สถานะใบกันเหลื่อม</th><th>ระดับปัญหา</th><th>งวด</th><th>รับของ</th><th>ตรวจรับ</th><th>เบิกสมบูรณ์</th></tr></thead><tbody id="detailRows"></tbody></table></div>
+    </section>
+    <section id="kpiTab" class="tab-pane">
+        <article class="panel kpi-chart-panel"><div class="panel-heading"><h2>◎ สัดส่วนสถานะ KPI (แบ่งตามประเภท 60, 75, 100 วัน)</h2></div><div class="kpi-donut-grid">
+            <div><h3>ทั่วไป (ไม่เกิน 5 แสน)</h3><p>เป้าหมาย 60 วัน</p><div class="kpi-canvas"><canvas id="kpiChart60"></canvas></div></div>
+            <div><h3>วิธีเฉพาะเจาะจง (เกิน 5 แสน)</h3><p>เป้าหมาย 75 วัน</p><div class="kpi-canvas"><canvas id="kpiChart75"></canvas></div></div>
+            <div><h3>วิธี E-Bidding</h3><p>เป้าหมาย 100 วัน</p><div class="kpi-canvas"><canvas id="kpiChart100"></canvas></div></div>
+        </div><div class="kpi-legend"><span class="kpi-pass">● ☑ ผ่าน KPI</span><span class="kpi-fail">● ✕ ไม่ผ่าน KPI</span><span class="kpi-progress">● ⌛ กำลังดำเนินการ</span><span class="kpi-none">● ยังไม่เริ่มคำนวณ</span></div></article>
+        <article class="panel"><div class="panel-heading"><h2>◎ สรุปสถานะ KPI แยกตามเจ้าหน้าที่</h2></div><div class="table-scroll detail-table"><table class="kpi-owner-table"><thead><tr><th>เจ้าหน้าที่</th><th>เข้าเกณฑ์ประเมิน KPI</th><th>☑ ผ่าน KPI</th><th>✕ ไม่ผ่าน KPI</th><th>⌛ กำลังดำเนินการ</th><th>ยังไม่เริ่มคำนวณ</th></tr></thead><tbody id="kpiRows"></tbody></table></div></article>
+    </section>
+    <section id="calendarTab" class="tab-pane">
+        <div class="tab-title"><div><h2>▧ ปฏิทินเฝ้าระวัง KPI (Warning Calendar)</h2><p>แสดงงานที่ใช้เวลาเกิน 50%, 75% หรือเกินกำหนด โดยไม่นับรายการที่เบิกจ่ายสมบูรณ์แล้ว</p></div><select id="warningFilter"><option value="">แสดงรายการทั้งหมด</option><option value="1">ระดับ 1 (&gt;50%)</option><option value="2">ระดับ 2 (&gt;75%)</option><option value="3">เกิน KPI (&gt;100%)</option></select></div>
+        <div class="warning-legend"><span class="warning-dot level-one"></span> ระดับ 1 (&gt;50%) <span class="warning-dot level-two"></span> ระดับ 2 (&gt;75%) <span class="warning-dot overdue"></span> เกิน KPI (&gt;100%)</div>
+        <div id="warningCards" class="warning-grid"></div>
+    </section>
+    <section id="personalTab" class="tab-pane">
+        <section class="personal-hero">
+            <div class="personal-identity"><span class="personal-avatar">♧</span><div><h2 id="personalOwnerName">กรุณาเลือกเจ้าหน้าที่</h2><p>เจ้าหน้าที่พัสดุ</p></div></div>
+            <select id="personalOwnerFilter"><option value="">เลือกเจ้าหน้าที่</option></select>
+        </section>
+        <div id="personalSummary" class="personal-summary"></div>
+        <div class="ratio-grid personal-ratios">
+            <article class="panel ratio-card"><div><b>▣ สัดส่วนการบริหารสัญญา (เทียบกับงานทั้งหมด)</b><strong id="personalContractPercent">0%</strong></div><div class="progress purple-bar"><span id="personalContractBar"></span></div><footer><span>บริหารสัญญา: <b id="personalContractJobs">0</b> รายการ</span><span>งานทั้งหมด: <b id="personalTotalJobs">0</b> รายการ</span></footer></article>
+            <article class="panel ratio-card"><div><b>◉ ความคืบหน้าการเบิกจ่าย (เทียบกับงานบริหารสัญญา)</b><strong class="green-text" id="personalPaymentPercent">0%</strong></div><div class="progress green-bar"><span id="personalPaymentBar"></span></div><footer><span>เบิกจ่ายแล้ว: <b id="personalPaidJobs">0</b> รายการ</span><span>บริหารสัญญา: <b id="personalManagedJobs">0</b> รายการ</span></footer></article>
+        </div>
+        <div id="personalIssues" class="issue-grid personal-issues"></div>
+        <div class="personal-chart-grid">
+            <article class="panel"><div class="panel-heading"><h2>⌁ สัดส่วนสถานะงานของ <span id="personalStatusOwner">-</span></h2></div><div class="personal-chart"><canvas id="personalStatusChart"></canvas></div><div id="personalStatusTable" class="personal-mini-table"></div></article>
+            <article class="panel"><div class="panel-heading"><h2>⌁ ความสัมพันธ์สถานะของ <span id="personalRadarOwner">-</span> (Radar Chart)</h2></div><div class="personal-chart"><canvas id="personalRadarChart"></canvas></div><div id="personalRadarTable" class="personal-mini-table"></div></article>
+        </div>
+        <article class="panel personal-duration-panel"><div class="panel-heading"><h2>◷ ค่าเฉลี่ยระยะเวลาการดำเนินงานของ <span id="personalDurationOwner">-</span></h2></div><div id="personalDurations" class="personal-duration-grid"></div></article>
+        <section class="personal-kpi-section"><h2>◎ สรุปสถานะการประเมิน KPI</h2><div id="personalKpiSummary" class="personal-kpi-grid"></div></section>
+        <section class="personal-work-section"><h2>⌁ ตารางติดตามสถานะการดำเนินงาน (Gantt Chart)</h2><div id="personalMethodGroups" class="personal-accordions"></div></section>
+        <section class="personal-work-section"><h2>☷ รายการงานทั้งหมดของ <span id="personalListOwner">-</span></h2><div id="personalTypeGroups" class="personal-accordions"></div></section>
+    </section>
+</main>
+<div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
+<script src="../js/ProcurementProgressDashboard.js?v=20261119-2"></script>
+</body></html>

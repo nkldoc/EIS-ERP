@@ -67,10 +67,25 @@
         var detailField = new Ext.form.TextArea({
             fieldLabel: "ความก้าวหน้า", name: "event_detail", anchor: "98%", height: 80, allowBlank: false
         });
+        var problemLevelStore = new Ext.data.ArrayStore({
+            fields: ["value", "label"],
+            data: [
+                [0, "0 - ปกติ"],
+                [1, "1 - มีปัญหาเล็กน้อย / ดำเนินการต่อได้"],
+                [2, "2 - มีปัญหา / ไม่สามารถดำเนินการต่อได้"]
+            ]
+        });
+        var problemLevelCombo = new Ext.form.ComboBox({
+            fieldLabel: "ระดับปัญหา", name: "importance_level", anchor: "98%",
+            store: problemLevelStore, valueField: "value", displayField: "label", mode: "local",
+            triggerAction: "all", forceSelection: true, editable: false, allowBlank: false,
+            value: 0
+        });
+        var isAdmin = Ext.session && (Number(Ext.session.dc_center_user) === 1 || Number(Ext.session.user_id) === 1);
         var adminMapButton = new Ext.Button({
             text: "ตั้งค่า Map สถานะ (Admin)",
             icon: "../images/icons/application_edit.png",
-            hidden: !(Ext.session && (Number(Ext.session.dc_center_user) === 1 || Number(Ext.session.user_id) === 1)),
+            hidden: !isAdmin,
             handler: function () {
                 if (!typeCombo.getValue()) {
                     Ext.Msg.alert("ข้อมูลไม่ครบ", "กรุณาเลือกประเภทความก้าวหน้าที่ต้องการ Map ก่อน");
@@ -102,17 +117,109 @@
                 );
             }
         });
+        var adminViewButton = new Ext.Button({
+            text: "ดูข้อมูลการตั้งค่า (Admin)",
+            icon: "../images/icons/application_view_list.png",
+            style: "margin-top:6px;",
+            hidden: !isAdmin,
+            handler: function () {
+                var mapStore = new Ext.data.JsonStore({
+                    root: "data", totalProperty: "total", idProperty: "id",
+                    fields: ["id", "menu_code", "menu_name", "event_type", "event_type_name", "i_enabled", "d_update", "mapping_source"]
+                });
+                var mapGrid = new Ext.grid.GridPanel({
+                    store: mapStore,
+                    border: false,
+                    stripeRows: true,
+                    loadMask: true,
+                    autoExpandColumn: "progressMapMenuName",
+                    columns: [
+                        {header: "รหัสเมนู", dataIndex: "menu_code", width: 85, sortable: true},
+                        {id: "progressMapMenuName", header: "ชื่อเมนู", dataIndex: "menu_name", width: 190, sortable: true},
+                        {header: "ประเภทความก้าวหน้า", dataIndex: "event_type_name", width: 180, sortable: true},
+                        {header: "สถานะ", dataIndex: "i_enabled", width: 70, align: "center", renderer: function (value) {
+                            return Number(value) === 1 ? "ใช้งาน" : "ไม่ใช้งาน";
+                        }},
+                        {header: "แหล่งที่มา", dataIndex: "mapping_source", width: 105, align: "center"},
+                        {header: "แก้ไขล่าสุด", dataIndex: "d_update", width: 135, sortable: true}
+                    ],
+                    viewConfig: {emptyText: "ยังไม่มีข้อมูลการตั้งค่า", deferEmptyText: false}
+                });
+                var mapWindow = new Ext.Window({
+                    title: "ข้อมูลการตั้งค่า Map สถานะความก้าวหน้า",
+                    width: 760,
+                    height: 430,
+                    minWidth: 620,
+                    minHeight: 320,
+                    modal: true,
+                    resizable: true,
+                    maximizable: true,
+                    layout: "fit",
+                    constrainHeader: true,
+                    items: [mapGrid],
+                    buttons: [{text: "ปิด", handler: function () { mapWindow.close(); }}]
+                });
+                mapWindow.show();
+                Ext.Ajax.request({
+                    url: config.saveUrl || "tor/api/mnTorController.php",
+                    method: "POST",
+                    params: {mode: "LIST_PROGRESS_MENU_MAP"},
+                    success: function (response) {
+                        var result, rowsByCode = {}, rows = [], code;
+                        try { result = Ext.decode(response.responseText); } catch (ignore) {}
+                        if (!result || result.success !== true) {
+                            Ext.Msg.alert("โหลดข้อมูลไม่สำเร็จ", result && result.msg ? result.msg : response.responseText);
+                            return;
+                        }
+
+                        // Start with every built-in mapping, including mappings that
+                        // have never been saved to sp_progress_menu_map.
+                        for (code in MENU_PROGRESS_MAP) {
+                            if (!MENU_PROGRESS_MAP.hasOwnProperty(code)) continue;
+                            rowsByCode[code] = {
+                                id: "default-" + code,
+                                menu_code: code,
+                                menu_name: "-",
+                                event_type: 0,
+                                event_type_name: MENU_PROGRESS_MAP[code],
+                                i_enabled: 1,
+                                d_update: "-",
+                                mapping_source: "ค่าเริ่มต้น"
+                            };
+                        }
+
+                        // Saved Admin values override built-in values; DB-only menu
+                        // codes are also included so the window always shows all rows.
+                        Ext.each(result.data || [], function (saved) {
+                            var existing = rowsByCode[saved.menu_code] || {};
+                            rowsByCode[saved.menu_code] = Ext.apply(existing, saved, {
+                                id: saved.id || ("saved-" + saved.menu_code),
+                                mapping_source: "กำหนดโดย Admin"
+                            });
+                        });
+                        for (code in rowsByCode) {
+                            if (rowsByCode.hasOwnProperty(code)) rows.push(rowsByCode[code]);
+                        }
+                        rows.sort(function (a, b) { return String(a.menu_code).localeCompare(String(b.menu_code)); });
+                        mapStore.loadData({data: rows, total: rows.length});
+                    },
+                    failure: function () {
+                        Ext.Msg.alert("โหลดข้อมูลไม่สำเร็จ", "ไม่สามารถอ่านข้อมูลการตั้งค่าได้");
+                    }
+                });
+            }
+        });
         var form = new Ext.form.FormPanel({
             border: false, labelWidth: 145, autoScroll: true,
             bodyStyle: "padding:16px 12px 12px 12px;",
-            items: [typeCombo, detailField, {
+            items: [typeCombo, problemLevelCombo, detailField, {
                 xtype: "panel", border: false, bodyStyle: "padding:4px 0 0 145px;background:transparent;",
-                items: [adminMapButton]
+                items: [adminMapButton, adminViewButton]
             }]
         });
         var win = new Ext.Window({
             title: "บันทึกความก้าวหน้า - " + (valueFrom(record, ["c_code", "pr_code", "tor_code"]) || "รายการ PR"),
-            width: 560, height: 280, minWidth: 500, minHeight: 250,
+            width: 560, height: 315, minWidth: 500, minHeight: 285,
             modal: true, resizable: true, layout: "fit", constrainHeader: true, items: [form],
             buttons: [{
                 text: "บันทึก", iconCls: "icon-save",
@@ -133,7 +240,8 @@
                             menu_code: menuCode,
                             event_type: typeCombo.getValue(),
                             event_title: selectedType ? selectedType.get("c_name") : typeCombo.getRawValue(),
-                            event_detail: detailField.getValue()
+                            event_detail: detailField.getValue(),
+                            importance_level: problemLevelCombo.getValue()
                         },
                         success: function (response) {
                             var result;

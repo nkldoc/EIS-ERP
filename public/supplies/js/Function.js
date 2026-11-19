@@ -46,6 +46,7 @@ function openReportPopup() {
       { id: "empKPI", title: "รายงาน KPI", desc: "โหลดรายงาน KPI", icon: "images/kpi.png", url: "bi/reports/Key_Performance_Indicator.php", tag: "บุคลากร" },
       { id: "torstart", title: "สรุปข้อมูลรายปี", desc: "ตารางสรุปข้อมูลรายปี", icon: "images/Performance.jpg", url: "bi/reports/Yearly_PR_Performance_Summary.php", tag: "ฝ่าย" },
       { id: "Reply", title: "รายการทักท้วง", desc: "รายการทักท้วง", icon: "images/reply.png", url: "bi/reports/Report_StatusReply.php", tag: "ฝ่าย" },
+      { id: "procurementProgress", title: "Dashboard ติดตามงานจัดซื้อจัดจ้าง", desc: "ติดตามสถานะและความก้าวหน้าตั้งแต่ PR จนถึงการเบิก", icon: "bi/images/monitor.png", url: "bi/reports/ProcurementProgressReport.php", tag: "ติดตามงาน" },
     ],
   });
 
