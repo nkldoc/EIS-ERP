@@ -27,6 +27,12 @@ function medsupApDeptCostId($deptType)
 // ไม่ระบุปีใช้เงิน (0) = ใช้ปีงบประมาณปัจจุบัน (ปีงบไทยเริ่ม 1 ต.ค. - เดือน ต.ค.-ธ.ค. ถือเป็นปีงบถัดไป)
 function medsupGenApCode($db, $deptType, $useYear = 0)
 {
+    // [ผู้ใช้ยืนยัน 2569-11-19] เวชภัณฑ์ (APMSD) ปีของเลข AP = ปีงบประมาณตามวันที่ออกเลข (ต.ค.-ธ.ค. = ปีถัดไป)
+    // ไม่ใช้ "ปีของเงิน" แล้ว แม้ใช้ใบกันเหลื่อมปีก่อน (ใบกันและช่อง "ใช้เงินปีงบประมาณ" ในฟอร์มยังเป็นปีเดิม)
+    // เภสัช (APF) / พัสดุ (APPS) ยังใช้กฎเดิมทุกอย่าง
+    if ($deptType === "APMSD") {
+        $useYear = 0;
+    }
     $now = new DateTime();
     $yearBE = intval($now->format("Y")) + 543;
     $fiscalYear = (intval($now->format("n")) >= 10) ? $yearBE + 1 : $yearBE;
@@ -67,6 +73,11 @@ function medsupIrUseYears($db, $ids)
     $years = array();
     while ($row = $db->Fetch($stmt)) {
         $y = 0;
+        if ($row["c_dept"] === "APMSD") {
+            // เวชภัณฑ์: ปีเลข IR ตามวันที่ออกเลข (0 = ปีงบปัจจุบัน) ไม่ผูกกับปีของใบกันเหลื่อม - ดู medsupGenApCode
+            $years[0] = 0;
+            continue;
+        }
         if (trim((string) $row["c_overlap"]) !== "") {
             if (intval($row["i_year_overlap"]) > 0) {
                 $y = intval($row["i_year_overlap"]) + 543;
@@ -91,6 +102,9 @@ function medsupIrUseYears($db, $ids)
 // ไม่ระบุ (0) = ใช้เงินปีปัจจุบัน ได้ปีงบปัจจุบัน (IR82-70-xxxxx) ดู medsupIrUseYear ว่าหาจากสัญญาอย่างไร
 function medsupGenIrCode($db, $deptType, $useYear = 0)
 {
+    if ($deptType === "APMSD") {
+        $useYear = 0;   // เวชภัณฑ์: ปีเลข IR ตามวันที่ออกเลข (ดู medsupGenApCode)
+    }
     $costId = medsupApDeptCostId($deptType);
     $now = new DateTime();
     $yearBE = intval($now->format("Y")) + 543;
