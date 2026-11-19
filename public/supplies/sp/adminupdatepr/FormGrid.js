@@ -999,6 +999,12 @@ Ext.onReady(function () {
                 dataIndex: "c_code_po",
                 renderer: function (value, metaData, record, rowIndex, colIndex, store) {
                     let vv = record.data.i_status_last;
+                    // สัญญาที่ถูกยกเลิก (sp_tor_contract.i_enabled != 1) แสดงสีแดง ขีดฆ่า และต่อท้าย (ยกเลิก)
+                    var cEn = record.get("i_enabled_contract");
+                    if (cEn !== null && cEn !== undefined && cEn !== "" && Number(cEn) !== 1 && value) {
+                        metaData.attr = 'style="font-weight: bold; color: #c62828; text-decoration: line-through;"';
+                        return value + ' <span style="text-decoration:none;display:inline-block;">(ยกเลิก)</span>';
+                    }
                     metaData.attr = 'style="font-weight: bold; color: ' + Ext.COLOR_STATUS[vv] + ';"';
                     return value;
                 },
