@@ -11,7 +11,7 @@ if (empty($_SESSION['user_id'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
-    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261119-3">
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261119-4">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -34,7 +34,7 @@ if (empty($_SESSION['user_id'])) {
             <article class="metric-card"><div><span>เบิกจ่าย/เสร็จสิ้นแล้ว</span><strong id="completedJobs">0</strong><small id="completedPercent" class="green-text">0% สำเร็จแล้ว</small></div><i class="green">◴</i></article>
         </div>
         <article class="panel chart-panel">
-            <div class="panel-heading"><h2>♧ ภาระงานแยกตามเจ้าหน้าที่</h2><div class="segmented" id="groupButtons"><button class="active" data-group="fund_source">แยกตามแหล่งเงิน</button><button data-group="procurement_type">แยกตามประเภท</button><button data-group="method_name">แยกตามวิธีจัดหา</button></div></div>
+            <div class="panel-heading"><h2>♧ ภาระงานแยกตามเจ้าหน้าที่</h2><div class="workload-controls"><div class="segmented" id="groupButtons"><button class="active" data-group="procurement_type">แยกตามประเภท</button><button data-group="method_name">แยกตามวิธีจัดหา</button><button data-group="fund_source">แยกตามแหล่งเงิน</button></div><select id="workloadMethodFilter" aria-label="กรองวิธีจัดหา"><option value="">รวมทุกวิธีจัดหา</option><option value="ebidding">E-Bidding</option><option value="selection">คัดเลือก</option><option value="specific_over">เฉพาะเจาะจง (&gt; 5 แสน)</option><option value="specific_under">เฉพาะเจาะจง (≤ 5 แสน)</option></select></div></div>
             <div class="chart-holder"><canvas id="workloadChart"></canvas></div>
         </article>
         <div class="ratio-grid">
@@ -109,5 +109,5 @@ if (empty($_SESSION['user_id'])) {
     </section>
 </main>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261119-3"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261119-4"></script>
 </body></html>
