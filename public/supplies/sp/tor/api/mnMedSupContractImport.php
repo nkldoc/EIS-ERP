@@ -449,6 +449,7 @@ function imp_validate($db, $inputRows)
             "c_detail" => imp_str($in["rc_detail"] ?? ""),
             "f_amt" => imp_num($in["rc_amt"] ?? ""),
             "c_ref_chk_id" => imp_cut(imp_str($in["chk_id"] ?? ""), 50),
+            "c_egp_no" => imp_cut(imp_str($in["egp_no"] ?? ""), 50),   // เลขคุมตรวจรับ EGP (เติมให้ตอนออกเลขตรวจรับ)
         );
         $hasRc = $rc["c_receive_code"] !== "" || $rc["c_erp_stock_code"] !== "" || imp_str($in["rc_date"] ?? "") !== ""
             || $rc["c_detail"] !== "" || imp_str($in["rc_amt"] ?? "") !== "";
@@ -481,6 +482,7 @@ function imp_validate($db, $inputRows)
             "due" => $p["raw"]["due"], "detail" => $p["c_detail"],
             "period_fund" => $p["c_fund_source_dtl"], "period_amt" => $p["f_fund_amt_dtl"],
             "rc_code" => $rc["c_receive_code"], "rc_erp" => $rc["c_erp_stock_code"], "rc_date" => imp_str($in["rc_date"] ?? ""),
+            "egp_no" => $rc["c_egp_no"],
             "rc_detail" => $rc["c_detail"], "rc_amt" => $hasRc ? $rc["f_amt"] : null,
             // ยอดที่คำนวณได้ (แสดงให้ตรวจก่อนบันทึก เทียบกับหน้า "แก้ไข VAT")
             "calc_before" => $money ? $money["before"] : null, "calc_vat" => $money ? $money["vat"] : null,
@@ -779,6 +781,9 @@ switch ($mode) {
             "select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill', 'c_ref_pr_id') is null then 0 else 1 end", array())) === 1;
         $hasRefReceive = intval($db->GetDataBySQL(
             "select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_ref_chk_id') is null then 0 else 1 end", array())) === 1;
+        // เลขคุมตรวจรับ EGP ของรายการรับของ (คอลัมน์จาก scriptBaseUpdate/sp_tor_period_bill_receive_egp_no.sql - ยังไม่รัน = ไม่เก็บ)
+        $hasEgpReceive = intval($db->GetDataBySQL(
+            "select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_egp_no') is null then 0 else 1 end", array())) === 1;
 
         $codes = array();
         $now = date("Y-m-d H:i:s");
@@ -875,13 +880,16 @@ switch ($mode) {
                     if ($hasRefReceive) {
                         $rcParams[] = ($rc["c_ref_chk_id"] ?? "") !== "" ? $rc["c_ref_chk_id"] : null;
                     }
+                    if ($hasEgpReceive) {
+                        $rcParams[] = ($rc["c_egp_no"] ?? "") !== "" ? $rc["c_egp_no"] : null;
+                    }
                     if (!$db->QueryParam(
                         "SET NOCOUNT ON; INSERT INTO NMU_ERP.dbo.sp_tor_period_bill_receive
                             (sp_tor_period_bill_id, c_receive_code, d_receive_date, c_detail, f_amt, c_erp_stock_code, i_enabled, dc_user_create_id, dc_user_create_cost_id, d_create
                             , draft_f_total_vat, draft_b_vat, draft_f_vat_percent, draft_f_vat_amt
                             , draft_b_wht, draft_f_wht_percent, draft_f_wht_amt
-                            , draft_f_penalty, draft_b_guarantee, draft_f_guarantee_percent, draft_f_other" . ($hasRefReceive ? ", c_ref_chk_id" : "") . ")
-                         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" . ($hasRefReceive ? ", ?" : "") . ");",
+                            , draft_f_penalty, draft_b_guarantee, draft_f_guarantee_percent, draft_f_other" . ($hasRefReceive ? ", c_ref_chk_id" : "") . ($hasEgpReceive ? ", c_egp_no" : "") . ")
+                         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?" . ($hasRefReceive ? ", ?" : "") . ($hasEgpReceive ? ", ?" : "") . ");",
                         $rcParams
                     )) {
                         $ok = false;
@@ -961,11 +969,14 @@ switch ($mode) {
         $rowsOwn = ($rowsUid === 1 || intval($_SESSION["i_type_user"] ?? 0) === 2) ? ""
             : " and exists (select 1 from NMU_ERP.dbo.sp_tor_period_bill_import i2 where i2.sp_tor_period_bill_import_id = b.sp_tor_period_bill_import_id and i2.dc_user_create_id "
                 . (medsupIsPharmacyUser($rowsUid) ? "in (" . implode(",", medsupPharmacyUserIds()) . ")" : "= " . $rowsUid) . ")";
+        $egpSel = intval($db->GetDataBySQL(
+            "select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_egp_no') is null then 0 else 1 end", array())) === 1
+            ? ", r.c_egp_no as rc_egp_no" : ", cast(null as varchar(50)) as rc_egp_no";
         $stmt = $db->QueryParam(
             "select b.sp_tor_period_bill_hdr_id, b.c_contract_code, b.c_ap_dept_type, b.c_project_name, b.c_contract_type, b.c_creditor_name, b.i_budget_year
                 , b.i_period, b.c_doc_ref, convert(varchar, b.d_doc_dateSub, 120) as d_doc_dateSub, b.c_detail, b.c_fund_source_dtl, b.f_fund_amt_dtl
                 , r.c_receive_code, r.c_erp_stock_code, convert(varchar, r.d_receive_date, 120) as d_receive_date, r.c_detail as rc_detail, r.f_amt as rc_amt
-                , b.c_overlap {$refSel}
+                , b.c_overlap {$refSel} {$egpSel}
              from NMU_ERP.dbo.sp_tor_period_bill b
              left join NMU_ERP.dbo.sp_tor_period_bill_receive r on r.sp_tor_period_bill_id = b.sp_tor_period_bill_id and r.i_enabled = 1
              where b.sp_tor_period_bill_import_id = ? and b.i_enabled = 1{$rowsOwn}
@@ -996,6 +1007,7 @@ switch ($mode) {
                 "po_id" => $r["c_ref_po_id"],
                 "chk_id" => $r["c_ref_chk_id"],
                 "c_overlap" => $r["c_overlap"],
+                "egp_no" => $r["rc_egp_no"],
                 // สถานะจองเงินในระบบงบ ณ ตอนที่เปิดดู (ค้นสดจากเลขอ้างอิงที่เก็บไว้)
                 "rsv_status" => imp_reserve_status($db, $r["c_ref_pr_id"], $r["c_ref_po_id"], $r["c_ref_chk_id"]),
             );

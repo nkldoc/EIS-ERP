@@ -53,7 +53,7 @@ Ext.storeDeliverMedSupReceive = new Ext.data.JsonStore({
     root: "data",
     idProperty: "id",
     fields: [
-        "id", "sp_tor_period_bill_id", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_ir_code", "d_ir_issue", "c_ap_code", "d_ap_issue", "c_erp_stock_code",
+        "id", "sp_tor_period_bill_id", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_ir_code", "d_ir_issue", "c_ap_code", "d_ap_issue", "c_erp_stock_code", "c_egp_no",
         "draft_f_total_vat", "draft_b_vat", "draft_f_vat_percent", "draft_b_wht", "draft_f_wht_percent",
         "draft_f_penalty", "draft_b_guarantee", "draft_f_guarantee_percent", "draft_f_other",
         "draft_f_vat_amt", "draft_f_wht_amt", "b_ir_confirm", "b_ap_unlock",
@@ -65,7 +65,7 @@ Ext.storeDeliverMedSupReceive = new Ext.data.JsonStore({
 // (isGroup:false) - สร้างใหม่ทุกครั้งที่ Ext.storeDeliverMedSupReceive โหลดเสร็จ
 Ext.storeDeliverMedSupReceiveDisplay = new Ext.data.JsonStore({
     autoDestroy: false,
-    fields: ["id", "isGroup", "hasDraft", "isConfirmed", "isLocked", "isUnlocked", "unlockId", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_ir_code", "d_ir_issue", "c_ap_code", "d_ap_issue", "c_erp_stock_code"],
+    fields: ["id", "isGroup", "hasDraft", "isConfirmed", "isLocked", "isUnlocked", "unlockId", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_ir_code", "d_ir_issue", "c_ap_code", "d_ap_issue", "c_erp_stock_code", "c_egp_no"],
     data: [],
 });
 
@@ -249,17 +249,21 @@ function buildReceiveDisplayRows() {
                 c_ap_code: r.get("c_ap_code"),
                 d_ap_issue: r.get("d_ap_issue"),
                 c_erp_stock_code: r.get("c_erp_stock_code"),
+                c_egp_no: r.get("c_egp_no"),
             });
             return;
         }
         if (!groups[ir]) {
             groups[ir] = {
-                count: 0, amt: 0, lastDate: "", lastErpStockCode: "", allConfirmed: true,
+                count: 0, amt: 0, lastDate: "", lastErpStockCode: "", egp: "", allConfirmed: true,
                 d_ir_issue: r.get("d_ir_issue"), c_ap_code: r.get("c_ap_code"), d_ap_issue: r.get("d_ap_issue")
             };
             groupOrder.push(ir);
         }
         groups[ir].count++;
+        if (!groups[ir].egp && r.get("c_egp_no")) {
+            groups[ir].egp = r.get("c_egp_no");   // เลขคุมตรวจรับ EGP ของ IR นี้ (เอาเลขแรกที่มี)
+        }
         // IR "ยืนยันยอดแล้ว" = ทุกแถวของ IR มี b_ir_confirm (เงื่อนไขเดียวกับ filter หน้าตรวจรับ)
         if (!parseInt(r.get("b_ir_confirm"), 10)) {
             groups[ir].allConfirmed = false;
@@ -292,12 +296,20 @@ function buildReceiveDisplayRows() {
             c_ap_code: g.c_ap_code,
             d_ap_issue: g.d_ap_issue,
             c_erp_stock_code: g.lastErpStockCode,
+            c_egp_no: g.egp,
         });
     });
     // store นี้ไม่ได้ตั้ง root ไว้ (ไม่ได้โหลดผ่าน URL/AJAX) - loadData() ต้องส่ง array
     // ดิบตรงๆ ห้ามห่อเป็น {data: rows} เหมือน response จาก server ไม่งั้น reader หา
     // records ไม่เจอ (ไม่มี root ให้แกะ) กริดเลยว่างเปล่าตลอด (บั๊กที่เจอจริง)
     Ext.storeDeliverMedSupReceiveDisplay.loadData(rows);
+    // แสดงเลขคุมตรวจรับ EGP (เลขแรกที่มี) ในแผงรายละเอียดงวด
+    var egpShow = "";
+    rows.forEach(function (x) { if (!egpShow && x.c_egp_no) { egpShow = x.c_egp_no; } });
+    var egpDispFld = Ext.getCmp("deliverMedSupEgpID");
+    if (egpDispFld) {
+        egpDispFld.setValue(egpShow || "-");
+    }
 }
 
 // หน้าต่างแสดงรายละเอียดเฉพาะงวดที่ดับเบิลคลิก (อ่านอย่างเดียว) - งวดใครงวดมัน ไม่รวม
@@ -365,6 +377,7 @@ function winDeliverWorkMedSup(rec) {
             }
         },
         {header: "เลขรับเข้าคลังของ ERP", dataIndex: "c_erp_stock_code", width: 190},
+        {header: "เลขคุมตรวจรับ EGP", dataIndex: "c_egp_no", width: 130},
         {header: "วันรับของ", dataIndex: "d_receive_date", width: 100, align: "center"},
         {header: "รายละเอียด", dataIndex: "c_detail", width: 220},
         {header: "จำนวนเงิน", dataIndex: "f_amt", width: 100, align: "right"},
@@ -406,6 +419,7 @@ function winDeliverWorkMedSup(rec) {
     var addReceiveDetailFld = new Ext.form.TextField({fieldLabel: "รายละเอียด", width: 220, emptyText: "รายละเอียด"});
     var addReceiveAmtFld = new Ext.form.NumberField({fieldLabel: "จำนวนเงิน", width: 90, emptyText: "จำนวนเงิน"});
     var addErpStockCodeFld = new Ext.form.TextField({fieldLabel: "เลขรับเข้าคลังของ ERP", width: 140, emptyText: "เลขรับเข้าคลังของ ERP"});
+    var addEgpNoFld = new Ext.form.TextField({fieldLabel: "เลขคุมตรวจรับ EGP", width: 130, emptyText: "เลขคุมตรวจรับ EGP"});
     var saveReceiveBtn = new Ext.Toolbar.Button({text: "+ เพิ่ม", iconCls: "icon-add"});
     var cancelEditBtn = new Ext.Toolbar.Button({text: "ยกเลิกแก้ไข", iconCls: "icon-clear", hidden: true});
     var issueIrBtn = new Ext.Toolbar.Button({text: "ออกเลข IR ที่เลือก", iconCls: "icon-save"});
@@ -417,6 +431,7 @@ function winDeliverWorkMedSup(rec) {
         addReceiveDetailFld.setValue("");
         addReceiveAmtFld.setValue("");
         addErpStockCodeFld.setValue("");
+        addEgpNoFld.setValue("");
         saveReceiveBtn.setText("+ เพิ่ม");
         cancelEditBtn.hide();
         // กำลังแก้ไขรายการ/จำนวนเงินอยู่เผื่อกรอกผิด ไม่ให้กดออกเลข IR/ลบสลับไปมาได้จนกว่า
@@ -524,6 +539,9 @@ function winDeliverWorkMedSup(rec) {
             d_receive_date: opts.date,
             c_erp_stock_code: opts.erpStockCode,
         };
+        if (typeof opts.egpNo !== "undefined") {
+            params.c_egp_no = opts.egpNo;   // เลขคุมตรวจรับ EGP (แก้/ล้างได้) - ผู้เรียกที่ไม่ส่งค่านี้ไม่แตะเลขเดิม
+        }
         if (opts.id) {
             params.sp_tor_period_bill_receive_id = opts.id;
         }
@@ -625,7 +643,7 @@ function winDeliverWorkMedSup(rec) {
         // NumberField editor อ่าน "1,000.00" ได้แค่ 1
         var draftGridStore = new Ext.data.JsonStore({
             idProperty: "id",
-            fields: ["id", "c_receive_code", "d_receive_date", "c_detail", {name: "f_amt", type: "float"}, "c_erp_stock_code"],
+            fields: ["id", "c_receive_code", "d_receive_date", "c_detail", {name: "f_amt", type: "float"}, "c_erp_stock_code", "c_egp_no"],
             data: pending.map(function (r) {
                 return Ext.apply({}, {f_amt: parseFloat(String(r.get("f_amt")).replace(/,/g, "")) || 0}, r.data);
             }),
@@ -792,6 +810,7 @@ function winDeliverWorkMedSup(rec) {
                         f_amt: r.get("f_amt"),
                         d_receive_date: r.get("d_receive_date"),
                         c_erp_stock_code: r.get("c_erp_stock_code"),
+                        c_egp_no: r.get("c_egp_no") || "",
                     },
                     success: next,
                     failure: function () {
@@ -845,7 +864,7 @@ function winDeliverWorkMedSup(rec) {
             title: (draftSrc ? "แก้ไขร่าง" : "กรอกร่าง") + " VAT / ภาษีหัก ณ ที่จ่าย - "
                 + (receiveRec.get("c_receive_code") || "")
                 + (receiveRec.get("c_ir_code") ? " (เลข IR " + receiveRec.get("c_ir_code") + ")" : " (ยังไม่ออกเลข IR)"),
-            width: 720,
+            width: 820,
             height: 500,
             modal: true,
             layout: "border",
@@ -862,10 +881,11 @@ function winDeliverWorkMedSup(rec) {
                     store: draftGridStore,
                     viewConfig: {emptyText: "ไม่มีรายการ..", deferEmptyText: true},
                     columns: [
-                        {header: "เลขที่ใบรับของ", dataIndex: "c_receive_code", width: 120, editor: new Ext.form.TextField({})},
+                        {header: "เลขที่ใบรับของ", dataIndex: "c_receive_code", width: 100, editor: new Ext.form.TextField({})},
                         {header: "เลขรับเข้าคลังของ ERP", dataIndex: "c_erp_stock_code", width: 150, editor: new Ext.form.TextField({})},
-                        {header: "วันรับของ", dataIndex: "d_receive_date", width: 100, align: "center", editor: draftDateEditor},
-                        {header: "รายละเอียด", dataIndex: "c_detail", width: 170, editor: new Ext.form.TextField({})},
+                        {header: "เลขคุมตรวจรับ EGP", dataIndex: "c_egp_no", width: 125, editor: new Ext.form.TextField({})},
+                        {header: "วันรับของ", dataIndex: "d_receive_date", width: 90, align: "center", editor: draftDateEditor},
+                        {header: "รายละเอียด", dataIndex: "c_detail", width: 130, editor: new Ext.form.TextField({})},
                         {
                             header: "จำนวนเงิน", dataIndex: "f_amt", width: 100, align: "right",
                             editor: new Ext.form.NumberField({allowBlank: false, allowNegative: false}),
@@ -958,6 +978,7 @@ function winDeliverWorkMedSup(rec) {
             detail: addReceiveDetailFld.getValue(),
             amt: addReceiveAmtFld.getValue(),
             erpStockCode: addErpStockCodeFld.getValue(),
+            egpNo: addEgpNoFld.getValue(),
             onSuccess: function () {
                 resetReceiveForm();
                 Ext.storeDeliverMedSupReceive.reload({
@@ -1048,7 +1069,7 @@ function winDeliverWorkMedSup(rec) {
     // แถวที่เหลือจะยังคงเดิม ไม่ถูกยกเลิก ไม่ต้องออกเลขใหม่)
     function winReceiveGroupDetail(irCode) {
         var groupStore = new Ext.data.JsonStore({
-            fields: ["id", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_erp_stock_code", "f_total_vat_row", "f_before_vat_row", "f_vat_row"],
+            fields: ["id", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_erp_stock_code", "c_egp_no", "f_total_vat_row", "f_before_vat_row", "f_vat_row"],
             idProperty: "id",
             data: [],
         });
@@ -1075,6 +1096,7 @@ function winDeliverWorkMedSup(rec) {
         var groupDetailFld = new Ext.form.TextField({fieldLabel: "รายละเอียด", width: 200, emptyText: "รายละเอียด"});
         var groupAmtFld = new Ext.form.NumberField({fieldLabel: "จำนวนเงิน", width: 90, emptyText: "จำนวนเงิน"});
         var groupErpStockCodeFld = new Ext.form.TextField({fieldLabel: "เลขรับเข้าคลังของ ERP", width: 140, emptyText: "เลขรับเข้าคลังของ ERP"});
+        var groupEgpNoFld = new Ext.form.TextField({fieldLabel: "เลขคุมตรวจรับ EGP", width: 130, emptyText: "เลขคุมตรวจรับ EGP"});
         var groupSaveBtn = new Ext.Toolbar.Button({text: "บันทึกแก้ไข", iconCls: "icon-save-edit", hidden: true});
         var groupCancelBtn = new Ext.Toolbar.Button({text: "ยกเลิก", iconCls: "icon-clear", hidden: true});
         var groupEditBtn = new Ext.Toolbar.Button({text: "แก้ไขรายการที่เลือก", iconCls: "icon-save-edit", disabled: true});
@@ -1114,6 +1136,8 @@ function winDeliverWorkMedSup(rec) {
             groupAmtFld.hide();
             groupErpStockCodeFld.setValue("");
             groupErpStockCodeFld.hide();
+            groupEgpNoFld.setValue("");
+            groupEgpNoFld.hide();
             groupSaveBtn.hide();
             groupCancelBtn.hide();
             groupEditBtn.show();
@@ -1151,6 +1175,8 @@ function winDeliverWorkMedSup(rec) {
             groupAmtFld.show();
             groupErpStockCodeFld.setValue(record.get("c_erp_stock_code"));
             groupErpStockCodeFld.show();
+            groupEgpNoFld.setValue(record.get("c_egp_no"));
+            groupEgpNoFld.show();
             groupSaveBtn.show();
             groupCancelBtn.show();
             groupEditBtn.hide();
@@ -1166,6 +1192,7 @@ function winDeliverWorkMedSup(rec) {
                 detail: groupDetailFld.getValue(),
                 amt: groupAmtFld.getValue(),
                 erpStockCode: groupErpStockCodeFld.getValue(),
+                egpNo: groupEgpNoFld.getValue(),
                 onSuccess: function () {
                     resetGroupForm();
                     Ext.storeDeliverMedSupReceive.reload();
@@ -1213,6 +1240,7 @@ function winDeliverWorkMedSup(rec) {
                         // ความกว้างพอให้หัวคอลัมน์ขึ้นครบ ไม่ถูกตัดเป็น "..." (ผู้ใช้ขอให้ชัดเจน)
                         {header: "ใบแจ้งหนี้/รับของ", dataIndex: "c_receive_code", width: 125},
                         {header: "เลขรับเข้าคลังของ ERP", dataIndex: "c_erp_stock_code", width: 165},
+                        {header: "เลขคุมตรวจรับ EGP", dataIndex: "c_egp_no", width: 130},
                         {header: "วันรับของ", dataIndex: "d_receive_date", width: 90, align: "center"},
                         {header: "รายละเอียด", dataIndex: "c_detail", width: 150},
                         {header: "จำนวนเงิน", dataIndex: "f_amt", width: 105, align: "right"},
@@ -1233,7 +1261,7 @@ function winDeliverWorkMedSup(rec) {
                     tbar: [
                         groupEditBtn, " ", groupDelBtn, " ", groupVatBtn,
                         "-",
-                        groupCodeFld, " ", groupErpStockCodeFld, " ",
+                        groupCodeFld, " ", groupErpStockCodeFld, " ", groupEgpNoFld, " ",
                         groupDateFld, " ", groupDetailFld, " ", groupAmtFld, " ",
                         groupSaveBtn, " ", groupCancelBtn,
                     ],
@@ -1450,7 +1478,7 @@ function winDeliverWorkMedSup(rec) {
                         // border layout ของ ExtJS 3 ต้องกำหนด height ให้ north/south region
                         // ตรงๆ เสมอ (ไม่รองรับ autoHeight) ไม่งั้น panel จะถูกบีบจนสูง 0 มองไม่เห็น
                         region: "north",
-                        height: deliverOverlapCode ? 380 : 320,
+                        height: deliverOverlapCode ? 405 : 345,
                         xtype: "form",
                         border: false,
                         bodyStyle: "padding:8px;",
@@ -1469,6 +1497,8 @@ function winDeliverWorkMedSup(rec) {
                             {id: "deliverMedSupTotalID", fieldLabel: "จำนวนเงินงวดนี้", value: ""},
                             {id: "deliverMedSupRemainID", fieldLabel: "คงเหลือ", value: "", style: "font-weight:bold;"},
                             {id: "deliverMedSupContractCodeID", fieldLabel: "เลขสัญญา", value: ""},
+                            // เลขคุมตรวจรับ EGP (จากไฟล์นำเข้า/ที่แก้ไว้ที่รายการรับของ) - เติมจาก buildReceiveDisplayRows
+                            {id: "deliverMedSupEgpID", fieldLabel: "เลขคุมตรวจรับ EGP", value: "-", style: "font-weight:bold;"},
                             {
                                 id: "deliverMedSupDueDateID",
                                 fieldLabel: "วันที่ครบกำหนดส่งของ",
@@ -1519,7 +1549,7 @@ function winDeliverWorkMedSup(rec) {
                         },
                         tbar: [
                             {xtype: "tbtext", text: "เพิ่มรายการรับของ:"}, " ",
-                            addReceiveCodeFld, " ", addErpStockCodeFld, " ",
+                            addReceiveCodeFld, " ", addErpStockCodeFld, " ", addEgpNoFld, " ",
                             addReceiveDateFld, " ", addReceiveDetailFld, " ", addReceiveAmtFld, " ",
                             saveReceiveBtn, " ", cancelEditBtn,
                             "-",
