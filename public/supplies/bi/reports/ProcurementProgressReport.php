@@ -59,9 +59,12 @@ if (empty($_SESSION['user_id'])) {
         <div class="table-scroll detail-table"><table><thead><tr><th>เลข PR</th><th>โครงการ/รายการ</th><th>เจ้าหน้าที่</th><th>แหล่งเงิน</th><th>ประเภท</th><th>สถานะล่าสุด</th><th>สถานะใบกันเหลื่อม</th><th>ระดับปัญหา</th><th>งวด</th><th>รับของ</th><th>ตรวจรับ</th><th>เบิกสมบูรณ์</th></tr></thead><tbody id="detailRows"></tbody></table></div>
     </section>
     <section id="kpiTab" class="tab-pane">
-        <div class="tab-title"><div><h2>◎ รายงาน KPI (รวมทุกประเภท)</h2><p>สรุปรายการตามระดับปัญหาและขั้นตอนดำเนินงาน</p></div><select id="kpiLevelFilter"><option value="">ทุกระดับ</option><option value="0">ระดับ 0 — ปกติ</option><option value="1">ระดับ 1 — มีปัญหาเล็กน้อย</option><option value="2">ระดับ 2 — ไม่สามารถดำเนินการต่อได้</option></select></div>
-        <div id="kpiSummary" class="metric-grid compact-metrics"></div>
-        <article class="panel"><div class="table-scroll detail-table"><table><thead><tr><th>เลข PR</th><th>รายการ</th><th>เจ้าหน้าที่</th><th>ขั้นตอนล่าสุด</th><th>ระดับ KPI</th><th>ความก้าวหน้าล่าสุด</th></tr></thead><tbody id="kpiRows"></tbody></table></div></article>
+        <article class="panel kpi-chart-panel"><div class="panel-heading"><h2>◎ สัดส่วนสถานะ KPI (แบ่งตามประเภท 60, 75, 100 วัน)</h2></div><div class="kpi-donut-grid">
+            <div><h3>ทั่วไป (ไม่เกิน 5 แสน)</h3><p>เป้าหมาย 60 วัน</p><div class="kpi-canvas"><canvas id="kpiChart60"></canvas></div></div>
+            <div><h3>วิธีเฉพาะเจาะจง (เกิน 5 แสน)</h3><p>เป้าหมาย 75 วัน</p><div class="kpi-canvas"><canvas id="kpiChart75"></canvas></div></div>
+            <div><h3>วิธี E-Bidding</h3><p>เป้าหมาย 100 วัน</p><div class="kpi-canvas"><canvas id="kpiChart100"></canvas></div></div>
+        </div><div class="kpi-legend"><span class="kpi-pass">● ☑ ผ่าน KPI</span><span class="kpi-fail">● ✕ ไม่ผ่าน KPI</span><span class="kpi-progress">● ⌛ กำลังดำเนินการ</span><span class="kpi-none">● ยังไม่เริ่มคำนวณ</span></div></article>
+        <article class="panel"><div class="panel-heading"><h2>◎ สรุปสถานะ KPI แยกตามเจ้าหน้าที่</h2></div><div class="table-scroll detail-table"><table class="kpi-owner-table"><thead><tr><th>เจ้าหน้าที่</th><th>เข้าเกณฑ์ประเมิน KPI</th><th>☑ ผ่าน KPI</th><th>✕ ไม่ผ่าน KPI</th><th>⌛ กำลังดำเนินการ</th><th>ยังไม่เริ่มคำนวณ</th></tr></thead><tbody id="kpiRows"></tbody></table></div></article>
     </section>
     <section id="calendarTab" class="tab-pane">
         <div class="tab-title"><div><h2>▧ ปฏิทินเฝ้าระวัง KPI (Warning Calendar)</h2><p>แสดงงานที่ใช้เวลาเกิน 50%, 75% หรือเกินกำหนด โดยไม่นับรายการที่เบิกจ่ายสมบูรณ์แล้ว</p></div><select id="warningFilter"><option value="">แสดงรายการทั้งหมด</option><option value="1">ระดับ 1 (&gt;50%)</option><option value="2">ระดับ 2 (&gt;75%)</option><option value="3">เกิน KPI (&gt;100%)</option></select></div>

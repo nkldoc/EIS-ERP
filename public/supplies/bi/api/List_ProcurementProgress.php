@@ -49,6 +49,7 @@ $sql = "SELECT TOP 2000
             ISNULL(flow.inspection_total, 0) AS inspection_total,
             ISNULL(flow.billing_total, 0) AS billing_total,
             ISNULL(flow.paid_total, 0) AS paid_total,
+            flow.paid_date,
             CASE WHEN ISNULL(flow.period_total, 0) > 0 AND flow.paid_total >= flow.period_total THEN 1 ELSE 0 END AS is_completed,
             CASE
                 WHEN ISNULL(con.i_overlap, 0) = 3
@@ -97,7 +98,8 @@ $sql = "SELECT TOP 2000
                    COUNT(DISTINCT CASE WHEN h.d_arrive_date IS NOT NULL OR NULLIF(LTRIM(RTRIM(h.c_arrive_code)), '') IS NOT NULL THEN p.sp_tor_hdr_period_id END) AS arrival_total,
                    COUNT(DISTINCT CASE WHEN h.sp_check_period_hdr_id IS NOT NULL AND (h.d_checking_date IS NOT NULL OR NULLIF(LTRIM(RTRIM(h.c_code)), '') IS NOT NULL) THEN p.sp_tor_hdr_period_id END) AS inspection_total,
                    COUNT(DISTINCT CASE WHEN ISNULL(h.po_working_hdr_id, 0) > 0 THEN p.sp_tor_hdr_period_id END) AS billing_total,
-                   COUNT(DISTINCT CASE WHEN ISNULL(ph.i_status_last, 0) >= 11 THEN p.sp_tor_hdr_period_id END) AS paid_total
+                   COUNT(DISTINCT CASE WHEN ISNULL(ph.i_status_last, 0) >= 11 THEN p.sp_tor_hdr_period_id END) AS paid_total,
+                   CONVERT(VARCHAR, MAX(CASE WHEN ISNULL(ph.i_status_last, 0) >= 11 THEN ph.d_update END), 120) AS paid_date
             FROM dbo.sp_tor_contract fc
             INNER JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_contract_id = fc.sp_tor_contract_id
             LEFT JOIN dbo.sp_check_period_hdr h ON h.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND h.i_enabled = 1
