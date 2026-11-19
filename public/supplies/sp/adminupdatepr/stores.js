@@ -39,6 +39,8 @@ Ext.store = new Ext.data.JsonStore({
         {name: "sp_tor_contract_id"},
         {name: "c_code"},
         {name: "c_code_po"},
+        {name: "i_enabled_contract"},
+        {name: "c_code_po_active"},
         {name: "i_is_upload"},
         {name: "c_name_status"},
         {name: "c_type_name"},
