@@ -11,6 +11,8 @@ if (empty($_SESSION['user_id'])) {
 
 $db = new DatabaseServer();
 $year = isset($_REQUEST['year']) ? intval($_REQUEST['year']) : 0;
+$yearFrom = isset($_REQUEST['year_from']) ? intval($_REQUEST['year_from']) : 0;
+$yearTo = isset($_REQUEST['year_to']) ? intval($_REQUEST['year_to']) : 0;
 $keyword = isset($_REQUEST['keyword']) ? trim($_REQUEST['keyword']) : "";
 $params = array();
 $where = " WHERE s.i_enabled = 1 ";
@@ -18,13 +20,23 @@ if ($year > 0) {
     $where .= " AND s.i_yyyy = ? ";
     $params[] = $year > 2500 ? $year - 543 : $year;
 }
+if ($yearFrom > 0 && $yearTo > 0) {
+    $fromAd = $yearFrom > 2500 ? $yearFrom - 543 : $yearFrom;
+    $toAd = $yearTo > 2500 ? $yearTo - 543 : $yearTo;
+    if ($fromAd > $toAd) {
+        $tmp = $fromAd; $fromAd = $toAd; $toAd = $tmp;
+    }
+    $where .= " AND s.i_yyyy BETWEEN ? AND ? ";
+    $params[] = $fromAd;
+    $params[] = $toAd;
+}
 if ($keyword !== "") {
     $where .= " AND (s.c_code LIKE ? OR s.c_name LIKE ? OR con.c_code LIKE ?) ";
     $like = "%" . $keyword . "%";
     $params[] = $like; $params[] = $like; $params[] = $like;
 }
 
-$sql = "SELECT TOP 2000
+$sql = "SELECT TOP 10000
             s.tor_id, s.c_code AS pr_code, s.c_name, s.i_yyyy,
             CONVERT(VARCHAR, s.d_tor_date, 120) AS procurement_start_date,
             CONVERT(VARCHAR, s.d_egp_date, 120) AS announcement_date,
