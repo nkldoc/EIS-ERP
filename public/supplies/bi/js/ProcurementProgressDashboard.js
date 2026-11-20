@@ -1,6 +1,6 @@
 (function () {
   "use strict";
-  var allRows = [], filteredRows = [], workloadChart, statusChart, ownerStatusChart, departmentStatusChart, ownerRelationChart, personalStatusChart, personalRadarChart, kpiCharts = [], groupField = "fund_source", relationOwner = "";
+  var allRows = [], filteredRows = [], workloadChart, statusChart, ownerStatusChart, departmentStatusChart, ownerRelationChart, personalStatusChart, personalRadarChart, kpiCharts = [], groupField = "procurement_type", relationOwner = "";
   var colors = ["#168de2", "#11b997", "#f5b62e", "#ff7f43", "#7467c7", "#d65db1", "#5a9bd4", "#8bc56b"];
   function el(id) { return document.getElementById(id); }
   function esc(value) { return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
@@ -17,10 +17,12 @@
     return row.current_progress || "อยู่ระหว่างดำเนินการ";
   }
   function applyFilters() {
-    var year = el("yearFilter").value, fund = el("fundFilter").value, keyword = el("keywordFilter").value.toLowerCase();
-    filteredRows = allRows.filter(function (r) { return (!year || String(r.i_yyyy) === year) && (!fund || r.fund_source === fund) && (!keyword || [r.pr_code,r.c_name,r.owner_name,r.department_name].join(" ").toLowerCase().indexOf(keyword) >= 0); });
+    var fund = el("fundFilter").value, keyword = el("keywordFilter").value.toLowerCase();
+    filteredRows = allRows.filter(function (r) { return (!fund || r.fund_source === fund) && (!keyword || [r.pr_code,r.c_name,r.owner_name,r.department_name].join(" ").toLowerCase().indexOf(keyword) >= 0); });
+    updateReportContext();
     render();
   }
+  function updateReportContext(){var from=el("yearFromFilter").value,to=el("yearToFilter").value,fund=el("fundFilter").value||"รวมทุกแหล่งเงิน",yearText=from===to?from:(from+" – "+to),now=new Date(),reportedAt=now.toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"});el("reportContext").innerHTML='<strong>รายงานปีงบประมาณ '+esc(yearText)+'</strong><span>แหล่งเงิน: '+esc(fund)+'</span><small>'+number(filteredRows.length)+' รายการ</small><small class="report-generated-at">ณ วันที่เรียกรายงาน '+esc(reportedAt)+' น.</small>';document.title='Dashboard จัดซื้อจัดจ้าง | ปีงบประมาณ '+yearText+' | '+fund;}
   function renderMetrics() {
     var total = filteredRows.length, completed = filteredRows.filter(function (r) { return Number(r.is_completed) === 1; }).length;
     var contract = filteredRows.filter(function (r) { return Number(r.period_total) > 0; }).length;
@@ -31,12 +33,15 @@
   }
   function renderWorkload() {
     var owners = {}, series = {};
-    filteredRows.forEach(function (r) { var owner=r.owner_name||"ไม่ระบุ", key=r[groupField]||"ไม่ระบุ"; owners[owner]=(owners[owner]||0)+1; series[key]=series[key]||{}; series[key][owner]=(series[key][owner]||0)+1; });
+    var methodFilter=el("workloadMethodFilter").value,chartRows=filteredRows.filter(function(r){return !methodFilter||procurementMethodGroup(r)===methodFilter;});
+    chartRows.forEach(function (r) { var owner=r.owner_name||"ไม่ระบุ", key=groupField==="method_name"?procurementMethodLabel(r):(r[groupField]||"ไม่ระบุ"); owners[owner]=(owners[owner]||0)+1; series[key]=series[key]||{}; series[key][owner]=(series[key][owner]||0)+1; });
     var labels=Object.keys(owners).sort(function(a,b){return owners[b]-owners[a];}).slice(0,30), keys=Object.keys(series).sort();
     var datasets=keys.map(function(key,index){return {label:key,data:labels.map(function(owner){return series[key][owner]||0;}),backgroundColor:colors[index%colors.length],borderWidth:0};});
     if(workloadChart) workloadChart.destroy();
     workloadChart=new Chart(el("workloadChart"),{type:"bar",data:{labels:labels,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{precision:0},grid:{color:"#e8edf3"}}}}});
   }
+  function procurementMethodGroup(row){var method=String(row.method_name||"").toLowerCase(),amount=Number(row.pr_amount||0);if(/e[\s-]*bidding|ประกวดราคา.*อิเล็กทรอนิกส์/.test(method))return "ebidding";if(/คัดเลือก/.test(method))return "selection";if(/เฉพาะเจาะจง|เจาะจง/.test(method))return amount>500000?"specific_over":"specific_under";return "other";}
+  function procurementMethodLabel(row){return {ebidding:"E-Bidding",selection:"คัดเลือก",specific_over:"เฉพาะเจาะจง (> 5 แสน)",specific_under:"เฉพาะเจาะจง (≤ 5 แสน)",other:"วิธีอื่น ๆ"}[procurementMethodGroup(row)];}
   function renderPipeline() {
     var total=filteredRows.length, steps=[["1. จัดทำงวด",filteredRows.filter(function(r){return Number(r.period_total)>0;}).length,"มี period_id"],["2. รับของ",filteredRows.filter(function(r){return Number(r.arrival_total)>0;}).length,"มีวันที่/เลขรับของ"],["3. ตรวจรับ",filteredRows.filter(function(r){return Number(r.inspection_total)>0;}).length,"มี check_id และข้อมูลตรวจรับ"],["4. เบิกจ่ายสมบูรณ์",filteredRows.filter(function(r){return Number(r.is_completed)>0;}).length,"ทุกงวดมี po_working และสถานะ ≥ 11"]];
     el("pipelineGrid").innerHTML=steps.map(function(s){var p=percent(s[1],total);return '<article class="pipeline-step"><header><b>'+s[0]+'</b><strong>'+number(s[1])+'</strong></header><div class="progress green-bar"><span style="width:'+p+'%"></span></div><small>'+p+'% · '+s[2]+'</small></article>';}).join("");
@@ -106,11 +111,14 @@
     var methods={},types={};rows.forEach(function(r){var m=kpiTarget(r)===100?'E-Bidding':(kpiTarget(r)===75?'เฉพาะเจาะจง (> 5 แสน)':'ทั่วไป/เฉพาะเจาะจง (≤ 5 แสน)'),t=r.procurement_type||'ไม่ระบุ';(methods[m]=methods[m]||[]).push(r);(types[t]=types[t]||[]).push(r);});el("personalMethodGroups").innerHTML=personalGroupHtml(methods,'กรุณาเลือกเจ้าหน้าที่');el("personalTypeGroups").innerHTML=personalGroupHtml(types,'กรุณาเลือกเจ้าหน้าที่');
   }
   function render(){renderMetrics();renderWorkload();renderPipeline();renderStatus();renderCrossReports();renderDetails();renderKpi();renderWarnings();renderPersonal();}
-  function loadData(){el("loading").classList.add("show");fetch("../api/List_ProcurementProgress.php",{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(j){if(!j.success)throw new Error(j.msg||"โหลดข้อมูลไม่สำเร็จ");allRows=j.data||[];fillSelect(el("yearFilter"),unique("i_yyyy").reverse(),"ทั้งหมด");fillSelect(el("fundFilter"),unique("fund_source"),"รวมทั้งหมด");fillSelect(el("statusOwnerFilter"),unique("owner_name"),"รวมทุกเจ้าหน้าที่");fillSelect(el("ownerMatrixFilter"),unique("owner_name"),"รวมทุกเจ้าหน้าที่");fillSelect(el("departmentMatrixFilter"),unique("department_name"),"รวมทุกหน่วยงาน");fillSelect(el("personalOwnerFilter"),unique("owner_name"),"เลือกเจ้าหน้าที่");if(!el("personalOwnerFilter").value&&el("personalOwnerFilter").options.length>1)el("personalOwnerFilter").selectedIndex=1;applyFilters();}).catch(function(err){alert("โหลดข้อมูลไม่สำเร็จ: "+err.message);}).finally(function(){el("loading").classList.remove("show");});}
-  ["yearFilter","fundFilter"].forEach(function(id){el(id).addEventListener("change",applyFilters);}); el("statusOwnerFilter").addEventListener("change",renderStatus); el("keywordFilter").addEventListener("input",applyFilters); el("refreshButton").addEventListener("click",loadData);
+  function currentFiscalYear(){var d=new Date();return d.getFullYear()+(d.getMonth()>=9?544:543);}
+  function initFiscalYearFilters(){var current=currentFiscalYear(),years=[];for(var y=current;y>=current-10;y--)years.push(y);["yearFromFilter","yearToFilter"].forEach(function(id){el(id).innerHTML=years.map(function(v){return '<option value="'+v+'">'+v+'</option>';}).join('');el(id).value=String(current);});}
+  function loadData(){var from=Number(el("yearFromFilter").value),to=Number(el("yearToFilter").value);if(from>to){var swap=from;from=to;to=swap;el("yearFromFilter").value=String(from);el("yearToFilter").value=String(to);}el("loading").classList.add("show");fetch("../api/List_ProcurementProgress.php?year_from="+encodeURIComponent(from)+"&year_to="+encodeURIComponent(to),{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(j){if(!j.success)throw new Error(j.msg||"โหลดข้อมูลไม่สำเร็จ");allRows=j.data||[];fillSelect(el("fundFilter"),unique("fund_source"),"รวมทั้งหมด");fillSelect(el("statusOwnerFilter"),unique("owner_name"),"รวมทุกเจ้าหน้าที่");fillSelect(el("ownerMatrixFilter"),unique("owner_name"),"รวมทุกเจ้าหน้าที่");fillSelect(el("departmentMatrixFilter"),unique("department_name"),"รวมทุกหน่วยงาน");fillSelect(el("personalOwnerFilter"),unique("owner_name"),"เลือกเจ้าหน้าที่");if(!el("personalOwnerFilter").value&&el("personalOwnerFilter").options.length>1)el("personalOwnerFilter").selectedIndex=1;applyFilters();}).catch(function(err){alert("โหลดข้อมูลไม่สำเร็จ: "+err.message);}).finally(function(){el("loading").classList.remove("show");});}
+  ["yearFromFilter","yearToFilter"].forEach(function(id){el(id).addEventListener("change",loadData);});el("fundFilter").addEventListener("change",applyFilters); el("statusOwnerFilter").addEventListener("change",renderStatus); el("keywordFilter").addEventListener("input",applyFilters); el("refreshButton").addEventListener("click",loadData);
   el("warningFilter").addEventListener("change",renderWarnings);el("personalOwnerFilter").addEventListener("change",renderPersonal);
+  el("workloadMethodFilter").addEventListener("change",renderWorkload);
   el("ownerMatrixFilter").addEventListener("change",renderCrossReports);el("departmentMatrixFilter").addEventListener("change",renderCrossReports);el("relationOwnerButtons").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;relationOwner=b.getAttribute("data-owner")||"";renderCrossReports();});
   el("groupButtons").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;[].forEach.call(this.querySelectorAll("button"),function(x){x.classList.remove("active");});b.classList.add("active");groupField=b.getAttribute("data-group");renderWorkload();});
   document.querySelector(".dashboard-tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;var tab=b.getAttribute("data-tab");[].forEach.call(this.querySelectorAll("button"),function(x){x.classList.remove("active");});b.classList.add("active");el("overviewSection").style.display=tab==="overview"?"block":"none";[].forEach.call(document.querySelectorAll(".overview-extra"),function(x){x.style.display=tab==="overview"?"":"none";});[].forEach.call(document.querySelectorAll(".tab-pane"),function(x){x.classList.remove("active");});if(tab!=="overview")el(tab+"Tab").classList.add("active");window.scrollTo({top:0,behavior:"smooth"});});
-  loadData();
+  initFiscalYearFilters();loadData();
 }());

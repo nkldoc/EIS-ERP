@@ -32,18 +32,6 @@ function openReportPopup() {
     data: [
       { id: "budget", title: "กราฟงบประมาณ", desc: "ภาพรวมงบ รายได้/กทม./อุดหนุน", icon: "dc/images/icons/billing-icon-baht.png", url: "bi/reports/Budget_Monitoring_Dashboard.php", tag: "งบประมาณ" },
       // { id:'budget2',  title:'กราฟงบประมาณ',        desc:'ภาพรวมงบ ', icon:'dc/images/icons/billing-icon.png', url:'bi/reports/Rep_RepBIBg_Expense.php',  tag:'งบประมาณ' },
-      { id: "status", title: "สถานะการดำเนินงาน", desc: "รอดำเนินการ → เบิกจ่ายแล้ว", icon: "images/management.png", url: "bi/reports/Report_ChartStatus.php", tag: "สถานะ" },
-      {
-        id: "tortype",
-        title: "วิธีการดำเนินงาน",
-        desc: "e-Bidding / คัดเลือก / เฉพาะเจาะจง",
-        icon: "dc/images/default/tree/folder-open.gif",
-        url: "bi/reports/Report_ChartTorType_New.php",
-        tag: "วิธีดำเนินงาน",
-      },
-      { id: "dept", title: "รายงานตามหน่วยงาน", desc: "กรองและเปรียบเทียบผลงานตามส่วนงาน", icon: "dc/images/folder.gif", url: "Report_ChartByDept.html", tag: "แผนก" },
-      { id: "emp", title: "รายงานตามผู้รับผิดชอบ", desc: "กรองผลการดำเนินงานตามผู้รับผิดชอบ", icon: "dc/images/default/tree/leaf.gif", url: "Report_ChartByEmp.html", tag: "บุคลากร" },
-      { id: "empKPI", title: "รายงาน KPI", desc: "โหลดรายงาน KPI", icon: "images/kpi.png", url: "bi/reports/Key_Performance_Indicator.php", tag: "บุคลากร" },
       { id: "torstart", title: "สรุปข้อมูลรายปี", desc: "ตารางสรุปข้อมูลรายปี", icon: "images/Performance.jpg", url: "bi/reports/Yearly_PR_Performance_Summary.php", tag: "ฝ่าย" },
       { id: "Reply", title: "รายการทักท้วง", desc: "รายการทักท้วง", icon: "images/reply.png", url: "bi/reports/Report_StatusReply.php", tag: "ฝ่าย" },
       { id: "procurementProgress", title: "Dashboard ติดตามงานจัดซื้อจัดจ้าง", desc: "ติดตามสถานะและความก้าวหน้าตั้งแต่ PR จนถึงการเบิก", icon: "bi/images/monitor.png", url: "bi/reports/ProcurementProgressReport.php", tag: "ติดตามงาน" },
