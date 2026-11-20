@@ -19,8 +19,10 @@
   function applyFilters() {
     var fund = el("fundFilter").value, keyword = el("keywordFilter").value.toLowerCase();
     filteredRows = allRows.filter(function (r) { return (!fund || r.fund_source === fund) && (!keyword || [r.pr_code,r.c_name,r.owner_name,r.department_name].join(" ").toLowerCase().indexOf(keyword) >= 0); });
+    updateReportContext();
     render();
   }
+  function updateReportContext(){var from=el("yearFromFilter").value,to=el("yearToFilter").value,fund=el("fundFilter").value||"รวมทุกแหล่งเงิน",yearText=from===to?from:(from+" – "+to),now=new Date(),reportedAt=now.toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"});el("reportContext").innerHTML='<strong>รายงานปีงบประมาณ '+esc(yearText)+'</strong><span>แหล่งเงิน: '+esc(fund)+'</span><small>'+number(filteredRows.length)+' รายการ</small><small class="report-generated-at">ณ วันที่เรียกรายงาน '+esc(reportedAt)+' น.</small>';document.title='Dashboard จัดซื้อจัดจ้าง | ปีงบประมาณ '+yearText+' | '+fund;}
   function renderMetrics() {
     var total = filteredRows.length, completed = filteredRows.filter(function (r) { return Number(r.is_completed) === 1; }).length;
     var contract = filteredRows.filter(function (r) { return Number(r.period_total) > 0; }).length;

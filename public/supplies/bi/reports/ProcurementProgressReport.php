@@ -11,13 +11,14 @@ if (empty($_SESSION['user_id'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
-    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261120-1">
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261120-3">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <main class="dashboard-shell">
     <header class="dashboard-header">
-        <div><h1><span class="title-icon">▧</span> Dashboard ติดตามงานจัดซื้อจัดจ้าง</h1><p>รายงานภาพรวมและระบบแจ้งเตือน (KPI) จากข้อมูลระบบจัดซื้อจัดจ้างของ EIS</p></div>
+        <div class="dashboard-brand"><h1><span class="title-icon">▧</span> Dashboard ติดตามงานจัดซื้อจัดจ้าง</h1><p>รายงานภาพรวมและระบบแจ้งเตือน (KPI) จากข้อมูลระบบจัดซื้อจัดจ้างของ EIS</p></div>
+        <div id="reportContext" class="report-context" aria-live="polite"><strong>รายงานปีงบประมาณ</strong><span>กำลังโหลดข้อมูล...</span></div>
         <div class="header-actions">
             <label>ปีงบประมาณเริ่มต้น <select id="yearFromFilter"></select></label>
             <label>ถึงปีงบประมาณ <select id="yearToFilter"></select></label>
@@ -110,5 +111,5 @@ if (empty($_SESSION['user_id'])) {
     </section>
 </main>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261120-1"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261120-3"></script>
 </body></html>
