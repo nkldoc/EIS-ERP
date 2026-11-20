@@ -1763,7 +1763,12 @@ Ext.AppUx = function (app, menu) {
                     Ext.Msg.alert("แจ้งเตือน", c.msg || "ยกเลิกไม่ได้");
                     return;
                 }
-                askReasonAndCancel(rec, label);
+                // IR/AP ใช้ร่วมกับงวดอื่น (รวมข้ามงวด) = ยกเลิกพร้อมกันทั้งชุด บอกผู้ใช้ให้ชัดก่อนยืนยัน
+                var gp = c.group_periods || [];
+                var labelAsk = gp.length > 1
+                    ? enc(rec.get("c_contract_code")) + " งวดที่ " + gp.map(enc).join(", ") + " (ใช้ IR/AP ร่วมกัน ยกเลิกพร้อมกัน)"
+                    : label;
+                askReasonAndCancel(rec, labelAsk);
             },
             failure: function () {
                 Ext.Msg.alert("แจ้งเตือน", "ตรวจสอบรายการไม่สำเร็จ");
