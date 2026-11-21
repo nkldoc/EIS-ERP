@@ -513,11 +513,11 @@ function winCheckingDetailTab(rec) {
         maxValue: new Date(), maxText: "วันที่ตรวจรับต้องไม่เกินวันที่ปัจจุบัน",
     });
     // เลขที่ EGP: บังคับกรอกเมื่อใช้เงินปีงบประมาณปัจจุบัน ถ้าใช้เงินปีงบประมาณเก่า (กันเหลื่อม เช่น 2569 ขณะที่ปีปัจจุบัน 2570)
-    // ยังไม่มีเลข EGP ระบบใส่ "-" ให้และล็อกช่องไว้ จะกรอกได้เมื่อ "ใช้เงินปีงบประมาณ" เป็นปีปัจจุบัน (ดู applyEgpRule)
+    // ยังไม่มีเลข EGP ระบบใส่ "-" ให้ ใช้เงินปีเก่า: เอกสารปี 69 ล็อก "-" / เอกสารปีปัจจุบัน (70) แก้เป็นเลขจริงได้ ส่วนใช้เงินปีปัจจุบันบังคับกรอก (ดู applyEgpRule)
     var c_egp_noFld = new Ext.form.TextField({fieldLabel: "เลขที่ EGP", width: 200, allowBlank: false});
     var egpHintFld = new Ext.form.DisplayField({
         fieldLabel: "", width: 420, hidden: true, style: "color:#c60;",
-        value: "ใช้เงินปีงบประมาณเก่า (กันเหลื่อม): เลขที่ EGP ใส่ \"-\" ไว้ก่อน จะกรอกได้เมื่อ \"ใช้เงินปีงบประมาณ\" เป็นปีปัจจุบัน",
+        value: "ใช้เงินปีงบประมาณเก่า (กันเหลื่อม): เลขที่ EGP ใส่ \"-\" ไว้ก่อน (เอกสารปีงบประมาณปัจจุบันแก้เป็นเลข EGP จริงได้ ส่วนเอกสารปีเก่าคงเป็น \"-\")",
     });
     // รายการส่งเบิก: ไม่บังคับกรอก (บันทึกและออกเลข AP ได้เลย)
     var c_disburse_detailFld = new Ext.form.TextArea({
@@ -651,9 +651,20 @@ function winCheckingDetailTab(rec) {
             c_egp_noFld.allowBlank = false;
             egpHintFld.hide();
         } else if (useYear > 0 && useYear < currentFiscalYearTh()) {
-            c_egp_noFld.setValue("-");
-            c_egp_noFld.setReadOnly(true);
-            c_egp_noFld.allowBlank = true;
+            // ใช้เงินปีเก่า (กันเหลื่อม): เอกสารปีงบประมาณ 69 (หรือเก่ากว่า) = "-" ล็อกเหมือนเดิม
+            // [ผู้ใช้ขอ] เอกสารปีงบประมาณปัจจุบัน (70) ที่ใช้เงินกันเหลื่อมปีเก่า = ใส่ "-" ให้ก่อนแต่ไม่ล็อก แก้เป็นเลข EGP จริงได้ (ไม่บังคับกรอก)
+            var refYear = parseInt(i_budget_year_refFld.getValue(), 10) || 0;
+            if (refYear >= currentFiscalYearTh()) {
+                if (curEgp === "") {
+                    c_egp_noFld.setValue("-");
+                }
+                c_egp_noFld.setReadOnly(false);
+                c_egp_noFld.allowBlank = true;
+            } else {
+                c_egp_noFld.setValue("-");
+                c_egp_noFld.setReadOnly(true);
+                c_egp_noFld.allowBlank = true;
+            }
             egpHintFld.show();
         } else {
             c_egp_noFld.setReadOnly(false);
@@ -733,6 +744,7 @@ function winCheckingDetailTab(rec) {
     }
 
     i_budget_year_useFld.on("select", applyEgpRule);
+    i_budget_year_refFld.on("select", applyEgpRule);
     applyEgpRule();
 
     var leftItems = [

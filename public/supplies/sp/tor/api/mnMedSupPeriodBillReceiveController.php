@@ -725,8 +725,13 @@ switch ($mode) {
         // = เก็บ "-" เสมอ (ไม่ว่า client ส่งอะไรมา) ใช้เงินปีงบประมาณปัจจุบันถึงจะต้องกรอกเลข EGP ("รายการส่งเบิก" ไม่บังคับ)
         $useYearTh = intval($_REQUEST["i_budget_year_use"] ?? 0);
         $fiscalYearTh = intval(date("Y")) + 543 + (intval(date("n")) >= 10 ? 1 : 0);
+        // เอกสารปีงบประมาณ (i_budget_year_ref) ปีเก่า = "-" เสมอ / [ผู้ใช้ขอ] เอกสารปีปัจจุบัน (70) ที่ใช้เงินปีเก่า
+        // แก้เลข EGP จริงได้: ส่งมาว่าง = "-" ส่วนที่กรอกเลขจริงมาเก็บตามนั้น
+        $refYearTh = intval($_REQUEST["i_budget_year_ref"] ?? 0);
         if ($useYearTh > 0 && $useYearTh < $fiscalYearTh) {
-            $egpNo = "-";
+            if ($refYearTh < $fiscalYearTh || $egpNo === "") {
+                $egpNo = "-";
+            }
         }
         if ($irCode === "" || $checkingDate === "" || $egpNo === "") {
             $stmt = false;
