@@ -1165,6 +1165,183 @@ switch ($mode) {
         $responseExtra["c_cancel_period"] = intval($billId);
         break;
 
+    case "CHANGE_VENDOR":
+        // [ผู้ใช้ขอ 2569-11-21] แก้ผู้ขาย/ผู้รับจ้างจากหน้ารายละเอียดงวด (ผู้ขายผิดจากไฟล์ Excel)
+        //  - เลือกจากทะเบียนเจ้าหนี้ (NMU.dbo.dc_creditor) เท่านั้น ชื่อ/เลขภาษี/id มาจากทะเบียน
+        //  - c_scope = all (ค่าเริ่มต้น: ทุกงวดของสัญญา+ประเภทเดียวกัน) หรือ one (เฉพาะงวดนี้)
+        //  - ออกใบเบิก D แล้วแต่ยังไม่เลยขั้น 0.30 (บันทึกใบขอเบิก) = แก้ใบเบิกใน EIS ให้ด้วย (po_working_dtl / po_working_begin_hdr)
+        //    เลยขั้น 0.30 หรือสถานะหลักไม่ใช่ 0 = ไม่ให้แก้ ต้องให้ผู้ดูแลระบบย้อนใบเบิกก่อน
+        //  - check_only = 1 : ตรวจกติกา+คืนรายการงวดที่จะแก้ (ยังไม่เขียนข้อมูล)
+        $billId = intval($_REQUEST["sp_tor_period_bill_id"] ?? 0);
+        $newCreditorId = intval($_REQUEST["dc_creditor_id"] ?? 0);
+        $scope = (($_REQUEST["c_scope"] ?? "all") === "one") ? "one" : "all";
+        $checkOnly = !empty($_REQUEST["check_only"]);
+        if ($billId <= 0 || $newCreditorId <= 0) {
+            $stmt = false;
+            $errMsg = "กรุณาเลือกผู้ขาย/ผู้รับจ้างจากทะเบียน";
+            break;
+        }
+        $bill = $db->GetDataBySQL(
+            "select sp_tor_period_bill_id, c_contract_code, i_period, isnull(c_ap_dept_type, '') as c_ap_dept_type,
+                    isnull(dc_creditor_id, 0) as dc_creditor_id, c_creditor_name
+               from NMU_ERP.dbo.sp_tor_period_bill where sp_tor_period_bill_id = ? and i_enabled = 1",
+            array($billId)
+        );
+        if (empty($bill) || !is_array($bill)) {
+            $stmt = false;
+            $errMsg = "ไม่พบงวดนี้ (อาจถูกยกเลิกไปแล้ว) กรุณารีเฟรชหน้า";
+            break;
+        }
+        $newCr = $db->GetDataBySQL(
+            "select top 1 dc_creditor_id, c_name, c_tax_number_imp from NMU.dbo.dc_creditor
+              where dc_creditor_id = ? and isnull(i_enable, 1) = 1",
+            array($newCreditorId)
+        );
+        if (empty($newCr) || !is_array($newCr)) {
+            $stmt = false;
+            $errMsg = "ไม่พบผู้ขายที่เลือกในทะเบียนเจ้าหนี้ กรุณาเลือกจากรายการค้นหา";
+            break;
+        }
+        // งวดที่จะแก้
+        $targets = array();
+        if ($scope === "one") {
+            $stmtT = $db->QueryParam(
+                "select sp_tor_period_bill_id, i_period, dc_creditor_id, c_creditor_name, c_tax_number_imp
+                   from NMU_ERP.dbo.sp_tor_period_bill where sp_tor_period_bill_id = ? and i_enabled = 1",
+                array($billId)
+            );
+        } else {
+            $stmtT = $db->QueryParam(
+                "select sp_tor_period_bill_id, i_period, dc_creditor_id, c_creditor_name, c_tax_number_imp
+                   from NMU_ERP.dbo.sp_tor_period_bill
+                  where i_enabled = 1 and c_contract_code = ? and isnull(c_ap_dept_type, '') = ? order by i_period",
+                array($bill["c_contract_code"], $bill["c_ap_dept_type"])
+            );
+        }
+        while ($stmtT && ($rt = $db->Fetch($stmtT))) {
+            $targets[] = $rt;
+        }
+        // ข้ามงวดที่เป็นผู้ขายคนนี้อยู่แล้ว
+        $targets = array_values(array_filter($targets, function ($t) use ($newCreditorId) {
+            return intval($t["dc_creditor_id"]) !== $newCreditorId;
+        }));
+        if (empty($targets)) {
+            $stmt = false;
+            $errMsg = "ผู้ขายของงวดที่เลือกเป็น " . $newCr["c_name"] . " อยู่แล้ว ไม่มีอะไรต้องแก้";
+            break;
+        }
+        $targetIds = array_map(function ($t) { return intval($t["sp_tor_period_bill_id"]); }, $targets);
+        $tPh = implode(",", array_fill(0, count($targetIds), "?"));
+
+        // ใบเบิก D ของงวดที่จะแก้ (ผ่านเลข IR -> ตรวจรับ c_code_ref)
+        $wdRows = array();
+        $hasWdColV = intval($db->GetDataBySQL("select case when col_length('NMU_ERP.dbo.sp_tor_period_bill_checking', 'c_code_ref') is not null then 1 else 0 end", array()));
+        if ($hasWdColV) {
+            $stmtW = $db->QueryParam(
+                "select distinct h.c_code_ref, h.po_working_hdr_id, h.i_status_last, convert(float, h.i_sub_status) as sub_status
+                   from NMU_ERP.dbo.sp_tor_period_bill_receive r
+                  inner join NMU_ERP.dbo.sp_tor_period_bill_checking c on c.c_ir_code = r.c_ir_code and c.i_enabled = 1 and isnull(c.c_code_ref, '') <> ''
+                  inner join " . DB_NMU_EIS . "po_working_hdr h on h.c_code_ref = c.c_code_ref
+                  where r.i_enabled = 1 and r.sp_tor_period_bill_id in ({$tPh})",
+                $targetIds
+            );
+            while ($stmtW && ($rw = $db->Fetch($stmtW))) {
+                $wdRows[] = $rw;
+            }
+        }
+        $blockedWd = array();
+        foreach ($wdRows as $rw) {
+            if (intval($rw["i_status_last"]) !== 0 || floatval($rw["sub_status"]) > 0.30) {
+                $blockedWd[] = $rw["c_code_ref"];
+            }
+        }
+        if (!empty($blockedWd)) {
+            $stmt = false;
+            $errMsg = "ไม่สามารถแก้ผู้ขายได้ เนื่องจากใบเบิก " . implode(", ", $blockedWd) . " ลงนามเลยขั้นบันทึกใบขอเบิกไปแล้ว กรุณาติดต่อผู้ดูแลระบบเพื่อย้อนใบเบิกก่อน";
+            break;
+        }
+        $newBank = null;
+        if (!empty($wdRows)) {
+            $newBank = $db->GetDataBySQL(
+                "select top 1 dc_bank_acc_creditor_id, c_code, c_name from NMU.dbo.dc_bank_acc_creditor
+                  where dc_creditor_id = ? and isnull(i_enable, 1) = 1 order by isnull(i_main, 0) desc, dc_bank_acc_creditor_id",
+                array($newCreditorId)
+            );
+            if (empty($newBank) || !is_array($newBank)) {
+                $stmt = false;
+                $errMsg = "ผู้ขายใหม่ไม่มีบัญชีธนาคารในทะเบียนเจ้าหนี้ ไม่สามารถแก้ใบเบิกที่ออกไปแล้วได้ กรุณาเพิ่มบัญชีธนาคารที่ทะเบียนเจ้าหนี้ก่อน";
+                break;
+            }
+        }
+        $responseExtra["periods"] = array_map(function ($t) { return intval($t["i_period"]); }, $targets);
+        $responseExtra["wd_codes"] = array_map(function ($w) { return $w["c_code_ref"]; }, $wdRows);
+        $responseExtra["new_name"] = $newCr["c_name"];
+        $responseExtra["new_tax"] = $newCr["c_tax_number_imp"];
+        if ($checkOnly) {
+            $stmt = true; // ผ่านกติกา ยังไม่เขียนข้อมูล
+            break;
+        }
+
+        $uidV = $_SESSION["user_id"] ?? null;
+        $ucostV = $_SESSION["dc_cost_id"] ?? null;
+        // ประวัติการแก้ (ตารางมีเมื่อรัน sp_tor_period_bill_vendor_log.sql แล้ว - ไม่มีก็ข้าม)
+        $hasLogTbl = intval($db->GetDataBySQL("select case when object_id('NMU_ERP.dbo.sp_tor_period_bill_vendor_log') is not null then 1 else 0 end", array()));
+        if ($hasLogTbl) {
+            foreach ($targets as $t) {
+                $stmt = $db->QueryParam(
+                    "insert into NMU_ERP.dbo.sp_tor_period_bill_vendor_log
+                        (sp_tor_period_bill_id, c_contract_code, i_period, dc_creditor_id_old, c_creditor_name_old, c_tax_number_old,
+                         dc_creditor_id_new, c_creditor_name_new, c_tax_number_new, c_wd_codes, dc_user_id, dc_cost_id, d_create)
+                     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, getdate())",
+                    array(intval($t["sp_tor_period_bill_id"]), $bill["c_contract_code"], intval($t["i_period"]),
+                        intval($t["dc_creditor_id"]), $t["c_creditor_name"], $t["c_tax_number_imp"],
+                        $newCreditorId, $newCr["c_name"], $newCr["c_tax_number_imp"],
+                        implode(",", $responseExtra["wd_codes"]), $uidV, $ucostV)
+                );
+                if (!$stmt) {
+                    $errMsg = "บันทึกประวัติการแก้ผู้ขายไม่สำเร็จ";
+                    break 2;
+                }
+            }
+        }
+        // 1) ใบเบิกใน EIS (ถ้ามี)
+        foreach ($wdRows as $rw) {
+            $hid = intval($rw["po_working_hdr_id"]);
+            $stmt = $db->QueryParam(
+                "update " . DB_NMU_EIS . "po_working_dtl
+                    set dc_creditor_id = ?, dc_creditor_transfer_id = ?, dc_bank_acc_creditor_id = ?,
+                        c_code_bank_acc = ?, c_name_bank_acc = ?, c_cnt_name = ?
+                  where po_working_hdr_id = ?",
+                array($newCreditorId, $newCreditorId, intval($newBank["dc_bank_acc_creditor_id"]),
+                    $newBank["c_code"], $newBank["c_name"], $newCr["c_name"], $hid)
+            );
+            if (!$stmt) {
+                $errMsg = "แก้ใบเบิก " . $rw["c_code_ref"] . " ไม่สำเร็จ";
+                break 2;
+            }
+            $stmt = $db->QueryParam(
+                "update " . DB_NMU_EIS . "po_working_begin_hdr
+                    set dc_creditor_id = ?, dc_creditor_transfer_id = ? where po_working_hdr_id = ?",
+                array($newCreditorId, $newCreditorId, $hid)
+            );
+            if (!$stmt) {
+                $errMsg = "แก้ใบเบิก " . $rw["c_code_ref"] . " ไม่สำเร็จ";
+                break 2;
+            }
+        }
+        // 2) งวด
+        $stmt = $db->QueryParam(
+            "update NMU_ERP.dbo.sp_tor_period_bill
+                set dc_creditor_id = ?, c_creditor_name = ?, c_tax_number_imp = ?,
+                    dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = getdate()
+              where i_enabled = 1 and sp_tor_period_bill_id in ({$tPh})",
+            array_merge(array($newCreditorId, $newCr["c_name"], $newCr["c_tax_number_imp"], $uidV, $ucostV), $targetIds)
+        );
+        if (!$stmt) {
+            $errMsg = "แก้ผู้ขายของงวดไม่สำเร็จ";
+        }
+        break;
+
     default:
         $stmt = false;
         break;

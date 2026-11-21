@@ -1585,6 +1585,140 @@ function winDeliverWorkMedSup(rec) {
         return d.getFullYear() + (d.getMonth() >= 9 ? 1 : 0) + 543;
     }
 
+    // [ผู้ใช้ขอ] แก้ผู้ขาย/ผู้รับจ้างจากหน้านี้ (ผู้ขายผิดจากไฟล์ Excel) - เลือกจากทะเบียนเจ้าหนี้เท่านั้น
+    // ค่าเริ่มต้นแก้ทุกงวดของสัญญา (ติ๊กเลือกเฉพาะงวดนี้ได้) ใบเบิก D ที่ออกแล้วแต่ยังไม่เลยขั้น 0.30 แก้ตามให้
+    // เซิร์ฟเวอร์ (mode CHANGE_VENDOR) เป็นคนตรวจกติกาและบันทึกประวัติ
+    function vendorLabel(name, tax) {
+        var enc = Ext.util.Format.htmlEncode;
+        return enc(name || "-") + (tax ? " (เลขภาษี " + enc(tax) + ")" : "");
+    }
+    function winChangeVendor() {
+        var enc = Ext.util.Format.htmlEncode;
+        var vendorStore = new Ext.data.JsonStore({
+            autoLoad: false,
+            url: "tor/api/List_MedSupPeriodBill.php",
+            baseParams: {type: "lookup_creditor"},
+            root: "data",
+            fields: ["dc_creditor_id", "c_code", "c_name", "c_tax_no"]
+        });
+        var vendorCombo = new Ext.form.ComboBox({
+            fieldLabel: "ผู้ขายใหม่",
+            anchor: "100%",
+            store: vendorStore,
+            valueField: "dc_creditor_id",
+            displayField: "c_name",
+            mode: "remote",
+            minChars: 1,
+            queryParam: "query",
+            triggerAction: "all",
+            forceSelection: true,
+            typeAhead: false,
+            allowBlank: false,
+            listWidth: 520,
+            emptyText: "พิมพ์ชื่อหรือเลขภาษีเพื่อค้นหา...",
+            tpl: '<tpl for="."><div class="x-combo-list-item">{c_name} <span style="color:#888;">({c_tax_no})</span></div></tpl>',
+            listeners: {
+                beforequery: function (q) {
+                    q.query = q.query || "";
+                }
+            }
+        });
+        var scopeGrp = new Ext.form.RadioGroup({
+            fieldLabel: "แก้ที่",
+            columns: 1,
+            items: [
+                {boxLabel: "ทุกงวดของสัญญา " + enc(rec.get("c_contract_code")) + " (แนะนำ)", name: "vendor_scope", inputValue: "all", checked: true},
+                {boxLabel: "เฉพาะงวดที่ " + enc(rec.get("i_period")) + " นี้", name: "vendor_scope", inputValue: "one"}
+            ]
+        });
+        function send(extra, cb) {
+            var scope = scopeGrp.getValue();
+            Ext.Ajax.request({
+                url: "tor/api/mnMedSupPeriodBillReceiveController.php",
+                method: "POST",
+                params: Ext.apply({
+                    mode: "CHANGE_VENDOR",
+                    sp_tor_period_bill_id: periodId,
+                    dc_creditor_id: vendorCombo.getValue(),
+                    c_scope: scope ? scope.inputValue : "all"
+                }, extra),
+                success: function (res) {
+                    var r;
+                    try {
+                        r = Ext.util.JSON.decode(res.responseText);
+                    } catch (e) {
+                        Ext.Msg.alert("แจ้งเตือน", "แก้ผู้ขายไม่สำเร็จ");
+                        return;
+                    }
+                    if (r.reval !== 0) {
+                        Ext.Msg.alert("แจ้งเตือน", r.msg || "แก้ผู้ขายไม่สำเร็จ");
+                        return;
+                    }
+                    cb(r);
+                },
+                failure: function () {
+                    Ext.Msg.alert("แจ้งเตือน", "แก้ผู้ขายไม่สำเร็จ");
+                }
+            });
+        }
+        var vwin = new Ext.Window({
+            title: "แก้ผู้ขาย/ผู้รับจ้าง - สัญญา " + rec.get("c_contract_code"),
+            width: 560,
+            modal: true,
+            closeAction: "destroy",
+            bodyStyle: "padding:10px;",
+            items: [{
+                xtype: "form",
+                border: false,
+                labelWidth: 90,
+                items: [
+                    {xtype: "displayfield", fieldLabel: "ผู้ขายเดิม", value: vendorLabel(rec.get("c_creditor_name"), rec.get("c_tax_number_imp"))},
+                    vendorCombo,
+                    scopeGrp,
+                    {xtype: "displayfield", hideLabel: true, style: "color:#888;",
+                     value: "เลือกจากทะเบียนเจ้าหนี้เท่านั้น ใบเบิก (D) ที่ออกแล้วแต่ยังไม่เลยขั้นบันทึกใบขอเบิก จะถูกแก้ตามให้อัตโนมัติ"}
+                ]
+            }],
+            buttons: [
+                {
+                    text: "บันทึก",
+                    iconCls: "icon-save",
+                    handler: function () {
+                        if (!vendorCombo.getValue() || !vendorCombo.isValid()) {
+                            Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกผู้ขายใหม่จากรายการค้นหา");
+                            return;
+                        }
+                        send({check_only: 1}, function (c) {
+                            var msg = "แก้ผู้ขายเป็น <b>" + vendorLabel(c.new_name, c.new_tax) + "</b><br>งวดที่แก้: " +
+                                (c.periods || []).map(enc).join(", ") +
+                                ((c.wd_codes || []).length ? "<br>ใบเบิกที่แก้ตามด้วย: " + c.wd_codes.map(enc).join(", ") : "") +
+                                "<br><br>ยืนยันใช่หรือไม่?";
+                            Ext.Msg.confirm("ยืนยันแก้ผู้ขาย", msg, function (b) {
+                                if (b !== "yes") {
+                                    return;
+                                }
+                                send({}, function () {
+                                    rec.set("c_creditor_name", c.new_name);
+                                    rec.set("c_tax_number_imp", c.new_tax);
+                                    rec.commit();
+                                    var disp = Ext.getCmp("deliverMedSupVendorID");
+                                    if (disp) {
+                                        disp.setValue(vendorLabel(c.new_name, c.new_tax));
+                                    }
+                                    vwin.destroy();
+                                    Ext.storeDeliverMedSupList.reload();
+                                    Ext.Msg.alert("สำเร็จ", "แก้ผู้ขายเรียบร้อยแล้ว");
+                                });
+                            });
+                        });
+                    }
+                },
+                {text: "ยกเลิก", iconCls: "icon-clear", handler: function () { vwin.destroy(); }}
+            ]
+        });
+        vwin.show();
+    }
+
     new Ext.Window({
         id: "win-deliver-medsupID",
         title: "รายละเอียดงวดที่ " + rec.get("i_period") + " - เลขที่สัญญา " + rec.get("c_contract_code"),
@@ -1603,7 +1737,7 @@ function winDeliverWorkMedSup(rec) {
                         // border layout ของ ExtJS 3 ต้องกำหนด height ให้ north/south region
                         // ตรงๆ เสมอ (ไม่รองรับ autoHeight) ไม่งั้น panel จะถูกบีบจนสูง 0 มองไม่เห็น
                         region: "north",
-                        height: deliverOverlapCode ? 405 : 345,
+                        height: deliverOverlapCode ? 411 : 351,
                         xtype: "form",
                         border: false,
                         bodyStyle: "padding:8px;",
@@ -1617,7 +1751,14 @@ function winDeliverWorkMedSup(rec) {
                             {fieldLabel: "เลขที่ใบกันเหลื่อม", value: deliverOverlapCode, hidden: !deliverOverlapCode, style: "font-weight:bold;"},
                             {fieldLabel: "ชื่อโครงการ", value: rec.get("c_project_name")},
                             {fieldLabel: "ชื่อค่าใช้จ่าย", value: rec.get("c_expense_name")},
-                            {fieldLabel: "ผู้ขาย/ผู้รับจ้าง", value: rec.get("c_creditor_name")},
+                            {
+                                xtype: "compositefield",
+                                fieldLabel: "ผู้ขาย/ผู้รับจ้าง",
+                                items: [
+                                    {xtype: "displayfield", id: "deliverMedSupVendorID", flex: 1, value: vendorLabel(rec.get("c_creditor_name"), rec.get("c_tax_number_imp"))},
+                                    {xtype: "button", text: "แก้ผู้ขาย", iconCls: "icon-edit", handler: winChangeVendor}
+                                ]
+                            },
                             {fieldLabel: "แหล่งเงิน", value: rec.get("c_fund_source_dtl")},
                             {id: "deliverMedSupTotalID", fieldLabel: "จำนวนเงินงวดนี้", value: ""},
                             {id: "deliverMedSupRemainID", fieldLabel: "คงเหลือ", value: "", style: "font-weight:bold;"},
