@@ -1,10 +1,17 @@
 <?php
+$confirmationAjaxRequest = isset($_GET['live']) || (($_POST['live'] ?? '') === '1');
+if ($confirmationAjaxRequest) {
+    // Keep PHP diagnostics in the server log; they must not corrupt the JSON
+    // response consumed by login-confirmation.js.
+    ini_set('display_errors', '0');
+    ini_set('log_errors', '1');
+}
 $presencePassiveRequest = true;
 require_once '../conf/config.php';
 require_once dirname(__DIR__) . '/conf/presence/SuppliesLogin.php';
 header('Content-Type: text/html; charset=utf-8'); header('Cache-Control: no-store, private');
 $error = '';
-$ajax = isset($_GET['live']) || (($_POST['live'] ?? '') === '1');
+$ajax = $confirmationAjaxRequest;
 $redirect = null;
 $_SESSION['supplies_confirmation_csrf'] ??= bin2hex(random_bytes(32));
 if (isset($_SESSION['supplies_login_pending']) && $_SESSION['supplies_login_pending']['expires'] < time()) { unset($_SESSION['supplies_login_pending']); $error = 'คำยืนยันหมดอายุ กรุณาเข้าสู่ระบบใหม่'; }
@@ -51,5 +58,5 @@ $statusLabel = $statusLabels[$requestStatus] ?? ['', '', ''];
 <span id="confirmation-status-icon" class="confirmation-status-icon" aria-hidden="true"><?=confirmationEscape($statusLabel[0])?></span><div><strong id="confirmation-status-title"><?=confirmationEscape($statusLabel[1])?></strong><small id="confirmation-status-detail"><?=confirmationEscape($statusLabel[2])?></small></div></div>
 <form id="confirmation-form" method="post" data-named-admin="<?=$namedAdmin ? '1' : '0'?>"><input type="hidden" name="csrf" value="<?=confirmationEscape($_SESSION['supplies_confirmation_csrf'])?>"><input type="hidden" name="confirmation" value="<?=confirmationEscape($pending['nonce'])?>">
 <?php if ($namedAdmin): ?><label for="admin_operator">ชื่อผู้ดูแล</label><input id="admin_operator" name="admin_operator" placeholder="admin-eak หรือ admin-moo" pattern="admin-[a-z0-9][a-z0-9_\-]{1,31}" maxlength="38" required value="<?=confirmationEscape($_POST['admin_operator'] ?? $pending['operator'] ?? '')?>"><p class="login-note">ชื่อแตกต่างกันจะไม่ออกจากระบบของ Admin คนอื่น</p><?php endif ?>
-<button id="request-login" class="<?=in_array($requestStatus, ['approved','stale'], true) ? 'login-approved' : ''?>" name="action" value="<?=in_array($requestStatus, ['pending','denied'], true) ? 'resend' : 'replace'?>"><?= $namedAdmin && !$replacing ? 'เข้าสู่ระบบด้วยชื่อผู้ดูแล' : ($requestStatus === 'stale' ? 'เข้าสู่ระบบแทนเซสชันค้าง' : ($requestStatus === 'approved' ? 'เข้าสู่ระบบตอนนี้' : (in_array($requestStatus, ['pending','denied'], true) ? 'ขออนุญาตอีกครั้ง' : 'ขออนุญาตผู้ใช้งานเดิม'))) ?></button><button name="action" value="cancel" formnovalidate style="background:#64748b">ยกเลิก</button></form><p class="login-note">คำขอมีอายุ 2 นาที · ไม่มีผลต่อ EIS-DOCS</p><script src="/supplies/assets/js/login-confirmation.js?v=20261123-pattern-fix"></script>
+<button id="request-login" class="<?=in_array($requestStatus, ['approved','stale'], true) ? 'login-approved' : ''?>" name="action" value="<?=in_array($requestStatus, ['pending','denied'], true) ? 'resend' : 'replace'?>"><?= $namedAdmin && !$replacing ? 'เข้าสู่ระบบด้วยชื่อผู้ดูแล' : ($requestStatus === 'stale' ? 'เข้าสู่ระบบแทนเซสชันค้าง' : ($requestStatus === 'approved' ? 'เข้าสู่ระบบตอนนี้' : (in_array($requestStatus, ['pending','denied'], true) ? 'ขออนุญาตอีกครั้ง' : 'ขออนุญาตผู้ใช้งานเดิม'))) ?></button><button name="action" value="cancel" formnovalidate style="background:#64748b">ยกเลิก</button></form><p class="login-note">คำขอมีอายุ 2 นาที · ไม่มีผลต่อ EIS-DOCS</p><script src="/supplies/assets/js/login-confirmation.js?v=20261123-json-response"></script>
 <?php else: ?><p>ไม่มีคำขอยืนยันการล็อกอินที่ใช้ได้</p><a href="/NMU_permission/">กลับหน้าเข้าสู่ระบบ</a><?php endif ?></main></body></html>

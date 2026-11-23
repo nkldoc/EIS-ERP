@@ -95,7 +95,9 @@ final class SuppliesLogin
         }
         $operator = !empty($pending['admin']) ? SingleLogin::operatorName($operator) : '';
         if (!empty($pending['admin']) && (int)$fresh['i_type_user'] !== 2) { unset($_SESSION['supplies_login_pending']); throw new RuntimeException('สิทธิ์ Admin เปลี่ยนแปลง กรุณาเข้าสู่ระบบใหม่'); }
-        $owner = ($pending['operator'] ?? '') === $operator ? ($pending['owner'] ?: null) : null;
+        // Pending confirmations may survive a deployment and can lack fields
+        // added by newer login flows. Treat an absent owner as no active owner.
+        $owner = ($pending['operator'] ?? '') === $operator ? (($pending['owner'] ?? '') ?: null) : null;
         $_SESSION['supplies_login_pending']['operator'] = $operator;
         if ($operator !== '') $pending['extra']['admin_operator'] = $operator;
         if ($owner !== null) {
