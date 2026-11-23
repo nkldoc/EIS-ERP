@@ -8,9 +8,41 @@
 // ทักท้วง = รายการ po_working_item ที่มีเหตุผลทักท้วง (po_reason_protest_id_s) หรือไฟล์ PDF ทักท้วง (c_file_pdf_protest_hdr/dtl)
 // ไฟล์ PDF อยู่ที่ฝั่ง EIS (PATH_EIS_PO_PROTEST_PDF) เปิดผ่าน EIS lib/Open_Pdf.php แบบเดียวกับที่ EIS เปิดเอง
 
+// โฟลเดอร์เก็บไฟล์ PDF ทักท้วงของ EIS - ต่างกันตามเครื่อง (บน server อยู่ไดรฟ์ E: ไม่ใช่ D:) จึงอ่านจาก config ของ NMU_EIS ตัวจริง
+// ลำดับ: ค่าคงที่ที่ ERP กำหนด -> ตัวแปรสภาพแวดล้อม EIS_PO_PROTEST_PDF_PATH -> อ่านบรรทัด define("PATH_EIS_PO_PROTEST_PDF", ...) จาก
+// NMU_EIS/conf/config.php (ตัวแปร EIS_CONFIG_PATH หรือ C:/xampp/htdocs/NMU_EIS/conf/config.php) -> ค่าเริ่มต้น D:/eis_pdf/po/po_protest_pdf/
 function medsupEisProtestPdfBase()
 {
-    return defined("PATH_EIS_PO_PROTEST_PDF") ? PATH_EIS_PO_PROTEST_PDF : "D:/eis_pdf/po/po_protest_pdf/";
+    static $base = null;
+    if ($base !== null) {
+        return $base;
+    }
+    $found = "";
+    if (defined("PATH_EIS_PO_PROTEST_PDF")) {
+        $found = PATH_EIS_PO_PROTEST_PDF;
+    } elseif (getenv("EIS_PO_PROTEST_PDF_PATH")) {
+        $found = getenv("EIS_PO_PROTEST_PDF_PATH");
+    } else {
+        $cands = array();
+        if (getenv("EIS_CONFIG_PATH")) {
+            $cands[] = getenv("EIS_CONFIG_PATH");
+        }
+        $cands[] = "C:/xampp/htdocs/NMU_EIS/conf/config.php";
+        foreach ($cands as $f) {
+            if (is_readable($f)) {
+                $txt = @file_get_contents($f);
+                if ($txt !== false && preg_match('/define\(\s*["\']PATH_EIS_PO_PROTEST_PDF["\']\s*,\s*["\']([^"\']+)["\']\s*\)/', $txt, $m)) {
+                    $found = $m[1];
+                    break;
+                }
+            }
+        }
+    }
+    if ($found === "") {
+        $found = "D:/eis_pdf/po/po_protest_pdf/";
+    }
+    $base = rtrim(str_replace("\\", "/", $found), "/") . "/";
+    return $base;
 }
 
 // ลิงก์ (ต่อท้าย NMU_EIS_HOST ฝั่ง JS) เปิดไฟล์ PDF ทักท้วง: รหัส code_F = (พาธไฟล์ไม่รวม .pdf) XOR 123 แล้ว URL-encode 2 ชั้น
