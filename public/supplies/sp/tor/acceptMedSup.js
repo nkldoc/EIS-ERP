@@ -74,8 +74,50 @@ Ext.storeAcceptMedSupList = new Ext.data.JsonStore({
         "i_period", "i_budget_year", "c_ap_dept_type", "n_lines", "c_detail", "f_total_amt", "d_receive_date_last", "d_ir_issue",
         "c_create_name", "c_ap_code", "d_ap_issue", "i_checking_ready", "chk_id", "d_checking", "c_code_ref", "po_working_hdr_id",
         "c_overlap", "i_budget_year_overlap", "c_overlap2", "i_budget_year_overlap2", "c_overlap3", "i_budget_year_overlap3",
+        // สถานะใบเบิก (D...) ใน EIS + ทักท้วง (อ่านอย่างเดียวจาก EIS)
+        "wd_status", "wd_status_text", "b_wd_deducted", "b_wd_protest_now", "b_wd_cancelled", "protests",
     ],
 });
+
+// [ผู้ใช้ขอ] หน้าต่างดูรายการ/เอกสารทักท้วงของใบเบิก (D...) - ให้ user ดูแล้วแก้ไขเอง เอกสาร PDF เปิดผ่าน EIS (Open_Pdf.php)
+Ext.fnWinWdProtest = function (rec) {
+    var enc = Ext.util.Format.htmlEncode;
+    var protests = rec.get("protests") || [];
+    var rows = [];
+    Ext.each(protests, function (p, i) {
+        var files = (p.files || []).map(function (f, k) {
+            return '<a href="#" class="wd-protest-file" data-i="' + i + '" data-k="' + k + '" style="color:#c00;font-weight:bold;">&#128196; ' + enc(f.label) + '</a>';
+        }).join("<br/>");
+        rows.push('<tr><td style="padding:6px;border-bottom:1px solid #ddd;white-space:nowrap;vertical-align:top;">' + enc(p.d_create || "-") + '</td>'
+            + '<td style="padding:6px;border-bottom:1px solid #ddd;vertical-align:top;">'
+            + ((p.reasons || []).length ? (p.reasons || []).map(function (t, n) { return (n + 1) + ". " + enc(t); }).join("<br/>") : '<span style="color:#999;">ไม่ระบุเหตุผล</span>')
+            + '</td><td style="padding:6px;border-bottom:1px solid #ddd;vertical-align:top;">' + (files || '<span style="color:#999;">ไม่มีไฟล์แนบ</span>') + '</td></tr>');
+    });
+    var html = '<div style="padding:8px;"><div style="margin-bottom:6px;">ใบเบิก <b>' + enc(rec.get("c_code_ref") || "-") + '</b> สถานะปัจจุบัน: <b>'
+        + enc(rec.get("wd_status_text") || "-") + '</b></div>'
+        + (rows.length ? '<table style="width:100%;border-collapse:collapse;"><tr style="background:#eee;"><th style="padding:6px;text-align:left;width:130px;">วันที่</th><th style="padding:6px;text-align:left;">เหตุผลที่ทักท้วง</th><th style="padding:6px;text-align:left;width:200px;">เอกสาร</th></tr>'
+            + rows.join("") + '</table>'
+            : '<div style="color:#999;">ไม่พบรายการทักท้วงของใบเบิกนี้</div>')
+        + '<div style="margin-top:8px;color:#555;font-size:12px;">ข้อมูลอ่านจาก EIS (ทักท้วงฏีกา) - แก้ไขใบเบิกตามเหตุผลที่ระบุแล้วส่งใหม่ที่ EIS</div></div>';
+    var w = new Ext.Window({
+        title: "ทักท้วงใบเบิก " + (rec.get("c_code_ref") || ""), width: 760, height: 380, modal: true, layout: "fit", autoScroll: true,
+        items: [{xtype: "panel", autoScroll: true, border: false, html: html}],
+        buttons: [{text: "ปิด", handler: function () { w.destroy(); }}]
+    });
+    w.show();
+    w.getEl().on("click", function (e, t) {
+        var a = Ext.fly(t).is("a.wd-protest-file") ? t : (Ext.fly(t).up("a.wd-protest-file", 5) || {}).dom;
+        if (!a) {
+            return;
+        }
+        e.stopEvent();
+        var f = (protests[parseInt(a.getAttribute("data-i"), 10)] || {}).files || [];
+        var one = f[parseInt(a.getAttribute("data-k"), 10)];
+        if (one && one.url) {
+            window.open(Ext.session.NMU_EIS_HOST + one.url, "_blank");
+        }
+    });
+};
 
 Ext.storeAcceptMedSupDtl = new Ext.data.JsonStore({
     autoDestroy: false,
@@ -1354,6 +1396,31 @@ Ext.AppUx = function (app, menu) {
                             : '<span style="color:#999;">-</span>';
                     }
                 },
+                {
+                    // [ผู้ใช้ขอ] สถานะใบเบิกใน EIS: หักงบประมาณแล้วหรือยัง / ถูกทักท้วงฏีกา (คลิกเปิดรายการ+เอกสารทักท้วงได้)
+                    id: "wdStatusID", header: "สถานะใบเบิก / ทักท้วง", dataIndex: "wd_status_text", width: 190,
+                    renderer: function (v, meta, rec) {
+                        if (!rec.get("c_code_ref")) {
+                            return '<span style="color:#999;">-</span>';
+                        }
+                        var enc = Ext.util.Format.htmlEncode;
+                        var protests = rec.get("protests") || [];
+                        var txt;
+                        if (rec.get("b_wd_cancelled")) {
+                            txt = '<span style="color:#888;">' + enc(v || "ยกเลิก") + '</span>';
+                        } else if (rec.get("b_wd_protest_now")) {
+                            txt = '<span style="color:#c00;font-weight:bold;">&#9888; ' + enc(v || "ทักท้วง") + '</span>';
+                        } else if (rec.get("b_wd_deducted")) {
+                            txt = '<span style="color:#080;font-weight:bold;" title="ใบเบิกถึงขั้น หักงบประมาณ ขึ้นไปแล้ว">&#10003; หักงบแล้ว</span> <span style="color:#555;">(' + enc(v) + ')</span>';
+                        } else {
+                            txt = '<span style="color:#c60;" title="ใบเบิกยังไม่ถึงขั้น หักงบประมาณ">' + enc(v || "-") + '</span>';
+                        }
+                        if (protests.length) {
+                            txt += '<br/><span style="color:#0066cc;text-decoration:underline;cursor:pointer;">ทักท้วง ' + protests.length + ' ครั้ง - ดูเอกสาร</span>';
+                        }
+                        return txt;
+                    }
+                },
                 {header: "จำนวนเงิน", dataIndex: "f_total_amt", width: 100, align: "right"},
                 {header: "ชื่อโครงการ/รายการ", dataIndex: "c_project_name", width: 220},
                 {header: "รายละเอียด", dataIndex: "c_detail", width: 90, align: "center"},
@@ -1380,6 +1447,11 @@ Ext.AppUx = function (app, menu) {
                         this.on("cellclick", function (grid, rowIndex, columnIndex) {
                             if (columnIndex === grid.getColumnModel().getIndexById("checkingReadyID")) {
                                 winCheckingDetailTab(grid.getStore().getAt(rowIndex));
+                            } else if (columnIndex === grid.getColumnModel().getIndexById("wdStatusID")) {
+                                var wdRec = grid.getStore().getAt(rowIndex);
+                                if ((wdRec.get("protests") || []).length) {
+                                    Ext.fnWinWdProtest(wdRec);
+                                }
                             } else if (columnIndex === grid.getColumnModel().getIndexById("draftPdfID")) {
                                 var draftRec = grid.getStore().getAt(rowIndex);
                                 if (draftRec.get("chk_id") && draftRec.get("i_checking_ready")) {

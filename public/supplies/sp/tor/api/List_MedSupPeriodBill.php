@@ -670,6 +670,32 @@ if ($type == "medsup_period_bill") {
         ${$root}[] = $temp;
     }
 
+    // [ผู้ใช้ขอ] สถานะใบเบิก (D...) ใน EIS: หักงบประมาณแล้วหรือยัง + ทักท้วงฏีกา + เอกสารทักท้วง (อ่านอย่างเดียว)
+    // ถ้าอ่านฝั่ง EIS ไม่ได้ ให้ข้าม (กริดยังแสดงปกติ ไม่มีสถานะ)
+    $wdCodes = array();
+    foreach (${$root} as $tmpRow) {
+        if (!empty($tmpRow["c_code_ref"])) {
+            $wdCodes[] = $tmpRow["c_code_ref"];
+        }
+    }
+    if (!empty($wdCodes)) {
+        include_once(__DIR__ . "/medsupWdStatus.php");
+        try {
+            $wdMap = medsupWdStatusMap($db, $date, $wdCodes);
+        } catch (Throwable $e) {
+            $wdMap = array();
+        }
+        foreach (${$root} as $i => $tmpRow) {
+            $info = $wdMap[$tmpRow["c_code_ref"] ?? ""] ?? null;
+            ${$root}[$i]["wd_status"] = $info ? $info["wd_status"] : 0;
+            ${$root}[$i]["wd_status_text"] = $info ? $info["wd_status_text"] : "";
+            ${$root}[$i]["b_wd_deducted"] = $info ? $info["b_wd_deducted"] : 0;
+            ${$root}[$i]["b_wd_protest_now"] = $info ? $info["b_wd_protest_now"] : 0;
+            ${$root}[$i]["b_wd_cancelled"] = $info ? $info["b_wd_cancelled"] : 0;
+            ${$root}[$i]["protests"] = $info ? $info["protests"] : array();
+        }
+    }
+
     $sqlCount = "select count(*) as totalCount from ({$sqlTempTable}) a";
     $totalCount = $db->GetDataBySQL($sqlCount, array());
     echo json_encode(array("totalCount" => $totalCount, $root => ${$root}));
