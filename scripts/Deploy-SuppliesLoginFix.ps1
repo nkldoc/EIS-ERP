@@ -10,6 +10,21 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module WebAdministration
 
+function Wait-WebAppPoolState {
+    param(
+        [Parameter(Mandatory = $true)][string] $Name,
+        [Parameter(Mandatory = $true)][string[]] $AllowedStates,
+        [int] $TimeoutSeconds = 60
+    )
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $state = (Get-WebAppPoolState -Name $Name -ErrorAction Stop).Value
+        if ($AllowedStates -contains $state) { return $state }
+        Start-Sleep -Milliseconds 500
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "Timed out waiting for app pool '$Name'. Current state: '$state'. Expected: $($AllowedStates -join ' or ')."
+}
+
 $sites = @(Get-Website | Where-Object {
     @($_.Bindings.Collection | ForEach-Object { ([string]$_.bindingInformation).Split(':')[-1] }) -contains $HostName
 })
@@ -68,7 +83,10 @@ New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
 $poolWasStarted = (Get-WebAppPoolState -Name $appPoolName).Value -eq 'Started'
 $deploymentStarted = $false
 try {
-    if ($poolWasStarted) { Stop-WebAppPool -Name $appPoolName }
+    if ($poolWasStarted) {
+        Stop-WebAppPool -Name $appPoolName
+        [void](Wait-WebAppPoolState -Name $appPoolName -AllowedStates @('Stopped'))
+    }
 
     foreach ($target in $targets) {
         $backupFile = Join-Path $backupDirectory $target.RelativePath
@@ -82,20 +100,37 @@ try {
     }
 
     # Stop/start clears the worker process and PHP OPcache for this app pool.
-    if ($poolWasStarted) { Start-WebAppPool -Name $appPoolName }
+    if ($poolWasStarted) {
+        Start-WebAppPool -Name $appPoolName
+        [void](Wait-WebAppPoolState -Name $appPoolName -AllowedStates @('Started'))
+    }
 } catch {
     $deploymentError = $_
-    if ($deploymentStarted) {
-        foreach ($target in $targets) {
-            $backupFile = Join-Path $backupDirectory $target.RelativePath
-            if (Test-Path -LiteralPath $backupFile -PathType Leaf) {
-                Copy-Item -LiteralPath $backupFile -Destination $target.Destination -Force
+    $recoveryError = $null
+    try {
+        if ($poolWasStarted) {
+            $state = Wait-WebAppPoolState -Name $appPoolName -AllowedStates @('Started', 'Stopped')
+            if ($state -eq 'Started' -and $deploymentStarted) {
+                Stop-WebAppPool -Name $appPoolName
+                [void](Wait-WebAppPoolState -Name $appPoolName -AllowedStates @('Stopped'))
             }
         }
+        if ($deploymentStarted) {
+            foreach ($target in $targets) {
+                $backupFile = Join-Path $backupDirectory $target.RelativePath
+                if (Test-Path -LiteralPath $backupFile -PathType Leaf) {
+                    Copy-Item -LiteralPath $backupFile -Destination $target.Destination -Force
+                }
+            }
+        }
+        if ($poolWasStarted -and (Get-WebAppPoolState -Name $appPoolName).Value -eq 'Stopped') {
+            Start-WebAppPool -Name $appPoolName
+            [void](Wait-WebAppPoolState -Name $appPoolName -AllowedStates @('Started'))
+        }
+    } catch {
+        $recoveryError = $_
     }
-    if ($poolWasStarted -and (Get-WebAppPoolState -Name $appPoolName).Value -ne 'Started') {
-        Start-WebAppPool -Name $appPoolName
-    }
+    if ($recoveryError) { throw "Deployment failed: $($deploymentError.Exception.Message) Recovery also failed: $($recoveryError.Exception.Message)" }
     throw $deploymentError
 }
 
