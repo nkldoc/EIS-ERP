@@ -53,7 +53,7 @@ Ext.storeDeliverMedSupReceive = new Ext.data.JsonStore({
     root: "data",
     idProperty: "id",
     fields: [
-        "id", "sp_tor_period_bill_id", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_ir_code", "d_ir_issue", "c_ap_code", "d_ap_issue", "c_erp_stock_code", "c_egp_no",
+        "id", "sp_tor_period_bill_id", "i_period", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_ir_code", "d_ir_issue", "c_ap_code", "d_ap_issue", "c_erp_stock_code", "c_egp_no",
         "draft_f_total_vat", "draft_b_vat", "draft_f_vat_percent", "draft_b_wht", "draft_f_wht_percent",
         "draft_f_penalty", "draft_b_guarantee", "draft_f_guarantee_percent", "draft_f_other",
         "draft_f_vat_amt", "draft_f_wht_amt", "b_ir_confirm", "b_ap_unlock",
@@ -255,12 +255,13 @@ function buildReceiveDisplayRows() {
         }
         if (!groups[ir]) {
             groups[ir] = {
-                count: 0, amt: 0, lastDate: "", lastErpStockCode: "", egp: "", allConfirmed: true,
+                count: 0, periods: {}, amt: 0, lastDate: "", lastErpStockCode: "", egp: "", allConfirmed: true,
                 d_ir_issue: r.get("d_ir_issue"), c_ap_code: r.get("c_ap_code"), d_ap_issue: r.get("d_ap_issue")
             };
             groupOrder.push(ir);
         }
         groups[ir].count++;
+        groups[ir].periods[r.get("i_period")] = true;
         if (!groups[ir].egp && r.get("c_egp_no")) {
             groups[ir].egp = r.get("c_egp_no");   // เลขคุมตรวจรับ EGP ของ IR นี้ (เอาเลขแรกที่มี)
         }
@@ -289,7 +290,7 @@ function buildReceiveDisplayRows() {
             // "เลขที่ IR" แยกซ้ำอีกที (ปล่อยว่างไว้)
             c_receive_code: ir,
             d_receive_date: g.lastDate,
-            c_detail: g.count + " รายการ",
+            c_detail: g.count + " รายการ" + (Object.keys(g.periods).length > 1 ? " (รวมงวด " + Object.keys(g.periods).sort(function (a, b) { return a - b; }).join(", ") + ")" : ""),
             f_amt: Ext.floatRenderer(g.amt),
             c_ir_code: "",
             d_ir_issue: g.d_ir_issue,
@@ -321,9 +322,14 @@ function winDeliverWorkMedSup(rec) {
 
     // อัปเดตยอด "คงเหลือ" หลังหักรายการรับของที่บันทึกไปแล้วทั้งหมด - เรียกทุกครั้งที่
     // กริดรับของโหลด/รีเฟรช (ตอนเปิดครั้งแรก, หลังเพิ่มรายการ, หลังออกเลข IR/AP)
+    // แถวของงวดนี้จริงๆ (store มีแถวของงวดอื่นที่รวม IR เดียวกันมาด้วย ไว้แสดงยอดรวม IR เท่านั้น ห้ามนับเป็นยอดใช้ของงวดนี้)
+    function isOwnPeriodRow(r) {
+        return parseInt(r.get("sp_tor_period_bill_id"), 10) === parseInt(periodId, 10);
+    }
     function updateRemainDisplay() {
         var used = 0;
         Ext.storeDeliverMedSupReceive.each(function (r) {
+            if (!isOwnPeriodRow(r)) { return; }
             used += parseFloat(String(r.get("f_amt")).replace(/,/g, "")) || 0;
         });
         var remainFld = Ext.getCmp("deliverMedSupRemainID");
@@ -511,7 +517,7 @@ function winDeliverWorkMedSup(rec) {
         // ไปแล้วหรือไม่ เพราะ periodTotal เป็นวงเงินของทั้งงวด)
         var used = 0;
         Ext.storeDeliverMedSupReceive.each(function (r) {
-            if (r.get("id") !== opts.id) {
+            if (r.get("id") !== opts.id && isOwnPeriodRow(r)) {
                 used += parseFloat(String(r.get("f_amt")).replace(/,/g, "")) || 0;
             }
         });
@@ -780,6 +786,7 @@ function winDeliverWorkMedSup(rec) {
             }
             var used = 0;
             Ext.storeDeliverMedSupReceive.each(function (r) {
+                if (!isOwnPeriodRow(r)) { return; }
                 var id = r.get("id");
                 used += newAmtById.hasOwnProperty(id) ? newAmtById[id] : (parseFloat(String(r.get("f_amt")).replace(/,/g, "")) || 0);
             });
@@ -989,6 +996,7 @@ function winDeliverWorkMedSup(rec) {
                         // แถวที่เพิ่งเพิ่ม = id มากที่สุดของงวดนี้ (identity) - ADD ไม่ได้คืน id กลับมา
                         var newId = 0;
                         Ext.storeDeliverMedSupReceive.each(function (r) {
+                            if (!isOwnPeriodRow(r)) { return; }
                             newId = Math.max(newId, parseInt(r.get("id"), 10) || 0);
                         });
                         if (newId) {
@@ -1062,6 +1070,123 @@ function winDeliverWorkMedSup(rec) {
         );
     }
     issueIrBtn.setHandler(issueIrForSelected);
+
+    // [ผู้ใช้ขอ] รวมรายการรับของข้ามงวด (สัญญาเดียวกัน) ออกเลข IR เดียว -> ตรวจรับ/AP/ใบเบิกเดียว
+    // ดึงรายการที่ยังไม่ออก IR ของทุกงวดในสัญญา (store แยก ไม่ยุ่งกับ store ของงวดนี้) ติ๊กแล้วส่ง
+    // ISSUE_IR ตัวเดิม (ฝั่ง server รับ id ข้ามงวดได้ และเช็คหน่วยงาน/ปีเงินปนกันให้อยู่แล้ว)
+    function winIssueIrAcrossPeriods() {
+        var poolStore = new Ext.data.JsonStore({
+            url: "tor/api/List_MedSupPeriodBill.php",
+            baseParams: {type: "medsup_period_bill_receive_pool", sp_tor_period_bill_id: periodId},
+            root: "data",
+            idProperty: "id",
+            autoLoad: true,
+            fields: ["id", "sp_tor_period_bill_id", "i_period", "c_receive_code", "d_receive_date", "c_detail", "f_amt", "c_egp_no"],
+            listeners: {
+                load: function (st) {
+                    // ติ๊กไว้ให้ทุกรายการ (ส่วนใหญ่รวมทั้งสัญญา) ผู้ใช้เอาติ๊กออกได้
+                    poolSm.selectAll();
+                }
+            }
+        });
+        var poolSm = new Ext.grid.CheckboxSelectionModel();
+        // ยอดรวมของรายการที่ติ๊กเลือก (อัปเดตทุกครั้งที่ติ๊ก/เอาติ๊กออก/โหลด)
+        var poolSumTxt = new Ext.Toolbar.TextItem({text: "ยอดรวมที่เลือก: 0.00 บาท (0 รายการ)"});
+        function updatePoolSum() {
+            var sel = poolSm.getSelections();
+            var sum = 0;
+            sel.forEach(function (r) { sum += parseFloat(String(r.get("f_amt")).replace(/,/g, "")) || 0; });
+            poolSumTxt.setText("<b style=\"color:#080;font-size:13px;\">ยอดรวมที่เลือก: " + moneyStr(sum) + " บาท (" + sel.length + " รายการ)</b>");
+        }
+        poolSm.on("selectionchange", updatePoolSum);
+        var poolGrid = new Ext.grid.GridPanel({
+            store: poolStore,
+            sm: poolSm,
+            stripeRows: true,
+            loadMask: true,
+            border: false,
+            height: 280,
+            viewConfig: {emptyText: "ไม่มีรายการรับของที่ยังไม่ออกเลข IR", deferEmptyText: false},
+            cm: new Ext.grid.ColumnModel({
+                defaults: {sortable: false},
+                columns: [
+                    poolSm,
+                    {header: "งวด", dataIndex: "i_period", width: 50, align: "center"},
+                    {header: "เลขที่ใบรับของ", dataIndex: "c_receive_code", width: 170},
+                    {header: "วันรับของ", dataIndex: "d_receive_date", width: 95, align: "center"},
+                    {header: "เลขคุมตรวจรับ EGP", dataIndex: "c_egp_no", width: 120},
+                    {header: "รายละเอียด", dataIndex: "c_detail", width: 160},
+                    {header: "จำนวนเงิน", dataIndex: "f_amt", width: 95, align: "right"},
+                ]
+            })
+        });
+        new Ext.Window({
+            id: "win-deliver-medsup-poolID",
+            title: "รวมรายการรับของข้ามงวด ออกเลข IR เดียว - สัญญา " + rec.get("c_contract_code"),
+            width: 720,
+            modal: true,
+            layout: "fit",
+            items: [poolGrid],
+            bbar: [poolSumTxt, "->", {xtype: "tbtext", text: "ติ๊กรายการที่ต้องการรวม - รายการที่ออก IR ไปแล้วไม่แสดงในนี้"}],
+            buttons: [
+                {
+                    text: "ออกเลข IR เดียวกันให้ที่เลือก",
+                    iconCls: "icon-save",
+                    handler: function () {
+                        var sel = poolSm.getSelections();
+                        if (!sel.length) {
+                            Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกรายการอย่างน้อย 1 รายการ");
+                            return;
+                        }
+                        var periods = {};
+                        var sumAmt = 0;
+                        sel.forEach(function (r) {
+                            periods[r.get("i_period")] = true;
+                            sumAmt += parseFloat(String(r.get("f_amt")).replace(/,/g, "")) || 0;
+                        });
+                        var periodList = Object.keys(periods).sort(function (a, b) { return a - b; });
+                        var ids = sel.map(function (r) { return r.get("id"); });
+                        Ext.Msg.confirm(
+                            "ยืนยันออกเลข IR",
+                            "รวม " + ids.length + " รายการ จากงวด " + periodList.join(", ") + " เป็นเลข IR เดียวกัน ยอดรวม " + moneyStr(sumAmt) + " บาท ใช่หรือไม่?",
+                            function (btn) {
+                                if (btn !== "yes") {
+                                    return;
+                                }
+                                Ext.Ajax.request({
+                                    url: "tor/api/mnMedSupPeriodBillReceiveController.php",
+                                    method: "POST",
+                                    params: {mode: "ISSUE_IR", ids: Ext.encode(ids)},
+                                    success: function (response) {
+                                        var res = Ext.decode(response.responseText);
+                                        if (res.reval !== 0) {
+                                            Ext.Msg.alert("แจ้งเตือน", res.msg || "ออกเลข IR ไม่สำเร็จ");
+                                            return;
+                                        }
+                                        Ext.getCmp("win-deliver-medsup-poolID").destroy();
+                                        Ext.storeDeliverMedSupReceive.reload();
+                                        if (Ext.storeDeliverMedSupList) {
+                                            Ext.storeDeliverMedSupList.reload();
+                                        }
+                                    },
+                                    failure: function () {
+                                        Ext.Msg.alert("แจ้งเตือน", "ออกเลข IR ไม่สำเร็จ");
+                                    }
+                                });
+                            }
+                        );
+                    }
+                },
+                {
+                    text: Ext.GLOBAL_BU_BACK_TH,
+                    iconCls: "icon-clear",
+                    handler: function () {
+                        Ext.getCmp("win-deliver-medsup-poolID").destroy();
+                    }
+                }
+            ]
+        }).show();
+    }
 
     // หน้าต่างแสดงรายการย่อยที่ถูกรวมอยู่ใต้แถวสรุป (isGroup:true) ของเลข IR หนึ่งๆ -
     // ดับเบิลคลิกแถวสรุปในกริดหลักแล้วเปิดมาดูได้ว่า "N รายการ" ที่รวมยอดกันไว้นั้น
@@ -1460,6 +1585,140 @@ function winDeliverWorkMedSup(rec) {
         return d.getFullYear() + (d.getMonth() >= 9 ? 1 : 0) + 543;
     }
 
+    // [ผู้ใช้ขอ] แก้ผู้ขาย/ผู้รับจ้างจากหน้านี้ (ผู้ขายผิดจากไฟล์ Excel) - เลือกจากทะเบียนเจ้าหนี้เท่านั้น
+    // ค่าเริ่มต้นแก้ทุกงวดของสัญญา (ติ๊กเลือกเฉพาะงวดนี้ได้) ใบเบิก D ที่ออกแล้วแต่ยังไม่เลยขั้น 0.30 แก้ตามให้
+    // เซิร์ฟเวอร์ (mode CHANGE_VENDOR) เป็นคนตรวจกติกาและบันทึกประวัติ
+    function vendorLabel(name, tax) {
+        var enc = Ext.util.Format.htmlEncode;
+        return enc(name || "-") + (tax ? " (เลขภาษี " + enc(tax) + ")" : "");
+    }
+    function winChangeVendor() {
+        var enc = Ext.util.Format.htmlEncode;
+        var vendorStore = new Ext.data.JsonStore({
+            autoLoad: false,
+            url: "tor/api/List_MedSupPeriodBill.php",
+            baseParams: {type: "lookup_creditor"},
+            root: "data",
+            fields: ["dc_creditor_id", "c_code", "c_name", "c_tax_no"]
+        });
+        var vendorCombo = new Ext.form.ComboBox({
+            fieldLabel: "ผู้ขายใหม่",
+            anchor: "100%",
+            store: vendorStore,
+            valueField: "dc_creditor_id",
+            displayField: "c_name",
+            mode: "remote",
+            minChars: 1,
+            queryParam: "query",
+            triggerAction: "all",
+            forceSelection: true,
+            typeAhead: false,
+            allowBlank: false,
+            listWidth: 520,
+            emptyText: "พิมพ์ชื่อหรือเลขภาษีเพื่อค้นหา...",
+            tpl: '<tpl for="."><div class="x-combo-list-item">{c_name} <span style="color:#888;">({c_tax_no})</span></div></tpl>',
+            listeners: {
+                beforequery: function (q) {
+                    q.query = q.query || "";
+                }
+            }
+        });
+        var scopeGrp = new Ext.form.RadioGroup({
+            fieldLabel: "แก้ที่",
+            columns: 1,
+            items: [
+                {boxLabel: "ทุกงวดของสัญญา " + enc(rec.get("c_contract_code")) + " (แนะนำ)", name: "vendor_scope", inputValue: "all", checked: true},
+                {boxLabel: "เฉพาะงวดที่ " + enc(rec.get("i_period")) + " นี้", name: "vendor_scope", inputValue: "one"}
+            ]
+        });
+        function send(extra, cb) {
+            var scope = scopeGrp.getValue();
+            Ext.Ajax.request({
+                url: "tor/api/mnMedSupPeriodBillReceiveController.php",
+                method: "POST",
+                params: Ext.apply({
+                    mode: "CHANGE_VENDOR",
+                    sp_tor_period_bill_id: periodId,
+                    dc_creditor_id: vendorCombo.getValue(),
+                    c_scope: scope ? scope.inputValue : "all"
+                }, extra),
+                success: function (res) {
+                    var r;
+                    try {
+                        r = Ext.util.JSON.decode(res.responseText);
+                    } catch (e) {
+                        Ext.Msg.alert("แจ้งเตือน", "แก้ผู้ขายไม่สำเร็จ");
+                        return;
+                    }
+                    if (r.reval !== 0) {
+                        Ext.Msg.alert("แจ้งเตือน", r.msg || "แก้ผู้ขายไม่สำเร็จ");
+                        return;
+                    }
+                    cb(r);
+                },
+                failure: function () {
+                    Ext.Msg.alert("แจ้งเตือน", "แก้ผู้ขายไม่สำเร็จ");
+                }
+            });
+        }
+        var vwin = new Ext.Window({
+            title: "แก้ผู้ขาย/ผู้รับจ้าง - สัญญา " + rec.get("c_contract_code"),
+            width: 560,
+            modal: true,
+            closeAction: "destroy",
+            bodyStyle: "padding:10px;",
+            items: [{
+                xtype: "form",
+                border: false,
+                labelWidth: 90,
+                items: [
+                    {xtype: "displayfield", fieldLabel: "ผู้ขายเดิม", value: vendorLabel(rec.get("c_creditor_name"), rec.get("c_tax_number_imp"))},
+                    vendorCombo,
+                    scopeGrp,
+                    {xtype: "displayfield", hideLabel: true, style: "color:#888;",
+                     value: "เลือกจากทะเบียนเจ้าหนี้เท่านั้น ใบเบิก (D) ที่ออกแล้วแต่ยังไม่เลยขั้นบันทึกใบขอเบิก จะถูกแก้ตามให้อัตโนมัติ"}
+                ]
+            }],
+            buttons: [
+                {
+                    text: "บันทึก",
+                    iconCls: "icon-save",
+                    handler: function () {
+                        if (!vendorCombo.getValue() || !vendorCombo.isValid()) {
+                            Ext.Msg.alert("แจ้งเตือน", "กรุณาเลือกผู้ขายใหม่จากรายการค้นหา");
+                            return;
+                        }
+                        send({check_only: 1}, function (c) {
+                            var msg = "แก้ผู้ขายเป็น <b>" + vendorLabel(c.new_name, c.new_tax) + "</b><br>งวดที่แก้: " +
+                                (c.periods || []).map(enc).join(", ") +
+                                ((c.wd_codes || []).length ? "<br>ใบเบิกที่แก้ตามด้วย: " + c.wd_codes.map(enc).join(", ") : "") +
+                                "<br><br>ยืนยันใช่หรือไม่?";
+                            Ext.Msg.confirm("ยืนยันแก้ผู้ขาย", msg, function (b) {
+                                if (b !== "yes") {
+                                    return;
+                                }
+                                send({}, function () {
+                                    rec.set("c_creditor_name", c.new_name);
+                                    rec.set("c_tax_number_imp", c.new_tax);
+                                    rec.commit();
+                                    var disp = Ext.getCmp("deliverMedSupVendorID");
+                                    if (disp) {
+                                        disp.setValue(vendorLabel(c.new_name, c.new_tax));
+                                    }
+                                    vwin.destroy();
+                                    Ext.storeDeliverMedSupList.reload();
+                                    Ext.Msg.alert("สำเร็จ", "แก้ผู้ขายเรียบร้อยแล้ว");
+                                });
+                            });
+                        });
+                    }
+                },
+                {text: "ยกเลิก", iconCls: "icon-clear", handler: function () { vwin.destroy(); }}
+            ]
+        });
+        vwin.show();
+    }
+
     new Ext.Window({
         id: "win-deliver-medsupID",
         title: "รายละเอียดงวดที่ " + rec.get("i_period") + " - เลขที่สัญญา " + rec.get("c_contract_code"),
@@ -1478,7 +1737,7 @@ function winDeliverWorkMedSup(rec) {
                         // border layout ของ ExtJS 3 ต้องกำหนด height ให้ north/south region
                         // ตรงๆ เสมอ (ไม่รองรับ autoHeight) ไม่งั้น panel จะถูกบีบจนสูง 0 มองไม่เห็น
                         region: "north",
-                        height: deliverOverlapCode ? 405 : 345,
+                        height: deliverOverlapCode ? 411 : 351,
                         xtype: "form",
                         border: false,
                         bodyStyle: "padding:8px;",
@@ -1492,7 +1751,14 @@ function winDeliverWorkMedSup(rec) {
                             {fieldLabel: "เลขที่ใบกันเหลื่อม", value: deliverOverlapCode, hidden: !deliverOverlapCode, style: "font-weight:bold;"},
                             {fieldLabel: "ชื่อโครงการ", value: rec.get("c_project_name")},
                             {fieldLabel: "ชื่อค่าใช้จ่าย", value: rec.get("c_expense_name")},
-                            {fieldLabel: "ผู้ขาย/ผู้รับจ้าง", value: rec.get("c_creditor_name")},
+                            {
+                                xtype: "compositefield",
+                                fieldLabel: "ผู้ขาย/ผู้รับจ้าง",
+                                items: [
+                                    {xtype: "displayfield", id: "deliverMedSupVendorID", flex: 1, value: vendorLabel(rec.get("c_creditor_name"), rec.get("c_tax_number_imp"))},
+                                    {xtype: "button", text: "แก้ผู้ขาย", iconCls: "icon-edit", handler: winChangeVendor}
+                                ]
+                            },
                             {fieldLabel: "แหล่งเงิน", value: rec.get("c_fund_source_dtl")},
                             {id: "deliverMedSupTotalID", fieldLabel: "จำนวนเงินงวดนี้", value: ""},
                             {id: "deliverMedSupRemainID", fieldLabel: "คงเหลือ", value: "", style: "font-weight:bold;"},
@@ -1560,6 +1826,11 @@ function winDeliverWorkMedSup(rec) {
             }
         ],
         buttons: [
+            {
+                text: "รวมงวดอื่นออก IR เดียวกัน",
+                iconCls: "icon-save",
+                handler: winIssueIrAcrossPeriods
+            },
             {
                 text: Ext.GLOBAL_BU_BACK_TH,
                 iconCls: "icon-clear",
@@ -1633,7 +1904,12 @@ Ext.AppUx = function (app, menu) {
                     Ext.Msg.alert("แจ้งเตือน", c.msg || "ยกเลิกไม่ได้");
                     return;
                 }
-                askReasonAndCancel(rec, label);
+                // IR/AP ใช้ร่วมกับงวดอื่น (รวมข้ามงวด) = ยกเลิกพร้อมกันทั้งชุด บอกผู้ใช้ให้ชัดก่อนยืนยัน
+                var gp = c.group_periods || [];
+                var labelAsk = gp.length > 1
+                    ? enc(rec.get("c_contract_code")) + " งวดที่ " + gp.map(enc).join(", ") + " (ใช้ IR/AP ร่วมกัน ยกเลิกพร้อมกัน)"
+                    : label;
+                askReasonAndCancel(rec, labelAsk);
             },
             failure: function () {
                 Ext.Msg.alert("แจ้งเตือน", "ตรวจสอบรายการไม่สำเร็จ");

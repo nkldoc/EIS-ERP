@@ -386,11 +386,15 @@ if ($type == "medsup_period_bill") {
 } else if ($type == "medsup_period_bill_receive") {
     // ================= รายการ "รับของ" ย่อยของงวดที่เลือก ================= //
     // ใช้กับเมนู "ส่งมอบงาน (เวชภัณฑ์)" - 1 งวดรับของทยอยได้หลายครั้ง (หลายแถว)
-    $arrParam[] = $_REQUEST['sp_tor_period_bill_id'] ?? null;
+    // รวมแถวของงวดอื่นที่ใช้เลข IR เดียวกับงวดนี้ (กรณีรวมข้ามงวดออก IR เดียว) เพื่อให้แถวสรุป IR ยอดรวมครบ
+    // - ฝั่งหน้าจอนับเฉพาะแถวของงวดนี้ (sp_tor_period_bill_id ตรงกับงวดที่เปิด) เป็นยอดใช้ไปของงวด
+    $recBillId = intval($_REQUEST['sp_tor_period_bill_id'] ?? 0);
+    $arrParam = array($recBillId, $recBillId);
     // เลขคุมตรวจรับ EGP ที่นำเข้ามากับไฟล์ (คอลัมน์จาก sp_tor_period_bill_receive_egp_no.sql - ยังไม่รัน = ว่าง)
     $egpCol = intval($db->GetDataBySQL("select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_egp_no') is null then 0 else 1 end", array())) === 1
         ? ", c_egp_no" : ", cast(null as varchar(50)) as c_egp_no";
     $sqlMain = "select sp_tor_period_bill_receive_id, sp_tor_period_bill_id
+                    , (select top 1 pb.i_period from NMU_ERP.dbo.sp_tor_period_bill pb where pb.sp_tor_period_bill_id = sp_tor_period_bill_receive.sp_tor_period_bill_id) as i_period
                     , c_receive_code
                     , convert(varchar, d_receive_date, 120) as d_receive_date
                     , c_detail, f_amt, c_ir_code
@@ -404,7 +408,9 @@ if ($type == "medsup_period_bill") {
                     , draft_f_vat_amt, draft_f_wht_amt
                     , b_ir_confirm, b_ap_unlock
                 from NMU_ERP.dbo.sp_tor_period_bill_receive
-                where sp_tor_period_bill_id = ? and i_enabled = 1
+                where i_enabled = 1 and (sp_tor_period_bill_id = ?
+                    or c_ir_code in (select r9.c_ir_code from NMU_ERP.dbo.sp_tor_period_bill_receive r9
+                                     where r9.sp_tor_period_bill_id = ? and r9.i_enabled = 1 and r9.c_ir_code is not null))
                 order by sp_tor_period_bill_receive_id";
 
     $stmt = $db->QueryParam($sqlMain, $arrParam);
@@ -412,6 +418,7 @@ if ($type == "medsup_period_bill") {
         ${$root}[] = array(
             "id" => intval($row["sp_tor_period_bill_receive_id"]),
             "sp_tor_period_bill_id" => intval($row["sp_tor_period_bill_id"]),
+            "i_period" => intval($row["i_period"]),
             "c_receive_code" => $row["c_receive_code"],
             "d_receive_date" => empty($row["d_receive_date"]) ? "" : $date->extDateBuddha($row["d_receive_date"]),
             "c_detail" => $row["c_detail"],
@@ -438,6 +445,38 @@ if ($type == "medsup_period_bill") {
             "b_ir_confirm" => intval($row["b_ir_confirm"]),
             // ผู้ดูแลระบบปลดล็อก IR ที่ออกเลขตรวจรับแล้วให้แก้ได้ (ดู mode UNLOCK_AP)
             "b_ap_unlock" => intval($row["b_ap_unlock"]),
+        );
+    }
+    echo json_encode(array($root => ${$root}));
+    exit();
+} else if ($type == "medsup_period_bill_receive_pool") {
+    // [ผู้ใช้ขอ] รายการรับของที่ "ยังไม่ออกเลข IR" ของทุกงวดในสัญญาเดียวกัน (หน่วยงานเดียวกัน) กับงวดที่เปิดอยู่
+    // ใช้ติ๊กรวมข้ามงวดเพื่อออกเลข IR เดียว (-> AP/ใบเบิกเดียว) เช่น สัญญา 2 งวดที่เบิกใบเดียว
+    $poolBillId = intval($_REQUEST['sp_tor_period_bill_id'] ?? 0);
+    $egpColPool = intval($db->GetDataBySQL("select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'c_egp_no') is null then 0 else 1 end", array())) === 1
+        ? ", r.c_egp_no" : ", cast(null as varchar(50)) as c_egp_no";
+    $sqlPool = "select r.sp_tor_period_bill_receive_id, r.sp_tor_period_bill_id, g.i_period
+                    , r.c_receive_code, convert(varchar, r.d_receive_date, 120) as d_receive_date
+                    , r.c_detail, r.f_amt {$egpColPool}
+                from NMU_ERP.dbo.sp_tor_period_bill cur
+                inner join NMU_ERP.dbo.sp_tor_period_bill g
+                    on g.c_contract_code = cur.c_contract_code and g.i_enabled = 1
+                    and isnull(g.c_ap_dept_type, 'APMSD') = isnull(cur.c_ap_dept_type, 'APMSD')
+                inner join NMU_ERP.dbo.sp_tor_period_bill_receive r
+                    on r.sp_tor_period_bill_id = g.sp_tor_period_bill_id and r.i_enabled = 1 and r.c_ir_code is null
+                where cur.sp_tor_period_bill_id = ? " . medsupOwnFilter("g", false) . "
+                order by g.i_period, r.sp_tor_period_bill_receive_id";
+    $stmt = $db->QueryParam($sqlPool, array($poolBillId));
+    while ($row = $db->Fetch($stmt)) {
+        ${$root}[] = array(
+            "id" => intval($row["sp_tor_period_bill_receive_id"]),
+            "sp_tor_period_bill_id" => intval($row["sp_tor_period_bill_id"]),
+            "i_period" => intval($row["i_period"]),
+            "c_receive_code" => $row["c_receive_code"],
+            "d_receive_date" => empty($row["d_receive_date"]) ? "" : $date->extDateBuddha($row["d_receive_date"]),
+            "c_detail" => $row["c_detail"],
+            "f_amt" => is_null($row["f_amt"]) ? "" : number_format($row["f_amt"], 2),
+            "c_egp_no" => $row["c_egp_no"],
         );
     }
     echo json_encode(array($root => ${$root}));
