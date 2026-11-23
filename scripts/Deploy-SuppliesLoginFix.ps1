@@ -1,72 +1,78 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
 param(
-    [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [string] $SiteName,
-
-    [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [string] $AppPoolName,
-
-    [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [string] $SiteRoot,
-
+    [string] $HostName = 'eis.nmu.ac.th',
     [string] $SourceRoot = (Split-Path -Parent $PSScriptRoot),
-
-    [string] $BackupRoot = (Join-Path $env:ProgramData 'EIS-ERP\deploy-backups'),
-
-    [switch] $SkipRecycle
+    [string] $BackupRoot = (Join-Path $env:ProgramData 'EIS-ERP\deploy-backups')
 )
 
 #Requires -RunAsAdministrator
 $ErrorActionPreference = 'Stop'
 
+Import-Module WebAdministration
+
+$sites = @(Get-Website | Where-Object {
+    @($_.Bindings.Collection | ForEach-Object { ([string]$_.bindingInformation).Split(':')[-1] }) -contains $HostName
+})
+if ($sites.Count -ne 1) {
+    throw "Expected one IIS site bound to '$HostName'; found $($sites.Count). Check the host binding before deployment."
+}
+$site = $sites[0]
+
+# Prefer an IIS application at /supplies. If there is no application, use the
+# supplies folder under the site's physical root.
+$suppliesApp = @(Get-WebApplication -Site $site.Name | Where-Object { $_.Path.TrimEnd('/') -ieq '/supplies' }) | Select-Object -First 1
+if ($suppliesApp) {
+    $targetRoot = [Environment]::ExpandEnvironmentVariables([string]$suppliesApp.PhysicalPath)
+    $appPoolName = [string]$suppliesApp.applicationPool
+    $layout = 'ApplicationRoot'
+} else {
+    $siteRoot = [Environment]::ExpandEnvironmentVariables([string]$site.PhysicalPath)
+    $targetRoot = Join-Path $siteRoot 'supplies'
+    $appPoolName = [string]$site.applicationPool
+    $layout = 'SiteRootWithSuppliesFolder'
+}
+
+if ([string]::IsNullOrWhiteSpace($appPoolName)) { throw "Could not determine the app pool for '$HostName/supplies'." }
+if (-not (Test-Path -LiteralPath $targetRoot -PathType Container)) { throw "Supplies application directory not found: $targetRoot" }
+if (-not (Test-Path -LiteralPath "IIS:\AppPools\$appPoolName")) { throw "IIS app pool not found: $appPoolName" }
+
+$resolvedSourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
 $files = @(
     'public\supplies\access\confirm-login.php',
     'public\supplies\conf\presence\SuppliesLogin.php',
     'public\supplies\assets\js\login-confirmation.js'
 )
-
-Import-Module WebAdministration
-
-$site = Get-Website -Name $SiteName -ErrorAction Stop
-$pool = Get-Item "IIS:\AppPools\$AppPoolName" -ErrorAction Stop
-$sitePhysicalPath = [Environment]::ExpandEnvironmentVariables([string]$site.PhysicalPath)
-$resolvedSiteRoot = [IO.Path]::GetFullPath($SiteRoot).TrimEnd('\')
-$resolvedPhysicalPath = [IO.Path]::GetFullPath($sitePhysicalPath).TrimEnd('\')
-if ($resolvedSiteRoot -ine $resolvedPhysicalPath) {
-    throw "SiteRoot '$resolvedSiteRoot' does not match IIS site '$SiteName' physical path '$resolvedPhysicalPath'."
-}
-
-$resolvedSourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
-$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$backupDirectory = Join-Path $BackupRoot "supplies-login-fix-$timestamp"
 $targets = foreach ($relativePath in $files) {
+    $appRelativePath = $relativePath.Substring('public\supplies\'.Length)
     $source = Join-Path $resolvedSourceRoot $relativePath
-    $destination = Join-Path $resolvedSiteRoot ($relativePath.Substring('public\'.Length))
+    $destination = Join-Path $targetRoot $appRelativePath
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing source file: $source" }
     if (-not (Test-Path -LiteralPath $destination -PathType Leaf)) { throw "Missing IIS target file: $destination" }
-    [pscustomobject]@{ RelativePath = $relativePath; Source = $source; Destination = $destination }
+    [pscustomobject]@{ RelativePath = $appRelativePath; Source = $source; Destination = $destination }
 }
 
-if (-not (Test-Path -LiteralPath $BackupRoot)) {
-    New-Item -ItemType Directory -Path $BackupRoot -Force | Out-Null
-}
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$backupDirectory = Join-Path $BackupRoot "supplies-login-fix-$timestamp"
+Write-Host "IIS site: $($site.Name)"
+Write-Host "Binding: $HostName"
+Write-Host "Supplies layout: $layout"
+Write-Host "Target: $targetRoot"
+Write-Host "App pool: $appPoolName"
+Write-Host "Backup: $backupDirectory"
 
-if (-not $PSCmdlet.ShouldProcess("IIS site '$SiteName' at '$resolvedSiteRoot'", 'Back up, deploy three Supplies login files, and recycle the application pool')) {
+if (-not $PSCmdlet.ShouldProcess("$HostName/supplies ($targetRoot)", "Back up and deploy 3 files; recycle app pool '$appPoolName'")) {
     return
 }
 
 New-Item -ItemType Directory -Path $backupDirectory -Force | Out-Null
-$poolWasStarted = (Get-WebAppPoolState -Name $AppPoolName).Value -eq 'Started'
+$poolWasStarted = (Get-WebAppPoolState -Name $appPoolName).Value -eq 'Started'
 $deploymentStarted = $false
 try {
-    if ($poolWasStarted -and -not $SkipRecycle) { Stop-WebAppPool -Name $AppPoolName }
+    if ($poolWasStarted) { Stop-WebAppPool -Name $appPoolName }
+
     foreach ($target in $targets) {
-        $backupFile = Join-Path $backupDirectory ($target.RelativePath.Substring('public\'.Length))
-        $backupParent = Split-Path -Parent $backupFile
-        New-Item -ItemType Directory -Path $backupParent -Force | Out-Null
+        $backupFile = Join-Path $backupDirectory $target.RelativePath
+        New-Item -ItemType Directory -Path (Split-Path -Parent $backupFile) -Force | Out-Null
         Copy-Item -LiteralPath $target.Destination -Destination $backupFile -Force
     }
 
@@ -75,24 +81,23 @@ try {
         Copy-Item -LiteralPath $target.Source -Destination $target.Destination -Force
     }
 
-    if ($poolWasStarted -and -not $SkipRecycle) { Start-WebAppPool -Name $AppPoolName }
-}
-catch {
+    # Stop/start clears the worker process and PHP OPcache for this app pool.
+    if ($poolWasStarted) { Start-WebAppPool -Name $appPoolName }
+} catch {
     $deploymentError = $_
-    if ($deploymentStarted -and (Test-Path -LiteralPath $backupDirectory)) {
+    if ($deploymentStarted) {
         foreach ($target in $targets) {
-            $backupFile = Join-Path $backupDirectory ($target.RelativePath.Substring('public\'.Length))
+            $backupFile = Join-Path $backupDirectory $target.RelativePath
             if (Test-Path -LiteralPath $backupFile -PathType Leaf) {
                 Copy-Item -LiteralPath $backupFile -Destination $target.Destination -Force
             }
         }
     }
-    if ($poolWasStarted -and -not $SkipRecycle -and (Get-WebAppPoolState -Name $AppPoolName).Value -ne 'Started') {
-        Start-WebAppPool -Name $AppPoolName
+    if ($poolWasStarted -and (Get-WebAppPoolState -Name $appPoolName).Value -ne 'Started') {
+        Start-WebAppPool -Name $appPoolName
     }
     throw $deploymentError
 }
 
-Write-Host "Deployed Supplies login fix to IIS site '$SiteName'."
-Write-Host "Backup: $backupDirectory"
-if ($SkipRecycle) { Write-Warning 'App pool recycle was skipped; PHP OPcache may still serve older code.' }
+Write-Host "Deployment completed for $HostName/supplies."
+Write-Host "Backup saved at: $backupDirectory"
