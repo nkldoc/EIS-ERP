@@ -54,6 +54,7 @@ if (-not (Test-Path -LiteralPath "IIS:\AppPools\$appPoolName")) { throw "IIS app
 $resolvedSourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
 $files = @(
     'public\supplies\access\confirm-login.php',
+    'public\supplies\conf\presence\Presence.php',
     'public\supplies\conf\presence\SuppliesLogin.php',
     'public\supplies\assets\js\login-confirmation.js'
 )
