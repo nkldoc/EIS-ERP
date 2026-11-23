@@ -398,8 +398,11 @@ if ($_REQUEST["type"] == "dc_cost_all") {
                 INNER JOIN " . DB_NMU_EIS . "bg_budget_dtl_overlap d ON d.bg_overlap_hdr_id = h.bg_overlap_hdr_id
                 INNER JOIN " . DB_NMU_EIS . "bg_budget_hdr_overlap bh ON bh.bg_budget_hdr_overlap_id = d.bg_budget_hdr_overlap_id AND bh.i_enable = 1
                 WHERE h.po_id = ? AND h.i_sys = 3
+                  AND (? = 0 OR bh.dc_expense_budget_type_id = ?)
                 ORDER BY bh.i_year DESC";
-    $stmt = $db->QueryParam($sqlMain, array(intval($_REQUEST["po_id"] ?? 0)));
+    // กรองตามแหล่งเงินที่หน่วยงานเลือก (dc_expense_budget_type_id) - ไม่กรองแล้วจะขึ้นใบกันของแหล่งอื่นให้เลือกผิด
+    $fundId = intval($_REQUEST["dc_expense_budget_type_id"] ?? 0);
+    $stmt = $db->QueryParam($sqlMain, array(intval($_REQUEST["po_id"] ?? 0), $fundId, $fundId));
     while ($stmt && ($row = $db->Fetch($stmt))) {
         ${$root}[] = array("c_booking" => $row["c_code_ref"], "i_year" => intval($row["i_year"]));
     }
