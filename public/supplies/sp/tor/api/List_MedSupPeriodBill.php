@@ -953,10 +953,13 @@ if ($type == "medsup_period_bill") {
     $q = $_REQUEST['query'] ?? '';
     $arrParam[] = "%{$q}%";
     $arrParam[] = "%{$q}%";
+    // c_has_addr = มีข้อมูลที่อยู่ภาษี (tax_c_name + จังหวัด/ที่อยู่) - ทะเบียนมีรายการชื่อ/เลขภาษีซ้ำกัน บางตัวไม่มีที่อยู่
+    // ทำให้ใบขอเบิกไม่แสดงที่อยู่ จึงเรียงตัวที่มีที่อยู่ก่อนและให้หน้าจอติดป้ายบอก
     $sqlMain = "select top 30 dc_creditor_id, c_code, c_name, c_tax_number_imp as c_tax_no
+                    , case when isnull(tax_c_name, '') <> '' and (isnull(tax_c_province, '') <> '' or isnull(tax_c_house_no, '') <> '') then 1 else 0 end as c_has_addr
                 from NMU.dbo.dc_creditor
                 where isnull(i_enable,1) = 1 and (c_name like ? or c_tax_number_imp like ?)
-                order by c_name";
+                order by case when isnull(tax_c_name, '') <> '' and (isnull(tax_c_province, '') <> '' or isnull(tax_c_house_no, '') <> '') then 0 else 1 end, c_name";
     $stmt = $db->QueryParam($sqlMain, $arrParam);
     while ($row = $db->Fetch($stmt)) {
         ${$root}[] = array(
@@ -964,6 +967,7 @@ if ($type == "medsup_period_bill") {
             "c_code" => $row["c_code"],
             "c_name" => $row["c_name"],
             "c_tax_no" => $row["c_tax_no"],
+            "c_has_addr" => intval($row["c_has_addr"]),
         );
     }
     echo json_encode(array($root => ${$root}));
