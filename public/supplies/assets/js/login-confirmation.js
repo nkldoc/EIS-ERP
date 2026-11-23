@@ -40,7 +40,7 @@
     var response = await fetch('/supplies/access/confirm-login?live=1', Object.assign({cache:'no-store', credentials:'same-origin', signal:AbortSignal.timeout(10000)}, options));
     var body = await response.text(), data;
     try { data = JSON.parse(body); }
-    catch (_) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง กรุณาตรวจ PHP error log'); }
+    catch (_) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง กรุณาติดต่อผู้ดูแลระบบ'); }
     if (!response.ok) throw new Error(data.error || 'ไม่สามารถดำเนินการได้ กรุณาลองใหม่');
     return data;
   }
