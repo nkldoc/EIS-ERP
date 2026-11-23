@@ -527,18 +527,24 @@ function imp_validate($db, $inputRows)
 
         $c["c_overlap"] = $h["c_overlap"];
         $c["c_contract_code"] = $h["contract_code"];
+        $existRows = array();   // งวดที่ใช้งานอยู่ของเลขที่สัญญานี้ในระบบ (ว่าง = สัญญาใหม่)
+        $c["append_hdr_id"] = null;
         if ($h["contract_code"] !== "") {
             if (isset($fileCodes[$h["contract_code"]])) {
                 $cErrs[] = "เลขที่สัญญา {$h["contract_code"]} ซ้ำกับลำดับสัญญา {$fileCodes[$h["contract_code"]]} ในไฟล์";
             } else {
                 $fileCodes[$h["contract_code"]] = $seq;
             }
-            $exists = $db->GetDataBySQL(
-                "select top 1 c_contract_code from NMU_ERP.dbo.sp_tor_period_bill where c_contract_code = ? and i_enabled = 1",
+            // [ผู้ใช้ขอ 2569-11-23] เลขที่สัญญามีในระบบแล้ว = เพิ่ม "งวดที่ยังไม่มี" เข้าสัญญาเดิมได้ (สัญญาหลายงวดที่ส่งไฟล์มาทีละงวด)
+            // เงื่อนไข: ประเภท (APF/APMSD/APPS) และผู้ขายตรงกับของเดิม + เลขงวดในไฟล์ต้องไม่ซ้ำงวดที่มีอยู่ (ตรวจต่อด้านล่างหลังหาผู้ขายแล้ว)
+            $stmtEx = $db->QueryParam(
+                "select sp_tor_period_bill_hdr_id, i_period, isnull(c_ap_dept_type, '') as c_ap_dept_type, isnull(dc_creditor_id, 0) as dc_creditor_id,
+                        c_fund_source_dtl, isnull(f_fund_amt_dtl, 0) as f_fund_amt_dtl
+                   from NMU_ERP.dbo.sp_tor_period_bill where c_contract_code = ? and i_enabled = 1 order by sp_tor_period_bill_hdr_id, i_period",
                 array($h["contract_code"])
             );
-            if (!empty($exists)) {
-                $cErrs[] = "เลขที่สัญญา {$h["contract_code"]} มีในระบบแล้ว";
+            while ($stmtEx && ($rx = $db->Fetch($stmtEx))) {
+                $existRows[] = $rx;
             }
         }
 
@@ -616,6 +622,42 @@ function imp_validate($db, $inputRows)
         $c["dc_creditor_id"] = $cred ? intval($cred["dc_creditor_id"]) : null;
         $c["c_creditor_name"] = $cred ? imp_str($cred["c_name"]) : $h["vendor"];
         $c["c_tax_number_imp"] = $cred ? imp_str($cred["c_tax_number_imp"]) : $h["tax"];
+
+        // เลขที่สัญญามีในระบบแล้ว: เพิ่มเฉพาะงวดที่ยังไม่มีเข้าสัญญาเดิม (ใช้ hdr_id เดิม)
+        if (!empty($existRows)) {
+            $exHdr = intval($existRows[0]["sp_tor_period_bill_hdr_id"]);
+            $exPeriods = array();
+            foreach ($existRows as $rx) {
+                $exPeriods[intval($rx["i_period"])] = true;
+            }
+            if (strtoupper($existRows[0]["c_ap_dept_type"]) !== $c["c_ap_dept_type"]) {
+                $cErrs[] = "เลขที่สัญญา {$h["contract_code"]} มีในระบบแล้วเป็นประเภท {$existRows[0]["c_ap_dept_type"]} ไม่ตรงกับประเภท {$c["c_ap_dept_type"]} ในไฟล์";
+            }
+            if ($cred && intval($existRows[0]["dc_creditor_id"]) !== intval($cred["dc_creditor_id"])) {
+                $cErrs[] = "เลขที่สัญญา {$h["contract_code"]} มีในระบบแล้วด้วยผู้ขายคนละราย (ไฟล์: " . imp_str($cred["c_name"])
+                    . ") กรุณาแก้ผู้ขายของสัญญาเดิมที่หน้าส่งมอบงานให้ตรงกันก่อน แล้วนำเข้าใหม่";
+            }
+            $dupPeriods = array();
+            foreach ($g["periods"] as $pp) {
+                if (ctype_digit((string) $pp["i_period"]) && isset($exPeriods[intval($pp["i_period"])])) {
+                    $dupPeriods[] = intval($pp["i_period"]);
+                }
+            }
+            if (!empty($dupPeriods)) {
+                $cErrs[] = "เลขที่สัญญา {$h["contract_code"]} มีงวดที่ " . implode(", ", $dupPeriods) . " ในระบบแล้ว (นำเข้าซ้ำไม่ได้)";
+            }
+            $c["append_hdr_id"] = $exHdr;
+            if (empty($dupPeriods)) {
+                $cWarns[] = "เลขที่สัญญา {$h["contract_code"]} มีในระบบแล้ว (งวดที่ " . implode(", ", array_keys($exPeriods)) . ") จะเพิ่มงวดใหม่เข้าสัญญาเดิม";
+            }
+            // ยอดงวดเดิมนับรวมในวงเงินแหล่งเงินของสัญญาด้วย (ตรวจวงเงินด้านล่าง)
+            foreach ($existRows as $rx) {
+                $fk = imp_str($rx["c_fund_source_dtl"]);
+                if ($fk !== "" && isset($headerFunds[$fk])) {
+                    $headerFunds[$fk]["used"] += floatval($rx["f_fund_amt_dtl"]);
+                }
+            }
+        }
 
         // งวด: แหล่งเงินของงวดต้องเป็นแหล่งเงินของหัวสัญญา, ยอดรวมงวดต่อแหล่งห้ามเกินวงเงิน
         // แหล่งนั้น (ขาด = เตือน), ยอดรายการรับของรวมต่องวดห้ามเกินจำนวนเงินงวด (กติกาเดียวกับ
@@ -793,7 +835,8 @@ switch ($mode) {
             }
             // hdr_id ใหม่ต่อสัญญา + เลขที่สัญญาอัตโนมัติ (ถ้าไม่ได้กรอก) - เหมือน mode ADD ของ
             // ST00092 (แถวที่ insert ไปแล้วใน transaction เดียวกันถูกนับด้วย เลขไม่ชนกัน)
-            $hdrId = intval($db->GetDataBySQL(
+            // เพิ่มงวดเข้าสัญญาเดิม (append_hdr_id) = ใช้ hdr_id ของสัญญานั้น
+            $hdrId = !empty($c["append_hdr_id"]) ? intval($c["append_hdr_id"]) : intval($db->GetDataBySQL(
                 "select top 1 sp_tor_period_bill_hdr_id from NMU_ERP.dbo.sp_tor_period_bill order by sp_tor_period_bill_hdr_id desc",
                 array()
             )) + 1;
