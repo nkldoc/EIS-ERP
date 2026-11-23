@@ -31,7 +31,6 @@ final class Presence
         // Presence is optional. Keep login available when the shared SMB store
         // is unavailable or its service identity cannot authenticate.
         if (!is_dir($directory)) {
-            error_log('Supplies presence disabled: shared directory is unavailable');
             return false;
         }
         return true;
