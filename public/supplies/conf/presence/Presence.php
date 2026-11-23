@@ -25,8 +25,15 @@ final class Presence
         if (($config['enabled'] ?? true) === false) return false;
         $host = self::host();
         if (in_array($host, ['dev-eis.nmu.ac.th', 'localhost', '127.0.0.1'], true)) return true;
-        return PresenceEnvironment::isProduction()
-            && (bool)(getenv('EIS_DOCS_PRESENCE_DIR') ?: ($config['directory'] ?? ''));
+        $directory = getenv('EIS_DOCS_PRESENCE_DIR') ?: ($config['directory'] ?? '');
+        if (!PresenceEnvironment::isProduction() || $directory === '') return false;
+
+        // Presence is optional. Keep login available when the shared SMB store
+        // is unavailable or its service identity cannot authenticate.
+        if (!is_dir($directory)) {
+            return false;
+        }
+        return true;
     }
     public static function sessionKey(string $system, string $uid, string $login): string
     {
