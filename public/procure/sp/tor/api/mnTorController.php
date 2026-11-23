@@ -537,6 +537,15 @@ switch ($mode) {
         $arrParam[] = $data["i_is_overlap"];
         $arrParam[] = $data["i_type_bg"];
         $arrParam[] = $data["confirm_overlap"];
+        // เลขใบกันที่เลือกในหน้ายืนยันกันเหลื่อม (เหมือน supplies) -> เก็บที่สัญญา c_overlap / i_yyyy_overlap
+        $overlapCode = trim((string) ($_REQUEST["c_overlap_select"] ?? ""));
+        $overlapYear = intval($_REQUEST["i_yyyy_overlap_select"] ?? 0);
+        $contractOverlapSql = "";
+        if ($overlapCode !== "" && $overlapYear > 0) {
+            $contractOverlapSql = ", c_overlap = ?, i_yyyy_overlap = ?";
+            $arrParam[] = $overlapCode;
+            $arrParam[] = (string) $overlapYear;
+        }
         $arrParam[] = $data["id"];
 
         $arrParam[] = $_SESSION["user_id"];
@@ -552,7 +561,7 @@ switch ($mode) {
                         , d_update = ?
                         , i_is_overlap = ?
                         , i_type_bg =  ?
-                        , confirm_overlap = ?
+                        , confirm_overlap = ?{$contractOverlapSql}
                     WHERE {$keyName} = ?
 
                 UPDATE sp_tor_contract
@@ -1274,8 +1283,11 @@ switch ($mode) {
         //        exit();
         break;
     case "UPDATE_OVERLAP":
+        // ฟอร์มยืนยันใบกันเหลื่อมส่งปีงบมาเป็น i_year (ตรงกับ supplies) ไม่ใช่ i_budget_year
+        // ถ้าอ่านผิดคีย์ ค่าจะเป็น NULL แล้วทับ i_yyyy ทุกครั้งที่ยืนยัน (เช่น tor_id 1030 ปีงบหาย)
+        // จึงใช้ ISNULL(?, i_yyyy) ให้คงปีเดิมไว้เมื่อไม่ได้ส่งมา
         // $arrParam[] = $data["c_name"] ?? NULL;
-        $arrParam[] = $data["i_budget_year"] ?? NULL;
+        $arrParam[] = $data["i_year"] ?? NULL;
         // $arrParam[] = $data["dc_expense_budget_type_id"] ?? NULL;
         // $arrParam[] = $data["po_expense_id"] ?? null;
         // $arrParam[] = $data["dc_cost_id"] ?? null;
@@ -1298,7 +1310,7 @@ switch ($mode) {
         $sql = "UPDATE {$table}
                             SET
                                 -- c_name = ?
-                                 i_yyyy = ?
+                                 i_yyyy = ISNULL(?, i_yyyy)
                                 -- , dc_expense_budget_type_id = ?
                                 -- , po_expense_id = ?
                                 -- , dc_cost_id = ?

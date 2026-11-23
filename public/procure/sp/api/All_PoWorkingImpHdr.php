@@ -384,9 +384,24 @@ if ($_REQUEST["type"] == "dc_cost_all") {
                 "dc_cost_id" => $row["dc_cost_id"],
                 "bg_expense_id" => $row["bg_expense_id"],
                 "dc_expense_budget_type_id" => $row["dc_expense_budget_type_id"],
+                // ยอดคงเหลือของใบกัน (ใช้แสดงในรายการเลือกเลขที่ใบกันของหน้ายืนยันกันเหลื่อมก่อหนี้)
+                "f_total" => floatval($row["f_total"]),
+                "d_end_date" => $row["d_end_date"] instanceof DateTime ? $row["d_end_date"]->format("Y-m-d") : $row["d_end_date"],
             );
             ${$root}[] = $temp;
         }
+    }
+} else if ($_REQUEST["type"] == "overlap_by_contract") {
+    // ใบกันที่ขอกันเหลื่อมมาจากสัญญานี้ (bg_overlap_hdr.po_id = sp_tor_contract_id) - ใช้เลือกให้อัตโนมัติในหน้ายืนยันกันเหลื่อมก่อหนี้
+    $sqlMain = "SELECT DISTINCT d.c_code_ref, bh.i_year
+                FROM " . DB_NMU_EIS . "bg_overlap_hdr h
+                INNER JOIN " . DB_NMU_EIS . "bg_budget_dtl_overlap d ON d.bg_overlap_hdr_id = h.bg_overlap_hdr_id
+                INNER JOIN " . DB_NMU_EIS . "bg_budget_hdr_overlap bh ON bh.bg_budget_hdr_overlap_id = d.bg_budget_hdr_overlap_id AND bh.i_enable = 1
+                WHERE h.po_id = ? AND h.i_sys = 3
+                ORDER BY bh.i_year DESC";
+    $stmt = $db->QueryParam($sqlMain, array(intval($_REQUEST["po_id"] ?? 0)));
+    while ($stmt && ($row = $db->Fetch($stmt))) {
+        ${$root}[] = array("c_booking" => $row["c_code_ref"], "i_year" => intval($row["i_year"]));
     }
 } else if ($_REQUEST["type"] == "overlap_remain") {
     // เลขใบกัน + เงินคงเหลือ ใช้แสดงใน alert เมื่อ API จองเงินตอบ Not enough money (ค้นด้วยเลขใบกัน c_booking)

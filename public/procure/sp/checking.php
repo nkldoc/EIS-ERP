@@ -165,6 +165,10 @@
         input[type=number] {
             -moz-appearance: textfield;
         }
+        .row-highlight .x-grid3-cell {
+            background: #ffe48d !important;
+            font-weight: bold;
+        }
     </style>
     </head>
 
