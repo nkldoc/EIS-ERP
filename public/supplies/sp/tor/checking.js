@@ -1031,7 +1031,8 @@ const win_request_edit_bg = function (rec) {
                                                                                                 Ext.Ajax.request({
                                                                                                         url: "api/All_PoWorkingImpHdr.php",
                                                                                                         method: "GET",
-                                                                                                        params: { type: "overlap_by_contract", po_id: rec.data.sp_tor_contract_id },
+                                                                                                        // กรองใบกันตามแหล่งเงินของรายการ (ไม่ให้ขึ้นใบกันของแหล่งอื่นมาให้เลือก)
+                                                                                                        params: { type: "overlap_by_contract", po_id: rec.data.sp_tor_contract_id, dc_expense_budget_type_id: rec.data.dc_expense_budget_type_id },
                                                                                                         callback: function (opt, ok, resp) {
                                                                                                                 var list = [];
                                                                                                                 try {

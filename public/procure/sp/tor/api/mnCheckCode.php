@@ -217,7 +217,8 @@ switch ($mode){
                             inner join sp_tor_hdr_period b on b.sp_tor_hdr_period_id = a.sp_tor_hdr_period_id
                             where b.i_is_last = 1 and sp_check_period_hdr_id = ?";
             $f1 = $db->GetDataBySQL($subSql, array($ret_id));
-            $i_last_period = $f1['i_is_last'];
+            // งวดที่ไม่ใช่งวดสุดท้าย query ไม่คืนแถว ($f1 = null) -> ไม่ใช่งวดสุดท้าย (ไม่ให้เกิด PHP Warning ปนไปกับ JSON)
+            $i_last_period = (is_array($f1) && !empty($f1['i_is_last'])) ? $f1['i_is_last'] : 0;
 
             $stmt3 = $db->QueryParam(" EXEC dbo.SP_CHECKING_GL ?, ?, ?", array($data["sp_check_period_hdr_id"], $data['dc_user_create_id'], $data['dc_user_create_cost_id']));
             if ($i_last_period) {

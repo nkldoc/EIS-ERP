@@ -1599,7 +1599,7 @@ function winDeliverWorkMedSup(rec) {
             url: "tor/api/List_MedSupPeriodBill.php",
             baseParams: {type: "lookup_creditor"},
             root: "data",
-            fields: ["dc_creditor_id", "c_code", "c_name", "c_tax_no"]
+            fields: ["dc_creditor_id", "c_code", "c_name", "c_tax_no", "c_has_addr"]
         });
         var vendorCombo = new Ext.form.ComboBox({
             fieldLabel: "ผู้ขายใหม่",
@@ -1616,7 +1616,10 @@ function winDeliverWorkMedSup(rec) {
             allowBlank: false,
             listWidth: 520,
             emptyText: "พิมพ์ชื่อหรือเลขภาษีเพื่อค้นหา...",
-            tpl: '<tpl for="."><div class="x-combo-list-item">{c_name} <span style="color:#888;">({c_tax_no})</span></div></tpl>',
+            // ทะเบียนมีรายการชื่อ/เลขภาษีซ้ำ บางตัวไม่มีข้อมูลที่อยู่ภาษี (ใบขอเบิกจะไม่แสดงที่อยู่) - ติดป้ายบอก และแสดงรหัส id
+            tpl: '<tpl for="."><div class="x-combo-list-item">{c_name} <span style="color:#888;">({c_tax_no}) id {dc_creditor_id}</span> ' +
+                '<tpl if="c_has_addr == 1"><span style="color:#2a7d2a;">[มีที่อยู่ภาษี]</span></tpl>' +
+                '<tpl if="c_has_addr != 1"><span style="color:#c00;">[ไม่มีที่อยู่ภาษี]</span></tpl></div></tpl>',
             listeners: {
                 beforequery: function (q) {
                     q.query = q.query || "";

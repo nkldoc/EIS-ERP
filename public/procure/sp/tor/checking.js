@@ -940,56 +940,123 @@ const win_request_edit_bg = function (rec) {
                                                                                 value: rec.data.expense_name,
                                                                                 width: 450,
                                                                         },
+                                                                        // เลขที่ใบกัน: เฉพาะใบกันที่ขอกันเหลื่อมมาจากสัญญานี้ (มียอดคงเหลือ)
+                                                                        // ปีงบประมาณแสดงตามปีของใบกันที่เลือก (ไม่ให้เลือกปีเอง)
                                                                         new Ext.form.ComboBox({
                                                                                 mode: "local",
-                                                                                // allowBlank: false, ReadOnly_set
-                                                                                fieldLabel: "ปีงบประมาณ",
-                                                                                submitValue: true,
-                                                                                allowBlank: false,
-                                                                                id: "i_budget_year_edit_bg",
-                                                                                hiddenName: "i_budget_year",
-                                                                                name: "i_budget_yearTxt",
-                                                                                store: Ext.store_year,
+                                                                                fieldLabel: "เลขที่ใบกัน",
+                                                                                id: "c_overlap_select_edit_bg",
+                                                                                submitValue: false,
+                                                                                allowBlank: true,
+                                                                                store: new Ext.data.JsonStore({
+                                                                                        url: "api/All_PoWorkingImpHdr.php",
+                                                                                        root: "data",
+                                                                                        idProperty: "id",
+                                                                                        fields: ["id", "c_booking", "i_year", "f_total", "d_end_date", "bg_expense_id",
+                                                                                                {
+                                                                                                        name: "c_label",
+                                                                                                        convert: function (v, r) {
+                                                                                                                return r.c_booking + "  (ปีงบ " + (Number(r.i_year) + 543) + "  คงเหลือ "
+                                                                                                                        + Ext.util.Format.number(Number(r.f_total || 0), "0,000.00") + ")";
+                                                                                                        },
+                                                                                                }],
+                                                                                }),
                                                                                 valueField: "id",
-                                                                                displayField: "c_name",
-                                                                                value: rec.data.i_yyyy,
+                                                                                displayField: "c_label",
                                                                                 triggerAction: "all",
                                                                                 forceSelection: true,
-                                                                                selectOnFocus: true,
-                                                                                typeAhead: false,
-                                                                                emptyText: "กรุณาเลือกปีงบประมาณ...",
-                                                                                config: {
-                                                                                        requireMe: false,
-                                                                                },
+                                                                                editable: false,
+                                                                                width: 450,
+                                                                                listWidth: 450,
+                                                                                emptyText: "กำลังโหลดใบกัน...",
                                                                                 listeners: {
-                                                                                        afterrender: function () {
-                                                                        // ReadOnly_set("i_budget_year_edit_bg", true);
-                                                                        // this.ReadOnly_set = function (set) {
-                                                                        //   this.setReadOnly(set);
-                                                                        //   this.getEl().dom.style.background = set ? "#EEEEEE" : "";
-                                                                        // };
-                                                                                                this.fn = function () { };
-                                                                                                this.select_value = function () { };
+                                                                                        afterrender: function (combo) {
+                                                                                                // แสดงเฉพาะใบกันของสัญญานี้ (bg_overlap_hdr.po_id = สัญญา) พร้อมยอดคงเหลือ
+                                                                                                var st = combo.getStore();
+                                                                                                var setText = function (t) {
+                                                                                                        combo.emptyText = t;
+                                                                                                        if (combo.rendered && !combo.getValue()) {
+                                                                                                                combo.applyEmptyText();
+                                                                                                        }
+                                                                                                };
+                                                                                                var loadOne = function (list, i, noBalance) {
+                                                                                                        if (!combo.rendered) {
+                                                                                                                return;
+                                                                                                        }
+                                                                                                        if (i >= list.length) {
+                                                                                                                if (st.getCount()) {
+                                                                                                                        setText("เลือกเลขที่ใบกัน...");
+                                                                                                                        var pick = st.getAt(0);
+                                                                                                                        combo.setValue(pick.get("id"));
+                                                                                                                        combo.fireEvent("select", combo, pick, 0);
+                                                                                                                } else {
+                                                                                                                        setText(noBalance.length
+                                                                                                                                ? "ใบกันของสัญญา " + noBalance.join(", ") + " ไม่มียอดคงเหลือหรือหมดอายุ"
+                                                                                                                                : "ไม่พบใบกันของสัญญานี้");
+                                                                                                                }
+                                                                                                                return;
+                                                                                                        }
+                                                                                                        var tmp = new Ext.data.JsonStore({ url: st.url, root: "data", idProperty: "id", fields: st.fields.items });
+                                                                                                        tmp.load({
+                                                                                                                params: {
+                                                                                                                        type: "booking_store",
+                                                                                                                        // หน่วยงานเจ้าของงบ = dc_cost_id2 (ถ้ามี) เหมือน Ext.bookingCostId() - ใบกันผูกกับหน่วยงานนี้ ไม่ใช่หน่วยงานเจ้าของเรื่อง (dc_cost_id)
+                                                                                                                        dc_cost_id: Number(rec.data.dc_cost_id2) > 0 ? rec.data.dc_cost_id2 : rec.data.dc_cost_id,
+                                                                                                                        i_yyyy_overlap: list[i].i_year,
+                                                                                                                        c_booking: list[i].c_booking,
+                                                                                                                },
+                                                                                                                callback: function () {
+                                                                                                                        if (tmp.getCount()) {
+                                                                                                                                st.add(tmp.getRange());
+                                                                                                                        } else {
+                                                                                                                                noBalance.push(list[i].c_booking);
+                                                                                                                        }
+                                                                                                                        loadOne(list, i + 1, noBalance);
+                                                                                                                },
+                                                                                                        });
+                                                                                                };
+                                                                                                Ext.Ajax.request({
+                                                                                                        url: "api/All_PoWorkingImpHdr.php",
+                                                                                                        method: "GET",
+                                                                                                        // กรองใบกันตามแหล่งเงินของรายการ (ไม่ให้ขึ้นใบกันของแหล่งอื่นมาให้เลือก)
+                                                                                                        params: { type: "overlap_by_contract", po_id: rec.data.sp_tor_contract_id, dc_expense_budget_type_id: rec.data.dc_expense_budget_type_id },
+                                                                                                        callback: function (opt, ok, resp) {
+                                                                                                                var list = [];
+                                                                                                                try {
+                                                                                                                        list = Ext.decode(resp.responseText).data || [];
+                                                                                                                } catch (e) { }
+                                                                                                                st.removeAll(true);
+                                                                                                                loadOne(list, 0, []);
+                                                                                                        },
+                                                                                                });
                                                                                         },
-                                                                                        select: function () {
-                                                                                                this.select_value();
-                                                                                        },
-                                                                                        Change: function () {
-                                                                                                this.fn();
-                                                                                                this.select_value();
-                                                                                        },
-                                                                                        beforequery: function (q) {
-                                                                                                if (q.query) {
-                                                                                                        var length = q.query.length;
-                                                                                                        q.query = new RegExp(Ext.escapeRe(q.query));
-                                                                                                        q.query.length = length;
-                                                                                                }
-                                                                                        },
-                                                                                        blur: function () {
-                                                                                                this.getStore().clearFilter();
+                                                                                        select: function (combo, r) {
+                                                                                                Ext.getCmp("c_overlap_select_hidden").setValue(r.get("c_booking"));
+                                                                                                Ext.getCmp("i_yyyy_overlap_select_hidden").setValue(r.get("i_year"));
+                                                                                                Ext.getCmp("i_budget_year_edit_bg").setValue(Number(r.get("i_year")) + 543);
                                                                                         },
                                                                                 },
                                                                         }),
+                                                                        {
+                                                                                xtype: "hidden",
+                                                                                id: "c_overlap_select_hidden",
+                                                                                name: "c_overlap_select",
+                                                                        },
+                                                                        {
+                                                                                xtype: "hidden",
+                                                                                id: "i_yyyy_overlap_select_hidden",
+                                                                                name: "i_yyyy_overlap_select",
+                                                                        },
+                                                                        {
+                                                                                xtype: "textfield",
+                                                                                fieldLabel: "ปีงบประมาณ",
+                                                                                id: "i_budget_year_edit_bg",
+                                                                                submitValue: false,
+                                                                                readOnly: true,
+                                                                                width: 120,
+                                                                                emptyText: "ตามปีของใบกัน",
+                                                                                style: { background: "#EEEEEE", "font-weight": "bold" },
+                                                                        },
                                                                         {
                                                                                 xtype: "datefield",
                                                                                 fieldLabel: "วันที่ทำรายการ",
@@ -1040,7 +1107,7 @@ const win_request_edit_bg = function (rec) {
                                 buttonAlign: "left",
                                 buttons: [
                                         {
-                                                text: "&nbsp;ส่งขอร้อง&nbsp;",
+                                                text: "&nbsp;ยืนยัน&nbsp;",
                                                 icon: "../images/icons/accept.png",
                                                 listeners: {
                                                         afterrender: function () {
