@@ -389,7 +389,7 @@ try {
             $days = (int) ($row['days_remaining'] ?? 0);
             $inspectionCode = trim((string) ($row['inspection_code'] ?? ''));
             $irCode = trim((string) ($row['ir_code'] ?? ''));
-            $age = (int) ($row['i_warranty_age'] ?? 0);
+            $age = (float) ($row['i_warranty_age'] ?? 0);
             $before = (int) ($row['i_before'] ?? 0);
             $warrantyDetail = $type === 'warranty'
                 ? ($age > 0 ? "รับประกัน {$age} เดือน" : 'ไม่ระบุระยะเวลารับประกัน') . ($before > 0 ? " · แจ้งล่วงหน้า {$before} วัน" : '')

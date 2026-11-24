@@ -183,6 +183,12 @@ function previewValueExpression($fieldName, $dataType, $alias) {
 }
 
 function shouldUseWorkInProcessAccount($request, $db) {
+    // ประเภทงาน 8 คือ "จ้างแบบไม่ได้ของ" ต้องลงบัญชีค่าใช้จ่ายตามหมวดงบประมาณ
+    // แม้ค่าจากหน้าจอเดิมจะส่ง i_workin_process = 1 มาก็ตาม
+    if (intval(isset($request['i_working_type']) ? $request['i_working_type'] : 0) === 8) {
+        return false;
+    }
+
     if (intval(isset($request['i_workin_process']) ? $request['i_workin_process'] : 0) !== 1) {
         return false;
     }
@@ -2614,7 +2620,7 @@ switch ($mode) {
                 $arrParam2["f_wip_total_price"] = $f_wip_total_price; // 1
                 $arrParam2["f_under_total_price"] = NULL;
                 $arrParam2["f_net_total_price"] = NULL;
-            } else if ($_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_product_type'] == 0 || $_REQUEST['i_working_type'] == 8) { // วิ่งตามผังงบประมาณ
+            } else if (($_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_product_type'] == 0) || $_REQUEST['i_working_type'] == 8) { // วิ่งตามผังงบประมาณ / จ้างแบบไม่ได้ของ
                 //TODO
                 if ($_SESSION['user_id'] == 0) {
                     echo ' i_working_type == 8) { // วิ่งตามผังงบประมาณ';
@@ -2631,11 +2637,11 @@ switch ($mode) {
                 $dc_acc_id = $Fetch_dc_acc_id["dc_acc_id"];
                 $arrParam2["dc_acc_id"] = $dc_acc_id ?? 0;  //0
                 $arrParam2["i_qty"] = $_REQUEST['i_qty']; //0
-                $arrParam2["i_workin_process"] = $_REQUEST['i_workin_process'];
+                $arrParam2["i_workin_process"] = 0;
                 $arrParam2["f_wip_total_price"] = NULL;   //($i_product_type == 1) ? 0 : $f_under_total_price; //floatVal($data["f_net_unit_price"]); //0
                 $arrParam2["f_under_total_price"] = NULL;
                 $arrParam2["f_net_total_price"] = $f_net_total_price; //0
-            } else if ($_REQUEST['i_workin_process'] == 0 && $_REQUEST['i_product_type'] == 2 && $_REQUEST['i_workin_process2'] == 0 || $_REQUEST['i_working_type'] <> 8) { // ครุภัณฑ์  เข้าเกณฑ์
+            } else if ($_REQUEST['i_workin_process'] == 0 && $_REQUEST['i_product_type'] == 2 && $_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_working_type'] <> 8) { // ครุภัณฑ์  เข้าเกณฑ์
                 //TODO
                 if ($_SESSION['user_id'] == 0) {
                     echo 'i_workin_process &&  i_product_type  && i_workin_process2  || i_working_type == 8) {  ครุภัณฑ์  เข้าเกณฑ์';
@@ -2795,7 +2801,7 @@ switch ($mode) {
                         $arrParam2["f_wip_total_price"] = $f_wip_total_price; // 1
                         $arrParam2["f_under_total_price"] = NULL;
                         $arrParam2["f_net_total_price"] = NULL;
-                    } else if ($_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_product_type'] == 0) { // วิ่งตามผังงบประมาณ
+                    } else if (($_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_product_type'] == 0) || $_REQUEST['i_working_type'] == 8) { // วิ่งตามผังงบประมาณ / จ้างแบบไม่ได้ของ
                         $arrParam = array(STATUS_ENABLE, STATUS_ENABLE, $_REQUEST['po_expense_id']);
                         $dc_acc = "	select c.dc_acc_id
                             from " . DB_CENTER . "dc_bg_acc_hdr  a
@@ -2807,7 +2813,7 @@ switch ($mode) {
                         $dc_acc_id = $Fetch_dc_acc_id["dc_acc_id"];
                         $arrParam2["dc_acc_id"] = $dc_acc_id ?? 0;  //0
                         $arrParam2["i_qty"] = $_REQUEST['i_qty']; //0
-                        $arrParam2["i_workin_process"] = $_REQUEST['i_workin_process'];
+                        $arrParam2["i_workin_process"] = 0;
                         $arrParam2["f_wip_total_price"] = NULL;   //($i_product_type == 1) ? 0 : $f_under_total_price; //floatVal($data["f_net_unit_price"]); //0
                         $arrParam2["f_under_total_price"] = NULL;
                         $arrParam2["f_net_total_price"] = $f_net_total_price; //0
