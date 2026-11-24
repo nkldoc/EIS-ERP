@@ -1841,13 +1841,29 @@ switch ($mode) {
                                            inner join sp_tor_hdr_period b on b.sp_tor_contract_id=a.sp_tor_contract_id and b.i_is_last=1
                                            where a.sp_tor_contract_id=?", array($id));
 
-            $sqlInsert = "insert into [dbo].[sp_alert_queque] (ref_id ,c_name,c_detail,i_is_start,due_date,i_before,user_id,sp_emp_id,i_is_status)
-                          values ({$id},'{$rs["c_doc_ref"]}','{$rs["c_code"]} {$rs["c_name"]}',0,'{$rs["d_due_date"]}','{$rs["i_alert"]}',{$_SESSION["user_id"]},{$_SESSION["sp_emp_id"]},null)";
+            // สัญญาที่ไม่ได้กำหนดงวดสุดท้ายจะไม่มีข้อมูลจาก INNER JOIN
+            // ไม่ต้องสร้างคิวแจ้งเตือน แต่ให้กระบวนการเปลี่ยนสถานะสัญญาทำงานต่อได้
+            if (!is_array($rs) || empty($rs)) {
+                return true;
+            }
+
+            $sqlInsert = "insert into [dbo].[sp_alert_queque]
+                          (ref_id, c_name, c_detail, i_is_start, due_date, i_before, user_id, sp_emp_id, i_is_status)
+                          values (?, ?, ?, 0, ?, ?, ?, ?, null)";
+            $params = array(
+                $id,
+                $rs["c_doc_ref"] ?? "",
+                trim(($rs["c_code"] ?? "") . " " . ($rs["c_name"] ?? "")),
+                $rs["d_due_date"] ?? null,
+                intval($rs["i_alert"] ?? 0),
+                intval($_SESSION["user_id"] ?? 0),
+                intval($_SESSION["sp_emp_id"] ?? 0)
+            );
 
             /*
               1 ,30014,2 ซื้อซอฟแวร์ Qlik sense	64/กกกว	0	2021-12-16	5	60048	17	1
              *  */
-            $stmt = $db->QueryParam($sqlInsert, array());
+            $stmt = $db->QueryParam($sqlInsert, $params);
 
             return $stmt;
         }
@@ -1863,10 +1879,10 @@ switch ($mode) {
                 . " inner join dbo.sp_tor_contract b on b.sp_tor_id = a.tor_id"
                 . " where b.sp_tor_contract_id = ?", array($id));
         //process แจ้งเตือนใกล้หมดสัญญา
-        if ($fs['i_purchase'] == 1 && $fs['i_type_contract'] == 3) {
+        if (is_array($fs) && intval($fs['i_purchase'] ?? 0) == 1 && intval($fs['i_type_contract'] ?? 0) == 3) {
 
         } else {
-            //Errior ถ้าไม่มีงวดสุดท้าย
+            // สร้างคิวเมื่อมีงวดสุดท้าย; หากไม่มีให้ข้ามโดยไม่หยุดการเปลี่ยนสถานะ
             $notif = notificationQueque($id);
         }
         //process PA

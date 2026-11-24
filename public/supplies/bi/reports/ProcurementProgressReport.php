@@ -11,7 +11,7 @@ if (empty($_SESSION['user_id'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
-    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261124-6">
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261124-7">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
@@ -43,6 +43,7 @@ if (empty($_SESSION['user_id'])) {
         </article>
         <article class="panel chart-panel dimension-panel">
             <div class="panel-heading dimension-heading"><div><h2>ปริมาณงานตามสถานะ แยกสีตามประเภทงาน</h2><p class="muted">กราฟมิติเพิ่มเติม เลือกแกน กลุ่มสี หรือสลับมิติได้โดยไม่กระทบตัวกรองเดิม</p></div><div class="dimension-controls"><label><span>แกน (แกน X)</span><select id="workloadAxis"><option value="status">สถานะ</option><option value="owner_name">เจ้าหน้าที่</option><option value="procurement_type">ประเภทงาน</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option></select></label><button id="swapDimensions" class="swap-button" type="button">⇆ สลับ</button><label><span>สีของกราฟ</span><select id="workloadColor"><option value="procurement_type">ประเภทงาน</option><option value="status">สถานะ</option><option value="owner_name">เจ้าหน้าที่</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option></select></label><div class="metric-toggle" id="workloadMetric"><button class="active" data-metric="count" type="button">จำนวนงาน</button><button data-metric="amount" type="button">วงเงิน (ลบ.)</button></div></div></div>
+            <section class="dimension-table-block"><div class="dimension-table-heading"><div><h3>ตารางสรุปจำนวนงาน: สถานะ × ประเภทงาน</h3><p>แถวเรียงตามลำดับสถานะมาตรฐาน คลิกชื่อสถานะเพื่อดูคำอธิบาย</p></div><div class="dimension-table-controls"><label><span>คอลัมน์แนวนอน</span><select id="dimensionTableColumns"><option value="procurement_type">ประเภทงาน</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option><option value="owner_name">เจ้าหน้าที่</option></select></label><div class="metric-toggle" id="dimensionTableMetric"><button class="active" data-metric="count" type="button">จำนวนงาน</button><button data-metric="amount" type="button">วงเงิน (ลบ.)</button><button data-metric="both" type="button">จำนวน + วงเงิน</button></div></div></div><div id="dimensionSummaryTable" class="table-scroll dimension-summary-table"></div></section>
             <div class="chart-holder dimension-chart-holder"><canvas id="dimensionChart"></canvas></div>
         </article>
         <article class="panel sankey-panel">
@@ -136,5 +137,5 @@ if (empty($_SESSION['user_id'])) {
     </section>
 </main>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261124-6"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261124-7"></script>
 </body></html>
