@@ -11,8 +11,10 @@ if (empty($_SESSION['user_id'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
-    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261123-6">
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261124-6">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
 </head>
 <body>
 <main class="dashboard-shell">
@@ -35,9 +37,18 @@ if (empty($_SESSION['user_id'])) {
             <article class="metric-card"><div><span>จำนวนงานที่เข้าเกณฑ์ KPI</span><strong id="kpiJobs">0</strong><small class="purple-text">เข้าเกณฑ์ประเมิน KPI</small></div><i class="purple">◎</i></article>
             <article class="metric-card"><div><span>เบิกจ่าย/เสร็จสิ้นแล้ว</span><strong id="completedJobs">0</strong><small id="completedPercent" class="green-text">0% สำเร็จแล้ว</small></div><i class="green">◴</i></article>
         </div>
-        <article class="panel chart-panel">
+        <article class="panel chart-panel" hidden aria-hidden="true">
             <div class="panel-heading"><h2>♧ ภาระงานแยกตามเจ้าหน้าที่</h2><div class="workload-controls"><div class="segmented" id="groupButtons"><button class="active" data-group="procurement_type">แยกตามประเภท</button><button data-group="method_name">แยกตามวิธีจัดหา</button><button data-group="fund_source">แยกตามแหล่งเงิน</button></div><select id="workloadMethodFilter" aria-label="กรองวิธีจัดหา"><option value="">รวมทุกวิธีจัดหา</option><option value="ebidding">E-Bidding</option><option value="selection">คัดเลือก</option><option value="specific_over">เฉพาะเจาะจง (&gt; 5 แสน)</option><option value="specific_under">เฉพาะเจาะจง (≤ 5 แสน)</option></select></div></div>
             <div class="chart-holder"><canvas id="workloadChart"></canvas></div>
+        </article>
+        <article class="panel chart-panel dimension-panel">
+            <div class="panel-heading dimension-heading"><div><h2>ปริมาณงานตามสถานะ แยกสีตามประเภทงาน</h2><p class="muted">กราฟมิติเพิ่มเติม เลือกแกน กลุ่มสี หรือสลับมิติได้โดยไม่กระทบตัวกรองเดิม</p></div><div class="dimension-controls"><label><span>แกน (แกน X)</span><select id="workloadAxis"><option value="status">สถานะ</option><option value="owner_name">เจ้าหน้าที่</option><option value="procurement_type">ประเภทงาน</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option></select></label><button id="swapDimensions" class="swap-button" type="button">⇆ สลับ</button><label><span>สีของกราฟ</span><select id="workloadColor"><option value="procurement_type">ประเภทงาน</option><option value="status">สถานะ</option><option value="owner_name">เจ้าหน้าที่</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option></select></label><div class="metric-toggle" id="workloadMetric"><button class="active" data-metric="count" type="button">จำนวนงาน</button><button data-metric="amount" type="button">วงเงิน (ลบ.)</button></div></div></div>
+            <div class="chart-holder dimension-chart-holder"><canvas id="dimensionChart"></canvas></div>
+        </article>
+        <article class="panel sankey-panel">
+            <div class="panel-heading sankey-heading"><div><h2><i></i> Sankey Flow: เส้นทางปริมาณงาน (ประเภทงาน ➔ วิธีจัดหา ➔ สถานะ)</h2><p class="muted">ความหนาของเส้นแสดงสัดส่วนงาน วางเมาส์บนเส้นหรือกล่องเพื่อดูรายละเอียด</p></div><div class="metric-toggle" id="sankeyMetric"><button class="active" data-metric="count" type="button">ตามจำนวนงาน (รายการ)</button><button data-metric="amount" type="button">ตามวงเงิน (บาท)</button></div></div>
+            <div class="sankey-stage-labels"><b>1. ประเภทงาน</b><b>2. วิธีจัดหา</b><b>3. สถานะ</b></div>
+            <div id="sankeyChart" class="sankey-chart" aria-label="กราฟเส้นทางปริมาณงาน"></div>
         </article>
         <div class="ratio-grid">
             <article class="panel ratio-card"><div><b>▧ สัดส่วนการบริหารสัญญา (ภาพรวม)</b><strong id="contractPercent">0%</strong></div><div class="progress purple-bar"><span id="contractBar"></span></div><footer><span>บริหารสัญญา: <b id="contractJobs">0</b> รายการ</span><span>งานทั้งหมด: <b id="ratioTotal">0</b> รายการ</span></footer></article>
@@ -125,5 +136,5 @@ if (empty($_SESSION['user_id'])) {
     </section>
 </main>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261123-6"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261124-6"></script>
 </body></html>
