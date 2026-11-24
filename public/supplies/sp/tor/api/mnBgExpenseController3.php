@@ -79,19 +79,28 @@ switch($mode){
                 $data['dc_user_update_id'],
                 $data['dc_user_update_cost_id'],
                 $data['d_update'],
+                $firstCode,
+                $secondCode,
                 $ret_id
             );
-            $sql = "UPDATE {$table} SET i_overlap = 2
+            $sql = "IF EXISTS (SELECT 1 FROM NMU_EIS.dbo.bg_overlap_hdr WHERE c_code = ?)
+                    AND EXISTS (SELECT 1 FROM NMU_EIS.dbo.bg_overlap_hdr WHERE c_code = ?)
+                    UPDATE c SET i_overlap = 2
                             , i_yyyy_overlap = ?
                             , c_overlap = ?
                             , bg_budget_dtl_overlap_id = ?
                             , c_overlap2 = ?
                             , i_yyyy_overlap2 = ?
+                            , bg_reserve_overlap_id = second_hdr.bg_overlap_hdr_id
                             , dc_user_update_id = ?
                             , dc_user_update_cost_id = ?
                             , d_update = ?
-                    WHERE {$keyName} = ?";
-        $stmt = $db->QueryParam($sql, $arrParam);
+                    FROM {$table} c
+                    INNER JOIN NMU_EIS.dbo.bg_overlap_hdr first_hdr ON first_hdr.c_code = ?
+                    INNER JOIN NMU_EIS.dbo.bg_overlap_hdr second_hdr ON second_hdr.c_code = ?
+                    WHERE c.{$keyName} = ?
+                    ELSE RAISERROR('Overlap document code was not found', 16, 1)";
+        $stmt = $db->QueryParam($sql, array_merge(array($firstCode, $secondCode), $arrParam));
         break;
     
     
