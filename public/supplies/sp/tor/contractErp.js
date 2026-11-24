@@ -6090,7 +6090,7 @@ i_enable: 0*/
       console.log(rec);
       var ip = Ext.session.ip_booking; // 192
 
-      if (rec.get("i_overlap") === 2) return false;
+      if (rec.get("i_overlap") === 2 && rec.get("c_overlap2")) return false;
       else
         return new Ext.Window({
           id: "winDcExpTypeDdd2ID",

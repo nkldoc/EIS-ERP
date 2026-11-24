@@ -4149,7 +4149,25 @@ switch ($mode) {
     case "UPDATE_CONTRACT_BG_OVERLAP2": //แหล่งเงินที่ 1
         $arrValue[] = $_REQUEST["bg_reserve_overlap_id"] ?? null;
         $arrValue[] = $_REQUEST["sp_tor_contract_id"] ?? null;
-        $sql = "UPDATE dbo.sp_tor_contract set bg_reserve_overlap_id=?, i_overlap = 2 WHERE sp_tor_contract_id = ?";
+        /* เก็บทั้ง id และเลข/ปีใบกันจากรายการจองจริง เพื่อไม่ให้ใบที่ 2
+         * หายหลัง reload และให้ preflight ตรวจสอบเลขใบกันได้ถูกต้อง */
+        $sql = "UPDATE c
+                SET c.bg_reserve_overlap_id = ?,
+                    c.c_overlap2 = ro.c_code_overlap,
+                    c.i_yyyy_overlap2 = CONVERT(varchar(10), ro.i_year),
+                    c.i_overlap = 2,
+                    c.d_update = GETDATE()
+                FROM dbo.sp_tor_contract c
+                LEFT JOIN NMU_EIS.dbo.bg_reserve_overlap ro
+                  ON ro.bg_reserve_overlap_id = ?
+                WHERE c.sp_tor_contract_id = ?";
+        /* first parameter is the id being saved; the join and WHERE each need
+         * their own parameter because QueryParam does not duplicate values. */
+        $arrValue = array(
+            $_REQUEST["bg_reserve_overlap_id"] ?? null,
+            $_REQUEST["bg_reserve_overlap_id"] ?? null,
+            $_REQUEST["sp_tor_contract_id"] ?? null
+        );
         $stmt = $db->QueryParam($sql, $arrValue);
         break;
     case "UPDATE_CONTRACT_BG_OVERLAP": //แหล่งเงินที่ 1

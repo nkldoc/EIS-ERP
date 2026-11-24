@@ -528,6 +528,7 @@ const transfer = function (data) {
     return years;
   };
 function popOverlap(rec) {
+    var target = rec === 2 ? 2 : 1;
     Ext.storeDepartment = new Ext.data.JsonStore({
         storeId: "storeDepartment",
         autoLoad: true,
@@ -568,35 +569,37 @@ function popOverlap(rec) {
             dataIndex: "f_total",
         },
     ];
-    Ext.PopDepartmentForm = new Ext.ux.Poplov({
+    var overlapPicker = new Ext.ux.Poplov({
         text: "เลขที่ใบกัน",
-        id: "bg_budget_dtl_overlap_idID", //go to relation
+        id: target === 2 ? "bg_budget_dtl_overlap_id2ID" : "bg_budget_dtl_overlap_idID",
         iconCls: "page_magnify",
         name: "bg_budget_dtl_overlap_id",
-        valueHidden: "bg_budget_dtl_overlap_id", //go to hidden
+        valueHidden: "bg_budget_dtl_overlap_id",
         store: Ext.storeDepartment,
         headerGrid: columnMini,
         widthText: 280,
         fieldLabel: "เลขที่ใบกัน",
         isCellClickGrid: true,
         cellClickGrid: function (grid, rowIndex, columnIndex, e) {
-            var id = "bg_budget_dtl_overlap_idID";
+            var id = target === 2 ? "bg_budget_dtl_overlap_id2ID" : "bg_budget_dtl_overlap_idID";
             var nameID = id + "_Name";
             var record = grid.getStore().getAt(rowIndex);
             Ext.overlap = record;
             var TextShow = record.data.c_code_ref;
             Ext.recs = record;
             Ext.getCmp(id).setValue(record.data.id); //Ext.getCmp(bg_budget_dtl_overlap_idID).setValue(record.data.id);
-            Ext.getCmp("dc_cost_idID").setValue(record.data.dc_costTxt);
-            Ext.getCmp("c_overlapID").setValue(TextShow);
-            Ext.getCmp("i_yearOverlapID").setValue(record.data.i_year);
+            if (target !== 2) Ext.getCmp("dc_cost_idID").setValue(record.data.dc_costTxt);
+            Ext.getCmp(target === 2 ? "c_overlap2ID" : "c_overlapID").setValue(TextShow);
+            if (target === 2) Ext.getCmp("i_yyyy_overlap2ID").setValue(record.data.i_year);
+            if (target !== 2) Ext.getCmp("i_yearOverlapID").setValue(record.data.i_year);
             Ext.getCmp(nameID).setValue(TextShow);
             Ext.getCmp("win-pop-lov" + id).hide();
             Ext.getCmp("win-pop-lov" + id).destroy();
-            Ext.getCmp("bookOverlapID").hide();
+            if (target !== 2) Ext.getCmp("bookOverlapID").hide();
             // console.log(record.data.dc_expense_budget_type_id);
             // console.log(record.data.bg_expense_id);
             // return ;
+            if (target === 2) return;
             if (record.data.dc_expense_budget_type_id != Ext.selectRow.get("dc_expense_budget_type_id")) {
                 var index = Ext.dc_expense_budget_type.findExact("id", record.data.dc_expense_budget_type_id);
                 Ext.overlap_budget_type = Ext.dc_expense_budget_type.getAt(index);
@@ -620,6 +623,8 @@ function popOverlap(rec) {
             }
         },
     });
+    if (target === 2) Ext.PopDepartmentForm2 = overlapPicker;
+    else Ext.PopDepartmentForm = overlapPicker;
 }
  Ext.i_type_bg = new Ext.data.JsonStore({
     autoDestroy: false,
@@ -4877,8 +4882,10 @@ Ext.AppUx = function (app, menu) {
             // {name: "i_overlap"},z
             {name: "bg_reserve_overlap_id"},
             {name: "c_overlap"},
+            {name: "c_overlap2"},
             {name: "i_booking_bg"},
             {name: "i_yyyy_overlap"},
+            {name: "i_yyyy_overlap2"},
             /*
              "c_books_cashiercheque" => $row["cashiercheque_on"],
              "c_receipt_cashiercheque" => $row["cashiercheque_seq"],
@@ -6268,6 +6275,7 @@ Ext.AppUx = function (app, menu) {
                                                     },
                                                     handler: function () {
                                                         var record = Ext.selectRow;
+                                                        Ext.overlapTarget = 1;
                                                         popOverlap();
                                                         var win = bgBagedOver(record, 2);
                                                         win.items.items[0].getForm().loadRecord(record);

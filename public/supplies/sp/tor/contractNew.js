@@ -499,10 +499,14 @@ const Uiedit_contractNew = function (rec) {
   };
   function bgBagedOver(rec, i) {
     Ext.rec = rec;
+    popOverlap(2);
+    Ext.PopDepartmentForm2.mini.hidden = !rec.get("c_overlap2");
     console.log(rec);
     var ip = Ext.session.ip_booking; // 192
 
-    if (rec.get("i_overlap") === 2) return false;
+    // A contract can already have its first reservation (i_overlap=2) and
+    // still need the second overlap. Only block when both are present.
+    if (rec.get("i_overlap") === 2 && rec.get("c_overlap2")) return false;
     else
       return new Ext.Window({
         id: "winDcExpTypeDdd2ID",
@@ -539,6 +543,22 @@ const Uiedit_contractNew = function (rec) {
               value: "UPDATEIOVER1", //1 ก่อนจอง 2 จองแล้ว
             },
             Ext.PopDepartmentForm.mini,
+            {
+              xtype: "checkbox",
+              boxLabel: "ใช้ใบกัน 2 ใบในสัญญา",
+              id: "useOverlap2ID",
+              checked: !!rec.get("c_overlap2"),
+              listeners: { afterrender: function (box) {
+                Ext.getCmp("modesubID").setValue(box.checked ? "UPDATEIOVER2" : "UPDATEIOVER1");
+              }, check: function (box, checked) {
+                Ext.getCmp("modesubID").setValue(checked ? "UPDATEIOVER2" : "UPDATEIOVER1");
+                var row = Ext.getCmp("pop_bg_budget_dtl_overlap_id2ID");
+                if (row) { checked ? row.show() : row.hide(); row.ownerCt.doLayout(); }
+              } }
+            },
+            Ext.PopDepartmentForm2.mini,
+            { xtype: "hidden", id: "c_overlap2ID", name: "c_overlap2_display", value: rec.get("c_overlap2") || "" },
+            { xtype: "hidden", id: "i_yyyy_overlap2ID", name: "i_yyyy_overlap2", value: rec.get("i_yyyy_overlap2") || "" },
             // {
             //   xtype: "textfield",
             //   fieldLabel: "ปีเลขที่ของใบกัน",

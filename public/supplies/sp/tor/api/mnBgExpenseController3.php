@@ -63,18 +63,34 @@ switch($mode){
         break;
     
     case "UPDATEIOVER2": 
-            $arrParam[] = 2; //ก่อนจอง 2 จองแล้ว
-            $arrParam[] = $data['bg_budget_dtl_overlap_id']; //bg_reserve_overlap_id bg_budget_dtl_overlap_id
-            $arrParam[] = $data['dc_user_update_id'];
-            $arrParam[] = $data['dc_user_update_cost_id'];
-            $arrParam[] = $data['d_update'];
-            $arrParam[] = $ret_id;
-            $sql = "UPDATE {$table} SET i_overlap = ?
-                            , bg_reserve_overlap_id = ?
+            $firstCode = trim($data['txtbg_budget_dtl_overlap_idID'] ?? '');
+            $secondCode = trim($data['txtbg_budget_dtl_overlap_id2ID'] ?? '');
+            if ($firstCode === '' || $secondCode === '' || $firstCode === $secondCode) {
+                $stmt = false;
+                $sql = 'Select two different overlap documents';
+                break;
+            }
+            $arrParam = array(
+                $data['yearTxt'] - 543,
+                $firstCode,
+                $data['bg_budget_dtl_overlap_id'],
+                $secondCode,
+                $data['i_yyyy_overlap2'] ?? null,
+                $data['dc_user_update_id'],
+                $data['dc_user_update_cost_id'],
+                $data['d_update'],
+                $ret_id
+            );
+            $sql = "UPDATE {$table} SET i_overlap = 2
+                            , i_yyyy_overlap = ?
+                            , c_overlap = ?
+                            , bg_budget_dtl_overlap_id = ?
+                            , c_overlap2 = ?
+                            , i_yyyy_overlap2 = ?
                             , dc_user_update_id = ?
                             , dc_user_update_cost_id = ?
                             , d_update = ?
-                    WHERE {$keyName} = ?"; 
+                    WHERE {$keyName} = ?";
         $stmt = $db->QueryParam($sql, $arrParam);
         break;
     
