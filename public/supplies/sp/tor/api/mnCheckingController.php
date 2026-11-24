@@ -4205,8 +4205,35 @@ switch ($mode) {
         $bal = array();
         $cid = $head['sp_tor_contract_id'];
         $res = sqlsrv_query($db->conn, $sqlBal, array($cid, $cid, $cid, $cid));
+        $seenOverlap = array();
         while ($res && ($r = $db->Fetch($res))) {
+            $r["b_unlinked"] = 0;
+            $seenOverlap[trim((string) $r["c_code_ref"])] = true;
             $bal[] = $r;
+        }
+        // [ผู้ใช้ขอ] ใบกันที่ระบบงบผูกกับสัญญานี้ (bg_overlap_hdr.po_id = สัญญา) แต่ยังไม่ได้บันทึกเลขใบกันที่สัญญา/ใบตรวจรับ/ใบเบิก
+        // ข้างบนค้นแต่เลขที่บันทึกไว้ จึงตอบว่า "ไม่ได้ใช้ใบกัน" ทั้งที่ระบบงบมีใบกันรออยู่ - แสดงเพิ่มพร้อมธงยังไม่ได้ผูก
+        $sqlUnlinked = "
+            SELECT o.c_code_ref, o.i_year, o.f_total AS f_overlap,
+                   ISNULL(pw.f_used,0) AS f_used, ISNULL(r.f_open,0) AS f_open,
+                   o.f_total - ISNULL(pw.f_used,0) - ISNULL(r.f_open,0) AS f_remain
+            FROM NMU_EIS..vw_bg_budget_overlap o
+            OUTER APPLY (SELECT SUM(d.f_total) f_used FROM NMU_EIS..po_working_dtl d
+                         INNER JOIN NMU_EIS..po_working_hdr h ON h.po_working_hdr_id = d.po_working_hdr_id AND h.i_enable = 1
+                         WHERE d.c_booking = o.c_code_ref) pw
+            OUTER APPLY (SELECT SUM(f_amt) f_open FROM NMU_EIS..vw_bg_reserve_overlap
+                         WHERE c_code_overlap = o.c_code_ref AND i_reserve IN (1,2,3) AND ISNULL(i_finish,0) = 0) r
+            WHERE o.c_code_ref IN (
+                SELECT d2.c_code_ref FROM NMU_EIS..bg_overlap_hdr h2
+                INNER JOIN NMU_EIS..bg_budget_dtl_overlap d2 ON d2.bg_overlap_hdr_id = h2.bg_overlap_hdr_id
+                WHERE h2.po_id = ? AND ISNULL(h2.i_sys, 1) <> 3 AND h2.i_enable = 1)
+            ORDER BY o.c_code_ref";
+        $resU = sqlsrv_query($db->conn, $sqlUnlinked, array($cid));
+        while ($resU && ($r = $db->Fetch($resU))) {
+            if (!isset($seenOverlap[trim((string) $r["c_code_ref"])])) {
+                $r["b_unlinked"] = 1;
+                $bal[] = $r;
+            }
         }
         // ข้อความสำหรับตรวจรับที่เปิดอยู่: เงินปีปัจจุบัน ออก AP โดยไม่เช็คเงิน แต่ใบเบิกตัดเงินแล้ว
         $note = null;

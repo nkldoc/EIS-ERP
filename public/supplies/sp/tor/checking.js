@@ -9446,6 +9446,7 @@ Ext.showUserOverlapCheck = function (chkId, onDone) {
                 var rows = res.rows || [];
                 var ovs = res.overlaps || [];
                 var bad = [];
+                var unlinked = [];   // ใบกันที่ระบบงบผูกกับสัญญา แต่ยังไม่ได้บันทึกที่สัญญา/ตรวจรับ
                 var html = '<div style="padding:10px;font-size:13px;line-height:1.6;">'
                         + '<div><b>สัญญา</b> ' + esc(h.c_contract_code || '-') + ' &nbsp; ' + esc(h.c_contract_name || '') + '</div>'
                         + '<div><b>PR</b> ' + esc(h.c_tor_code || '-') + ' &nbsp; ' + esc(h.c_tor_name || '') + '</div>';
@@ -9465,7 +9466,12 @@ Ext.showUserOverlapCheck = function (chkId, onDone) {
                                 + '<td ' + th + '>เลขใบกัน</td><td ' + th + '>ปีงบ</td><td ' + th + '>ยอดใบกัน</td>'
                                 + '<td ' + th + '>เบิกแล้ว</td><td ' + th + '>ตัดรอเบิก</td><td ' + th + '>คงเหลือ</td></tr>';
                         Ext.each(ovs, function (o) {
-                                html += '<tr><td ' + td + '>' + esc(o.c_code_ref) + '</td><td ' + td + '>' + thYear(o.i_year) + '</td>'
+                                if (Number(o.b_unlinked) === 1) {
+                                        unlinked.push(o);
+                                }
+                                html += '<tr><td ' + td + '>' + esc(o.c_code_ref)
+                                        + (Number(o.b_unlinked) === 1 ? '<br><span style="color:#b45f06;font-size:12px;">ระบบงบมีใบกันนี้ผูกกับสัญญา แต่ยังไม่ได้เลือก/บันทึกที่ตรวจรับ</span>' : '')
+                                        + '</td><td ' + td + '>' + thYear(o.i_year) + '</td>'
                                         + '<td ' + tdR + '>' + fmt(o.f_overlap) + '</td><td ' + tdR + '>' + fmt(o.f_used) + '</td>'
                                         + '<td ' + tdR + '>' + fmt(o.f_open) + '</td><td ' + tdR + '><b>' + fmt(o.f_remain) + '</b></td></tr>';
                         });
@@ -9498,10 +9504,13 @@ Ext.showUserOverlapCheck = function (chkId, onDone) {
                         });
                         html += '</table>';
                 }
-                html += '<div style="margin-top:10px;font-weight:bold;color:' + (bad.length ? '#c00' : '#080') + '">'
+                html += '<div style="margin-top:10px;font-weight:bold;color:' + (bad.length ? '#c00' : (unlinked.length ? '#b45f06' : '#080')) + '">'
                         + (bad.length
                                 ? 'พบ ' + bad.length + ' รายการที่ต้องแก้ กด "แก้ไขรายการที่ผิด" เพื่อคืนยอดใบกันให้ถูกต้อง'
-                                : 'ข้อมูลใบกันของสัญญานี้ถูกต้อง')
+                                : (unlinked.length
+                                        ? 'ระบบงบมีใบกัน ' + unlinked.map(function (u) { return esc(u.c_code_ref); }).join(', ')
+                                                + ' ผูกกับสัญญานี้ แต่ยังไม่ได้เลือกใบกันที่ตรวจรับ กรุณาเลือก "เลขที่ใบกันเงินเหลื่อมปี" ในหน้าตรวจรับแล้วบันทึก'
+                                        : 'ข้อมูลใบกันของสัญญานี้ถูกต้อง'))
                         + '</div></div>';
                 return { html: html, bad: bad };
         };
