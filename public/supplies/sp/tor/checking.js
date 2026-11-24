@@ -2004,6 +2004,14 @@ Ext.uiConfirmVat = (rec) => {
                                         ],
                                         listeners: {
                                                 afteredit: function (e) {
+                                                                if (e.field === "dc_acc_id") {
+                                                                        var accountIndex = Ext.dc_acc.findExact("id", e.value);
+                                                                        if (accountIndex === -1) {
+                                                                                accountIndex = Ext.dc_acc.find("id", String(e.value));
+                                                                        }
+                                                                        var accountRecord = accountIndex >= 0 ? Ext.dc_acc.getAt(accountIndex) : null;
+                                                                        e.record.set("dc_acc_name", accountRecord ? accountRecord.get("c_name") : "");
+                                                                }
                                                         if (e.field === "f_vat_amt") {
                                                                 e.record._vatManual = true;
                                                                 e.record.commit();
@@ -6759,6 +6767,10 @@ function winWarranty(rec) {
                                         {
                                                 fieldLabel: "ระยะเวลารับประกัน/เดือน",
                                                 xtype: "numberfield",
+                                                allowDecimals: true,
+                                                decimalPrecision: 1,
+                                                incrementValue: 0.5,
+                                                minValue: 0.5,
                                                 value: 24,
                                                 name: "warraty_age",
                                                 id: "warraty_age2ID",
@@ -11293,9 +11305,11 @@ var cellClick = function (grid, rowIndex, columnIndex, e) {
 var getWarraty = function () {
         if ([1, 3].includes(Ext.getCmp("i_is_warrantyID").getValue().inputValue)) {
                 var a = Ext.getCmp("d_checking_dateID").getValue() || {};
-                var b = Ext.getCmp("warraty_ageID").getValue() || {};
+                var b = parseFloat(Ext.getCmp("warraty_ageID").getValue()) || 0;
                 var c = Ext.getCmp("i_notif_dayID").getValue() || {};
-                var warranty_day = new Date(a).add(Date.MONTH, b);
+                var wholeMonths = Math.floor(b);
+                var partialMonthDays = Math.round((b - wholeMonths) * 30);
+                var warranty_day = new Date(a).add(Date.MONTH, wholeMonths).add(Date.DAY, partialMonthDays);
                 var notif_warranty_day = new Date(warranty_day).add(Date.DAY, - parseInt(c));
                 Ext.getCmp("i_warraty_endID").setValue(warranty_day.format("d-m-Y"));
                 Ext.getCmp("notif_dayID").setValue(notif_warranty_day.format("d-m-Y"));
@@ -13942,11 +13956,11 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 inv_mode_id: Ext.getCmp("inv_mode_idID").getValue() == "" ? 0 : Ext.getCmp("inv_mode_idID").getValue(),
                                                                                                                 // inv_mode_id : Ext.getCmp("inv_mode_idID").getValue(),
                                                                                                                 c_name: Ext.getCmp("c_nameID").getValue(),
-                                                                                                                i_workin_process: Ext.getCmp("workin_processID").getValue().inputValue, // งานระหว่างดำเนินการ
+                                                                                                                i_workin_process: Number(Ext.getCmp("i_working_typeID").getValue()) === 8 ? 0 : Ext.getCmp("workin_processID").getValue().inputValue, // จ้างไม่ได้ของต้องเป็นค่าใช้จ่าย
                                                                                                                 i_qty: Ext.getCmp("i_qty3ID").getValue(),
                                                                                                                 i_workin_process2: Ext.getCmp("workin_process2ID").getValue().inputValue, // เข้าเกณฑ์
                                                                                                                 i_is_work_cost: Ext.getCmp("i_is_work_costID").getValue() == true ? 1 : 0,
-                                                                                                                workin_process: Ext.getCmp("workin_processID").getValue().inputValue,
+                                                                                                                workin_process: Number(Ext.getCmp("i_working_typeID").getValue()) === 8 ? 0 : Ext.getCmp("workin_processID").getValue().inputValue,
                                                                                                                 f_net_total_price: Ext.getCmp("f_net_total_priceID").getValue(),
                                                                                                                 f_wip_total_price: Ext.getCmp("f_wip_total_priceID").getValue(),
                                                                                                                 f_under_total_price: Ext.getCmp("f_under_total_priceID").getValue(),
@@ -14710,6 +14724,14 @@ Ext.AppUx = function (app, menu) {
                                                                 ],
                                                                 listeners: {
                                                                         afteredit: function (e) {
+                                                                                if (e.field === "dc_acc_id") {
+                                                                                        var accountIndex = Ext.dc_acc.findExact("id", e.value);
+                                                                                        if (accountIndex === -1) {
+                                                                                                accountIndex = Ext.dc_acc.find("id", String(e.value));
+                                                                                        }
+                                                                                        var accountRecord = accountIndex >= 0 ? Ext.dc_acc.getAt(accountIndex) : null;
+                                                                                        e.record.set("dc_acc_name", accountRecord ? accountRecord.get("c_name") : "");
+                                                                                }
                                                                                 if (e.field === "f_vat_amt") {
                                                                                         e.record._vatManual = true;
                                                                                         e.record.commit();
@@ -16248,15 +16270,17 @@ Ext.AppUx = function (app, menu) {
                                                                                         {
                                                                                                 fieldLabel: "ระยะเวลารับประกัน/เดือน",
                                                                                                 xtype: "numberfield",
+                                                                                                allowDecimals: true,
+                                                                                                decimalPrecision: 1,
+                                                                                                incrementValue: 0.5,
+                                                                                                minValue: 0.5,
                                                                                                 value: 24,
                                                                                                 hidden: true,
                                                                                                 name: "warraty_age",
                                                                                                 id: "warraty_ageID",
                                                                                                 validator: function (val) {
-                                                                                                        if (this.getValue() < 1 && Ext.getCmp("i_is_warrantyID").getValue().inputValue == 1) {
-                                                                                                                this.setValue(12);
-                                                                                                                // alert("ถ้าไม่มีการรับประกันให้ใส่เป็น 1 เดือน");
-                                                                                                                return;
+                                                                                                        if (this.getValue() < 0.5 && Ext.getCmp("i_is_warrantyID").getValue().inputValue == 1) {
+                                                                                                                return "กรุณาระบุระยะเวลารับประกันอย่างน้อย 0.5 เดือน";
                                                                                                         } else if (Ext.isEmpty(val)) {
                                                                                                                 return "กรุณากรอก วันที่ออกเอกสาร ";
                                                                                                         } else {

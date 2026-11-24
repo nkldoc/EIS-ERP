@@ -183,6 +183,12 @@ function previewValueExpression($fieldName, $dataType, $alias) {
 }
 
 function shouldUseWorkInProcessAccount($request, $db) {
+    // ประเภทงาน 8 คือ "จ้างแบบไม่ได้ของ" ต้องลงบัญชีค่าใช้จ่ายตามหมวดงบประมาณ
+    // แม้ค่าจากหน้าจอเดิมจะส่ง i_workin_process = 1 มาก็ตาม
+    if (intval(isset($request['i_working_type']) ? $request['i_working_type'] : 0) === 8) {
+        return false;
+    }
+
     if (intval(isset($request['i_workin_process']) ? $request['i_workin_process'] : 0) !== 1) {
         return false;
     }
@@ -2614,7 +2620,7 @@ switch ($mode) {
                 $arrParam2["f_wip_total_price"] = $f_wip_total_price; // 1
                 $arrParam2["f_under_total_price"] = NULL;
                 $arrParam2["f_net_total_price"] = NULL;
-            } else if ($_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_product_type'] == 0 || $_REQUEST['i_working_type'] == 8) { // วิ่งตามผังงบประมาณ
+            } else if (($_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_product_type'] == 0) || $_REQUEST['i_working_type'] == 8) { // วิ่งตามผังงบประมาณ / จ้างแบบไม่ได้ของ
                 //TODO
                 if ($_SESSION['user_id'] == 0) {
                     echo ' i_working_type == 8) { // วิ่งตามผังงบประมาณ';
@@ -2631,11 +2637,11 @@ switch ($mode) {
                 $dc_acc_id = $Fetch_dc_acc_id["dc_acc_id"];
                 $arrParam2["dc_acc_id"] = $dc_acc_id ?? 0;  //0
                 $arrParam2["i_qty"] = $_REQUEST['i_qty']; //0
-                $arrParam2["i_workin_process"] = $_REQUEST['i_workin_process'];
+                $arrParam2["i_workin_process"] = 0;
                 $arrParam2["f_wip_total_price"] = NULL;   //($i_product_type == 1) ? 0 : $f_under_total_price; //floatVal($data["f_net_unit_price"]); //0
                 $arrParam2["f_under_total_price"] = NULL;
                 $arrParam2["f_net_total_price"] = $f_net_total_price; //0
-            } else if ($_REQUEST['i_workin_process'] == 0 && $_REQUEST['i_product_type'] == 2 && $_REQUEST['i_workin_process2'] == 0 || $_REQUEST['i_working_type'] <> 8) { // ครุภัณฑ์  เข้าเกณฑ์
+            } else if ($_REQUEST['i_workin_process'] == 0 && $_REQUEST['i_product_type'] == 2 && $_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_working_type'] <> 8) { // ครุภัณฑ์  เข้าเกณฑ์
                 //TODO
                 if ($_SESSION['user_id'] == 0) {
                     echo 'i_workin_process &&  i_product_type  && i_workin_process2  || i_working_type == 8) {  ครุภัณฑ์  เข้าเกณฑ์';
@@ -2795,7 +2801,7 @@ switch ($mode) {
                         $arrParam2["f_wip_total_price"] = $f_wip_total_price; // 1
                         $arrParam2["f_under_total_price"] = NULL;
                         $arrParam2["f_net_total_price"] = NULL;
-                    } else if ($_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_product_type'] == 0) { // วิ่งตามผังงบประมาณ
+                    } else if (($_REQUEST['i_workin_process2'] == 0 && $_REQUEST['i_product_type'] == 0) || $_REQUEST['i_working_type'] == 8) { // วิ่งตามผังงบประมาณ / จ้างแบบไม่ได้ของ
                         $arrParam = array(STATUS_ENABLE, STATUS_ENABLE, $_REQUEST['po_expense_id']);
                         $dc_acc = "	select c.dc_acc_id
                             from " . DB_CENTER . "dc_bg_acc_hdr  a
@@ -2807,7 +2813,7 @@ switch ($mode) {
                         $dc_acc_id = $Fetch_dc_acc_id["dc_acc_id"];
                         $arrParam2["dc_acc_id"] = $dc_acc_id ?? 0;  //0
                         $arrParam2["i_qty"] = $_REQUEST['i_qty']; //0
-                        $arrParam2["i_workin_process"] = $_REQUEST['i_workin_process'];
+                        $arrParam2["i_workin_process"] = 0;
                         $arrParam2["f_wip_total_price"] = NULL;   //($i_product_type == 1) ? 0 : $f_under_total_price; //floatVal($data["f_net_unit_price"]); //0
                         $arrParam2["f_under_total_price"] = NULL;
                         $arrParam2["f_net_total_price"] = $f_net_total_price; //0
@@ -3541,27 +3547,35 @@ switch ($mode) {
         $ret_id = $bg_id["bg_reserve_money_id"];
         break;
     case "Billed_Last_Month":
-        $data = array();
-// ============== //
-        $addField = null;
-        $addValue = null;
-        unset($data);
-        unset($arrValue);
-// ============== //
-        $data["c_Billing_code"] = $_REQUEST["c_Billing_code"];
-// $data["d_doc_arrive_dt"] = $_REQUEST["d_update_date"];
-        $data["sp_check_period_hdr_id"] = $_REQUEST["sp_check_period_hdr_id"];
+        $billingCode = trim((string) ($_REQUEST["c_Billing_code"] ?? ""));
+        $checkingId = intval($_REQUEST["sp_check_period_hdr_id"] ?? 0);
 
-        foreach ($data as $fld => $value) {
-            $arrValue[] = ($value != "") ? $value : null;
-            $addField .= ", {$fld}";
-            $addValue .= ", ?";
+        if ($billingCode === "" || $checkingId <= 0) {
+            $stmt = false;
+            $sql = "ข้อมูลเลขที่ใบวางบิลหรือรายการตรวจรับไม่ครบถ้วน";
+            break;
         }
-        $sql = "UPDATE sp_check_period_hdr SET c_billing_code  = ?   where sp_check_period_hdr_id =  ?
-                SELECT @@IDENTITY as sp_check_period_hdr_id";
-        $stmt = $db->QueryParam($sql, $arrValue);
-        $bg_id = $db->Fetch($stmt);
-        $ret_id = $bg_id["sp_check_period_hdr_id"];
+
+        // UPDATE does not create an identity value, so @@IDENTITY cannot be
+        // used here. Update first, then verify the affected row explicitly.
+        $sql = "UPDATE dbo.sp_check_period_hdr
+                SET c_billing_code = ?
+                WHERE sp_check_period_hdr_id = ?";
+        $stmt = $db->QueryParam($sql, array($billingCode, $checkingId));
+        $updatedRow = $stmt ? $db->GetDataBySQL(
+                "SELECT sp_check_period_hdr_id
+                 FROM dbo.sp_check_period_hdr
+                 WHERE sp_check_period_hdr_id = ? AND c_billing_code = ?",
+                array($checkingId, $billingCode)
+        ) : false;
+
+        if (!$updatedRow || !isset($updatedRow["sp_check_period_hdr_id"])) {
+            $stmt = false;
+            $sql = "ไม่พบรายการตรวจรับที่ต้องการบันทึกเลขที่ใบวางบิล";
+            break;
+        }
+
+        $ret_id = intval($updatedRow["sp_check_period_hdr_id"]);
         break;
 
     case "getBookingType":

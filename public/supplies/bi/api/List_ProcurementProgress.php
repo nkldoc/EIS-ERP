@@ -57,10 +57,14 @@ $sql = "SELECT TOP 10000
             ISNULL((SELECT TOP 1 bt.c_name FROM NMU_DATACENTER.dbo.dc_expense_budget_type bt WHERE bt.dc_expense_budget_type_id = s.dc_expense_budget_type_id), N'ไม่ระบุแหล่งเงิน') AS fund_source,
             ISNULL((SELECT TOP 1 cost.c_name FROM NMU_DATACENTER.dbo.dc_cost cost WHERE cost.dc_cost_id = COALESCE(NULLIF(s.dc_cost2_id, 0), s.dc_cost_id)), N'ไม่ระบุหน่วยงาน') AS department_name,
             ISNULL(flow.period_total, 0) AS period_total,
+            ISNULL(flow.period_amount, 0) AS period_amount,
             ISNULL(flow.arrival_total, 0) AS arrival_total,
+            ISNULL(flow.arrival_amount, 0) AS arrival_amount,
             ISNULL(flow.inspection_total, 0) AS inspection_total,
+            ISNULL(flow.inspection_amount, 0) AS inspection_amount,
             ISNULL(flow.billing_total, 0) AS billing_total,
             ISNULL(flow.paid_total, 0) AS paid_total,
+            ISNULL(flow.paid_amount, 0) AS paid_amount,
             flow.paid_date,
             CASE WHEN ISNULL(flow.period_total, 0) > 0 AND flow.paid_total >= flow.period_total THEN 1 ELSE 0 END AS is_completed,
             CASE
@@ -106,17 +110,30 @@ $sql = "SELECT TOP 10000
                      ORDER BY h.sp_check_period_hdr_id DESC) chk
         LEFT JOIN NMU_EIS.dbo.po_working_hdr pay ON pay.po_working_hdr_id = chk.po_working_hdr_id
         OUTER APPLY (
-            SELECT COUNT(DISTINCT p.sp_tor_hdr_period_id) AS period_total,
-                   COUNT(DISTINCT CASE WHEN h.d_arrive_date IS NOT NULL OR NULLIF(LTRIM(RTRIM(h.c_arrive_code)), '') IS NOT NULL THEN p.sp_tor_hdr_period_id END) AS arrival_total,
-                   COUNT(DISTINCT CASE WHEN h.sp_check_period_hdr_id IS NOT NULL AND (h.d_checking_date IS NOT NULL OR NULLIF(LTRIM(RTRIM(h.c_code)), '') IS NOT NULL) THEN p.sp_tor_hdr_period_id END) AS inspection_total,
-                   COUNT(DISTINCT CASE WHEN ISNULL(h.po_working_hdr_id, 0) > 0 THEN p.sp_tor_hdr_period_id END) AS billing_total,
-                   COUNT(DISTINCT CASE WHEN ISNULL(ph.i_status_last, 0) >= 11 THEN p.sp_tor_hdr_period_id END) AS paid_total,
-                   CONVERT(VARCHAR, MAX(CASE WHEN ISNULL(ph.i_status_last, 0) >= 11 THEN ph.d_update END), 120) AS paid_date
-            FROM dbo.sp_tor_contract fc
-            INNER JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_contract_id = fc.sp_tor_contract_id
-            LEFT JOIN dbo.sp_check_period_hdr h ON h.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND h.i_enabled = 1
-            LEFT JOIN NMU_EIS.dbo.po_working_hdr ph ON ph.po_working_hdr_id = h.po_working_hdr_id AND ph.i_enable = 1
-            WHERE fc.sp_tor_id = s.tor_id AND fc.i_enabled = 1
+            SELECT COUNT(*) AS period_total,
+                   SUM(x.period_amount) AS period_amount,
+                   SUM(x.has_arrival) AS arrival_total,
+                   SUM(CASE WHEN x.has_arrival = 1 THEN x.period_amount ELSE 0 END) AS arrival_amount,
+                   SUM(x.has_inspection) AS inspection_total,
+                   SUM(CASE WHEN x.has_inspection = 1 THEN x.period_amount ELSE 0 END) AS inspection_amount,
+                   SUM(x.has_billing) AS billing_total,
+                   SUM(x.has_paid) AS paid_total,
+                   SUM(CASE WHEN x.has_paid = 1 THEN x.period_amount ELSE 0 END) AS paid_amount,
+                   CONVERT(VARCHAR, MAX(x.paid_date), 120) AS paid_date
+            FROM (
+                SELECT p.sp_tor_hdr_period_id,
+                       ISNULL((SELECT SUM(ISNULL(pd.f_net_total_price, 0))
+                               FROM dbo.sp_tor_dtl_period pd
+                               WHERE pd.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id), 0) AS period_amount,
+                       CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr ah WHERE ah.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND ah.i_enabled = 1 AND (ah.d_arrive_date IS NOT NULL OR NULLIF(LTRIM(RTRIM(ah.c_arrive_code)), '') IS NOT NULL)) THEN 1 ELSE 0 END AS has_arrival,
+                       CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr ih WHERE ih.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND ih.i_enabled = 1 AND (ih.d_checking_date IS NOT NULL OR NULLIF(LTRIM(RTRIM(ih.c_code)), '') IS NOT NULL)) THEN 1 ELSE 0 END AS has_inspection,
+                       CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr bh WHERE bh.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND bh.i_enabled = 1 AND ISNULL(bh.po_working_hdr_id, 0) > 0) THEN 1 ELSE 0 END AS has_billing,
+                       CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr phh INNER JOIN NMU_EIS.dbo.po_working_hdr pwh ON pwh.po_working_hdr_id = phh.po_working_hdr_id WHERE phh.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND phh.i_enabled = 1 AND pwh.i_enable = 1 AND ISNULL(pwh.i_status_last, 0) >= 11) THEN 1 ELSE 0 END AS has_paid,
+                       (SELECT MAX(pwd.d_update) FROM dbo.sp_check_period_hdr pdh INNER JOIN NMU_EIS.dbo.po_working_hdr pwd ON pwd.po_working_hdr_id = pdh.po_working_hdr_id WHERE pdh.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND pdh.i_enabled = 1 AND pwd.i_enable = 1 AND ISNULL(pwd.i_status_last, 0) >= 11) AS paid_date
+                FROM dbo.sp_tor_contract fc
+                INNER JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_contract_id = fc.sp_tor_contract_id
+                WHERE fc.sp_tor_id = s.tor_id AND fc.i_enabled = 1
+            ) x
         ) flow
         {$where}
         ORDER BY s.i_yyyy DESC, s.tor_id DESC";
@@ -129,6 +146,9 @@ if ($stmt) {
             ? intval($row['i_yyyy']) + 543 : intval($row['i_yyyy']);
         $row['pr_amount'] = floatval($row['pr_amount']);
         $row['contract_amount'] = floatval($row['contract_amount']);
+        foreach (array('period_amount', 'arrival_amount', 'inspection_amount', 'paid_amount') as $amountField) {
+            $row[$amountField] = floatval($row[$amountField]);
+        }
         foreach (array('importance_level', 'period_total', 'arrival_total', 'inspection_total', 'billing_total', 'paid_total', 'is_completed') as $numericField) {
             $row[$numericField] = intval($row[$numericField]);
         }
