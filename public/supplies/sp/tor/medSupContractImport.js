@@ -65,6 +65,9 @@ Ext.MEDSUP_IMPORT_COLUMNS = [
     // เลขคุมตรวจรับ EGP (ไม่บังคับ) เก็บที่รายการรับของ แล้วเติมให้ในช่อง "เลขที่ EGP" ตอนออกเลขตรวจรับ (ST00096)
     // user ไม่ต้องพิมพ์/ก๊อปปี้เอง (ต้องรัน scriptBaseUpdate/sp_tor_period_bill_receive_egp_no.sql ก่อน ไม่งั้นระบบข้ามคอลัมน์นี้)
     {key: "egp_no", label: "เลขคุมตรวจรับ egp", alias: ["เลขคุมตรวจรับ EGP", "เลขคุมตรวจรับ"]},
+    // วันที่บันทึกการตรวจรับ (ไม่บังคับ) เก็บที่รายการรับของ แล้วเติมให้ในช่อง "วันที่ตรวจรับ" ของหน้าตรวจรับ (ST00096) ตอนออกเลขตรวจรับอัตโนมัติ
+    // (ต้องรัน scriptBaseUpdate/sp_tor_period_bill_receive_d_checking_import.sql ก่อน ไม่งั้นระบบข้ามคอลัมน์นี้)
+    {key: "chk_date", label: "วันที่บันทึกการตรวจรับ", alias: ["วันที่บันทึกตรวจรับ"], date: true},
     // รหัสบัญชีตั้งหนี้ของงวด (ไม่บังคับ) ว่าง = ใช้การจับคู่หมวดค่าใช้จ่ายเดิม
     {key: "debt_acc", label: "รหัสบัญชีตั้งหนี้"},
 ];
@@ -259,6 +262,7 @@ function winMedSupImportRows(rec) {
         {header: "chk_id", key: "chk_id"},
         {header: "c_overlap", key: "c_overlap"},
         {header: "เลขคุมตรวจรับ egp", key: "egp_no"},
+        {header: "วันที่บันทึกการตรวจรับ", key: "chk_date"},
         {header: "สถานะจองเงิน (ระบบงบ)", key: "rsv_status", render: Ext.fnImportRsvStatus},
     ];
     var tablePanel = new Ext.Panel({border: false, autoScroll: true, html: "<div class=\"medsup-imp-empty\">กำลังโหลด..</div>"});

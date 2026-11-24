@@ -859,7 +859,17 @@ if ($type == "medsup_period_bill") {
         $mChk = medsupIrMoney($db, $irForCheck);
         $vatWarning = $mChk === null ? "" : medsupIrVatCheck($db, $irForCheck, $mChk["f_total_vat"], $mChk["f_vat_amt"], $mChk["f_wht_amt"]);
     }
-    echo json_encode(array($root => ${$root}, "vat_warning" => $vatWarning));
+    // [ผู้ใช้ขอ] วันที่บันทึกการตรวจรับที่นำเข้ามากับไฟล์ (sp_tor_period_bill_receive.d_checking_import - เอาวันแรกของ IR นี้)
+    // ฟอร์มใช้เติมช่อง "วันที่ตรวจรับ" อัตโนมัติ ถ้ายังไม่เคยบันทึกตรวจรับ - ยังไม่รัน sp_tor_period_bill_receive_d_checking_import.sql = ว่าง
+    $chkImport = "";
+    if (intval($db->GetDataBySQL("select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill_receive', 'd_checking_import') is null then 0 else 1 end", array())) === 1) {
+        $chkImportRaw = $db->GetDataBySQL(
+            "select top 1 convert(varchar, d_checking_import, 120) from NMU_ERP.dbo.sp_tor_period_bill_receive
+             where c_ir_code = ? and i_enabled = 1 and d_checking_import is not null
+             order by d_checking_import, sp_tor_period_bill_receive_id", array($irForCheck));
+        $chkImport = empty($chkImportRaw) ? "" : $date->extDateBuddha($chkImportRaw);
+    }
+    echo json_encode(array($root => ${$root}, "vat_warning" => $vatWarning, "d_checking_import" => $chkImport));
     exit();
 } else if ($type == "medsup_pr_list") {
     // ================= รายการ PR ที่ยังไม่ผูกสัญญา (เมนู "การจัดทำ PR (หน่วยงาน)
