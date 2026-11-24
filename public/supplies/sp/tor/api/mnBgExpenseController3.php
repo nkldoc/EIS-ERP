@@ -86,7 +86,6 @@ switch($mode){
             $sql = "IF EXISTS (SELECT 1 FROM NMU_EIS.dbo.bg_overlap_hdr WHERE c_code = ?)
                     AND EXISTS (SELECT 1 FROM NMU_EIS.dbo.bg_overlap_hdr WHERE c_code = ?)
                     UPDATE c SET i_overlap = 2
-                            , i_status_overlap = 1
                             , i_yyyy_overlap = ?
                             , c_overlap = ?
                             , bg_budget_dtl_overlap_id = ?
