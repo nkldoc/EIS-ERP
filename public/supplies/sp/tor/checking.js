@@ -2004,6 +2004,14 @@ Ext.uiConfirmVat = (rec) => {
                                         ],
                                         listeners: {
                                                 afteredit: function (e) {
+                                                                if (e.field === "dc_acc_id") {
+                                                                        var accountIndex = Ext.dc_acc.findExact("id", e.value);
+                                                                        if (accountIndex === -1) {
+                                                                                accountIndex = Ext.dc_acc.find("id", String(e.value));
+                                                                        }
+                                                                        var accountRecord = accountIndex >= 0 ? Ext.dc_acc.getAt(accountIndex) : null;
+                                                                        e.record.set("dc_acc_name", accountRecord ? accountRecord.get("c_name") : "");
+                                                                }
                                                         if (e.field === "f_vat_amt") {
                                                                 e.record._vatManual = true;
                                                                 e.record.commit();
@@ -14707,6 +14715,14 @@ Ext.AppUx = function (app, menu) {
                                                                 ],
                                                                 listeners: {
                                                                         afteredit: function (e) {
+                                                                                if (e.field === "dc_acc_id") {
+                                                                                        var accountIndex = Ext.dc_acc.findExact("id", e.value);
+                                                                                        if (accountIndex === -1) {
+                                                                                                accountIndex = Ext.dc_acc.find("id", String(e.value));
+                                                                                        }
+                                                                                        var accountRecord = accountIndex >= 0 ? Ext.dc_acc.getAt(accountIndex) : null;
+                                                                                        e.record.set("dc_acc_name", accountRecord ? accountRecord.get("c_name") : "");
+                                                                                }
                                                                                 if (e.field === "f_vat_amt") {
                                                                                         e.record._vatManual = true;
                                                                                         e.record.commit();
