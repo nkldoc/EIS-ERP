@@ -3547,27 +3547,35 @@ switch ($mode) {
         $ret_id = $bg_id["bg_reserve_money_id"];
         break;
     case "Billed_Last_Month":
-        $data = array();
-// ============== //
-        $addField = null;
-        $addValue = null;
-        unset($data);
-        unset($arrValue);
-// ============== //
-        $data["c_Billing_code"] = $_REQUEST["c_Billing_code"];
-// $data["d_doc_arrive_dt"] = $_REQUEST["d_update_date"];
-        $data["sp_check_period_hdr_id"] = $_REQUEST["sp_check_period_hdr_id"];
+        $billingCode = trim((string) ($_REQUEST["c_Billing_code"] ?? ""));
+        $checkingId = intval($_REQUEST["sp_check_period_hdr_id"] ?? 0);
 
-        foreach ($data as $fld => $value) {
-            $arrValue[] = ($value != "") ? $value : null;
-            $addField .= ", {$fld}";
-            $addValue .= ", ?";
+        if ($billingCode === "" || $checkingId <= 0) {
+            $stmt = false;
+            $sql = "ข้อมูลเลขที่ใบวางบิลหรือรายการตรวจรับไม่ครบถ้วน";
+            break;
         }
-        $sql = "UPDATE sp_check_period_hdr SET c_billing_code  = ?   where sp_check_period_hdr_id =  ?
-                SELECT @@IDENTITY as sp_check_period_hdr_id";
-        $stmt = $db->QueryParam($sql, $arrValue);
-        $bg_id = $db->Fetch($stmt);
-        $ret_id = $bg_id["sp_check_period_hdr_id"];
+
+        // UPDATE does not create an identity value, so @@IDENTITY cannot be
+        // used here. Update first, then verify the affected row explicitly.
+        $sql = "UPDATE dbo.sp_check_period_hdr
+                SET c_billing_code = ?
+                WHERE sp_check_period_hdr_id = ?";
+        $stmt = $db->QueryParam($sql, array($billingCode, $checkingId));
+        $updatedRow = $stmt ? $db->GetDataBySQL(
+                "SELECT sp_check_period_hdr_id
+                 FROM dbo.sp_check_period_hdr
+                 WHERE sp_check_period_hdr_id = ? AND c_billing_code = ?",
+                array($checkingId, $billingCode)
+        ) : false;
+
+        if (!$updatedRow || !isset($updatedRow["sp_check_period_hdr_id"])) {
+            $stmt = false;
+            $sql = "ไม่พบรายการตรวจรับที่ต้องการบันทึกเลขที่ใบวางบิล";
+            break;
+        }
+
+        $ret_id = intval($updatedRow["sp_check_period_hdr_id"]);
         break;
 
     case "getBookingType":
