@@ -2409,6 +2409,10 @@ function win_hdr_period(rec, event) {
                           },
                          success: function (res) {
                             var result = Ext.decode(res.responseText);
+                            if (!result.success || result.success === "Error") {
+                              Ext.MessageBox.alert("บันทึกไม่ได้", result.msg || "คืนค่างวดไม่สำเร็จ");
+                              return;
+                            }
                             if (result.success === "Success") {
                               Ext.MessageBox.alert("สำเร็จ", "ดึงรายการกลับเรียบร้อยแล้ว", function() {
                                 Ext.store3.load({

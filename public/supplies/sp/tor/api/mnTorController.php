@@ -240,6 +240,15 @@ $data['d_tor_date'] = !empty($d_tor_date) ? $date->bc_to_ad($data['d_tor_date'])
 $f_total_amt = !empty($data["f_total_amt"]) ? str_replace(',', '', $data["f_total_amt"]) : 0; //str_replace(',', '', $data[$value]);
 $data['dc_cost_id'] = $data['dc_cost_id'] ?? 38;
 $data["c_comment"] = $data["c_comment"] ?? NULL;
+require_once __DIR__ . '/periodAmountGuard.php';
+try {
+    guardPeriodAmount($db, $_REQUEST);
+} catch (RuntimeException $error) {
+    $db->RollBackTran();
+    echo json_encode(array('success' => false, 'reval' => 1, 'msg' => $error->getMessage()), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 switch ($mode) {
     case "GET_PROGRESS_MENU_MAP":
         $menuCode = trim($_REQUEST["menu_code"] ?? "");
@@ -3464,7 +3473,7 @@ switch ($mode) {
                         , CONVERT(VARCHAR, a.d_period_date, 120) AS d_period_date
                     FROM dbo.sp_tor_hdr_period a
                     INNER JOIN sp_tor_contract b ON b.sp_tor_contract_id = a.sp_tor_contract_id
-                    LEFT JOIN sp_tor_dtl_period c ON a.sp_tor_hdr_period_id = c.sp_tor_hdr_period_id and c.i_enabled = 1
+                    OUTER APPLY (SELECT TOP 1 d.i_is_item, d.i_product_type, d.i_hire_type FROM dbo.sp_tor_dtl_period d WHERE d.sp_tor_hdr_period_id=a.sp_tor_hdr_period_id AND d.i_enabled=1 ORDER BY d.sp_tor_dtl_period_id) c
                     WHERE  a.sp_tor_contract_id=? {$con} and a.i_enabled = {$i_enabled}
                     order by a.i_period,a.i_period_contract
                     ";
