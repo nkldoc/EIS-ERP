@@ -682,7 +682,7 @@ DeleteTor_dtl = function (record) {
         autoLoad: true,
         url: "api/All_PoWorkingImpHdr.php",
         baseParams: {
-            type: "dc_cost",
+            type: "dc_cost_all",
         },
 
         root: "data",

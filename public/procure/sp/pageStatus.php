@@ -122,7 +122,8 @@ $dc_department_id = $_SESSION["dc_department_id"];
 $st = $_GET["st"] ?? $_SESSION["st"] ?? null;
 $_SESSION["st"] = $st ?? $_SESSION["st"] ?? null;
 $pg = new clsPageStatus($db, $st);
-$js = $pg->get_js() . ".js?__dc=" . __VPRODUCT_;
+$scriptFile = __DIR__ . "/tor/" . $pg->get_js() . ".js";
+$js = $pg->get_js() . ".js?__dc=" . (is_file($scriptFile) ? filemtime($scriptFile) : __VPRODUCT_);
 ?>
 <!DOCTYPE html> 
 <html lang="en"> 
