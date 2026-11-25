@@ -32,24 +32,10 @@ $fetch = function ($sql, $params) use ($db) {
     }
     return $rows;
 };
-// Apply the same department/employee scope as the contract listing.
-$scope = '';
+// This overview is readable by signed-in users across departments.
+// Editing remains restricted to central admins by the write endpoints.
 $params = array($contractId > 0 ? $contractId : $requestedTorId);
-$adminPrAccess = false;
-if ($requestedTorId > 0 && intval($_GET['admin_pr_management'] ?? 0) === 1) {
-    $adminPrAccess = (bool)$db->GetDataBySQL('SELECT TOP 1 m.dc_menu_id FROM dc_menu m JOIN dc_user u ON u.dc_user_id=? WHERE m.c_filelocation=? AND m.i_enable=1 AND m.i_delete=2 AND (u.i_type_user=2 OR EXISTS (SELECT 1 FROM dc_user_menu um WHERE um.dc_menu_id=m.dc_menu_id AND um.dc_user_id=u.dc_user_id))', array($_SESSION['user_id'], 'sp-AdminUpdatePR'));
-}
-if ($adminPrAccess || intval($_SESSION['dc_center_user'] ?? 0) === 1) {
-    // Authorized central admins search details across departments.
-} elseif (intval($_SESSION['i_level'] ?? 0) === 2) {
-    $scope = ' AND e.dc_department_id=?';
-    $params[] = intval($_SESSION['dc_department_id'] ?? 0);
-} elseif (intval($_SESSION['i_level'] ?? 0) === 3) {
-    $scope = ' AND e.sp_emp_id=?';
-    $params[] = intval($_SESSION['sp_emp_id'] ?? 0);
-} elseif (intval($_SESSION['i_level'] ?? 0) !== 1) {
-    $scope = ' AND 1=0';
-}
+$canManageEdit = intval($_SESSION['dc_center_user'] ?? 0) === 1;
 $prCondition = $contractId > 0 ? 't.tor_id=(SELECT sp_tor_id FROM dbo.sp_tor_contract WHERE sp_tor_contract_id=?)' : 't.tor_id=?';
 $pr = $fetch('SELECT t.*, bg.c_name AS pr_type_name,
     (SELECT TOP 1 cost.c_name FROM ' . DB_CENTER . 'dc_cost cost
@@ -57,7 +43,7 @@ $pr = $fetch('SELECT t.*, bg.c_name AS pr_type_name,
     FROM dbo.sp_tor t
     INNER JOIN dbo.sp_emp e ON e.sp_emp_id=t.sp_emp_id
     LEFT JOIN dbo.sp_type_bg bg ON bg.sp_type_bg_id=t.i_type_bg
-    WHERE ' . $prCondition . $scope, $params);
+    WHERE ' . $prCondition, $params);
 if (!$pr) {
     http_response_code(404);
     echo json_encode(array('success' => false, 'msg' => 'ไม่พบ PR หรือสัญญา หรือไม่มีสิทธิ์ดูข้อมูล'));
