@@ -4042,27 +4042,6 @@ Ext.AppUx = function (app, menu) {
         success: function (result, request) {
           var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
           if (jsonData.success) {
-            Ext.Ajax.request({
-              url: "tor/api/mnTorController.php",
-              method: "POST", //GET
-              params: {
-                mode: "UP_SP_MN_CONTRACT_HDR",
-                sp_contract_po_id: record.get("sp_tor_contract_pro_id"),
-                f_total_amt: record.get("f_total_amt"),
-                d_doc_date: record.data.d_doc_date,
-                d_start_date: record.get("d_start_date"),
-                d_end_date: record.json.d_due_date,
-                c_name_in: record.get("c_name"),
-              },
-              success: function (result, request) {
-                var jsonData = Ext.util.JSON.decode(result.responseText); //decode json
-                if (jsonData.success) {
-                  Ext.MessageBox.alert("Success", jsonData.msg, function () {
-                    Ext.storeProject.reload();
-                  });
-                }
-              },
-            });
             Ext.MessageBox.alert("Success", jsonData.msg, function () {
               Ext.storeProject.reload();
             });

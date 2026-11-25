@@ -1882,6 +1882,15 @@ switch ($mode) {
         }
 
         $id = $_REQUEST["id"] ?? null;
+        require_once __DIR__ . '/contractDeliveryGuard.php';
+        try {
+            $re_id = ensureContractDeliveryHeader($db, $id, $_SESSION);
+            $id = (int) $id;
+        } catch (RuntimeException $error) {
+            $db->RollBackTran();
+            echo json_encode(array('success' => false, 'reval' => 1, 'msg' => $error->getMessage()), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
 
         $fs = $db->GetDataBySQL("select a.i_purchase,a.i_type_contract "
                 . " from dbo.sp_tor a"
@@ -7184,7 +7193,13 @@ switch ($mode) {
         //        } else {  }
         $selectRow = null;
         $data["sp_contract_id"] = $_REQUEST["sp_contract_po_id"];
-        $rs = $db->GetDataBySQL('SELECT i_type_fine, sp_tor_id FROM dbo.sp_tor_contract WHERE  sp_tor_contract_id = ?', array($_REQUEST["sp_contract_po_id"]));
+        $rs = $db->GetDataBySQL('SELECT c.i_type_fine, c.sp_tor_id, COALESCE(NULLIF(c.sp_emp_id,0),NULLIF(t.sp_emp_id,0)) AS sp_emp_id FROM dbo.sp_tor_contract c INNER JOIN dbo.sp_tor t ON t.tor_id=c.sp_tor_id WHERE c.sp_tor_contract_id = ?', array($_REQUEST["sp_contract_po_id"]));
+        if (!is_array($rs) || empty($rs['sp_emp_id'])) {
+            $db->RollBackTran();
+            echo json_encode(array('success' => false, 'reval' => 1,
+                'msg' => '??????????????????????????????????????????'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         //        $data["sp_tor_id"] = $rc['sp_tor_id'];
         $data["i_type_fine"] = $rs['i_type_fine'];
         $data["c_name"] = $_REQUEST["c_name_in"];
@@ -7219,7 +7234,7 @@ switch ($mode) {
             $stmt = $db->QueryParam($sql, $arrValue);
         } else {
 
-            $data["sp_emp_id"] = $_SESSION["sp_emp_id"];
+            $data["sp_emp_id"] = $rs["sp_emp_id"];
             $data["dc_user_create_id"] = $_SESSION["user_id"];
             $data["dc_user_create_cost_id"] = $_SESSION["dc_cost_id"];
             $data["d_create"] = date("Y-m-d H:i:s");
@@ -7233,7 +7248,7 @@ switch ($mode) {
             $sql = "
                 SET NOCOUNT ON
                 INSERT INTO sp_mn_contract_hdr (" . substr($addField, 1) . ") VALUES (" . substr($addValue, 1) . ");
-                SELECT @@IDENTITY as id;";
+                SELECT CAST(SCOPE_IDENTITY() AS int) as id;";
             $stmt = $db->QueryParam($sql, $arrValue);
             if (@$_REQUEST["show_sql"]) {
                 /*                 * ****echo sql***** */
@@ -7300,7 +7315,13 @@ switch ($mode) {
 
         $selectRow = null;
         $data["sp_contract_id"] = $_REQUEST["sp_contract_po_id"];
-        $rs = $db->GetDataBySQL('SELECT i_type_fine, sp_tor_id FROM dbo.sp_tor_contract WHERE  sp_tor_contract_id = ?', array($_REQUEST["sp_contract_po_id"]));
+        $rs = $db->GetDataBySQL('SELECT c.i_type_fine, c.sp_tor_id, COALESCE(NULLIF(c.sp_emp_id,0),NULLIF(t.sp_emp_id,0)) AS sp_emp_id FROM dbo.sp_tor_contract c INNER JOIN dbo.sp_tor t ON t.tor_id=c.sp_tor_id WHERE c.sp_tor_contract_id = ?', array($_REQUEST["sp_contract_po_id"]));
+        if (!is_array($rs) || empty($rs['sp_emp_id'])) {
+            $db->RollBackTran();
+            echo json_encode(array('success' => false, 'reval' => 1,
+                'msg' => '??????????????????????????????????????????'), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         //        $data["sp_tor_id"] = $rc['sp_tor_id'];
         $data["i_type_fine"] = $rs['i_type_fine'];
         $data["c_name"] = $_REQUEST["c_name_in"];
@@ -7335,7 +7356,7 @@ switch ($mode) {
             $stmt = $db->QueryParam($sql, $arrValue);
         } else {
 
-            $data["sp_emp_id"] = $_SESSION["sp_emp_id"];
+            $data["sp_emp_id"] = $rs["sp_emp_id"];
             $data["dc_user_create_id"] = $_SESSION["user_id"];
             $data["dc_user_create_cost_id"] = $_SESSION["dc_cost_id"];
             $data["d_create"] = date("Y-m-d H:i:s");
@@ -7349,7 +7370,7 @@ switch ($mode) {
             $sql = "
                 SET NOCOUNT ON
                 INSERT INTO sp_mn_contract_hdr (" . substr($addField, 1) . ") VALUES (" . substr($addValue, 1) . ");
-                SELECT @@IDENTITY as id;";
+                SELECT CAST(SCOPE_IDENTITY() AS int) as id;";
             $stmt = $db->QueryParam($sql, $arrValue);
             $ss_id = $db->Fetch($stmt);
             $re_id = $ss_id["id"];
