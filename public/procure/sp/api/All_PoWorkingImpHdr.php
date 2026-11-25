@@ -438,7 +438,6 @@ if ($_REQUEST["type"] == "dc_cost_all") {
     $sqlMain = "
 		SELECT * FROM " . DB_CENTER . "dc_cost
 		WHERE i_last = 1 AND i_enable = 1 AND i_delete = 2
-			AND c_code_tree LIKE '0104%'
 		ORDER BY c_code";
     $arrParam = array(STATUS_ENABLE, 1);
     $stmt = $db->QueryParam($sqlMain, $arrParam);
