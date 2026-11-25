@@ -696,7 +696,7 @@ Ext.AppUx = function (app, menu) {
         autoLoad: true,
         url: "api/All_PoWorkingImpHdr.php",
         baseParams: {
-            type: "dc_cost",
+            type: "dc_cost_all",
         },
         root: "data",
         idProperty: "id",
