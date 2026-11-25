@@ -956,6 +956,18 @@ const win_request_edit_bg = function (rec) {
                                                                         },
                                                                         // เลขที่ใบกัน: เฉพาะใบกันที่ขอกันเหลื่อมมาจากสัญญานี้ (มียอดคงเหลือ)
                                                                         // ปีงบประมาณแสดงตามปีของใบกันที่เลือก (ไม่ให้เลือกปีเอง)
+                                                                        {
+                                                                                xtype: "combo", fieldLabel: "ใช้ใบกันของสัญญา", id: "overlap_slot_edit_bg",
+                                                                                hiddenName: "overlap_slot", mode: "local", triggerAction: "all",
+                                                                                editable: false, forceSelection: true, value: rec.data.c_overlap2 && !rec.data.c_overlap ? 2 : 1, width: 180,
+                                                                                store: new Ext.data.ArrayStore({ fields: ["id", "label"], data: [[1, "ใบที่ 1"], [2, "ใบที่ 2"]] }),
+                                                                                valueField: "id", displayField: "label",
+                                                                                listeners: { select: function () {
+                                                                                        Ext.getCmp("c_overlap_select_edit_bg").clearValue();
+                                                                                        Ext.getCmp("c_overlap_select_hidden").setValue("");
+                                                                                        Ext.getCmp("i_yyyy_overlap_select_hidden").setValue("");
+                                                                                } }
+                                                                        },
                                                                         new Ext.form.ComboBox({
                                                                                 mode: "local",
                                                                                 fieldLabel: "เลขที่ใบกัน",
@@ -12161,6 +12173,8 @@ Ext.AppUx = function (app, menu) {
                                                 var used = code
                                                         ? '<div style="color:#080;font-weight:bold;white-space:nowrap;">✔ ' + Ext.util.Format.htmlEncode(code) + '</div>'
                                                         : "";
+                                                var secondCode = record.get("c_overlap2");
+                                                if (secondCode) used += '<div style="color:#080;font-weight:bold;white-space:nowrap;">ใบที่ 2: ' + Ext.util.Format.htmlEncode(secondCode) + '</div>';
                                                 return used + '<button type="button" class="check-overlap-user" style="cursor:pointer;color:#0b5394;border:1px solid #6fa8dc;border-radius:3px;background:#fff;padding:2px 8px;">ตรวจใบกัน</button>';
                                         },
                                 },

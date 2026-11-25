@@ -1336,9 +1336,12 @@ switch ($mode) {
         // เลือกเลขใบกันมาพร้อมการยืนยัน -> เก็บไว้ที่สัญญา ตอนออกเลข AP จะใช้ใบกันนี้ให้อัตโนมัติ
         $overlapCode = trim((string) ($_REQUEST["c_overlap_select"] ?? ""));
         $overlapYear = intval($_REQUEST["i_yyyy_overlap_select"] ?? 0);
+        $overlapSlot = intval($_REQUEST["overlap_slot"] ?? 1);
         $contractOverlapSql = "";
         if ($overlapCode !== "" && $overlapYear > 0) {
-            $contractOverlapSql = ", c_overlap = ?, i_yyyy_overlap = ?";
+            $contractOverlapSql = $overlapSlot === 2
+                ? ", c_overlap2 = ?, i_yyyy_overlap2 = ?"
+                : ", c_overlap = ?, i_yyyy_overlap = ?";
             $arrParam[] = $overlapCode;
             $arrParam[] = (string) $overlapYear;
         }
