@@ -435,6 +435,28 @@ if ($_REQUEST["type"] == "dc_cost_all") {
             ${$root}[] = $temp;
         }
     }
+} else if ($_REQUEST["type"] == "contract_overlap2") {
+    // ????????: ??????/?????????????????? ??????? view/??????????/???????????????????????????
+    $sqlMain = "SELECT TOP 1 c.c_overlap2 AS c_booking,
+                       COALESCE(NULLIF(TRY_CONVERT(int, c.i_yyyy_overlap2), 0), h.i_year) AS i_year,
+                       h.bg_budget_dtl_overlap_id AS id
+                FROM dbo.sp_tor_contract c
+                OUTER APPLY (
+                    SELECT TOP 1 o.bg_budget_dtl_overlap_id, o.i_year
+                    FROM " . DB_NMU_EIS . "bg_overlap_hdr o
+                    WHERE o.c_code = LTRIM(RTRIM(c.c_overlap2))
+                    ORDER BY o.bg_overlap_hdr_id DESC
+                ) h
+                WHERE c.sp_tor_contract_id = ?
+                  AND NULLIF(LTRIM(RTRIM(c.c_overlap2)), '') IS NOT NULL";
+    $stmt = $db->QueryParam($sqlMain, array(intval($_REQUEST["po_id"] ?? 0)));
+    while ($stmt && ($row = $db->Fetch($stmt))) {
+        $year = intval($row["i_year"]);
+        if ($year > 2400) $year -= 543;
+        if ($year <= 0) continue; // ???????????????????????
+        $code = trim($row["c_booking"]);
+        ${$root}[] = array("id" => $row["id"] ?: $code, "c_booking" => $code, "i_year" => $year);
+    }
 } else if ($_REQUEST["type"] == "overlap_by_contract") {
     // ใบกันที่ขอกันเหลื่อมมาจากสัญญานี้ (bg_overlap_hdr.po_id = sp_tor_contract_id) - ใช้เลือกให้อัตโนมัติในหน้ายืนยันกันเหลื่อมก่อหนี้
     $sqlMain = "SELECT DISTINCT d.c_code_ref, bh.i_year

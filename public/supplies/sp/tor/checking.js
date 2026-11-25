@@ -966,6 +966,8 @@ const win_request_edit_bg = function (rec) {
                                                                                         Ext.getCmp("c_overlap_select_edit_bg").clearValue();
                                                                                         Ext.getCmp("c_overlap_select_hidden").setValue("");
                                                                                         Ext.getCmp("i_yyyy_overlap_select_hidden").setValue("");
+                                                                                        Ext.getCmp("i_budget_year_edit_bg").setValue("");
+                                                                                        Ext.getCmp("c_overlap_select_edit_bg").fireEvent("afterrender", Ext.getCmp("c_overlap_select_edit_bg"));
                                                                                 } }
                                                                         },
                                                                         new Ext.form.ComboBox({
@@ -999,6 +1001,30 @@ const win_request_edit_bg = function (rec) {
                                                                                         afterrender: function (combo) {
                                                                                                 // แสดงเฉพาะใบกันของสัญญานี้ (bg_overlap_hdr.po_id = สัญญา) พร้อมยอดคงเหลือ
                                                                                                 var st = combo.getStore();
+                                                                                                var slot = Number(Ext.getCmp("overlap_slot_edit_bg").getValue());
+                                                                                                var generation = (combo.overlapLoadGeneration || 0) + 1;
+                                                                                                combo.overlapLoadGeneration = generation;
+                                                                                                st.removeAll(true);
+                                                                                                if (slot === 2) {
+                                                                                                        Ext.Ajax.request({
+                                                                                                                url: st.url, method: "GET",
+                                                                                                                params: { type: "contract_overlap2", po_id: rec.data.sp_tor_contract_id },
+                                                                                                                callback: function (opt, ok, resp) {
+                                                                                                                        if (!combo.rendered || combo.overlapLoadGeneration !== generation) return;
+                                                                                                                        var rows = [];
+                                                                                                                        try { if (ok) rows = Ext.decode(resp.responseText).data || []; } catch (e) { }
+                                                                                                                        st.loadData({ data: rows });
+                                                                                                                        combo.emptyText = ok ? "??????????????????????????????????" : "??????????????????????????";
+                                                                                                                        if (st.getCount()) {
+                                                                                                                                var pick = st.getAt(0);
+                                                                                                                                combo.setValue(pick.get("id"));
+                                                                                                                                combo.fireEvent("select", combo, pick, 0);
+                                                                                                                        } else combo.applyEmptyText();
+                                                                                                                }
+                                                                                                        });
+                                                                                                        return;
+                                                                                                }
+
                                                                                                 var setText = function (t) {
                                                                                                         combo.emptyText = t;
                                                                                                         if (combo.rendered && !combo.getValue()) {
@@ -1006,7 +1032,7 @@ const win_request_edit_bg = function (rec) {
                                                                                                         }
                                                                                                 };
                                                                                                 var loadOne = function (list, i, noBalance) {
-                                                                                                        if (!combo.rendered) {
+                                                                                                        if (!combo.rendered || combo.overlapLoadGeneration !== generation) {
                                                                                                                 return;
                                                                                                         }
                                                                                                         if (i >= list.length) {
@@ -1031,6 +1057,7 @@ const win_request_edit_bg = function (rec) {
                                                                                                                         c_booking: list[i].c_booking,
                                                                                                                 },
                                                                                                                 callback: function () {
+                                                                                                                        if (!combo.rendered || combo.overlapLoadGeneration !== generation) return;
                                                                                                                         if (tmp.getCount()) {
                                                                                                                                 st.add(tmp.getRange());
                                                                                                                         } else {
@@ -1050,6 +1077,7 @@ const win_request_edit_bg = function (rec) {
                                                                                                                 try {
                                                                                                                         list = Ext.decode(resp.responseText).data || [];
                                                                                                                 } catch (e) { }
+                                                                                                                if (!combo.rendered || combo.overlapLoadGeneration !== generation) return;
                                                                                                                 st.removeAll(true);
                                                                                                                 loadOne(list, 0, []);
                                                                                                         },
@@ -15422,8 +15450,8 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 }
 
                                                                                                                 var overlapYear = parseInt(Ext.selectRow.get("i_yyyy_overlap2"), 10);
-                                                                                                                var overlapCode = Ext.selectRow.get("c_overlap2");
-                                                                                                                if (!overlapYear || !overlapCode) {
+                                                                                                                var overlapCode = String(Ext.selectRow.get("c_overlap2") || "").replace(/^\s+|\s+$/g, "");
+                                                                                                                if (!overlapCode) {
                                                                                                                         checkbox.setValue(false);
                                                                                                                         Ext.Msg.alert("แจ้งเตือน", "สัญญาไม่มีข้อมูลใบกันใบที่ 2");
                                                                                                                         return;
@@ -15436,9 +15464,8 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                                                                                 Ext.booking_store.load({
                                                                                                                         params: {
-                                                                                                                                dc_cost_id: Ext.getCmp("dc_cost_idID").getValue(),
-                                                                                                                                i_yyyy_overlap: overlapYear,
-                                                                                                                                c_booking: overlapCode
+                                                                                                                                type: "contract_overlap2",
+                                                                                                                                po_id: Ext.selectRow.get("sp_tor_contract_id")
                                                                                                                         },
                                                                                                                         callback: function (records, options, success) {
                                                                                                                                 Ext.getCmp("winPeriodHdrID").getEl().unmask();
@@ -15459,6 +15486,10 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                 var bookingCombo = Ext.getCmp("c_bookingID");
                                                                                                                                 bookingCombo.setValue(bookingRecord.get("id"));
                                                                                                                                 bookingCombo.lastSelectionText = overlapCode;
+                                                                                                                                overlapYear = Number(bookingRecord.get("i_year"));
+                                                                                                                                Ext.selectRow.set("i_yyyy_overlap2", overlapYear);
+                                                                                                                                Ext.selectRow.set("c_overlap2", overlapCode);
+                                                                                                                                Ext.getCmp("i_yyyy_overlapID").setValue(overlapYear);
                                                                                                                                 Ext.selectRow.set("i_yyyy_overlap", overlapYear);
                                                                                                                                 Ext.selectRow.set("c_overlap", overlapCode);
                                                                                                                                 Ext.selectRow.set("c_booking", overlapCode);
