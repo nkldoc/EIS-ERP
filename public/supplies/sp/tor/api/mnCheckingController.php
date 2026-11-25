@@ -311,16 +311,32 @@ switch ($mode) {
             exit();
         }
         $lookupSource = trim($_REQUEST['source'] ?? 'tor');
-        if (!in_array($lookupSource, array('tor', 'contract', 'ap'), true)) {
+        if (!in_array($lookupSource, array('tor', 'contract', 'ap', 'contract_ap'), true)) {
             $lookupSource = 'tor';
         }
         $lookupKeyword = trim($_REQUEST['keyword'] ?? '');
         $lookupLike = '%' . $lookupKeyword . '%';
-        if ($lookupSource === 'ap') {
+        if ($lookupSource === 'contract_ap') {
+            $lookupSql = "SELECT 'ap' AS source,h.sp_check_period_hdr_id,h.c_code,h.c_arrive_code,
+                            p.i_period,h.f_total,
+                            COALESCE(c.c_code,cm.c_code) AS contract_code,
+                            COALESCE(c.c_name,cm.c_name,t.c_name) AS c_name,h.i_enabled
+                          FROM dbo.sp_check_period_hdr h
+                          LEFT JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id=h.sp_tor_hdr_period_id
+                          LEFT JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
+                          LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=h.sp_mn_contract_hdr_id
+                          LEFT JOIN dbo.sp_tor_contract cm ON cm.sp_tor_contract_id=m.sp_contract_id
+                          LEFT JOIN dbo.sp_tor t ON t.tor_id=COALESCE(c.sp_tor_id,cm.sp_tor_id)
+                          WHERE h.i_enabled=1
+                            AND (NULLIF(LTRIM(RTRIM(h.c_code)),'') IS NOT NULL
+                              OR NULLIF(LTRIM(RTRIM(h.c_arrive_code)),'') IS NOT NULL)
+                            AND (?<>'' AND (c.c_code LIKE ? OR cm.c_code LIKE ?))
+                          ORDER BY h.sp_check_period_hdr_id DESC";
+        } else if ($lookupSource === 'ap') {
             $lookupSql = "SELECT TOP 200 'ap' AS source,
                             COALESCE(c.sp_tor_id,cm.sp_tor_id) AS tor_id,
                             COALESCE(c.sp_tor_contract_id,cm.sp_tor_contract_id) AS sp_tor_contract_id,
-                            h.sp_check_period_hdr_id,h.c_code,
+                            h.sp_check_period_hdr_id,h.c_code,COALESCE(c.c_code,cm.c_code) AS contract_code,
                             COALESCE(c.c_name,cm.c_name,t.c_name) AS c_name,h.i_enabled
                           FROM dbo.sp_check_period_hdr h
                           LEFT JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
@@ -2918,6 +2934,14 @@ switch ($mode) {
         break;
     case "GENCHECKINGCODE":
         requirePaidCheckingAdmin($db, $data['id'] ?? 0);
+        require_once __DIR__.'/checkingChildNumber.php';
+        try {
+            $childPlan = checkingChildNumberPlan($db,intval($data['id'] ?? 0));
+            checkingRequireChildConfirmation($childPlan,$_REQUEST['child_number_token'] ?? '');
+        } catch (Throwable $error) {
+            $db->RollBackTran();
+            echo json_encode(array('success'=>false,'msg'=>$error->getMessage()),JSON_UNESCAPED_UNICODE); exit;
+        }
         $ret_id = $data["id"];
 
         // The database is authoritative for edit/create mode. An existing IR/CHK

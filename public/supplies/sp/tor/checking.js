@@ -6613,6 +6613,7 @@ Ext.genCode = function (rec, skipBgCheck) {
                 method: "POST",
                 params: {
                         mode: "GENCODECHECKING",
+                        child_number_token: Ext.getCmp('checking-child-number-token') ? Ext.getCmp('checking-child-number-token').getValue() : '',
                         sp_check_period_hdr_id: Ext.perioidHdr.data.id,
                         i_is_warranty: Ext.perioidHdr.data.i_is_warranty,
                         sp_tor_contract_id: Ext.perioidHdr.data.sp_tor_contract_id,
@@ -6624,19 +6625,26 @@ Ext.genCode = function (rec, skipBgCheck) {
                         i_skip_bg_check: skipBgCheck === true ? 1 : 0,
                 },
                 success: function (result, request) {
-                        if (result.statusText) {
+                        var issued;
+                        try { issued = Ext.decode(result.responseText); } catch (ignore) {}
+                        if (!issued || issued.reval !== 0 || (issued.success !== true && issued.success !== 'Success')) {
+                                if (Ext.clearCheckingChildConfirmation) Ext.clearCheckingChildConfirmation();
+                                return Ext.Msg.alert('ออกเลขตรวจรับ', issued && issued.msg || 'ไม่สามารถออกเลขตรวจรับได้');
+                        }
+                        if (issued) {
                                 Ext.storeDtl.reload();
                                 var ob = Ext.lastOverlapBooked;
                                 Ext.lastOverlapBooked = null;
-                                Ext.Msg.alert("แจ้งเตือน", skipBgCheck === true
+                                Ext.Msg.alert("แจ้งเตือน", (skipBgCheck === true
                                         ? "ออกเลขตรวจรับเรียบร้อยแล้ว (ไม่ได้เช็คเงินและใบกัน)"
                                         : (ob && ob.code
                                                 ? "ตัดเงินใบกันเหลื่อม <b>" + Ext.util.Format.htmlEncode(ob.code) + "</b> และออกเลขตรวจรับเรียบร้อยแล้ว"
-                                                : "หักเงินและออกเลขเรียบร้อยแล้ว"));
+                                                : "หักเงินและออกเลขเรียบร้อยแล้ว") ) + (issued.c_code ? '<br>เลข AP: <b>' + Ext.util.Format.htmlEncode(issued.c_code) + '</b>' : ''));
                                 Ext.getCmp("winPeriodHdrID").destroy();
                         }
                 },
                 failure: function (result, request) {
+                        if (Ext.clearCheckingChildConfirmation) Ext.clearCheckingChildConfirmation();
                         Ext.MessageBox.alert("Failed", result.responseText);
                 },
         });
@@ -10933,7 +10941,7 @@ function showCustomEditForm(rec) {
                                                 },
                                                 // TAB 4: ข้อมูลเลขรับของ/ตรวจรับ (Document Receive/Check Info)
                                                 {
-                                                        title: 'รายการจองเงิน',
+                                                        title: 'ปรับ รายการแยกเบิก',
                                                         id: 'tab-receive-custom',
                                                         xtype: 'form',
                                                         frame: true,
@@ -11103,6 +11111,7 @@ function showCustomEditForm(rec) {
                 };
                 win.show();
                 loadRecordToTabs(rec);
+                if (Ext.addCheckingParentSelector) Ext.addCheckingParentSelector(Ext.getCmp('tab-receive-custom'), rec);
                 // remember this period id so we can reopen after F5
                 if (rec && rec.data && rec.data.sp_tor_hdr_period_id) {
                         localStorage.setItem('lastBookingPeriod', rec.data.sp_tor_hdr_period_id);
@@ -13693,6 +13702,7 @@ Ext.AppUx = function (app, menu) {
                                 labelWidth: 150,
                                 listeners: {
                                         afterrender: function () {
+                                                        if (Ext.loadCheckingChildNumberStatus) Ext.loadCheckingChildNumberStatus(Ext.selectRow.get('sp_check_period_hdr_id'));
                                                 Ext.getCmp("winPeriodHdrID").getEl().mask("Please wait...", "x-mask-loading");
                                                 if ([99].includes(Ext.selectRow.data.i_send_gl_dr)) {
                                                         Ext.getCmp("buSaveSub3ID").hide();
@@ -13732,6 +13742,8 @@ Ext.AppUx = function (app, menu) {
                                         },
                                 },
                                 items: [
+                                                {xtype: 'hidden', name: 'child_number_token', id: 'checking-child-number-token'},
+                                                {xtype: 'panel', id: 'checking-child-number-status', border: false, bodyStyle: 'padding:10px;margin-bottom:8px;background:#fff7ed', html: 'กำลังตรวจสอบรูปแบบเลขตรวจรับ...'},
                                         {
                                                 xtype: "fieldset",
                                                 title: "ข้อมูลการรับของ&#x600D",
@@ -17615,6 +17627,19 @@ Ext.AppUx = function (app, menu) {
                                                 text: "บันทึกรายการหลัก",
                                                 handler: function () {
                                                         var budgetSaveButton = Ext.getCmp("buSaveSub3ID");
+                                                        if (Ext.confirmCheckingChildNumber && !budgetSaveButton.childNumberApproved) {
+                                                                if (budgetSaveButton.childNumberLoading) return;
+                                                                budgetSaveButton.childNumberLoading = true;
+                                                                var childCheckId = Ext.selectRow.get('sp_check_period_hdr_id');
+                                                                Ext.confirmCheckingChildNumber(childCheckId, function (token) {
+                                                                        if (budgetSaveButton.destroyed || budgetSaveButton.isDestroyed || childCheckId !== Ext.selectRow.get('sp_check_period_hdr_id')) return;
+                                                                        budgetSaveButton.childNumberLoading = false;
+                                                                        budgetSaveButton.childNumberApproved = true;
+                                                                        Ext.getCmp('checking-child-number-token').setValue(token);
+                                                                        budgetSaveButton.handler.call(budgetSaveButton.scope || budgetSaveButton, budgetSaveButton);
+                                                                }, function () { budgetSaveButton.childNumberLoading = false; });
+                                                                return;
+                                                        }
                                                         if (!budgetSaveButton.budgetYearRefreshed) {
                                                                 if (budgetSaveButton.budgetYearLoading) return;
                                                                 budgetSaveButton.budgetYearLoading = true;
@@ -18036,6 +18061,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                                 },
                                                                                                                                                                 failure: function (form, action) {
                                                                                                                                                                         validationSaveButton.receiveValidationPassed = false;
+                                                                                                                                                                        if (Ext.clearCheckingChildConfirmation) Ext.clearCheckingChildConfirmation();
                                                                                                                                                                         if (Ext.getCmp(Ext.poFormID) && Ext.getCmp(Ext.poFormID).getEl())
                                                                                                                                                                                 Ext.getCmp(Ext.poFormID).getEl().unmask();
                                                                                                                                                                         if (Ext.getCmp("contenterCenter") && Ext.getCmp("contenterCenter").getEl())
@@ -18069,6 +18095,7 @@ Ext.AppUx = function (app, menu) {
                                                                                 },
                                                                                 failure: function (form, action) {
                                                                                         validationSaveButton.receiveValidationPassed = false;
+                                                                                        if (Ext.clearCheckingChildConfirmation) Ext.clearCheckingChildConfirmation();
                                                                                         if (Ext.getCmp(Ext.poFormID) && Ext.getCmp(Ext.poFormID).getEl())
                                                                                                 Ext.getCmp(Ext.poFormID).getEl().unmask();
                                                                                         if (Ext.getCmp("contenterCenter") && Ext.getCmp("contenterCenter").getEl())

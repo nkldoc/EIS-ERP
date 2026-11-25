@@ -81,6 +81,8 @@ $_SESSION['menu'] = "{$pg->get_menu()}"; ?>';
         <script type="text/javascript" src="./tor/receive-validation/ui/receive-validation-history.js?_dc=<?= __VPRODUCT_; ?>"></script>
         <script type="text/javascript" src="./tor/checkingAdmin.js?_dc=<?= filemtime(__DIR__ . '/tor/checkingAdmin.js'); ?>"></script>
         <script type="text/javascript" src="./tor/contractDetails.js?_dc=<?= filemtime(__DIR__ . '/tor/contractDetails.js'); ?>"></script>
+        <script type="text/javascript" src="./tor/checkingParent.js?_dc=<?= filemtime(__DIR__ . '/tor/checkingParent.js'); ?>"></script>
+        <script type="text/javascript" src="./tor/checkingChildNumber.js?_dc=<?= filemtime(__DIR__ . '/tor/checkingChildNumber.js'); ?>"></script>
         <script type="text/javascript" src="./tor/<?PHP echo $js; ?>"></script>
         <!-- <script type="text/javascript" src="./tor/deliverWork.js?_dc=<?= __VPRODUCT_; ?>"></script> -->
         <!-- <script type="text/javascript" src="./tor/pageStatus.js?_dc=<?= __VPRODUCT_; ?>"></script> -->

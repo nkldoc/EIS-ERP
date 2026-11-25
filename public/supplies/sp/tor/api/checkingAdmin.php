@@ -37,6 +37,10 @@ $access = $rows('SELECT sp_check_period_hdr_id FROM dbo.sp_check_period_hdr WHER
 if (!$access) adminCheckingReply(404, array('success' => false, 'msg' => 'ไม่พบใบตรวจรับที่เลือก'));
 if (!$isAdmin) adminCheckingReply(403, array('success' => false, 'msg' => 'เฉพาะ Admin เท่านั้นที่แก้ไขใบตรวจรับได้'));
 $token = hash_hmac('sha256', 'checking-admin|' . $_SESSION['user_id'] . '|' . $id, session_id());
+if (in_array($_REQUEST['mode'] ?? '', array('parent_load', 'parent_save'), true)) {
+    require __DIR__ . '/checkingParent.php';
+    exit;
+}
 // Only these fields can be changed; document IDs and relationship keys stay fixed.
 $fields = array(
     'sp_check_period_hdr' => array(

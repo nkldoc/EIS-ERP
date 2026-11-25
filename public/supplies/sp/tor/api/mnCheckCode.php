@@ -5,6 +5,7 @@ include("../../../conf/config.php");
 include("../../../lib/database/DatabaseServer.php");
 include("../../../lib/database/apiUtil.php");
 include("../../../lib/date/i_date.class.php");
+require_once __DIR__.'/checkingChildNumber.php';
 
 $db = new DatabaseServer();
 $date = new i_date();
@@ -150,6 +151,15 @@ switch ($mode){
         break; 
     
         case "GENCODECHECKING":
+            try {
+                if (empty($_SESSION['user_id']) || ($_SERVER['REQUEST_METHOD'] ?? '')!=='POST') throw new InvalidArgumentException('กรุณาเข้าสู่ระบบและบันทึกด้วย POST');
+                $childPlan = checkingChildNumberPlan($db,intval($_REQUEST['sp_check_period_hdr_id'] ?? 0),true);
+                checkingRequireChildConfirmation($childPlan,$_REQUEST['child_number_token'] ?? '');
+                if (!empty($childPlan['is_child']) && $childPlan['existing_code']!=='') throw new DomainException('รายการลูกนี้ออกเลข AP แล้ว ไม่สามารถออกเลขซ้ำได้');
+            } catch (Throwable $error) {
+                $db->RollBackTran(); http_response_code(409);
+                echo json_encode(array('success'=>false,'reval'=>1,'msg'=>$error->getMessage()),JSON_UNESCAPED_UNICODE); exit;
+            }
             $data['dc_user_create_cost_id'] = $_SESSION['dc_cost_id']; // ลงยัญชี
             $data['dc_user_create_id'] = $_SESSION['user_id'];  // ลงยัญชี
             $ret_id = $_REQUEST["sp_check_period_hdr_id"] ?? null;
@@ -181,17 +191,26 @@ switch ($mode){
                 INSERT INTO #TEMP_SP_TOR_CODE_DEBT_GEN EXEC SP_TOR_CODE_DEBT_GEN ?,?,?,?,?,?;
                 SELECT c_code,sp_check_period_hdr_id FROM #TEMP_SP_TOR_CODE_DEBT_GEN;
             ";
-            $stmt = $db->QueryParam($sql, $arrValue);
-            $arr_gen_code = $db->Fetch($stmt);
+            if (!empty($childPlan['is_child'])) {
+                $stmt = true;
+                $arr_gen_code = array('c_code'=>$childPlan['proposed_code'],'sp_check_period_hdr_id'=>intval($ret_id));
+            } else {
+                $stmt = $db->QueryParam($sql, $arrValue);
+                $arr_gen_code = $db->Fetch($stmt);
+            }
             $c_code = $arr_gen_code["c_code"];
             $i_product_type = $_REQUEST["i_product_type"]>0?1:0; //สนแค่มีของ 
             $ref_id = $arr_gen_code["sp_check_period_hdr_id"];
             unset($arrValue);
         if ($ret_id == $ref_id) {
             //อัพเดท
-            $sql2 = "UPDATE {$table} SET i_menu = 2 ,c_code= '{$c_code}', i_register_status =  {$i_product_type} ,sp_emp_id   = {$_SESSION['sp_emp_id']} WHERE {$keyName} = ?;";
+            $sql2 = "UPDATE {$table} SET i_menu=2,c_code=?,i_register_status=?,sp_emp_id=? WHERE {$keyName}=?;";
             //update code
-            $stmt2 = $db->QueryParam($sql2, array($data["sp_check_period_hdr_id"]));
+            $stmt2 = $db->QueryParam($sql2, array($c_code,$i_product_type,$_SESSION['sp_emp_id'],$data["sp_check_period_hdr_id"]));
+            if (!empty($childPlan['is_child']) && $stmt2) {
+                $stmt2 = $db->QueryParam('INSERT INTO NMU_ERPLOG..sys_log_change (table_name,row_id,row_field,field_name,old_value,new_value,user_id,date_create,remarks) VALUES(?,?,?,?,?,?,?,GETDATE(),?)',
+                    array('sp_check_period_hdr',$ret_id,'sp_check_period_hdr_id','c_code','',$c_code,$_SESSION['user_id'],'ออกเลข AP ลูก อ้างอิงใบแม่ '.$childPlan['parent_code']));
+            }
             // ออกเลขตรวจรับโดยไม่เช็คเงินและใบกัน (checkbox ในหน้าตรวจรับ): เก็บร่องรอยไว้ให้ตามจองเงินย้อนหลังได้
             // (ถ้ายังไม่ได้เพิ่มคอลัมน์ตาม scriptBaseUpdate/sp_check_period_hdr_skip_bg_check.sql การออกเลขยังทำงานปกติ แค่ไม่มีร่องรอย)
             if (($_REQUEST["i_skip_bg_check"] ?? 0) == 1) {
@@ -267,7 +286,7 @@ switch ($mode){
 if ($stmt && $stmt2 && $stmt3 && $stmt4) {
 //if (false) {
     $db->CommitTran();
-    $re = array("reval" => 0, "success" => "Success", "msg" => "บันทึกเรียบร้อยแล้ว", "id" => $id);
+    $re = array("reval" => 0, "success" => "Success", "msg" => "บันทึกเรียบร้อยแล้ว", "id" => $id, "c_code" => $c_code ?? null);
 } else {
     $db->RollBackTran();
     $re = array("reval" => 1, "success" => "Error", "msg" => "check statement : ");
