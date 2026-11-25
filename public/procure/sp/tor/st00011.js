@@ -1111,6 +1111,17 @@ Ext.AppUx = function (app, menu) {
         root: "data",
         idProperty: "id",
         fields: ["id", "c_code", "c_name"],
+      listeners: {
+        load: function (store) {
+          var combo = Ext.getCmp("dc_cost2_idID");
+          if (!combo || combo.getStore() !== store) return;
+          var value = combo.getValue();
+          // Re-resolve the label when lookup data arrives after form.loadRecord.
+          if (value !== null && value !== undefined && value !== "") {
+            combo.setValue(value);
+          }
+        }
+      },
     });
 
     Ext.po_creditor_transfer = new Ext.data.JsonStore({
