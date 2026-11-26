@@ -399,7 +399,7 @@ function imp_validate($db, $inputRows)
                 "rowNo" => $rowNo, "i_period" => $period, "c_doc_ref" => $pRaw["doc_ref"],
                 "d_doc_dateSub" => $due ?: null, "c_detail" => $pRaw["detail"],
                 "c_fund_source_dtl" => $periodFund, "f_fund_amt_dtl" => $periodAmt,
-                "raw" => $pRaw, "receives" => array(), "rowIdx" => array(), "debt" => "",
+                "raw" => $pRaw, "receives" => array(), "rowIdx" => array(), "debt" => "", "transfer_id" => 0,
                 "ref" => array("pr_id" => "", "po_id" => "", "chk_id" => ""),
             );
         } else {
@@ -437,6 +437,49 @@ function imp_validate($db, $inputRows)
                 $errs[] = "รหัสบัญชีตั้งหนี้ \"{$debtIn}\" ต้องเป็นบัญชีค่าใช้จ่าย (ขึ้นต้นด้วย 5)";
             } elseif (($groups[$seq]["periods"][$pIdx]["debt"] ?? "") === "") {
                 $groups[$seq]["periods"][$pIdx]["debt"] = $debtIn;
+            }
+        }
+        // โดยมอบให้/ผู้รับเงิน (ไม่บังคับ): อีเมล / เลข id / ชื่อ / เลขผู้เสียภาษี ของผู้รับเงินในทะเบียนเจ้าหนี้ ว่าง = จ่ายให้ผู้ขายของสัญญา
+        $trAmbiguous = false;
+        $transferIn = imp_str($in["transfer"] ?? "");
+        if ($transferIn !== "" && intval($groups[$seq]["periods"][$pIdx]["transfer_id"] ?? 0) === 0) {
+            if (strpos($transferIn, "@") !== false) {
+                // มี @ = อีเมลของผู้รับเงิน (ERP ส่งเป็นอีเมล) แปลงเป็น dc_creditor_id จากทะเบียนเจ้าหนี้ (ไม่สนตัวพิมพ์เล็ก/ใหญ่/ช่องว่างหัวท้าย)
+                // อีเมลซ้ำหลายเจ้าหนี้ที่ใช้งาน = กำกวม ไม่เดา แจ้ง error ให้ระบุ id แทน
+                $trIds = array();
+                $stTr = $db->QueryParam(
+                    "select dc_creditor_id from NMU.dbo.dc_creditor
+                     where isnull(i_enable,1) = 1 and lower(ltrim(rtrim(c_email))) = lower(?)",
+                    array(trim($transferIn))
+                );
+                while ($stTr && ($rTr = $db->Fetch($stTr))) {
+                    $trIds[] = intval($rTr["dc_creditor_id"]);
+                }
+                $tr = null;
+                if (count($trIds) > 1) {
+                    $trAmbiguous = true;
+                    $errs[] = "อีเมลผู้รับเงิน \"{$transferIn}\" ตรงกับเจ้าหนี้ " . count($trIds) . " ราย - กรุณาระบุเป็น dc_creditor_transfer_id แทน";
+                } elseif (count($trIds) === 1) {
+                    $tr = array("dc_creditor_id" => $trIds[0]);
+                }
+            } elseif (preg_match('/^[0-9]{1,9}$/', $transferIn)) {
+                // ตัวเลขไม่เกิน 9 หลัก = เลข id ในทะเบียนเจ้าหนี้ (dc_creditor_transfer_id จาก ERP) - เลขผู้เสียภาษียาว 12-13 หลักจึงไม่ชนกัน
+                $tr = $db->Fetch($db->QueryParam(
+                    "select top 1 dc_creditor_id from NMU.dbo.dc_creditor where isnull(i_enable,1) = 1 and dc_creditor_id = ?",
+                    array(intval($transferIn))
+                ));
+            } else {
+                $tr = $db->Fetch($db->QueryParam(
+                    "select top 1 dc_creditor_id from NMU.dbo.dc_creditor
+                     where isnull(i_enable,1) = 1 and (c_name = ? or c_tax_number_imp = ?)
+                     order by dc_creditor_id desc",
+                    array($transferIn, $transferIn)
+                ));
+            }
+            if ($tr) {
+                $groups[$seq]["periods"][$pIdx]["transfer_id"] = intval($tr["dc_creditor_id"]);
+            } elseif (empty($trAmbiguous)) {
+                $errs[] = "ไม่พบผู้รับเงิน (โดยมอบให้) \"{$transferIn}\" ในทะเบียนเจ้าหนี้ (ใส่ id, อีเมล, ชื่อให้ตรง หรือเลขผู้เสียภาษี)";
             }
         }
         $p = $groups[$seq]["periods"][$pIdx];
@@ -900,6 +943,10 @@ switch ($mode) {
                     "i_budget_year_overlap" => $c["i_budget_year_overlap"] ?? null,
                     "c_debt_acc_code" => ($p["debt"] ?? "") !== "" ? $p["debt"] : null,
                 );
+                if (intval($p["transfer_id"] ?? 0) > 0 && intval($db->GetDataBySQL(
+                    "select case when COL_LENGTH('NMU_ERP.dbo.sp_tor_period_bill', 'dc_creditor_transfer_id') is null then 0 else 1 end", array())) === 1) {
+                    $data["dc_creditor_transfer_id"] = intval($p["transfer_id"]);
+                }
                 if ($hasRefBill) {
                     foreach (array("pr_id", "po_id", "chk_id") as $rk) {
                         $data["c_ref_" . $rk] = ($p["ref"][$rk] ?? "") !== "" ? $p["ref"][$rk] : null;
