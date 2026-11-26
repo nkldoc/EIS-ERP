@@ -26,13 +26,18 @@ $target = null;
 $written = false;
 if (!sqlsrv_begin_transaction($conn)) pdfReply(false, 'ไม่สามารถเริ่มบันทึกได้');
 try {
-    $stmt = sqlsrv_query($conn, 'SELECT h.c_arrive_code, h.check_pdf, h.i_is_upload_chk, c.dc_cost_id
+    $stmt = sqlsrv_query($conn, 'SELECT h.c_arrive_code, h.check_pdf, h.i_is_upload_chk, c.dc_cost_id,
+            p.i_status_last AS pdf_payment_status
         FROM NMU_ERP.dbo.sp_check_period_hdr h WITH (UPDLOCK, HOLDLOCK)
         INNER JOIN NMU_ERP.dbo.sp_tor_contract c ON c.sp_tor_contract_id = h.sp_tor_contract_id
-        WHERE h.sp_check_period_hdr_id = ?', [$id]);
+        LEFT JOIN NMU_EIS.dbo.po_working_hdr p WITH (UPDLOCK, HOLDLOCK)
+            ON p.po_working_hdr_id = h.po_working_hdr_id AND p.i_enable = 1
+        WHERE h.sp_check_period_hdr_id = ? AND h.i_enabled = 1', [$id]);
     if (!$stmt) throw new Exception('ไม่สามารถอ่านข้อมูลเอกสารได้');
     $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
     if (!$row) throw new Exception('ไม่พบรายการตรวจรับ');
+    $paymentStatus = (int)($row['pdf_payment_status'] ?? 0);
+    if ($paymentStatus === 2) throw new Exception('สถานะเบิก 2 ไม่สามารถแก้ไขหรืออัปโหลด PDF ได้');
     $admin = (int)($_SESSION['dc_center_user'] ?? 0) === 1;
     if (SuppliesWorkspacePolicy::externalUnit($_SESSION)
         && (int)$row['dc_cost_id'] !== (int)($_SESSION['dc_cost_id'] ?? 0)) {
@@ -46,7 +51,7 @@ try {
     $hasPdf = (int)$row['check_pdf'] === 1 && trim((string)$row['i_is_upload_chk']) !== '';
     // A NULL status and path mean an admin has released this PDF for replacement.
     $released = $row['check_pdf'] === null && $row['i_is_upload_chk'] === null;
-    if (!$admin && ($hasPdf || (is_file($target) && !$released))) throw new Exception('มีเอกสารแล้ว เฉพาะ Admin เท่านั้นที่เปลี่ยนไฟล์ได้');
+    if (!$admin && $paymentStatus !== 3 && ($hasPdf || (is_file($target) && !$released))) throw new Exception('มีเอกสารแล้ว เฉพาะ Admin หรือรายการสถานะ 3 ทักท้วงเท่านั้นที่เปลี่ยนไฟล์ได้');
     if (is_file($target)) {
         $backup = tempnam($dir, 'pdf_backup_');
         if (!$backup || !copy($target, $backup)) throw new Exception('ไม่สามารถสำรองไฟล์เดิมได้');

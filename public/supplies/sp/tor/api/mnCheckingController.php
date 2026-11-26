@@ -1654,6 +1654,7 @@ switch ($mode) {
         ,case when   isnull (b.i_overlap,0) != 3 and  isnull(bb.i_type_bg,0) = 4    then 1 when   isnull(b.i_overlap,0) = 3   then  2
         else  0 end   as i_status_overlap  -- 0 ปกติ  1 กันเหลื่อมยังไม่ก่อหนี้    2 กันเหลื่อม ก่อหนี้แล้ว
         , c.i_is_upload_chk
+        , (select pdf_po.i_status_last from NMU_EIS.dbo.po_working_hdr pdf_po where pdf_po.po_working_hdr_id=c.po_working_hdr_id and pdf_po.i_enable=1) as pdf_payment_status
         , cc.c_code as c_code_billing
         , (select top 1 c_code from NMU_EIS..po_working_dtl where po_working_hdr_id  = c.po_working_hdr_id ) as c_code_po
         , isnull((select top 1 sp_cate_id from NMU_ERP.dbo.[view_sp_tor_work_socore] where sp_tor_id=b.sp_tor_id order by sp_cate_id desc),0) as sp_cate_id
@@ -1916,6 +1917,7 @@ switch ($mode) {
                 "i_step" => intval($row["i_step"]),
                 "check_pdf" => intval($row["check_pdf"]),
                 "i_is_upload_chk" => $row["i_is_upload_chk"],
+                "pdf_payment_status" => isset($row["pdf_payment_status"]) ? intval($row["pdf_payment_status"]) : null,
                 "i_yyyy_overlap" => intval($row["i_yyyy_overlap"]) == 0 ? intval($BudgetYear) : intval($row["i_yyyy_overlap"]),
                 "i_yyyy_overlap2" => intval($row["i_yyyy_overlap2"]),
                 "c_overlap2" => $row["c_overlap2"],

@@ -15,7 +15,7 @@ $GLOBALS['state']=array('header'=>array('sp_check_period_hdr_id'=>6881,'i_enable
  'ledger'=>array(array('sp_tranf_hdr_id'=>3,'sp_check_period_hdr_id'=>6881,'f_net_total_price'=>'107.00')),'logs'=>array());
 $GLOBALS['snapshot']=null;$GLOBALS['committed']=false;$GLOBALS['rolledBack']=false;
 if (!extension_loaded('sqlsrv')) {
-function sqlsrv_rows_affected($stmt){return 1;}
+function sqlsrv_rows_affected($stmt){return $GLOBALS['case']==='pdfresetstatus2'?0:1;}
 function sqlsrv_begin_transaction($c){$GLOBALS['snapshot']=$GLOBALS['state'];return true;}
 function sqlsrv_commit($c){$GLOBALS['committed']=true;return true;}
 function sqlsrv_rollback($c){$GLOBALS['state']=$GLOBALS['snapshot'];$GLOBALS['rolledBack']=true;return true;}
@@ -34,7 +34,7 @@ function sqlsrv_query($conn,$sql,$params){
   return new FakeRows(array());
  }
  if(strpos($sql,'UPDATE')===0){
-  if(strpos($sql,'SET i_is_upload_chk = NULL')!==false){$GLOBALS['state']['header']['i_is_upload_chk']=null;$GLOBALS['state']['header']['check_pdf']=null;$GLOBALS['resetPdf']=true;return new FakeRows(array());}
+  if(strpos($sql,'SET i_is_upload_chk = NULL')!==false){if($GLOBALS['case']==='pdfresetstatus2'){if(strpos($sql,'p.i_status_last = 2')===false)throw new Exception('Missing payment guard');return new FakeRows(array());}$GLOBALS['state']['header']['i_is_upload_chk']=null;$GLOBALS['state']['header']['check_pdf']=null;$GLOBALS['resetPdf']=true;return new FakeRows(array());}
 
   preg_match('/UPDATE dbo\.\[([^\]]+)\] SET \[([^\]]+)\]/',$sql,$match);$table=$match[1];$field=$match[2];
   if(in_array($table,array('sp_tor','sp_tor_dtl','sp_tor_contract','sp_tor_hdr_period'))){$GLOBALS['relatedWrite']=array($table,$field,$params[0],$params[3]);return new FakeRows(array());}
@@ -64,7 +64,7 @@ if(in_array($GLOBALS['case'],array('finance','preview','financeauditfail','snaps
 $relatedCases=array('pr'=>array('sp_tor',55,'c_name','PR OLD','PR NEW'), 'pritem'=>array('sp_tor_dtl',56,'c_name','ITEM OLD','ITEM NEW'), 'contract'=>array('sp_tor_contract',77,'d_doc_date','2026-01-01','2026-02-01'), 'period'=>array('sp_tor_hdr_period',78,'c_contract_code','PERIOD OLD','PERIOD NEW'));
 if(isset($relatedCases[$GLOBALS['case']])){[$table,$rowId,$field,$old,$new]=$relatedCases[$GLOBALS['case']];$_POST['changes']=json_encode(array(array('table'=>$table,'row_id'=>$rowId,'field'=>$field,'old_value'=>$old,'new_value'=>$new)));}
 if($GLOBALS['case']==='relatedscope')$_POST['changes']=json_encode(array(array('table'=>'sp_tor','row_id'=>999,'field'=>'c_name','old_value'=>'PR OLD','new_value'=>'BAD')));
-if(in_array($GLOBALS['case'],array('pdfreset','pdfresetcsrf','pdfresetdenied'))){
+if(in_array($GLOBALS['case'],array('pdfreset','pdfresetcsrf','pdfresetdenied','pdfresetstatus2'))){
  $_REQUEST['mode']='pdf_reset_save';
  if($GLOBALS['case']==='pdfresetcsrf')$_POST['csrf_token']='invalid';
  if($GLOBALS['case']==='pdfresetdenied')$_SESSION['dc_center_user']=0;
@@ -74,6 +74,7 @@ ob_start();
 register_shutdown_function(function(){
  $out=ob_get_clean();$json=json_decode($out,true);$case=$GLOBALS['case'];$s=$GLOBALS['state'];
  if(isset($GLOBALS['relatedCases'][$case])){$expected=$GLOBALS['relatedCases'][$case];$pass=$json['success']&&$GLOBALS['committed']&&$GLOBALS['relatedWrite']===array($expected[0],$expected[2],$expected[4],$expected[1])&&count($s['logs'])===1;}
+ elseif($case==='pdfresetstatus2')$pass=!$json['success']&&empty($GLOBALS['resetPdf'])&&http_response_code()===409;
  elseif($case==='pdfreset')$pass=$json['success']&&!empty($GLOBALS['resetPdf'])&&$s['header']['check_pdf']===null&&$s['header']['i_is_upload_chk']===null;
  elseif(in_array($case,array('pdfresetcsrf','pdfresetdenied')))$pass=!$json['success']&&empty($GLOBALS['resetPdf'])&&http_response_code()===403;
  elseif($case==='finance')$pass=$json['success']&&$GLOBALS['committed']&&$s['header']['f_total']==='214.00'&&$s['header']['f_vat_amt']==='14.00'&&$s['header']['f_tax_personal']==='2.00'&&$s['header']['f_warranty']==='10.70'&&$s['header']['f_fine_amt']==='4.28'&&$s['header']['f_pay']==='197.02'&&$s['items'][0]['f_net_total_price']==='214.00'&&$s['debts'][0]['f_sum_Transf']==='214.00'&&$s['ledger'][0]['f_net_total_price']==='214.00'&&count($s['logs'])>8;

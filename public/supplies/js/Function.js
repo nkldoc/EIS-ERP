@@ -32,7 +32,8 @@ function openReportPopup() {
     data: [
       { id: "budget", title: "กราฟงบประมาณ", desc: "ภาพรวมงบ รายได้/กทม./อุดหนุน", icon: "dc/images/icons/billing-icon-baht.png", url: "bi/reports/Budget_Monitoring_Dashboard.php", tag: "งบประมาณ" },
       // { id:'budget2',  title:'กราฟงบประมาณ',        desc:'ภาพรวมงบ ', icon:'dc/images/icons/billing-icon.png', url:'bi/reports/Rep_RepBIBg_Expense.php',  tag:'งบประมาณ' },
-      { id: "torstart", title: "สรุปข้อมูลรายปี", desc: "ตารางสรุปข้อมูลรายปี", icon: "images/Performance.jpg", url: "bi/reports/Yearly_PR_Performance_Summary.php", tag: "ฝ่าย" },
+      // ซ่อนรายงานสรุปข้อมูลรายปีชั่วคราว
+      // { id: "torstart", title: "สรุปข้อมูลรายปี", desc: "ตารางสรุปข้อมูลรายปี", icon: "images/Performance.jpg", url: "bi/reports/Yearly_PR_Performance_Summary.php", tag: "ฝ่าย" },
       { id: "Reply", title: "รายการทักท้วง", desc: "รายการทักท้วง", icon: "images/reply.png", url: "bi/reports/Report_StatusReply.php", tag: "ฝ่าย" },
       { id: "procurementProgress", title: "Dashboard ติดตามงานจัดซื้อจัดจ้าง", desc: "ติดตามสถานะและความก้าวหน้าตั้งแต่ PR จนถึงการเบิก", icon: "bi/images/monitor.png", url: "bi/reports/ProcurementProgressReport.php", tag: "ติดตามงาน" },
     ],

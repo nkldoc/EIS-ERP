@@ -11746,6 +11746,9 @@ Ext.AppUx = function (app, menu) {
                                 name: "i_status_chk",
                         },
                         {
+                                name: "pdf_payment_status",
+                        },
+                        {
                                 name: "i_is_register",
                         },
                         {
@@ -13716,20 +13719,22 @@ Ext.AppUx = function (app, menu) {
                         var field = Ext.getCmp("upload_pdf1");
                         var save = Ext.getCmp("saveCheckingPdfID");
                         var unlock = Ext.getCmp("unlockCheckingPdfID");
-                        var allowed = !hasCheckingPdf() || (Number(Ext.session.dc_center_user) === 1 && field && field.adminPdfUnlocked);
+                        var paymentStatus = Number(Ext.selectRow.data.pdf_payment_status);
+                        var locked = paymentStatus === 2;
+                        var allowed = !locked && (paymentStatus === 3 || !hasCheckingPdf() || (Number(Ext.session.dc_center_user) === 1 && field && field.adminPdfUnlocked));
                         var stored = Ext.getCmp("storedCheckingPdfID");
                         if (stored) {
                                 stored.setValue(Ext.util.Format.htmlEncode(String(Ext.selectRow.data.i_is_upload_chk || '')));
                                 stored.setVisible(!allowed);
                         }
-                        if (field) field.setVisible(allowed);
-                        if (save) save.setVisible(allowed);
-                        if (unlock) unlock.setVisible(Number(Ext.session.dc_center_user) === 1 && hasCheckingPdf() && !allowed);
+                        if (field) { field.setVisible(allowed); field.setDisabled(!allowed); }
+                        if (save) { save.setVisible(allowed); save.setDisabled(!allowed); }
+                        if (unlock) unlock.setVisible(!locked && Number(Ext.session.dc_center_user) === 1 && hasCheckingPdf() && !allowed);
                         var reset = Ext.getCmp("resetCheckingPdfID");
                         if (reset) {
                                 reset.setValue(false);
                                 reset.enable();
-                                reset.setVisible(Number(Ext.session.dc_center_user) === 1 && hasCheckingPdf());
+                                reset.setVisible(!locked && Number(Ext.session.dc_center_user) === 1 && hasCheckingPdf());
                         }
                 }
                 function getPDF(a) {

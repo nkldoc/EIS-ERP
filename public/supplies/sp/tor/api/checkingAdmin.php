@@ -52,9 +52,12 @@ if (($_REQUEST['mode'] ?? '') === 'pdf_reset_save') {
     }
     $stmt = sqlsrv_query($db->conn, 'UPDATE dbo.sp_check_period_hdr
         SET i_is_upload_chk = NULL, check_pdf = NULL, d_upload_chk = NULL
-        WHERE sp_check_period_hdr_id = ? AND i_enabled = 1', array($id));
+        WHERE sp_check_period_hdr_id = ? AND i_enabled = 1
+          AND NOT EXISTS (SELECT 1 FROM NMU_EIS.dbo.po_working_hdr p WITH (UPDLOCK, HOLDLOCK)
+              WHERE p.po_working_hdr_id = dbo.sp_check_period_hdr.po_working_hdr_id
+                AND p.i_enable = 1 AND p.i_status_last = 2)', array($id));
     if (!$stmt || sqlsrv_rows_affected($stmt) !== 1) {
-        adminCheckingReply(500, array('success' => false, 'msg' => 'ไม่สามารถเปิดให้อัปโหลด PDF ใหม่ได้'));
+        adminCheckingReply($stmt ? 409 : 500, array('success' => false, 'msg' => 'ไม่สามารถเปิดให้อัปโหลด PDF ใหม่ได้ กรุณาตรวจสอบสถานะเบิก (สถานะ 2 ห้ามแก้ไข PDF)'));
     }
     adminCheckingReply(200, array('success' => true, 'msg' => 'เปิดให้เจ้าหน้าที่อัปโหลด PDF ใหม่แล้ว'));
 }
