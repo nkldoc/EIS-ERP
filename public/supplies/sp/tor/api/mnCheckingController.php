@@ -318,7 +318,7 @@ switch ($mode) {
         $lookupLike = '%' . $lookupKeyword . '%';
         if ($lookupSource === 'contract_ap') {
             $lookupSql = "SELECT 'ap' AS source,h.sp_check_period_hdr_id,h.c_code,h.c_arrive_code,
-                            p.i_period,h.f_total,budget.c_name AS budget_name,
+                            p.i_period,h.f_total,p.dc_expense_budget_type_id AS budget_id,budget.c_name AS budget_name,
                             COALESCE(c.c_code,cm.c_code) AS contract_code,
                             COALESCE(c.c_name,cm.c_name,t.c_name) AS c_name,h.i_enabled
                           FROM dbo.sp_check_period_hdr h
