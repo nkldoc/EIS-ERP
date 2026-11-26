@@ -17612,7 +17612,7 @@ Ext.AppUx = function (app, menu) {
                                                                                         {
                                                                                                 xtype: "checkbox",
                                                                                                 id: "resetCheckingPdfID",
-                                                                                                boxLabel: "????? PDF: ?????????????????????????????",
+                                                                                                boxLabel: "แก้ไข PDF: เปิดให้เจ้าหน้าที่อัปโหลดใหม่",
                                                                                                 hidden: Number(Ext.session.dc_center_user) !== 1 || !hasCheckingPdf(),
                                                                                                 listeners: {
                                                                                                         check: function (checkbox, checked) {
@@ -17624,7 +17624,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                         checkbox.enable();
                                                                                                                         checkbox.setValue(false);
                                                                                                                         var result = Ext.decode(response.responseText, true);
-                                                                                                                        Ext.Msg.alert("???????????????", result && result.msg || "??????????????????????? PDF ???????");
+                                                                                                                        Ext.Msg.alert("บันทึกไม่สำเร็จ", result && result.msg || "ไม่สามารถเปิดให้อัปโหลด PDF ใหม่ได้");
                                                                                                                 }
                                                                                                                 Ext.Ajax.request({
                                                                                                                         url: "tor/api/checkingAdmin.php",
@@ -17652,7 +17652,7 @@ Ext.AppUx = function (app, menu) {
                                                                                                                                                         syncCheckingPdfUpload();
                                                                                                                                                 }
                                                                                                                                                 Ext.storePeriodHdr.reload();
-                                                                                                                                                Ext.Msg.alert("??????", data.msg);
+                                                                                                                                                Ext.Msg.alert("สำเร็จ", data.msg);
                                                                                                                                         }
                                                                                                                                 });
                                                                                                                         }

@@ -48,15 +48,15 @@ if (($_REQUEST['mode'] ?? '') === 'pdf_reset_load') {
 }
 if (($_REQUEST['mode'] ?? '') === 'pdf_reset_save') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($token, (string)($_POST['csrf_token'] ?? ''))) {
-        adminCheckingReply(403, array('success' => false, 'msg' => '??????????????????????????????????'));
+        adminCheckingReply(403, array('success' => false, 'msg' => 'กรุณาเปิดรายการใหม่แล้วลองอีกครั้ง'));
     }
     $stmt = sqlsrv_query($db->conn, 'UPDATE dbo.sp_check_period_hdr
         SET i_is_upload_chk = NULL, check_pdf = NULL, d_upload_chk = NULL
         WHERE sp_check_period_hdr_id = ? AND i_enabled = 1', array($id));
     if (!$stmt || sqlsrv_rows_affected($stmt) !== 1) {
-        adminCheckingReply(500, array('success' => false, 'msg' => '??????????????????????? PDF ???????'));
+        adminCheckingReply(500, array('success' => false, 'msg' => 'ไม่สามารถเปิดให้อัปโหลด PDF ใหม่ได้'));
     }
-    adminCheckingReply(200, array('success' => true, 'msg' => '????????????????????????? PDF ????????'));
+    adminCheckingReply(200, array('success' => true, 'msg' => 'เปิดให้เจ้าหน้าที่อัปโหลด PDF ใหม่แล้ว'));
 }
 if (in_array($_REQUEST['mode'] ?? '', array('parent_load', 'parent_save'), true)) {
     require __DIR__ . '/checkingParent.php';
