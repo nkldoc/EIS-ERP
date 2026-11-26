@@ -121,6 +121,55 @@ function medsupGenIrCode($db, $deptType, $useYear = 0)
     return $prefix . str_pad($maxNum + 1, 5, "0", STR_PAD_LEFT);
 }
 
+// แก้ยอด VAT/ภาษี/ค่าปรับ ในใบเบิก D ของ EIS (po_working_begin_hdr / po_working_dtl) ให้ตรงกับยอดตรวจรับของ IR ($m = medsupIrMoney)
+// หลังแก้ VAT ที่หน้าส่งมอบงาน - เฉพาะใบเบิกที่ยังแก้ได้ (ยังไม่ลงนามเลยขั้น 0.30 หรือถูกทักท้วงฏีกาขั้น 3.00) ใบที่ผ่านไปแล้วไม่แตะ
+// คืนข้อความ error ("" = สำเร็จ หรือไม่มีใบเบิกให้แก้)
+function medsupSyncWdAmounts($db, $irCode, $m)
+{
+    $hasCol = intval($db->GetDataBySQL("select case when col_length('NMU_ERP.dbo.sp_tor_period_bill_checking', 'c_code_ref') is not null then 1 else 0 end", array()));
+    if (!$hasCol || empty($irCode) || empty($m)) {
+        return "";
+    }
+    $st = $db->QueryParam(
+        "select distinct h.c_code_ref, h.po_working_hdr_id, h.i_status_last, convert(float, h.i_sub_status) as sub_status
+           from NMU_ERP.dbo.sp_tor_period_bill_checking c
+          inner join " . DB_NMU_EIS . "po_working_hdr h on h.c_code_ref = c.c_code_ref
+          where c.c_ir_code = ? and c.i_enabled = 1 and isnull(c.c_code_ref, '') <> '' and h.i_enable = 1",
+        array($irCode)
+    );
+    $rows = array();
+    while ($st && ($r = $db->Fetch($st))) {
+        $rows[] = $r;
+    }
+    foreach ($rows as $r) {
+        $okDraft = intval($r["i_status_last"]) === 0 && floatval($r["sub_status"]) <= 0.30;
+        $okProtest = intval($r["i_status_last"]) === 3 && floatval($r["sub_status"]) == 3.0;
+        if (!$okDraft && !$okProtest) {
+            continue;
+        }
+        $hid = intval($r["po_working_hdr_id"]);
+        $ok = $db->QueryParam(
+            "update " . DB_NMU_EIS . "po_working_begin_hdr
+                set f_per_inv = ?, f_per_vat_rate = ?, f_per_vat = ?, f_per_inv_vat = ?, f_per_other = ?, f_per_fine = ?,
+                    f_per_pay = ?, f_per_tax_personal_rate = ?, f_per_tax_personal = ?, f_per_warranty = ?
+              where po_working_hdr_id = ?",
+            array($m["f_before_vat"], $m["f_vat_percent"], $m["f_vat_amt"], $m["f_request_amt"], $m["f_other"], $m["f_penalty"],
+                $m["f_pay_amt"], $m["f_wht_percent"], $m["f_wht_amt"], $m["f_guarantee_amt"], $hid)
+        );
+        if (!$ok) {
+            return "แก้ยอดในใบเบิก " . $r["c_code_ref"] . " ไม่สำเร็จ";
+        }
+        $ok = $db->QueryParam(
+            "update " . DB_NMU_EIS . "po_working_dtl set f_total = ? where po_working_hdr_id = ?",
+            array($m["f_request_amt"], $hid)
+        );
+        if (!$ok) {
+            return "แก้ยอดในใบเบิก " . $r["c_code_ref"] . " ไม่สำเร็จ";
+        }
+    }
+    return "";
+}
+
 $mode = $_REQUEST["mode"] ?? null;
 // มีคอลัมน์เลขคุมตรวจรับ EGP ที่รายการรับของหรือยัง (scriptBaseUpdate/sp_tor_period_bill_receive_egp_no.sql)
 function medsupReceiveHasEgpCol($db)
@@ -445,6 +494,14 @@ switch ($mode) {
                 $irCode,
             )
         );
+        if ($stmt) {
+            // ใบเบิก D ที่ผูกกับ IR นี้และยังแก้ได้ (ร่าง/ถูกทักท้วง) = แก้ยอด VAT ในใบเบิก EIS ให้ตรงกัน ไม่งั้นหน้าทักท้วงยังเป็นยอดเดิม
+            $syncErr = medsupSyncWdAmounts($db, $irCode, $m);
+            if ($syncErr !== "") {
+                $stmt = false;
+                $errMsg = $syncErr;
+            }
+        }
         break;
 
     case "ISSUE_IR":
