@@ -334,7 +334,11 @@ function winDeliverWorkMedSup(rec) {
         });
         var remainFld = Ext.getCmp("deliverMedSupRemainID");
         if (remainFld) {
-            remainFld.setValue(moneyStr(periodTotal - used) + " บาท (ใช้ไปแล้ว " + moneyStr(used) + " บาท)");
+            // ปัดเศษ float ก่อนแสดง (222305.34 + 61311 = 283616.33999999997 ทำให้ "ใช้ไปแล้ว" ตัดเป็น .33
+            // และ "คงเหลือ" เหลือ 5.8e-11 ซึ่ง Ext.floatRenderer แสดงผิดเป็น 5.82 แทน 0.00)
+            var usedR = round2(used);
+            var remainR = round2(round2(periodTotal) - usedR);
+            remainFld.setValue(moneyStr(remainR) + " บาท (ใช้ไปแล้ว " + moneyStr(usedR) + " บาท)");
         }
     }
     Ext.storeDeliverMedSupReceive.on("load", updateRemainDisplay);
@@ -526,8 +530,8 @@ function winDeliverWorkMedSup(rec) {
             Ext.Msg.alert(
                 "แจ้งเตือน",
                 "จำนวนเงินรวมเกินวงเงินของงวดนี้<br>วงเงินงวดนี้: " + moneyStr(periodTotal) + " บาท"
-                + "<br>รับของไปแล้ว (ไม่รวมแถวนี้): " + moneyStr(used) + " บาท"
-                + "<br>คงเหลือ: " + moneyStr(periodTotal - used) + " บาท"
+                + "<br>รับของไปแล้ว (ไม่รวมแถวนี้): " + moneyStr(round2(used)) + " บาท"
+                + "<br>คงเหลือ: " + moneyStr(round2(round2(periodTotal) - round2(used))) + " บาท"
             );
             return;
         }
