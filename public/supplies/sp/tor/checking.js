@@ -9780,6 +9780,11 @@ function showCustomEditForm(rec) {
                                                         defaults: { anchor: '100%', msgTarget: 'side', allowBlank: false },
                                                         tbar: [{
                                                                 text: 'อัปเดท ใช้งาน',
+                                                                cls: 'checking-enable-button',
+                                                                icon: '../images/icons/ui-enable-check.svg',
+                                                                minWidth: 160,
+                                                                height: 34,
+                                                                tooltip: 'เปิดใช้งานใบตรวจรับและงวดสัญญาที่เกี่ยวข้อง',
                                                                 hidden: Number(Ext.session.dc_center_user) !== 1,
                                                                 handler: function (button) {
                                                                         var checkId = rec && rec.get('sp_check_period_hdr_id');

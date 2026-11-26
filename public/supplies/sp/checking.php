@@ -25,6 +25,36 @@ $js = $pg->get_js() . ".js?__dc=" . (is_file($scriptFile) ? filemtime($scriptFil
         <!-- System ERP :: Src js  -->
         <?php include __DIR__ . "/../lib/loadJs.php"; ?>
 <?php include __DIR__ . "/../lib/loadCss.php"; ?>
+        <style type="text/css">
+            .checking-enable-button {
+                background: #15803d !important;
+                border: 1px solid #166534 !important;
+                border-radius: 6px;
+                padding: 3px 10px;
+                margin-left: 6px !important;
+                box-shadow: 0 2px 3px rgba(0,0,0,.18);
+            }
+            .checking-enable-button .x-btn-tl,
+            .checking-enable-button .x-btn-tr,
+            .checking-enable-button .x-btn-tc,
+            .checking-enable-button .x-btn-ml,
+            .checking-enable-button .x-btn-mr,
+            .checking-enable-button .x-btn-mc,
+            .checking-enable-button .x-btn-bl,
+            .checking-enable-button .x-btn-br,
+            .checking-enable-button .x-btn-bc { background: transparent !important; }
+            .checking-enable-button .x-btn-text {
+                color: #fff !important;
+                font-size: 14px !important;
+                font-weight: bold !important;
+                min-height: 24px;
+                padding-left: 25px !important;
+                background-size: 20px 20px;
+            }
+            .checking-enable-button.x-btn-over { background: #166534 !important; }
+            .checking-enable-button.x-btn-focus { outline: 3px solid #86efac; outline-offset: 2px; }
+            .checking-enable-button.x-item-disabled { opacity: .55; box-shadow: none; }
+        </style>
         <!-- System ERP :: -->
         <script type="text/javascript" src="../lib/right/GrantPermission.php?_dc=<?= __VPRODUCT_; ?>&f=<?php echo $_SERVER["PHP_SELF"]; ?>"></script>
         <!-- System ERP :: -->
