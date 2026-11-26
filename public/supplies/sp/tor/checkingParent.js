@@ -4,7 +4,7 @@
         if (!panel || Number(Ext.session.dc_center_user) !== 1) return;
         var id = Number(inspection.get('sp_check_period_hdr_id') || inspection.get('id'));
         if (!id) return;
-        var selected = {}, syncing = false, ready = false, csrf, snapshot;
+        var selected = {}, syncing = false, ready = false, csrf, snapshot, motherAmount = null;
         function setPanelHtml(target, html) {
             if (target.rendered) target.update(html);
             else target.html = html;
@@ -15,7 +15,7 @@
         var store = new Ext.data.JsonStore({
             url: 'tor/api/mnCheckingController.php', root: 'data',
             idProperty: 'sp_check_period_hdr_id',
-            fields: ['sp_check_period_hdr_id', 'c_code', 'c_arrive_code', 'contract_code', 'c_name', 'i_period', 'f_total'],
+            fields: ['sp_check_period_hdr_id', 'c_code', 'c_arrive_code', 'contract_code', 'c_name', 'i_period', 'f_total', 'budget_name'],
             baseParams: {mode: 'SEARCH_RELATION_CODES', source: 'contract_ap'}
         });
         var selection = new Ext.grid.CheckboxSelectionModel({singleSelect: false});
@@ -26,11 +26,25 @@
             updateCount();
         });
         function updateCount() {
-            var codes = [], total = 0;
-            for (var key in selected) if (Object.prototype.hasOwnProperty.call(selected,key)) { total++; codes.push(selected[key].c_code || selected[key].c_arrive_code); }
+            var codes = [], total = 0, cents = 0, missing = 0;
+            for (var key in selected) if (Object.prototype.hasOwnProperty.call(selected,key)) { total++; codes.push(selected[key].c_code || selected[key].c_arrive_code); var amount = moneyCents(selected[key].f_total); if (amount === null) missing++; else cents += amount; }
             count.setText('เลือก AP / IR ' + total + ' รายการ');
             setPanelHtml(selectedSummary, 'AP / IR ลูกที่เลือก: ' + encode(codes.join(', ') || '-'));
+            var html = 'ยอดรวม AP / IR ลูกที่เลือก: <b>' + money(cents) + '</b> บาท | ยอด AP แม่: <b>' + (motherAmount === null ? '-' : money(motherAmount)) + '</b> บาท';
+            if (missing || motherAmount === null) {
+                html += ' | <b style="color:#b91c1c">ยังตรวจสอบยอดไม่ได้ (ข้อมูลจำนวนเงินไม่ครบ)</b>';
+            } else {
+                var difference = motherAmount - cents;
+                html += difference === 0 ? ' | <b style="color:#15803d">ยอดเท่ากัน</b>' : ' | <b style="color:#b91c1c">' + (difference > 0 ? 'ยอดที่ยังขาด: ' : 'ยอดเกิน: ') + money(Math.abs(difference)) + ' บาท</b>';
+            }
+            setPanelHtml(amountSummary, html);
         }
+        function moneyCents(value) {
+            if (value === null || value === undefined || value === '') return null;
+            var amount = Number(value);
+            return isFinite(amount) ? Math.round(amount * 100) : null;
+        }
+        function money(value) { return Ext.util.Format.number(value / 100, '0,000.00'); }
         var search = function () {
             var value = String(keyword.getValue() || '').replace(/^\s+|\s+$/g, '');
             if (!value) return Ext.Msg.alert('ค้นหา AP', 'กรุณาระบุเลขสัญญา');
@@ -57,6 +71,7 @@
                     selected[row.sp_check_period_hdr_id] = row;
                     children.push(row);
                 } else {
+                    motherAmount = moneyCents(row.f_total);
                     enabled.setValue(Number(row.i_parent) === 1);
                     setPanelHtml(motherSummary, 'เลข AP แม่: <b style="color:#b91c1c">' + encode(row.c_code || 'ยังไม่ออกเลข AP') + '</b>');
                 }
@@ -68,9 +83,11 @@
             updateCount();
         }
         var selectedSummary = new Ext.Panel({border: false, html: 'AP ลูกที่เลือก: -', bodyStyle: 'padding:8px;word-break:break-word'});
+        var amountSummary = new Ext.Panel({border: false, bodyStyle: 'padding:8px;font-size:14px', html: ''});
         var grid = new Ext.grid.GridPanel({
             store: store, sm: selection, height: 340, border: true,
             columns: [selection,
+                {header: 'แหล่งเงิน', dataIndex: 'budget_name', width: 200, renderer: encode},
                 {header: 'เลขสัญญา', dataIndex: 'contract_code', width: 180, renderer: encode},
                 {header: 'เลข AP', dataIndex: 'c_code', width: 180, renderer: encode},
                 {header: 'เลข IR', dataIndex: 'c_arrive_code', width: 180, renderer: encode},
@@ -88,7 +105,7 @@
         });
         var reason = new Ext.form.TextField({fieldLabel: 'เหตุผลในการแก้ไข', maxLength: 1000, anchor: '98%'});
         grid.on('viewready', restoreChecks);
-        var details = new Ext.Panel({border: false, items: [grid, selectedSummary]});
+        var details = new Ext.Panel({border: false, items: [grid, amountSummary, selectedSummary]});
         var enabled = new Ext.form.Checkbox({name: 'i_parent', fieldLabel: 'i_parent',
             boxLabel: 'เป็นใบแม่ (เลือก AP ลูกจากเลขสัญญา)', checked: false, disabled: true});
         keyword.on('specialkey', function (field, event) { if (event.getKey() === event.ENTER) search(); });

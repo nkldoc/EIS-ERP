@@ -1,6 +1,7 @@
 <?php
 // php -n tests/checking-parent-save-test.php [success|self|other|mother|conflict|auditfail|clear|csrf|nonpost]
 if (extension_loaded('sqlsrv')) exit('Run with php -n');
+if (!defined('DB_CENTER')) define('DB_CENTER', 'NMU.dbo.');
 if (!function_exists('mb_strlen')) { function mb_strlen($s,$encoding=null) { return strlen($s); } }
 $case=$argv[1] ?? 'success';
 $id=10; $token='csrf'; $db=(object)array('conn'=>'fake');

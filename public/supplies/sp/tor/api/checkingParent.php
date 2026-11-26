@@ -3,10 +3,11 @@
 if (!isset($rows, $query, $token, $id, $db)) { http_response_code(404); exit; }
 $parentSnapshot = function () use ($rows, $id) {
     return $rows('SELECT h.sp_check_period_hdr_id,h.c_code,h.c_arrive_code,h.i_parent,h.parent_id,
-        p.i_period,h.f_total,COALESCE(c.c_code,cm.c_code) AS contract_code,
+        p.i_period,h.f_total,budget.c_name AS budget_name,COALESCE(c.c_code,cm.c_code) AS contract_code,
         COALESCE(c.c_name,cm.c_name) AS c_name
         FROM dbo.sp_check_period_hdr h
         LEFT JOIN dbo.sp_tor_hdr_period p ON p.sp_tor_hdr_period_id=h.sp_tor_hdr_period_id
+        LEFT JOIN ' . DB_CENTER . 'dc_expense_budget_type budget ON budget.dc_expense_budget_type_id=p.dc_expense_budget_type_id
         LEFT JOIN dbo.sp_tor_contract c ON c.sp_tor_contract_id=h.sp_tor_contract_id
         LEFT JOIN dbo.sp_mn_contract_hdr m ON m.sp_mn_contract_hdr_id=h.sp_mn_contract_hdr_id
         LEFT JOIN dbo.sp_tor_contract cm ON cm.sp_tor_contract_id=m.sp_contract_id

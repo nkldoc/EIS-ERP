@@ -24,7 +24,7 @@ function scenario(rows, failure) {
         this.load = options => { this.lastLoad = options; };
     }
     const panel = {add() {}, doLayout() {}};
-    const Ext = {session: {dc_center_user: 1}, util: {Format: {htmlEncode: String}},
+    const Ext = {session: {dc_center_user: 1}, util: {Format: {htmlEncode: String, number: value => Number(value).toFixed(2)}},
         each: (items, fn) => items.forEach(fn), encode: JSON.stringify, decode: JSON.parse,
         form: {TextField: Control, Checkbox: Control}, Toolbar: {TextItem: Control},
         data: {JsonStore: Control}, grid: {CheckboxSelectionModel: Control, GridPanel: Control},
@@ -84,3 +84,14 @@ assert.deepEqual(Array.from(result.panel.getSelectedParentAPs()), [13]);
 assert(result.controls.some(c => c.html && c.html.includes('IR13')));
 assert(result.controls.some(c => c.columns && c.columns.some(column => column.dataIndex === 'c_arrive_code')));
 console.log('PASS: deferred tab load enables controls; restores children; explains child restriction; retries failed loads');
+
+result = scenario([{sp_check_period_hdr_id: 10, i_parent: 1, f_total: 1000},
+    {sp_check_period_hdr_id: 12, parent_id: 10, f_total: 600, budget_name: 'Income'}]);
+assert(result.grid.columns.some(c => c.dataIndex === 'budget_name'));
+assert(result.controls.some(c => c.html && c.html.includes('400.00') && c.html.includes('color:#b91c1c')));
+result = scenario([{sp_check_period_hdr_id: 10, i_parent: 1, f_total: 0.3},
+    {sp_check_period_hdr_id: 12, parent_id: 10, f_total: 0.1},
+    {sp_check_period_hdr_id: 13, parent_id: 10, f_total: 0.2}]);
+assert(result.controls.some(c => c.html && c.html.includes('color:#15803d')));
+result.grid.bbar[2].handler();
+assert(result.controls.some(c => c.html && c.html.includes('0.30') && c.html.includes('color:#b91c1c')));

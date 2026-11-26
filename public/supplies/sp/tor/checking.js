@@ -17,20 +17,32 @@ function roundHalfUp2(v) {
     return Math.round(parseFloat((v * 100).toPrecision(12))) / 100;
 }
 // alert กรณี API จองเงินตอบ Not enough money: แสดงเลขใบกัน ยอดใบกัน ใช้ไปแล้ว คงเหลือ ยอดที่ขอ (ขอข้อมูลแบบ sync เพราะใช้แทน string ใน alert เดิม)
-Ext.overlapNotEnoughMsg = function () {
+Ext.overlapNotEnoughMsg = function (context) {
     var base = "เงินใบกันไม่เพียงพอ";
     var code = "";
+    var apiMessage = context && context.response ? String(context.response.msg || '') : '';
+    var encode = Ext.util.Format.htmlEncode;
+    function sentValue(name) {
+        var match = context && context.url && String(context.url).match(new RegExp('/' + name + '/([^/?]+)'));
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+    function details() {
+        return apiMessage ? '<br>ข้อความจาก API: ' + encode(apiMessage) : '';
+    }
     try {
         var cb2 = Ext.getCmp("use_contract_overlap2ID");
         var cb = Ext.getCmp("c_bookingID");
-        if (Ext.selectRow && cb2 && cb2.getValue && cb2.getValue() === true) code = Ext.selectRow.get("c_overlap2") || "";
-        if (!code && cb) code = cb.lastSelectionText || "";
-        if (!code && Ext.selectRow) code = Ext.selectRow.get("c_overlap") || "";
+        if (context && context.url) code = sentValue('c_code_overlap');
+        else {
+            if (Ext.selectRow && cb2 && cb2.getValue && cb2.getValue() === true) code = Ext.selectRow.get("c_overlap2") || "";
+            if (!code && cb) code = cb.lastSelectionText || "";
+            if (!code && Ext.selectRow) code = Ext.selectRow.get("c_overlap") || "";
+        }
         if (!code) {
             // ไม่มีเลขใบกัน = จองจากงบปีปัจจุบัน ไม่ใช่ใบกัน
             var rc = Ext.getCmp("f_totalID");
             var ra = rc ? parseFloat(String(rc.getValue()).replace(/,/g, "")) : NaN;
-            return "เงินงบประมาณไม่เพียงพอ" + (ra > 0 ? "<br>ยอดที่ขอ : " + Ext.util.Format.number(ra, "0,000.00") + " บาท" : "") + "<br>กรุณาติดต่อฝ่ายการคลัง";
+            return "API ปฏิเสธการจองเงินงบประมาณ" + (ra > 0 ? "<br>ยอดที่ขอ : " + Ext.util.Format.number(ra, "0,000.00") + " บาท" : "") + details() + "<br>กรุณาติดต่อฝ่ายการคลัง";
         }
         var xhr = new XMLHttpRequest();
         xhr.open("GET", "api/All_PoWorkingImpHdr.php?type=overlap_remain&c_booking=" + encodeURIComponent(code), false);
@@ -38,13 +50,18 @@ Ext.overlapNotEnoughMsg = function () {
         var rows = (Ext.util.JSON.decode(xhr.responseText).data || []);
         var fmt = function (v) { return Ext.util.Format.number(v, "0,000.00") + " บาท"; };
         if (!rows.length) return base + "<br>เลขใบกัน : " + code + "<br>ไม่พบข้อมูลใบกัน<br>กรุณาติดต่อฝ่ายการคลัง";
-        var msg = base + "<br>เลขใบกัน : " + code + "<br>ยอดใบกัน : " + fmt(rows[0].f_overlap) + "<br>ใช้ไปแล้ว : " + fmt(rows[0].f_used) + "<br>เงินคงเหลือ : " + fmt(rows[0].f_remain);
+        var msg = "API ปฏิเสธการตัดเงินใบกัน" + "<br>เลขใบกัน : " + encode(code) + "<br>ยอดใบกัน : " + fmt(rows[0].f_overlap) + "<br>ใช้ไปแล้ว : " + fmt(rows[0].f_used) + "<br>เงินคงเหลือตามหน้าจอ : " + fmt(rows[0].f_remain);
         var reqCmp = Ext.getCmp("f_totalID");
-        var reqAmt = reqCmp ? parseFloat(String(reqCmp.getValue()).replace(/,/g, "")) : NaN;
+        var reqAmt = sentValue('f_amt') ? Number(sentValue('f_amt')) : (reqCmp ? parseFloat(String(reqCmp.getValue()).replace(/,/g, "")) : NaN);
         if (reqAmt > 0) msg += "<br>ยอดที่ขอ : " + fmt(reqAmt);
-        return msg + "<br>กรุณาติดต่อฝ่ายการคลัง";
+        if (isFinite(reqAmt) && Math.round(Number(rows[0].f_remain) * 100) >= Math.round(reqAmt * 100)) {
+            msg += '<br>ยอดตามหน้าจอเพียงพอ แต่ API ปฏิเสธ กรุณาตรวจสอบสูตรคงเหลือและเงื่อนไขฝั่ง API';
+        }
+        if (sentValue('chk_id')) msg += '<br>รหัสตรวจรับที่ส่ง: ' + encode(sentValue('chk_id'));
+        if (sentValue('i_year')) msg += '<br>ปีใบกันที่ส่ง: ' + encode(sentValue('i_year'));
+        return msg + details() + "<br>กรุณาติดต่อฝ่ายการคลัง";
     } catch (e) {
-        return base + (code ? "<br>เลขใบกัน : " + code : "") + "<br>กรุณาติดต่อฝ่ายการคลัง";
+        return base + (code ? "<br>เลขใบกัน : " + encode(code) : "") + details() + "<br>กรุณาติดต่อฝ่ายการคลัง";
     }
 };
 /* global Ext v-pro*/
@@ -6053,7 +6070,7 @@ Ext.auditBoong = function (i) {
                                         Ext.upMoneyCheckingId(jsonData.bg_reserve_money_id);
                                 });
                         } else {
-                                Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg() : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg), function () {
+                                Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg({url: link, response: jsonData}) : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg), function () {
                                         Ext.getCmp("winPeriodHdrID").getEl().unmask();
                                         var editorWindow = new Ext.Window({
                                                 title: 'ข้อมูลการจอง สำหรับไว้ตรวจสอบเงินจอง',
@@ -6520,7 +6537,7 @@ Ext.c_overlap_close = function (rec, event, edit) {
                                 Ext.MessageBox.alert("แจ้งเตือน", "ยอดเงินใบไม่เพียงพอ ติดต่องบประมาณ");
                         } else {
                                 Ext.getCmp("winPeriodHdrID").getEl().unmask();
-                                Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg() : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg));
+                                Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg({url: link, response: jsonData}) : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg));
                         }
 
                         return false;
@@ -6561,7 +6578,7 @@ Ext.reqMoney = function (id, req, f) {
                         if (jsonData.success) {
                                 Ext.upMoneyId(Ext.perioidHdr.get("id"), 1, f, jsonData.bg_request_money_income_id);
                         } else {
-                                Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg() : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg));
+                                Ext.MessageBox.alert("Failed", (String(jsonData.msg).indexOf("Not enough money") !== -1 ? Ext.overlapNotEnoughMsg({url: link, response: jsonData}) : "ข้อมูลผิดพลาด ติดต่อ admin <br>" + jsonData.msg));
                         }
                 },
                 failure: function (result, request) {
