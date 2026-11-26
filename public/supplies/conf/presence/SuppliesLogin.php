@@ -41,7 +41,7 @@ final class SuppliesLogin
     {
         $uid = (string)$row['dc_user_id'];
         $current = (string)($_SESSION['user_id'] ?? '') === $uid ? ($_SESSION['login_instance'] ?? null) : null;
-        $admin = (int)($row['i_type_user'] ?? 0) === 2 && !isset($extra['impersonation_admin_center_id']);
+        $admin = SingleLogin::namedAccount('SUPPLIES', $uid, (int)($row['i_type_user'] ?? 0)) && !isset($extra['impersonation_admin_center_id']);
         try {
             if ($admin) throw new DuplicateLoginException('');
             return SingleLogin::start('SUPPLIES', $uid, $current);
@@ -68,7 +68,7 @@ final class SuppliesLogin
         $_SESSION['DOMAIN'] = DOMAIN['en']; $_SESSION['DOMAIN_NAME'] = DOMAIN['th'];
         $_SESSION['DOMAIN_LOGIN'] = 'SUPPLIES'; $_SESSION['menu'] = $extra['menu'] ?? 'sp/dashBard.php';
         $_SESSION['user_id'] = (int)$row['dc_user_id']; $_SESSION['user_name'] = (string)$row['c_full_name'];
-        if ((int)($row['i_type_user'] ?? 0) === 2 && !isset($extra['impersonation_admin_center_id']) && isset($extra['admin_operator'])) $_SESSION['admin_operator'] = SingleLogin::operatorName((string)$extra['admin_operator']);
+        if (SingleLogin::namedAccount('SUPPLIES', (string)$row['dc_user_id'], (int)($row['i_type_user'] ?? 0)) && !isset($extra['impersonation_admin_center_id']) && isset($extra['admin_operator'])) $_SESSION['admin_operator'] = SingleLogin::operatorName((string)$extra['admin_operator']);
         foreach (['dc_emp_id','sp_emp_id','dc_department_id','dc_department_type_id','i_seq','i_level','dc_center_user','dc_cost_id','dc_area_id','i_type_user','dc_cost_acc_id','i_set_type_emp','i_type_emp','super_user'] as $field) $_SESSION[$field] = (int)($row[$field] ?? 0);
         foreach (['c_sp_emp','c_department_type','c_department','c_position','cost_name','cost_code'] as $field) $_SESSION[$field] = (string)($row[$field] ?? '');
         if (isset($extra['impersonation_admin_center_id'])) $_SESSION['impersonation_admin_center_id'] = (int)$extra['impersonation_admin_center_id'];
@@ -94,7 +94,7 @@ final class SuppliesLogin
             if (!$stmt || !$db->Fetch($stmt)) { unset($_SESSION['supplies_login_pending']); throw new RuntimeException('สิทธิ์ผู้ดูแลระบบเปลี่ยนแปลง กรุณาขอสวมสิทธิ์ใหม่'); }
         }
         $operator = !empty($pending['admin']) ? SingleLogin::operatorName($operator) : '';
-        if (!empty($pending['admin']) && (int)$fresh['i_type_user'] !== 2) { unset($_SESSION['supplies_login_pending']); throw new RuntimeException('สิทธิ์ Admin เปลี่ยนแปลง กรุณาเข้าสู่ระบบใหม่'); }
+        if (!empty($pending['admin']) && !SingleLogin::namedAccount('SUPPLIES', (string)$pending['row']['dc_user_id'], (int)$fresh['i_type_user'])) { unset($_SESSION['supplies_login_pending']); throw new RuntimeException('สิทธิ์ Admin เปลี่ยนแปลง กรุณาเข้าสู่ระบบใหม่'); }
         // Pending confirmations may survive a deployment and can lack fields
         // added by newer login flows. Treat an absent owner as no active owner.
         $owner = ($pending['operator'] ?? '') === $operator ? (($pending['owner'] ?? '') ?: null) : null;

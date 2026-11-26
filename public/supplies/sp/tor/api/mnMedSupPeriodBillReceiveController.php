@@ -30,9 +30,7 @@ function medsupGenApCode($db, $deptType, $useYear = 0)
     // [ผู้ใช้ยืนยัน 2569-11-19] เวชภัณฑ์ (APMSD) ปีของเลข AP = ปีงบประมาณตามวันที่ออกเลข (ต.ค.-ธ.ค. = ปีถัดไป)
     // ไม่ใช้ "ปีของเงิน" แล้ว แม้ใช้ใบกันเหลื่อมปีก่อน (ใบกันและช่อง "ใช้เงินปีงบประมาณ" ในฟอร์มยังเป็นปีเดิม)
     // เภสัช (APF) / พัสดุ (APPS) ยังใช้กฎเดิมทุกอย่าง
-    if ($deptType === "APMSD") {
-        $useYear = 0;
-    }
+    // [ผู้ใช้สั่ง 2569-11-26] เวชภัณฑ์ (APMSD) ใช้กฎเดียวกับเภสัช (APF): ปีของเลขตามปีของเงิน (ใช้ใบกันปี 69 ได้เลข 69) ยกเลิกกติกา 19-11 ที่ใช้ปีตามวันที่ออกเลข
     $now = new DateTime();
     $yearBE = intval($now->format("Y")) + 543;
     $fiscalYear = (intval($now->format("n")) >= 10) ? $yearBE + 1 : $yearBE;
@@ -73,18 +71,13 @@ function medsupIrUseYears($db, $ids)
     $years = array();
     while ($row = $db->Fetch($stmt)) {
         $y = 0;
-        if ($row["c_dept"] === "APMSD") {
-            // เวชภัณฑ์: ปีเลข IR ตามวันที่ออกเลข (0 = ปีงบปัจจุบัน) ไม่ผูกกับปีของใบกันเหลื่อม - ดู medsupGenApCode
-            $years[0] = 0;
-            continue;
-        }
         if (trim((string) $row["c_overlap"]) !== "") {
             if (intval($row["i_year_overlap"]) > 0) {
                 $y = intval($row["i_year_overlap"]) + 543;
             } elseif (preg_match('/^(\d{2})-/', trim((string) $row["c_overlap"]), $m)) {
                 $y = 2500 + intval($m[1]);
             }
-        } elseif ($row["c_dept"] === "APF" && intval($row["i_year_contract"]) > 0) {
+        } elseif (($row["c_dept"] === "APF" || $row["c_dept"] === "APMSD") && intval($row["i_year_contract"]) > 0) {
             // [ผู้ใช้ยืนยัน] สัญญาที่ไม่ใช้ใบกันเหลื่อมใช้ปีงบของสัญญา (ค.ศ. 2026 = 2569 -> IR50-69 / AP..69) เหมือนเวชภัณฑ์
             // เพราะผู้ใช้ยังไม่ได้ทำปีงบปัจจุบัน (เดิมได้ปีปัจจุบัน 70)
             $y = intval($row["i_year_contract"]) + 543;
@@ -102,9 +95,7 @@ function medsupIrUseYears($db, $ids)
 // ไม่ระบุ (0) = ใช้เงินปีปัจจุบัน ได้ปีงบปัจจุบัน (IR82-70-xxxxx) ดู medsupIrUseYear ว่าหาจากสัญญาอย่างไร
 function medsupGenIrCode($db, $deptType, $useYear = 0)
 {
-    if ($deptType === "APMSD") {
-        $useYear = 0;   // เวชภัณฑ์: ปีเลข IR ตามวันที่ออกเลข (ดู medsupGenApCode)
-    }
+    // [ผู้ใช้สั่ง 2569-11-26] เวชภัณฑ์ (APMSD) ใช้กฎเดียวกับเภสัช (APF): ปีของเลขตามปีของเงิน (ใช้ใบกันปี 69 ได้เลข 69) ยกเลิกกติกา 19-11 ที่ใช้ปีตามวันที่ออกเลข
     $costId = medsupApDeptCostId($deptType);
     $now = new DateTime();
     $yearBE = intval($now->format("Y")) + 543;
@@ -1343,6 +1334,185 @@ switch ($mode) {
         );
         if (!$stmt) {
             $errMsg = "แก้ผู้ขายของงวดไม่สำเร็จ";
+        }
+        break;
+
+    case "CHANGE_OVERLAP":
+        // [ผู้ใช้ขอ 2569-11-26] แก้เลขใบกันเหลื่อมของงวด (เช่น 69-102-03-1-1073 -> 69-102-03-1-1074) จากหน้ารายละเอียดงวด
+        //  - แก้ได้เมื่อยังไม่ออกใบเบิก D / ใบเบิกยังไม่เลยขั้น 0.30 (ก่อนส่งเรื่อง 0.40) / ใบเบิกถูกทักท้วงฏีกา (3.00)
+        //    ใบเบิกขั้น 0.40 ขึ้นไป = ไม่ให้แก้ (ต้องให้ผู้ดูแลระบบย้อนก่อน)
+        //  - เลขใหม่ต้องเป็นใบกันของหน่วยงานเดียวกัน แหล่งเงินเดียวกับใบกันเดิม และยอดคงเหลือพอ
+        //  - c_scope = one (เฉพาะงวดนี้ ค่าเริ่มต้น) / all (ทุกงวดของสัญญา+ประเภทเดียวกันที่ใช้เลขเดิม)
+        //  - check_only = 1 : ตรวจกติกาอย่างเดียว ยังไม่เขียนข้อมูล
+        $billId = intval($_REQUEST["sp_tor_period_bill_id"] ?? 0);
+        $newOv = trim((string) ($_REQUEST["c_overlap_new"] ?? ""));
+        $scope = (($_REQUEST["c_scope"] ?? "one") === "all") ? "all" : "one";
+        $checkOnly = !empty($_REQUEST["check_only"]);
+        if ($billId <= 0 || $newOv === "") {
+            $stmt = false;
+            $errMsg = "กรุณาระบุเลขใบกันเหลื่อมใหม่";
+            break;
+        }
+        $bill = $db->GetDataBySQL(
+            "select sp_tor_period_bill_id, c_contract_code, i_period, isnull(c_ap_dept_type, '') as c_ap_dept_type,
+                    isnull(c_overlap, '') as c_overlap, isnull(c_overlap2, '') as c_overlap2, isnull(c_overlap3, '') as c_overlap3
+               from NMU_ERP.dbo.sp_tor_period_bill where sp_tor_period_bill_id = ? and i_enabled = 1",
+            array($billId)
+        );
+        if (empty($bill) || !is_array($bill)) {
+            $stmt = false;
+            $errMsg = "ไม่พบงวดนี้ (อาจถูกยกเลิกไปแล้ว) กรุณารีเฟรชหน้า";
+            break;
+        }
+        // ช่องที่เก็บเลขใบกัน: ใช้ช่องแรกที่มีค่า (แหล่งเงินแรก) - ถ้ายังไม่มีเลขใบกัน ไม่มีอะไรให้แก้
+        $slot = $bill["c_overlap"] !== "" ? "" : ($bill["c_overlap2"] !== "" ? "2" : ($bill["c_overlap3"] !== "" ? "3" : null));
+        if ($slot === null) {
+            $stmt = false;
+            $errMsg = "งวดนี้ไม่ได้ใช้ใบกันเหลื่อม จึงไม่มีเลขให้แก้";
+            break;
+        }
+        $oldOv = $bill["c_overlap" . $slot];
+        if (strcasecmp($oldOv, $newOv) === 0) {
+            $stmt = false;
+            $errMsg = "เลขใบกันเหลื่อมเป็น " . $oldOv . " อยู่แล้ว ไม่มีอะไรต้องแก้";
+            break;
+        }
+        $ovCost = ($bill["c_ap_dept_type"] === "APF") ? 50 : (($bill["c_ap_dept_type"] === "APPS") ? 38 : 82);
+        $ovNew = $db->GetDataBySQL(
+            "select top 1 i_year, dc_expense_budget_type_id, f_total from " . DB_NMU_EIS . "vw_bg_budget_overlap
+              where c_code_ref = ? and dc_cost_id = ? order by i_year desc",
+            array($newOv, $ovCost)
+        );
+        if (empty($ovNew) || !is_array($ovNew)) {
+            $stmt = false;
+            $errMsg = "ไม่พบใบกันเหลื่อมเลขที่ " . $newOv . " ของหน่วยงาน " . $bill["c_ap_dept_type"] . " ในระบบงบประมาณ";
+            break;
+        }
+        $ovOld = $db->GetDataBySQL(
+            "select top 1 dc_expense_budget_type_id from " . DB_NMU_EIS . "vw_bg_budget_overlap where c_code_ref = ? and dc_cost_id = ? order by i_year desc",
+            array($oldOv, $ovCost)
+        );
+        if (is_array($ovOld) && intval($ovOld["dc_expense_budget_type_id"]) !== intval($ovNew["dc_expense_budget_type_id"])) {
+            $stmt = false;
+            $errMsg = "แหล่งเงินของใบกัน " . $newOv . " ไม่ตรงกับใบกันเดิม " . $oldOv;
+            break;
+        }
+        // งวดที่จะแก้ (ที่ใช้เลขเดิมช่องเดียวกัน)
+        $targets = array();
+        if ($scope === "one") {
+            $stmtT = $db->QueryParam(
+                "select sp_tor_period_bill_id, i_period, f_period_amt from NMU_ERP.dbo.sp_tor_period_bill
+                  where sp_tor_period_bill_id = ? and i_enabled = 1",
+                array($billId)
+            );
+        } else {
+            $stmtT = $db->QueryParam(
+                "select sp_tor_period_bill_id, i_period, f_period_amt from NMU_ERP.dbo.sp_tor_period_bill
+                  where i_enabled = 1 and c_contract_code = ? and isnull(c_ap_dept_type, '') = ? and c_overlap{$slot} = ? order by i_period",
+                array($bill["c_contract_code"], $bill["c_ap_dept_type"], $oldOv)
+            );
+        }
+        while ($stmtT && ($rt = $db->Fetch($stmtT))) {
+            $targets[] = $rt;
+        }
+        $targetIds = array_map(function ($t) { return intval($t["sp_tor_period_bill_id"]); }, $targets);
+        $tPh = implode(",", array_fill(0, count($targetIds), "?"));
+        $needAmt = 0;
+        foreach ($targets as $t) {
+            $needAmt += floatval($t["f_period_amt"]);
+        }
+        if ($needAmt > floatval($ovNew["f_total"]) + 0.004) {
+            $stmt = false;
+            $errMsg = "ยอดคงเหลือของใบกัน " . $newOv . " (" . number_format(floatval($ovNew["f_total"]), 2) . ") ไม่พอสำหรับยอดงวดที่แก้ (" . number_format($needAmt, 2) . ")";
+            break;
+        }
+        // ใบเบิก D ของงวดที่จะแก้ (ผ่านเลข IR) + ใบตรวจรับของ IR
+        $wdRows = array();
+        $irCodes = array();
+        $stmtI = $db->QueryParam(
+            "select distinct r.c_ir_code from NMU_ERP.dbo.sp_tor_period_bill_receive r
+              where r.i_enabled = 1 and isnull(r.c_ir_code, '') <> '' and r.sp_tor_period_bill_id in ({$tPh})",
+            $targetIds
+        );
+        while ($stmtI && ($ri = $db->Fetch($stmtI))) {
+            $irCodes[] = $ri["c_ir_code"];
+        }
+        $hasWdColO = intval($db->GetDataBySQL("select case when col_length('NMU_ERP.dbo.sp_tor_period_bill_checking', 'c_code_ref') is not null then 1 else 0 end", array()));
+        if ($hasWdColO) {
+            $stmtW = $db->QueryParam(
+                "select distinct h.c_code_ref, h.po_working_hdr_id, h.i_status_last, convert(float, h.i_sub_status) as sub_status
+                   from NMU_ERP.dbo.sp_tor_period_bill_receive r
+                  inner join NMU_ERP.dbo.sp_tor_period_bill_checking c on c.c_ir_code = r.c_ir_code and c.i_enabled = 1 and isnull(c.c_code_ref, '') <> ''
+                  inner join " . DB_NMU_EIS . "po_working_hdr h on h.c_code_ref = c.c_code_ref
+                  where r.i_enabled = 1 and r.sp_tor_period_bill_id in ({$tPh})",
+                $targetIds
+            );
+            while ($stmtW && ($rw = $db->Fetch($stmtW))) {
+                $wdRows[] = $rw;
+            }
+        }
+        $blockedWd = array();
+        foreach ($wdRows as $rw) {
+            // ก่อนส่งเรื่อง (ขั้น <= 0.30) หรือถูกทักท้วงฏีกา (สถานะ 3, ขั้น 3.00) แก้ได้ / ขั้น 0.40 ขึ้นไป = ไม่ให้แก้
+            $okDraft = intval($rw["i_status_last"]) === 0 && floatval($rw["sub_status"]) <= 0.30;
+            $okProtest = intval($rw["i_status_last"]) === 3 && floatval($rw["sub_status"]) == 3.0;
+            if (!$okDraft && !$okProtest) {
+                $blockedWd[] = $rw["c_code_ref"] . " (ขั้น " . number_format(floatval($rw["sub_status"]), 2) . ")";
+            }
+        }
+        if (!empty($blockedWd)) {
+            $stmt = false;
+            $errMsg = "ไม่สามารถแก้เลขใบกันเหลื่อมได้ เนื่องจากใบเบิก " . implode(", ", $blockedWd) . " ส่งเรื่องเลยขั้น 0.40 แล้ว (ที่แก้ได้คือยังไม่ถึง 0.40 หรือถูกทักท้วงเท่านั้น) กรุณาติดต่อผู้ดูแลระบบเพื่อย้อนใบเบิกก่อน";
+            break;
+        }
+        $responseExtra["periods"] = array_map(function ($t) { return intval($t["i_period"]); }, $targets);
+        $responseExtra["wd_codes"] = array_map(function ($w) { return $w["c_code_ref"]; }, $wdRows);
+        $responseExtra["old_overlap"] = $oldOv;
+        $responseExtra["new_overlap"] = $newOv;
+        $responseExtra["remain_new"] = floatval($ovNew["f_total"]);
+        if ($checkOnly) {
+            $stmt = true; // ผ่านกติกา ยังไม่เขียนข้อมูล
+            break;
+        }
+
+        $uidO = $_SESSION["user_id"] ?? null;
+        $ucostO = $_SESSION["dc_cost_id"] ?? null;
+        // 1) งวด
+        $stmt = $db->QueryParam(
+            "update NMU_ERP.dbo.sp_tor_period_bill
+                set c_overlap{$slot} = ?, i_budget_year_overlap{$slot} = ?,
+                    dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = getdate()
+              where i_enabled = 1 and sp_tor_period_bill_id in ({$tPh})",
+            array_merge(array($newOv, intval($ovNew["i_year"]), $uidO, $ucostO), $targetIds)
+        );
+        if (!$stmt) {
+            $errMsg = "แก้เลขใบกันเหลื่อมของงวดไม่สำเร็จ";
+            break;
+        }
+        // 2) รายละเอียดตรวจรับของ IR ที่ใช้เลขเดิมอยู่ (ถ้ามี)
+        if (!empty($irCodes)) {
+            $iPh = implode(",", array_fill(0, count($irCodes), "?"));
+            $stmt = $db->QueryParam(
+                "update NMU_ERP.dbo.sp_tor_period_bill_checking
+                    set c_overlap_no = ?, dc_user_update_id = ?, dc_user_update_cost_id = ?, d_update = getdate()
+                  where c_ir_code in ({$iPh}) and c_overlap_no = ?",
+                array_merge(array($newOv, $uidO, $ucostO), $irCodes, array($oldOv))
+            );
+            if (!$stmt) {
+                $errMsg = "แก้เลขใบกันเหลื่อมในรายละเอียดตรวจรับไม่สำเร็จ";
+                break;
+            }
+        }
+        // 3) ปีของใบกันในใบเบิก EIS (ถ้ามี) ให้ตรงกับใบกันใหม่
+        foreach ($wdRows as $rw) {
+            $stmt = $db->QueryParam(
+                "update " . DB_NMU_EIS . "po_working_dtl set i_budget_year_overlap = ? where po_working_hdr_id = ?",
+                array(intval($ovNew["i_year"]), intval($rw["po_working_hdr_id"]))
+            );
+            if (!$stmt) {
+                $errMsg = "แก้ใบเบิก " . $rw["c_code_ref"] . " ไม่สำเร็จ";
+                break 2;
+            }
         }
         break;
 

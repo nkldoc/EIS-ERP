@@ -334,7 +334,11 @@ function winDeliverWorkMedSup(rec) {
         });
         var remainFld = Ext.getCmp("deliverMedSupRemainID");
         if (remainFld) {
-            remainFld.setValue(moneyStr(periodTotal - used) + " บาท (ใช้ไปแล้ว " + moneyStr(used) + " บาท)");
+            // ปัดเศษ float ก่อนแสดง (222305.34 + 61311 = 283616.33999999997 ทำให้ "ใช้ไปแล้ว" ตัดเป็น .33
+            // และ "คงเหลือ" เหลือ 5.8e-11 ซึ่ง Ext.floatRenderer แสดงผิดเป็น 5.82 แทน 0.00)
+            var usedR = round2(used);
+            var remainR = round2(round2(periodTotal) - usedR);
+            remainFld.setValue(moneyStr(remainR) + " บาท (ใช้ไปแล้ว " + moneyStr(usedR) + " บาท)");
         }
     }
     Ext.storeDeliverMedSupReceive.on("load", updateRemainDisplay);
@@ -526,8 +530,8 @@ function winDeliverWorkMedSup(rec) {
             Ext.Msg.alert(
                 "แจ้งเตือน",
                 "จำนวนเงินรวมเกินวงเงินของงวดนี้<br>วงเงินงวดนี้: " + moneyStr(periodTotal) + " บาท"
-                + "<br>รับของไปแล้ว (ไม่รวมแถวนี้): " + moneyStr(used) + " บาท"
-                + "<br>คงเหลือ: " + moneyStr(periodTotal - used) + " บาท"
+                + "<br>รับของไปแล้ว (ไม่รวมแถวนี้): " + moneyStr(round2(used)) + " บาท"
+                + "<br>คงเหลือ: " + moneyStr(round2(round2(periodTotal) - round2(used))) + " บาท"
             );
             return;
         }
@@ -1722,6 +1726,110 @@ function winDeliverWorkMedSup(rec) {
         vwin.show();
     }
 
+    // [ผู้ใช้ขอ 2569-11-26] แก้เลขใบกันเหลื่อมจากหน้านี้ - แก้ได้เมื่อยังไม่ถึงขั้น 0.40 หรือใบเบิกถูกทักท้วง
+    // เซิร์ฟเวอร์ (mode CHANGE_OVERLAP) ตรวจกติกา/ยอดคงเหลือ/แหล่งเงิน แล้วบันทึกให้
+    function winChangeOverlap() {
+        var enc = Ext.util.Format.htmlEncode;
+        var ovField = new Ext.form.TextField({
+            fieldLabel: "เลขใบกันใหม่",
+            anchor: "100%",
+            allowBlank: false,
+            emptyText: "เช่น 69-102-03-1-1074"
+        });
+        var ovScope = new Ext.form.RadioGroup({
+            fieldLabel: "แก้ที่",
+            columns: 1,
+            items: [
+                {boxLabel: "เฉพาะงวดที่ " + enc(rec.get("i_period")) + " นี้", name: "overlap_scope", inputValue: "one", checked: true},
+                {boxLabel: "ทุกงวดของสัญญา " + enc(rec.get("c_contract_code")) + " ที่ใช้เลขเดิม", name: "overlap_scope", inputValue: "all"}
+            ]
+        });
+        function sendOv(extra, cb) {
+            var sc = ovScope.getValue();
+            Ext.Ajax.request({
+                url: "tor/api/mnMedSupPeriodBillReceiveController.php",
+                method: "POST",
+                params: Ext.apply({
+                    mode: "CHANGE_OVERLAP",
+                    sp_tor_period_bill_id: periodId,
+                    c_overlap_new: Ext.util.Format.trim(ovField.getValue() || ""),
+                    c_scope: sc ? sc.inputValue : "one"
+                }, extra),
+                success: function (res) {
+                    var r;
+                    try {
+                        r = Ext.util.JSON.decode(res.responseText);
+                    } catch (e) {
+                        Ext.Msg.alert("แจ้งเตือน", "แก้เลขใบกันเหลื่อมไม่สำเร็จ");
+                        return;
+                    }
+                    if (r.reval !== 0) {
+                        Ext.Msg.alert("แจ้งเตือน", r.msg || "แก้เลขใบกันเหลื่อมไม่สำเร็จ");
+                        return;
+                    }
+                    cb(r);
+                },
+                failure: function () {
+                    Ext.Msg.alert("แจ้งเตือน", "แก้เลขใบกันเหลื่อมไม่สำเร็จ");
+                }
+            });
+        }
+        var owin = new Ext.Window({
+            title: "แก้เลขใบกันเหลื่อม - สัญญา " + rec.get("c_contract_code"),
+            width: 520,
+            modal: true,
+            closeAction: "destroy",
+            bodyStyle: "padding:10px;",
+            items: [{
+                xtype: "form",
+                border: false,
+                labelWidth: 100,
+                items: [
+                    {xtype: "displayfield", fieldLabel: "เลขใบกันเดิม", value: enc(deliverOverlapCode)},
+                    ovField,
+                    ovScope,
+                    {xtype: "displayfield", hideLabel: true, style: "color:#888;",
+                     value: "ต้องเป็นใบกันของหน่วยงานเดียวกัน แหล่งเงินเดียวกัน และยอดคงเหลือพอ แก้ได้เมื่อใบเบิกยังไม่ถึงขั้น 0.40 หรือถูกทักท้วง"}
+                ]
+            }],
+            buttons: [
+                {
+                    text: "บันทึก",
+                    iconCls: "icon-save",
+                    handler: function () {
+                        if (!ovField.isValid()) {
+                            Ext.Msg.alert("แจ้งเตือน", "กรุณากรอกเลขใบกันเหลื่อมใหม่");
+                            return;
+                        }
+                        sendOv({check_only: 1}, function (c) {
+                            var msg = "แก้เลขใบกันเหลื่อม <b>" + enc(c.old_overlap) + "</b> เป็น <b>" + enc(c.new_overlap) + "</b><br>งวดที่แก้: " +
+                                (c.periods || []).map(enc).join(", ") +
+                                ((c.wd_codes || []).length ? "<br>ใบเบิกที่เกี่ยวข้อง: " + c.wd_codes.map(enc).join(", ") : "") +
+                                "<br><br>ยืนยันใช่หรือไม่?";
+                            Ext.Msg.confirm("ยืนยันแก้เลขใบกันเหลื่อม", msg, function (b) {
+                                if (b !== "yes") {
+                                    return;
+                                }
+                                sendOv({}, function () {
+                                    owin.destroy();
+                                    Ext.storeDeliverMedSupList.reload();
+                                    Ext.Msg.alert("สำเร็จ", "แก้เลขใบกันเหลื่อมเรียบร้อยแล้ว กรุณาเปิดหน้ารายละเอียดงวดใหม่เพื่อดูเลขล่าสุด", function () {
+                                        var w = Ext.getCmp("win-deliver-medsupID");
+                                        if (w) {
+                                            w.destroy();
+                                        }
+                                    });
+                                });
+                            });
+                        });
+                    }
+                },
+                {text: "ยกเลิก", iconCls: "icon-clear", handler: function () { owin.destroy(); }}
+            ]
+        });
+        owin.show();
+    }
+
     new Ext.Window({
         id: "win-deliver-medsupID",
         title: "รายละเอียดงวดที่ " + rec.get("i_period") + " - เลขที่สัญญา " + rec.get("c_contract_code"),
@@ -1751,7 +1859,15 @@ function winDeliverWorkMedSup(rec) {
                             // ใช้ใบกันเหลื่อม = ปีงบประมาณของเอกสารเป็นปีปัจจุบัน ส่วนปีที่ใช้เงินคือปีของใบกัน
                             {fieldLabel: "ปีงบประมาณ", value: deliverOverlapCode ? deliverFiscalYearTh() : rec.get("i_budget_year")},
                             {fieldLabel: "ใช้เงินปีงบประมาณ", value: deliverOverlapYear, hidden: !deliverOverlapCode},
-                            {fieldLabel: "เลขที่ใบกันเหลื่อม", value: deliverOverlapCode, hidden: !deliverOverlapCode, style: "font-weight:bold;"},
+                            {
+                                xtype: "compositefield",
+                                fieldLabel: "เลขที่ใบกันเหลื่อม",
+                                hidden: !deliverOverlapCode,
+                                items: [
+                                    {xtype: "displayfield", flex: 1, value: deliverOverlapCode, style: "font-weight:bold;"},
+                                    {xtype: "button", text: "แก้เลขใบกัน", iconCls: "icon-edit", handler: winChangeOverlap}
+                                ]
+                            },
                             {fieldLabel: "ชื่อโครงการ", value: rec.get("c_project_name")},
                             {fieldLabel: "ชื่อค่าใช้จ่าย", value: rec.get("c_expense_name")},
                             {
