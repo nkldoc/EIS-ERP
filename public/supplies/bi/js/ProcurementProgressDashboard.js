@@ -120,7 +120,8 @@
   }
   function renderStatus() {
     var selected=el("statusOwnerFilter").value, rows=selected?filteredRows.filter(function(r){return r.owner_name===selected;}):filteredRows, counts={}, matrix={};
-    rows.forEach(function(r){var key=stage(r), overlap=r.overlap_status||"";counts[key]=(counts[key]||0)+1;matrix[key]=matrix[key]||{"ยังไม่ก่อหนี้":0,"ก่อหนี้แล้ว":0,"บันทึกใบกันเหลื่อมแล้ว":0};if(matrix[key][overlap]!==undefined)matrix[key][overlap]++;}); var labels=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}), values=labels.map(function(k){return counts[k];});
+    var statusOrder=["รอดำเนินการ","อยู่ระหว่างดำเนินการ","บริหารสัญญา","บริหารสัญญา/งวด","รับของ","ตรวจรับ","ขอเบิกจ่าย","เบิกจ่ายสมบูรณ์"];
+    rows.forEach(function(r){var key=stage(r), overlap=r.overlap_status||"";counts[key]=(counts[key]||0)+1;matrix[key]=matrix[key]||{"ยังไม่ก่อหนี้":0,"ก่อหนี้แล้ว":0,"บันทึกใบกันเหลื่อมแล้ว":0};if(matrix[key][overlap]!==undefined)matrix[key][overlap]++;}); var labels=Object.keys(counts).sort(function(a,b){var ai=statusOrder.indexOf(a),bi=statusOrder.indexOf(b);return (ai<0?99:ai)-(bi<0?99:bi)||a.localeCompare(b);}), values=labels.map(function(k){return counts[k];});
     if(statusChart) statusChart.destroy();
     statusChart=new Chart(el("statusChart"),{type:"doughnut",data:{labels:labels,datasets:[{data:values,backgroundColor:colors,borderWidth:3,borderColor:"#fff"}]},options:{responsive:true,maintainAspectRatio:false,cutout:"63%",plugins:{legend:{position:"bottom"},tooltip:{backgroundColor:"#17243a",titleColor:"#fff",bodyColor:"#e6eef8",padding:14,cornerRadius:10,displayColors:true,callbacks:{afterLabel:function(c){return statusTooltipLines(c.label);}}}}}});
     var totals={"ยังไม่ก่อหนี้":0,"ก่อหนี้แล้ว":0,"บันทึกใบกันเหลื่อมแล้ว":0};
