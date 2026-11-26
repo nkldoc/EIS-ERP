@@ -137,5 +137,5 @@ if (empty($_SESSION['user_id'])) {
     </section>
 </main>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261126-3"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261126-4"></script>
 </body></html>
