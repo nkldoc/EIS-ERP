@@ -30,9 +30,7 @@ function medsupGenApCode($db, $deptType, $useYear = 0)
     // [ผู้ใช้ยืนยัน 2569-11-19] เวชภัณฑ์ (APMSD) ปีของเลข AP = ปีงบประมาณตามวันที่ออกเลข (ต.ค.-ธ.ค. = ปีถัดไป)
     // ไม่ใช้ "ปีของเงิน" แล้ว แม้ใช้ใบกันเหลื่อมปีก่อน (ใบกันและช่อง "ใช้เงินปีงบประมาณ" ในฟอร์มยังเป็นปีเดิม)
     // เภสัช (APF) / พัสดุ (APPS) ยังใช้กฎเดิมทุกอย่าง
-    if ($deptType === "APMSD") {
-        $useYear = 0;
-    }
+    // [ผู้ใช้สั่ง 2569-11-26] เวชภัณฑ์ (APMSD) ใช้กฎเดียวกับเภสัช (APF): ปีของเลขตามปีของเงิน (ใช้ใบกันปี 69 ได้เลข 69) ยกเลิกกติกา 19-11 ที่ใช้ปีตามวันที่ออกเลข
     $now = new DateTime();
     $yearBE = intval($now->format("Y")) + 543;
     $fiscalYear = (intval($now->format("n")) >= 10) ? $yearBE + 1 : $yearBE;
@@ -73,18 +71,13 @@ function medsupIrUseYears($db, $ids)
     $years = array();
     while ($row = $db->Fetch($stmt)) {
         $y = 0;
-        if ($row["c_dept"] === "APMSD") {
-            // เวชภัณฑ์: ปีเลข IR ตามวันที่ออกเลข (0 = ปีงบปัจจุบัน) ไม่ผูกกับปีของใบกันเหลื่อม - ดู medsupGenApCode
-            $years[0] = 0;
-            continue;
-        }
         if (trim((string) $row["c_overlap"]) !== "") {
             if (intval($row["i_year_overlap"]) > 0) {
                 $y = intval($row["i_year_overlap"]) + 543;
             } elseif (preg_match('/^(\d{2})-/', trim((string) $row["c_overlap"]), $m)) {
                 $y = 2500 + intval($m[1]);
             }
-        } elseif ($row["c_dept"] === "APF" && intval($row["i_year_contract"]) > 0) {
+        } elseif (($row["c_dept"] === "APF" || $row["c_dept"] === "APMSD") && intval($row["i_year_contract"]) > 0) {
             // [ผู้ใช้ยืนยัน] สัญญาที่ไม่ใช้ใบกันเหลื่อมใช้ปีงบของสัญญา (ค.ศ. 2026 = 2569 -> IR50-69 / AP..69) เหมือนเวชภัณฑ์
             // เพราะผู้ใช้ยังไม่ได้ทำปีงบปัจจุบัน (เดิมได้ปีปัจจุบัน 70)
             $y = intval($row["i_year_contract"]) + 543;
@@ -102,9 +95,7 @@ function medsupIrUseYears($db, $ids)
 // ไม่ระบุ (0) = ใช้เงินปีปัจจุบัน ได้ปีงบปัจจุบัน (IR82-70-xxxxx) ดู medsupIrUseYear ว่าหาจากสัญญาอย่างไร
 function medsupGenIrCode($db, $deptType, $useYear = 0)
 {
-    if ($deptType === "APMSD") {
-        $useYear = 0;   // เวชภัณฑ์: ปีเลข IR ตามวันที่ออกเลข (ดู medsupGenApCode)
-    }
+    // [ผู้ใช้สั่ง 2569-11-26] เวชภัณฑ์ (APMSD) ใช้กฎเดียวกับเภสัช (APF): ปีของเลขตามปีของเงิน (ใช้ใบกันปี 69 ได้เลข 69) ยกเลิกกติกา 19-11 ที่ใช้ปีตามวันที่ออกเลข
     $costId = medsupApDeptCostId($deptType);
     $now = new DateTime();
     $yearBE = intval($now->format("Y")) + 543;
