@@ -44,7 +44,9 @@ try {
     if (!is_dir($dir) || !is_writable($dir)) throw new Exception('โฟลเดอร์ PDF ไม่พร้อมใช้งาน');
     $target = $dir . '/' . $code . '.pdf';
     $hasPdf = (int)$row['check_pdf'] === 1 && trim((string)$row['i_is_upload_chk']) !== '';
-    if (!$admin && ($hasPdf || is_file($target))) throw new Exception('มีเอกสารแล้ว เฉพาะ Admin เท่านั้นที่เปลี่ยนไฟล์ได้');
+    // A NULL status and path mean an admin has released this PDF for replacement.
+    $released = $row['check_pdf'] === null && $row['i_is_upload_chk'] === null;
+    if (!$admin && ($hasPdf || (is_file($target) && !$released))) throw new Exception('มีเอกสารแล้ว เฉพาะ Admin เท่านั้นที่เปลี่ยนไฟล์ได้');
     if (is_file($target)) {
         $backup = tempnam($dir, 'pdf_backup_');
         if (!$backup || !copy($target, $backup)) throw new Exception('ไม่สามารถสำรองไฟล์เดิมได้');

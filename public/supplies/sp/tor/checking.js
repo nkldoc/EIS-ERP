@@ -13725,6 +13725,12 @@ Ext.AppUx = function (app, menu) {
                         if (field) field.setVisible(allowed);
                         if (save) save.setVisible(allowed);
                         if (unlock) unlock.setVisible(Number(Ext.session.dc_center_user) === 1 && hasCheckingPdf() && !allowed);
+                        var reset = Ext.getCmp("resetCheckingPdfID");
+                        if (reset) {
+                                reset.setValue(false);
+                                reset.enable();
+                                reset.setVisible(Number(Ext.session.dc_center_user) === 1 && hasCheckingPdf());
+                        }
                 }
                 function getPDF(a) {
                         if (Ext.check_pdf == 1) {
@@ -17602,6 +17608,57 @@ Ext.AppUx = function (app, menu) {
                                                                                                                 this.setValue(Ext.selectRow.data.i_is_upload_chk);
                                                                                                         },
                                                                                                 },
+                                                                                        },
+                                                                                        {
+                                                                                                xtype: "checkbox",
+                                                                                                id: "resetCheckingPdfID",
+                                                                                                boxLabel: "????? PDF: ?????????????????????????????",
+                                                                                                hidden: Number(Ext.session.dc_center_user) !== 1 || !hasCheckingPdf(),
+                                                                                                listeners: {
+                                                                                                        check: function (checkbox, checked) {
+                                                                                                                if (!checked) return;
+                                                                                                                var record = Ext.selectRow;
+                                                                                                                var id = record.get("sp_check_period_hdr_id");
+                                                                                                                checkbox.disable();
+                                                                                                                function failed(response) {
+                                                                                                                        checkbox.enable();
+                                                                                                                        checkbox.setValue(false);
+                                                                                                                        var result = Ext.decode(response.responseText, true);
+                                                                                                                        Ext.Msg.alert("???????????????", result && result.msg || "??????????????????????? PDF ???????");
+                                                                                                                }
+                                                                                                                Ext.Ajax.request({
+                                                                                                                        url: "tor/api/checkingAdmin.php",
+                                                                                                                        method: "GET",
+                                                                                                                        params: {mode: "pdf_reset_load", sp_check_period_hdr_id: id},
+                                                                                                                        failure: failed,
+                                                                                                                        success: function (response) {
+                                                                                                                                var result = Ext.decode(response.responseText, true);
+                                                                                                                                if (!result || !result.success) { failed(response); return; }
+                                                                                                                                Ext.Ajax.request({
+                                                                                                                                        url: "tor/api/checkingAdmin.php",
+                                                                                                                                        method: "POST",
+                                                                                                                                        params: {mode: "pdf_reset_save", sp_check_period_hdr_id: id, csrf_token: result.csrf_token},
+                                                                                                                                        failure: failed,
+                                                                                                                                        success: function (saved) {
+                                                                                                                                                var data = Ext.decode(saved.responseText, true);
+                                                                                                                                                if (!data || !data.success) { failed(saved); return; }
+                                                                                                                                                record.set("check_pdf", null);
+                                                                                                                                                record.set("i_is_upload_chk", null);
+                                                                                                                                                if (Ext.selectRow === record) {
+                                                                                                                                                        Ext.check_pdf = null;
+                                                                                                                                                        Ext.getCmp("upload_pdf1").setValue("");
+                                                                                                                                                        checkbox.hide();
+                                                                                                                                                        Ext.getCmp("checkingPdfDownloadID").update(getPDF());
+                                                                                                                                                        syncCheckingPdfUpload();
+                                                                                                                                                }
+                                                                                                                                                Ext.storePeriodHdr.reload();
+                                                                                                                                                Ext.Msg.alert("??????", data.msg);
+                                                                                                                                        }
+                                                                                                                                });
+                                                                                                                        }
+                                                                                                                });
+                                                                                                        }
+                                                                                                }
                                                                                         },
                                                                                         {
                                                                                                 xtype: "panel",
