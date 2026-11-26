@@ -87,8 +87,6 @@ $sql = "SELECT TOP 10000
             CASE
                 WHEN ev.event_title IS NOT NULL THEN ev.event_title
                 WHEN s.i_enabled = 2 THEN N'ยกเลิก'
-                WHEN s.tor_status_id = 21 AND ISNULL(pay.i_status_last, 0) >= 11 THEN N'เบิกจ่ายเงินเสร็จสิ้น'
-                WHEN s.tor_status_id = 21 AND chk.po_working_hdr_id IS NOT NULL THEN N'ขออนุมัติเบิกจ่ายเงิน'
                 WHEN con.sp_tor_contract_id IS NOT NULL THEN N'บริหารสัญญา'
                 WHEN s.tor_status_id IN (1,11,12,14,15,16,17,18,19,20,22,23,28,29,30,31) THEN N'อยู่ระหว่างดำเนินการ'
                 ELSE N'รอดำเนินการ'
@@ -127,7 +125,7 @@ $sql = "SELECT TOP 10000
                                WHERE pd.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id), 0) AS period_amount,
                        CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr ah WHERE ah.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND ah.i_enabled = 1 AND (ah.d_arrive_date IS NOT NULL OR NULLIF(LTRIM(RTRIM(ah.c_arrive_code)), '') IS NOT NULL)) THEN 1 ELSE 0 END AS has_arrival,
                        CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr ih WHERE ih.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND ih.i_enabled = 1 AND (ih.d_checking_date IS NOT NULL OR NULLIF(LTRIM(RTRIM(ih.c_code)), '') IS NOT NULL)) THEN 1 ELSE 0 END AS has_inspection,
-                       CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr bh WHERE bh.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND bh.i_enabled = 1 AND ISNULL(bh.po_working_hdr_id, 0) > 0) THEN 1 ELSE 0 END AS has_billing,
+                       CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr bh INNER JOIN NMU_EIS.dbo.po_working_hdr bwh ON bwh.po_working_hdr_id = bh.po_working_hdr_id WHERE bh.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND bh.i_enabled = 1 AND bwh.i_enable = 1 AND ISNULL(bwh.i_status_last, 0) >= 2) THEN 1 ELSE 0 END AS has_billing,
                        CASE WHEN EXISTS (SELECT 1 FROM dbo.sp_check_period_hdr phh INNER JOIN NMU_EIS.dbo.po_working_hdr pwh ON pwh.po_working_hdr_id = phh.po_working_hdr_id WHERE phh.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND phh.i_enabled = 1 AND pwh.i_enable = 1 AND ISNULL(pwh.i_status_last, 0) >= 11) THEN 1 ELSE 0 END AS has_paid,
                        (SELECT MAX(pwd.d_update) FROM dbo.sp_check_period_hdr pdh INNER JOIN NMU_EIS.dbo.po_working_hdr pwd ON pwd.po_working_hdr_id = pdh.po_working_hdr_id WHERE pdh.sp_tor_hdr_period_id = p.sp_tor_hdr_period_id AND pdh.i_enabled = 1 AND pwd.i_enable = 1 AND ISNULL(pwd.i_status_last, 0) >= 11) AS paid_date
                 FROM dbo.sp_tor_contract fc

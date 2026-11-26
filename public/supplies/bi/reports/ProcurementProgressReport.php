@@ -77,7 +77,7 @@ if (empty($_SESSION['user_id'])) {
             <article><b>บริหารสัญญา/งวด</b><span>เริ่มจากเมนูจัดทำงวด เมื่อพบเลขที่งวด (period_id) อย่างน้อย 1 งวด</span></article>
             <article><b>รับของ</b><span>เริ่มจากเมนูรับของ เมื่อมีวันที่รับของหรือเลขที่รับของของงวด</span></article>
             <article><b>ตรวจรับ</b><span>เริ่มจากเมนูตรวจรับ เมื่อมีเลขที่ตรวจรับ (check_id) และวันที่หรือเลขที่ตรวจรับ</span></article>
-            <article><b>ขอเบิกจ่าย</b><span>เริ่มจากเมนูขออนุมัติเบิกจ่าย เมื่อรายการตรวจรับถูกเชื่อมกับ po_working</span></article>
+            <article><b>ขอเบิกจ่าย</b><span>เอกสารเบิกจ่ายที่ใช้งานมีสถานะตั้งแต่ 2 ขึ้นไป (ส่งตรวจรับ) และยังไม่ครบเงื่อนไขเบิกจ่ายสมบูรณ์</span></article>
             <article><b>เบิกจ่ายสมบูรณ์</b><span>เมื่อทุกงวดมีรายการเบิกจ่ายและสถานะเบิกจ่ายจริงตั้งแต่ระดับ 11 ขึ้นไป</span></article>
         </div>
         <p class="status-guide-note">หมายเหตุ: หากมีการบันทึกเหตุการณ์ติดตามงาน ระบบจะแสดงชื่อเหตุการณ์ล่าสุดเป็นสถานะของ PR นั้น</p>
@@ -137,5 +137,5 @@ if (empty($_SESSION['user_id'])) {
     </section>
 </main>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261124-7"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261126-1"></script>
 </body></html>
