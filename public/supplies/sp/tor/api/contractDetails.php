@@ -61,7 +61,7 @@ $contracts = $fetch('SELECT c.*, cr.c_name AS creditor_name,
         WHERE cost.dc_cost_id=c.dc_cost_id) AS owner_department_name
     FROM dbo.sp_tor_contract c
     LEFT JOIN ' . DB_NMU . 'dc_creditor cr ON cr.dc_creditor_id=c.dc_creditor_id
-    WHERE c.sp_tor_id=?' . $selectedContract . ' ORDER BY c.sp_tor_contract_id', $contractParams);
+    WHERE c.sp_tor_id=? AND c.i_enabled=1' . $selectedContract . ' ORDER BY c.sp_tor_contract_id', $contractParams);
 $contractsById = array();
 foreach ($contracts as $contract) $contractsById[intval($contract['sp_tor_contract_id'])] = $contract;
 // IDs come only from contracts belonging to the authorized PR above.
