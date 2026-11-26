@@ -166,6 +166,35 @@ function medsupSyncWdAmounts($db, $irCode, $m)
         if (!$ok) {
             return "แก้ยอดในใบเบิก " . $r["c_code_ref"] . " ไม่สำเร็จ";
         }
+        // รายการตั้งหนี้ของใบเบิก (po_working_begin_dtl = ยอดรวมของ IR, po_working_begin_item = ตาราง "ข้อมูลการตั้งหนี้" ที่หน้าทักท้วง)
+        // ใบเบิกเวชภัณฑ์มี 1 แถวต่อ IR - แก้เฉพาะเมื่อมีแถวเดียว (ถ้ามีหลายแถวไม่เดา ปล่อยไว้ให้แก้ที่หน้า EIS)
+        $bh = intval($db->GetDataBySQL("select top 1 po_working_begin_hdr_id from " . DB_NMU_EIS . "po_working_begin_hdr where po_working_hdr_id = ?", array($hid)));
+        if ($bh > 0) {
+            $nDtl = intval($db->GetDataBySQL("select count(*) from " . DB_NMU_EIS . "po_working_begin_dtl where po_working_begin_hdr_id = ? and isnull(i_enable, 1) = 1 and isnull(i_delete, 2) = 2", array($bh)));
+            if ($nDtl === 1) {
+                $ok = $db->QueryParam(
+                    "update " . DB_NMU_EIS . "po_working_begin_dtl
+                        set f_inv = ?, f_vat_rate = ?, f_vat = ?, f_inv_vat = ?, f_other = ?, f_fine = ?,
+                            f_pay = ?, f_tax_personal_rate = ?, f_tax_personal = ?, f_warranty = ?
+                      where po_working_begin_hdr_id = ? and isnull(i_enable, 1) = 1 and isnull(i_delete, 2) = 2",
+                    array($m["f_before_vat"], $m["f_vat_percent"], $m["f_vat_amt"], $m["f_request_amt"], $m["f_other"], $m["f_penalty"],
+                        $m["f_pay_amt"], $m["f_wht_percent"], $m["f_wht_amt"], $m["f_guarantee_amt"], $bh)
+                );
+                if (!$ok) {
+                    return "แก้ยอดในใบเบิก " . $r["c_code_ref"] . " ไม่สำเร็จ";
+                }
+            }
+            $nItem = intval($db->GetDataBySQL("select count(*) from " . DB_NMU_EIS . "po_working_begin_item where po_working_begin_hdr_id = ?", array($bh)));
+            if ($nItem === 1) {
+                $ok = $db->QueryParam(
+                    "update " . DB_NMU_EIS . "po_working_begin_item set f_inv = ?, f_vat = ?, f_inv_vat = ? where po_working_begin_hdr_id = ?",
+                    array($m["f_before_vat"], $m["f_vat_amt"], $m["f_request_amt"], $bh)
+                );
+                if (!$ok) {
+                    return "แก้ยอดในใบเบิก " . $r["c_code_ref"] . " ไม่สำเร็จ";
+                }
+            }
+        }
     }
     return "";
 }
