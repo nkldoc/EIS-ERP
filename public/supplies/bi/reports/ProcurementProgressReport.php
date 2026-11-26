@@ -11,7 +11,8 @@ if (empty($_SESSION['user_id'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
-    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261124-7">
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261126-9">
+    <script src="../lib/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
@@ -66,7 +67,7 @@ if (empty($_SESSION['user_id'])) {
     </section>
     <section class="status-grid overview-extra">
         <article class="panel"><div class="panel-heading"><h2>สัดส่วนสถานะงาน</h2><select id="statusOwnerFilter"><option value="">รวมทุกเจ้าหน้าที่</option></select></div><div class="donut-holder"><canvas id="statusChart"></canvas></div><p class="chart-note">สถานะคำนวณจากขั้นตอนล่าสุดของแต่ละ PR</p></article>
-        <article class="panel status-table-panel"><div class="panel-heading"><div><h2>ตารางสรุปสถานะและใบกันเหลื่อม</h2><p class="muted">อ้างอิง PR, สัญญา และใบกันเหลื่อมจาก NMU_EIS</p></div></div><div class="table-scroll"><table><thead><tr><th>สถานะ</th><th class="overlap-head no-debt">ยังไม่ก่อหนี้<br><small>อ้างอิง PR</small></th><th class="overlap-head debt">ก่อหนี้แล้ว<br><small>อ้างอิงสัญญา</small></th><th class="overlap-head saved">บันทึกใบกันเหลื่อมแล้ว<br><small>NMU_EIS</small></th><th>รวม</th></tr></thead><tbody id="statusRows"></tbody></table></div></article>
+        <article class="panel status-table-panel"><div class="panel-heading"><div><h2>ตารางสรุปสถานะและใบกันเหลื่อม</h2><p class="muted">อ้างอิง PR, สัญญา และใบกันเหลื่อมจาก NMU_EIS</p></div></div><div class="table-scroll"><table><thead><tr><th>สถานะ</th><th class="overlap-head no-debt">ยังไม่ก่อหนี้<br><small>อ้างอิง PR</small></th><th class="overlap-head debt">ก่อหนี้แล้ว<br><small>อ้างอิงสัญญา</small></th><th class="overlap-head saved">บันทึกใบกันเหลื่อมแล้ว<br><small>NMU_EIS</small></th><th id="overlapReviewHeader"></th><th id="overlapOutsideHeader"></th><th>รวม</th></tr></thead><tbody id="statusRows"></tbody></table></div></article>
     </section>
     <section class="panel status-guide overview-extra">
         <div class="panel-heading"><div><h2>คำอธิบายเกณฑ์สถานะงาน</h2><p class="muted">ระบบแสดงสถานะจากขั้นตอนล่าสุดที่พบของแต่ละ PR</p></div></div>
@@ -99,8 +100,9 @@ if (empty($_SESSION['user_id'])) {
         <div id="ownerRelationMatrix" class="table-scroll cross-table"></div>
     </section>
     <section id="detailSection" class="panel overview-extra">
-        <div class="panel-heading detail-heading"><div><h2>ตารางสรุปภาพรวมทั้งหมด</h2><p class="muted">แสดงสถานะล่าสุดและกระบวนการเบิกจ่ายของแต่ละ PR</p></div><input id="keywordFilter" placeholder="ค้นหาเลข PR / โครงการ / เจ้าหน้าที่"></div>
+        <div class="panel-heading detail-heading"><div><h2>ตารางสรุปภาพรวมทั้งหมด</h2><p class="muted">แสดงสถานะล่าสุดและกระบวนการเบิกจ่ายของแต่ละ PR</p></div><div class="detail-actions"><button id="exportDetailsButton" class="primary-button" type="button">Export Excel ทั้งหมด</button><input id="keywordFilter" placeholder="ค้นหาเลข PR / โครงการ / เจ้าหน้าที่"></div></div>
         <div class="table-scroll detail-table"><table><thead><tr><th>เลข PR</th><th>โครงการ/รายการ</th><th>เจ้าหน้าที่</th><th>แหล่งเงิน</th><th>ประเภท</th><th>สถานะล่าสุด</th><th>สถานะใบกันเหลื่อม</th><th>ระดับปัญหา</th><th>งวด</th><th>รับของ</th><th>ตรวจรับ</th><th>เบิกสมบูรณ์</th></tr></thead><tbody id="detailRows"></tbody></table></div>
+        <div id="detailSummary" class="detail-summary" aria-live="polite"></div>
     </section>
     <section id="kpiTab" class="tab-pane">
         <article class="panel kpi-chart-panel"><div class="panel-heading"><h2>◎ สัดส่วนสถานะ KPI (แบ่งตามประเภท 60, 75, 100 วัน)</h2></div><div class="kpi-donut-grid">
@@ -136,6 +138,11 @@ if (empty($_SESSION['user_id'])) {
         <section class="personal-work-section"><h2>☷ รายการงานทั้งหมดของ <span id="personalListOwner">-</span></h2><div id="personalTypeGroups" class="personal-accordions"></div></section>
     </section>
 </main>
+<dialog id="overlapDialog" class="overlap-dialog" aria-labelledby="overlapDialogTitle">
+    <header><div><h2 id="overlapDialogTitle">รายละเอียดใบกันเหลื่อม</h2><p id="overlapDialogCount" class="muted"></p></div><button id="closeOverlapDialog" type="button" aria-label="ปิดรายละเอียด">✕ ปิด</button></header>
+    <p class="overlap-explanation">นับครั้งเดียวต่อ PR โดยจัดกลุ่มพบใบกันก่อนกลุ่มก่อหนี้ · “บันทึกใบกันเหลื่อมแล้ว” หมายถึงพบเลขใบกันในทะเบียนที่ใช้งาน ไม่ได้ยืนยันว่าอนุมัติหรือเบิกจ่ายแล้ว · PR และใบตรวจรับ/AP มี c_overlap ส่วน PO มีทั้ง c_overlap และ c_overlap2 · AP ที่ส่งเบิกตรวจ c_booking เพิ่มเติม · รายการที่มีคำเตือนยังต้องตรวจเลขและปีจากหลักฐาน</p>
+    <div class="table-scroll overlap-dialog-table"><table><thead><tr><th>เลข PR / ดูรายละเอียด</th><th>โครงการ/รายการ</th><th>เลขสัญญา (PO)</th><th>เลขใบกันทั้งหมด</th><th>กลุ่มใบกัน</th><th>การก่อหนี้</th><th>ผลตรวจสอบ</th></tr></thead><tbody id="overlapDialogRows"></tbody></table></div>
+</dialog>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261126-4"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261126-6"></script>
 </body></html>

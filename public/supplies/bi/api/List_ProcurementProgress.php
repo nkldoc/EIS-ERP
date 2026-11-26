@@ -36,8 +36,9 @@ if ($keyword !== "") {
     $params[] = $like; $params[] = $like; $params[] = $like;
 }
 
-$sql = "SELECT TOP 10000
-            s.tor_id, s.c_code AS pr_code, s.c_name, s.i_yyyy,
+$sql = "SELECT
+            s.tor_id, s.c_code AS pr_code, s.c_name, s.i_yyyy, s.i_type_bg,
+            s.c_overlap AS pr_overlap_code, s.i_overlap AS pr_overlap_flag, s.i_yyyy_overlap AS pr_overlap_year,
             CONVERT(VARCHAR, s.d_tor_date, 120) AS procurement_start_date,
             CONVERT(VARCHAR, s.d_egp_date, 120) AS announcement_date,
             ISNULL(s.f_total_amt, 0) AS pr_amount,
@@ -68,23 +69,6 @@ $sql = "SELECT TOP 10000
             flow.paid_date,
             CASE WHEN ISNULL(flow.period_total, 0) > 0 AND flow.paid_total >= flow.period_total THEN 1 ELSE 0 END AS is_completed,
             CASE
-                WHEN ISNULL(con.i_overlap, 0) = 3
-                     OR NULLIF(LTRIM(RTRIM(con.c_overlap)), '') IS NOT NULL
-                     OR EXISTS (SELECT 1 FROM NMU_EIS.dbo.bg_reserve_overlap ro
-                                WHERE ro.i_enable = 1 AND (ro.pr_id = s.tor_id OR ro.po_id = con.sp_tor_contract_id))
-                    THEN N'บันทึกใบกันเหลื่อมแล้ว'
-                WHEN con.sp_tor_contract_id IS NOT NULL
-                     AND (ISNULL(s.i_type_bg, 0) = 4
-                          OR EXISTS (SELECT 1 FROM NMU_EIS.dbo.bg_reserve_money rm
-                                     WHERE rm.i_enable = 1 AND (rm.pr_id = s.tor_id OR rm.po_id = con.sp_tor_contract_id)))
-                    THEN N'ก่อหนี้แล้ว'
-                WHEN ISNULL(s.i_type_bg, 0) = 4
-                     OR EXISTS (SELECT 1 FROM NMU_EIS.dbo.bg_reserve_money rm
-                                WHERE rm.i_enable = 1 AND rm.pr_id = s.tor_id)
-                    THEN N'ยังไม่ก่อหนี้'
-                ELSE N''
-            END AS overlap_status,
-            CASE
                 WHEN ev.event_title IS NOT NULL THEN ev.event_title
                 WHEN s.i_enabled = 2 THEN N'ยกเลิก'
                 WHEN con.sp_tor_contract_id IS NOT NULL THEN N'บริหารสัญญา'
@@ -94,7 +78,7 @@ $sql = "SELECT TOP 10000
         FROM dbo.sp_tor s
         OUTER APPLY (SELECT TOP 1 c.sp_tor_contract_id, c.c_code, c.f_total_amt, c.d_doc_date, c.d_due_date,
                             c.i_overlap, c.c_overlap, c.bg_reserve_overlap_id
-                     FROM dbo.sp_tor_contract c WHERE c.sp_tor_id = s.tor_id
+                     FROM dbo.sp_tor_contract c WHERE c.sp_tor_id = s.tor_id AND c.i_enabled = 1
                      ORDER BY c.sp_tor_contract_id DESC) con
         OUTER APPLY (SELECT TOP 1 e.sp_tor_event_id, e.event_type, e.event_title,
                             e.event_detail, e.event_date, e.d_create, e.sp_status_hdr_name, e.importance_level
@@ -152,6 +136,21 @@ if ($stmt) {
         }
         $rows[] = $row;
     }
+}
+require_once __DIR__ . '/ProcurementOverlap.php';
+try {
+    $rows = procurementOverlapEnrich($rows, function ($sql, $params) use ($db) {
+        $stmt = sqlsrv_query($db->conn, $sql, $params);
+        if (!$stmt) throw new RuntimeException('Overlap query failed');
+        $result = array();
+        while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) $result[] = $row;
+        return $result;
+    });
+} catch (Throwable $error) {
+    error_log('Procurement overlap: ' . $error->getMessage());
+    http_response_code(500);
+    echo json_encode(array('success' => false, 'msg' => 'Cannot load overlap evidence'));
+    exit;
 }
 echo json_encode(array("success" => true, "data" => $rows), JSON_UNESCAPED_UNICODE);
 

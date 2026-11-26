@@ -122,18 +122,85 @@
     var pipelineStatuses=["บริหารสัญญา/งวด","รับของ","ตรวจรับ","เบิกจ่ายสมบูรณ์"];
     el("pipelineGrid").innerHTML=steps.map(function(s,i){var p=percent(s[1],total);return '<article class="pipeline-step"'+statusTitle(pipelineStatuses[i])+'><header><b>'+s[0]+'</b><strong>'+number(s[1])+'</strong></header><div class="pipeline-amount"><span>ยอดเงินรวม</span><b>'+money(s[2])+'</b></div>'+fundHtml(s[3])+'<div class="progress green-bar"><span style="width:'+p+'%"></span></div><small>'+p+'% · '+s[4]+'</small></article>';}).join("");
   }
+  var overlapGroups = ["ยังไม่ก่อหนี้", "ก่อหนี้แล้ว", "บันทึกใบกันเหลื่อมแล้ว", "ต้องตรวจสอบ", "ไม่เข้าข่ายกันเหลื่อม"];
+  function overlapRows(status, group) {
+    var owner = el("statusOwnerFilter").value;
+    return filteredRows.filter(function (r) { return (!owner || r.owner_name === owner) && (!status || stage(r) === status) && (!group || r.overlap_status === group); });
+  }
+  function overlapCountButton(count, status, group) {
+    return '<button type="button" class="overlap-count" data-overlap-filter="' + esc(group || "") + '" data-stage-filter="' + esc(status || "") + '"' + (count ? '' : ' disabled') + ' aria-label="ดูรายการ ' + esc(group || 'ทั้งหมด') + ' ' + number(count) + ' รายการ">' + number(count) + '</button>';
+  }
+  function overlapEvidenceHtml(r) {
+    var warnings = (r.overlap_warnings || []).map(function (warning) { return '<li>' + esc(warning) + '</li>'; }).join("");
+    return '<div class="overlap-pr-detail"><p><b>' + esc(r.pr_code) + '</b> · ' + esc(r.c_name) + '</p><p>เจ้าหน้าที่: ' + esc(r.owner_name) + ' · หน่วยงาน: ' + esc(r.department_name) + ' · วงเงิน PR: ' + money(r.pr_amount) + '</p><p>การก่อหนี้: <b>' + esc(r.overlap_debt_status) + '</b> · กลุ่มใบกัน: <b>' + esc(r.overlap_status) + '</b></p>' + (warnings ? '<ul class="overlap-warnings">' + warnings + '</ul>' : '') +
+      '<div class="table-scroll"><table><thead><tr><th>ต้นทาง</th><th>เลข PR / สัญญา / AP</th><th>ช่องที่บันทึก</th><th>เลขใบกัน</th><th>ปีที่บันทึก</th><th>ผลตรวจทะเบียน NMU_EIS</th></tr></thead><tbody>' + (r.overlap_evidence || []).map(function (item) {
+        return '<tr><td>' + esc(item.source) + '</td><td>' + esc(item.reference || '-') + '</td><td><code>' + esc(item.field) + '</code></td><td>' + esc(item.code || 'ยังไม่ระบุ') + '</td><td>' + esc(item.year || '-') + '</td><td>' + (item.verified ? 'พบใบกัน · ปี ' + esc(item.document_year || '-') + (item.document_status == null ? ' · ทะเบียนงบกันเหลื่อม' : ' · รหัสสถานะ ' + esc(item.document_status)) : (item.code ? 'ไม่พบใบกันที่ใช้งาน' : 'ยังไม่มีเลขใบกัน')) + (item.year_mismatch ? ' · ปีไม่ตรงกัน' : '') + '</td></tr>';
+      }).join("") + '</tbody></table></div></div>';
+  }
+  function openOverlapDetails(status, group) {
+    var rows = overlapRows(status, group), dialog = el("overlapDialog");
+    el("overlapDialogTitle").textContent = (group || "รายการทั้งหมด") + (status ? " · " + status : "");
+    el("overlapDialogCount").textContent = number(rows.length) + " PR · " + (el("statusOwnerFilter").value || "รวมทุกเจ้าหน้าที่") + " · คลิกเลข PR เพื่อดูหลักฐาน PR / PO / AP";
+    el("overlapDialogRows").innerHTML = rows.map(function (r) {
+      var contracts = Array.from(new Set((r.overlap_evidence || []).filter(function (i) { return i.source === 'PO'; }).map(function (i) { return i.reference; })));
+      return '<tr><td><button class="pr-detail-toggle" type="button" data-pr-detail="' + Number(r.tor_id) + '" aria-expanded="false">' + esc(r.pr_code) + '</button></td><td class="overlap-project">' + esc(r.c_name) + '</td><td>' + esc(contracts.join(' / ') || 'ยังไม่มีสัญญา') + '</td><td>' + esc((r.overlap_codes || []).join(' / ') || 'ยังไม่มีเลขใบกัน') + '</td><td>' + esc(r.overlap_status) + '</td><td>' + esc(r.overlap_debt_status) + '</td><td>' + ((r.overlap_warnings || []).length ? '<span class="overlap-warning-tag">ต้องตรวจสอบ ' + number(r.overlap_warnings.length) + ' จุด</span>' : '—') + '</td></tr>' +
+        '<tr id="overlap-pr-' + Number(r.tor_id) + '" hidden><td colspan="7">' + overlapEvidenceHtml(r) + '</td></tr>';
+    }).join("") || '<tr><td colspan="7">ไม่พบข้อมูล</td></tr>';
+    if (!dialog.open) dialog.showModal();
+  }
   function renderStatus() {
     var selected=el("statusOwnerFilter").value, rows=selected?filteredRows.filter(function(r){return r.owner_name===selected;}):filteredRows, counts={}, matrix={};
     var statusOrder=["รอดำเนินการ","อยู่ระหว่างดำเนินการ","บริหารสัญญา","บริหารสัญญา/งวด","รับของ","ตรวจรับ","ขอเบิกจ่าย","เบิกจ่ายสมบูรณ์"];
-    rows.forEach(function(r){var key=stage(r), overlap=r.overlap_status||"";counts[key]=(counts[key]||0)+1;matrix[key]=matrix[key]||{"ยังไม่ก่อหนี้":0,"ก่อหนี้แล้ว":0,"บันทึกใบกันเหลื่อมแล้ว":0};if(matrix[key][overlap]!==undefined)matrix[key][overlap]++;}); var labels=Object.keys(counts).sort(function(a,b){var ai=statusOrder.indexOf(a),bi=statusOrder.indexOf(b);return (ai<0?99:ai)-(bi<0?99:bi)||a.localeCompare(b);}), values=labels.map(function(k){return counts[k];});
+    rows.forEach(function(r){var key=stage(r), overlap=r.overlap_status||"ไม่เข้าข่ายกันเหลื่อม";counts[key]=(counts[key]||0)+1;matrix[key]=matrix[key]||{};matrix[key][overlap]=(matrix[key][overlap]||0)+1;}); var labels=Object.keys(counts).sort(function(a,b){var ai=statusOrder.indexOf(a),bi=statusOrder.indexOf(b);return (ai<0?99:ai)-(bi<0?99:bi)||a.localeCompare(b);}), values=labels.map(function(k){return counts[k];});
     if(statusChart) statusChart.destroy();
     statusChart=new Chart(el("statusChart"),{type:"doughnut",data:{labels:labels,datasets:[{data:values,backgroundColor:colors,borderWidth:3,borderColor:"#fff"}]},options:{responsive:true,maintainAspectRatio:false,cutout:"63%",plugins:{legend:{position:"bottom"},tooltip:{backgroundColor:"#17243a",titleColor:"#fff",bodyColor:"#e6eef8",padding:14,cornerRadius:10,displayColors:true,callbacks:{afterLabel:function(c){return statusTooltipLines(c.label);}}}}}});
-    var totals={"ยังไม่ก่อหนี้":0,"ก่อหนี้แล้ว":0,"บันทึกใบกันเหลื่อมแล้ว":0};
-    var body=labels.map(function(k,i){Object.keys(totals).forEach(function(x){totals[x]+=matrix[k][x];});return '<tr><td class="status-hover"'+statusTitle(k)+'>'+esc(k)+'</td><td class="overlap-value">'+number(matrix[k]["ยังไม่ก่อหนี้"])+'</td><td class="overlap-value">'+number(matrix[k]["ก่อหนี้แล้ว"])+'</td><td class="overlap-value">'+number(matrix[k]["บันทึกใบกันเหลื่อมแล้ว"])+'</td><td><b>'+number(values[i])+'</b></td></tr>';}).join("");
-    body+='<tr><th>รวมทั้งหมด</th><th class="overlap-value">'+number(totals["ยังไม่ก่อหนี้"])+'</th><th class="overlap-value">'+number(totals["ก่อหนี้แล้ว"])+'</th><th class="overlap-value">'+number(totals["บันทึกใบกันเหลื่อมแล้ว"])+'</th><th>'+number(rows.length)+'</th></tr>';
-    el("statusRows").innerHTML=labels.length?body:'<tr><td colspan="5">ไม่พบข้อมูล</td></tr>';
+    var totals={}; overlapGroups.forEach(function (group) { totals[group]=0; });
+    var body=labels.map(function(k,i){return '<tr><td class="status-hover"'+statusTitle(k)+'>'+esc(k)+'</td>'+overlapGroups.map(function(group){var count=matrix[k][group]||0;totals[group]+=count;return '<td class="overlap-value">'+overlapCountButton(count,k,group)+'</td>';}).join('')+'<td>'+overlapCountButton(values[i],k,'')+'</td></tr>';}).join("");
+    body+='<tr><th>รวมทั้งหมด</th>'+overlapGroups.map(function(group){return '<th class="overlap-value">'+overlapCountButton(totals[group],'',group)+'</th>';}).join('')+'<th>'+overlapCountButton(rows.length,'','')+'</th></tr>';
+    el("statusRows").innerHTML=labels.length?body:'<tr><td colspan="7">ไม่พบข้อมูล</td></tr>';
+  }
+  function detailStatusCounts() {
+    var counts = new Map(), order = ["รอดำเนินการ","อยู่ระหว่างดำเนินการ","บริหารสัญญา","บริหารสัญญา/งวด","รับของ","ตรวจรับ","ขอเบิกจ่าย","เบิกจ่ายสมบูรณ์"];
+    filteredRows.forEach(function (r) { var status = stage(r); counts.set(status, (counts.get(status) || 0) + 1); });
+    return Array.from(counts.keys()).sort(function (a, b) {
+      var ai = order.indexOf(a), bi = order.indexOf(b);
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi) || a.localeCompare(b);
+    }).map(function (status) { return [status, counts.get(status)]; });
+  }
+  function exportDetails() {
+    var headers = ["เลข PR","โครงการ/รายการ","เจ้าหน้าที่","แหล่งเงิน","ประเภท","สถานะล่าสุด","สถานะใบกันเหลื่อม","ระดับปัญหา","งวด","รับของ","ตรวจรับ","เบิกสมบูรณ์"];
+    var rows = filteredRows.map(function (r) {
+      return [String(r.pr_code || ""), r.c_name || "", r.owner_name || "", r.fund_source || "", r.procurement_type || "", stage(r), r.overlap_status || "-",
+        ["ปกติ","มีปัญหาเล็กน้อย / ดำเนินการต่อได้","มีปัญหา / ไม่สามารถดำเนินการต่อได้"][Number(r.importance_level || 0)] || "ปกติ",
+        Number(r.period_total || 0), Number(r.arrival_total || 0), Number(r.inspection_total || 0), Number(r.paid_total || 0)];
+    });
+    var workbook = XLSX.utils.book_new(), sheet = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+    sheet["!cols"] = [22,70,28,26,24,28,28,44,12,12,12,16].map(function (width) { return {wch: width}; });
+    sheet["!autofilter"] = {ref: sheet["!ref"]};
+    XLSX.utils.book_append_sheet(workbook, sheet, "รายการทั้งหมด");
+    var summary = [["ปีงบประมาณ", el("yearFromFilter").value + " - " + el("yearToFilter").value], ["แหล่งเงิน", el("fundFilter").value || "รวมทั้งหมด"], ["คำค้น", el("keywordFilter").value], [], ["สถานะ", "จำนวนรายการ"]]
+      .concat(detailStatusCounts(), [["รวมทั้งหมด", filteredRows.length]]);
+    var summarySheet = XLSX.utils.aoa_to_sheet(summary);
+    summarySheet["!cols"] = [{wch: 42}, {wch: 28}];
+    XLSX.utils.book_append_sheet(workbook, summarySheet, "สรุปสถานะ");
+    var evidenceRows = [["เลข PR", "กลุ่มใบกัน", "การก่อหนี้", "ต้นทาง", "เลขอ้างอิง", "ช่องที่บันทึก", "เลขใบกัน", "ปีที่บันทึก", "พบในทะเบียน", "ปีในทะเบียน", "คำเตือน"]];
+    filteredRows.forEach(function (r) {
+      (r.overlap_evidence || []).forEach(function (item) {
+        evidenceRows.push([r.pr_code, r.overlap_status, r.overlap_debt_status, item.source, item.reference, item.field, item.code,
+          item.year || "", item.verified ? "พบ" : (item.code ? "ไม่พบ" : "ยังไม่ระบุ"), item.document_year || "", (r.overlap_warnings || []).join(" / ")]);
+      });
+    });
+    var evidenceSheet = XLSX.utils.aoa_to_sheet(evidenceRows);
+    evidenceSheet["!cols"] = [22,28,20,18,26,24,30,16,18,16,70].map(function (width) { return {wch:width}; });
+    evidenceSheet["!autofilter"] = {ref:evidenceSheet["!ref"]};
+    XLSX.utils.book_append_sheet(workbook, evidenceSheet, "หลักฐานใบกัน PR PO AP");
+    XLSX.writeFile(workbook, "ProcurementProgress_" + el("yearFromFilter").value + "_" + el("yearToFilter").value + ".xlsx");
   }
   function renderDetails() {
+    el("exportDetailsButton").disabled = filteredRows.length === 0;
+    el("detailSummary").innerHTML = '<strong>รวมทั้งหมด ' + number(filteredRows.length) + ' รายการ</strong>' + detailStatusCounts().map(function (entry) {
+      return '<span class="detail-status-count">' + esc(entry[0]) + ' <b>' + number(entry[1]) + '</b></span>';
+    }).join("") + (filteredRows.length > 500 ? '<small>แสดง 500 รายการแรก · Export Excel ได้ครบทั้งหมด</small>' : "");
     el("detailRows").innerHTML=filteredRows.slice(0,500).map(function(r){var level=Number(r.importance_level||0),levelText=["ปกติ","มีปัญหาเล็กน้อย / ดำเนินการต่อได้","มีปัญหา / ไม่สามารถดำเนินการต่อได้"][level]||"ปกติ";function flag(v){return '<span class="stage-dot '+(Number(v)>0?'done':'pending')+'"></span>'+number(v);}
       var overlapClass=r.overlap_status==="ยังไม่ก่อหนี้"?"overlap-no-debt":(r.overlap_status==="ก่อหนี้แล้ว"?"overlap-debt":"overlap-saved"),overlap=r.overlap_status?'<span class="overlap-badge '+overlapClass+'">'+esc(r.overlap_status)+'</span>':'-';
       var currentStage=stage(r);return '<tr><td><b>'+esc(r.pr_code)+'</b></td><td>'+esc(r.c_name)+'</td><td>'+esc(r.owner_name)+'</td><td>'+esc(r.fund_source)+'</td><td>'+esc(r.procurement_type)+'</td><td class="status-hover"'+statusTitle(currentStage)+'>'+esc(currentStage)+'</td><td>'+overlap+'</td><td><span class="level level-'+level+'">'+esc(levelText)+'</span></td><td>'+flag(r.period_total)+'</td><td>'+flag(r.arrival_total)+'</td><td>'+flag(r.inspection_total)+'</td><td>'+flag(r.paid_total)+'</td></tr>';}).join("")||'<tr><td colspan="12">ไม่พบข้อมูล</td></tr>';
@@ -207,5 +274,21 @@
   el("sankeyMetric").addEventListener("click",function(e){var button=e.target.closest("button");if(!button)return;[].forEach.call(this.querySelectorAll("button"),function(x){x.classList.remove("active");});button.classList.add("active");sankeyMetric=button.getAttribute("data-metric")||"count";renderSankey();});
   el("ownerMatrixFilter").addEventListener("change",renderCrossReports);el("ownerTypeFilter").addEventListener("change",renderCrossReports);el("departmentMatrixFilter").addEventListener("change",renderCrossReports);el("relationOwnerButtons").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;relationOwner=b.getAttribute("data-owner")||"";renderCrossReports();});
   document.querySelector(".dashboard-tabs").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;var tab=b.getAttribute("data-tab");[].forEach.call(this.querySelectorAll("button"),function(x){x.classList.remove("active");});b.classList.add("active");el("overviewSection").style.display=tab==="overview"?"block":"none";[].forEach.call(document.querySelectorAll(".overview-extra"),function(x){x.style.display=tab==="overview"?"":"none";});[].forEach.call(document.querySelectorAll(".tab-pane"),function(x){x.classList.remove("active");});if(tab!=="overview")el(tab+"Tab").classList.add("active");window.scrollTo({top:0,behavior:"smooth"});});
+  el("overlapReviewHeader").textContent = "ต้องตรวจสอบ";
+  el("overlapOutsideHeader").textContent = "ไม่เข้าข่ายกันเหลื่อม";
+  document.querySelector(".status-table-panel .muted").textContent = "คลิกตัวเลขเพื่อดูรายละเอียด · นับครั้งเดียวต่อ PR โดยให้กลุ่มพบใบกันมาก่อน · ก่อหนี้อ้างอิงสัญญาที่ใช้งาน";
+  el("statusRows").addEventListener("click", function (event) {
+    var button = event.target.closest("[data-overlap-filter]");
+    if (button) openOverlapDetails(button.getAttribute("data-stage-filter"), button.getAttribute("data-overlap-filter"));
+  });
+  el("closeOverlapDialog").addEventListener("click", function () { el("overlapDialog").close(); });
+  el("overlapDialogRows").addEventListener("click", function (event) {
+    var button = event.target.closest("[data-pr-detail]");
+    if (!button) return;
+    var detail = el("overlap-pr-" + button.getAttribute("data-pr-detail"));
+    detail.hidden = !detail.hidden;
+    button.setAttribute("aria-expanded", String(!detail.hidden));
+  });
+  el("exportDetailsButton").addEventListener("click", exportDetails);
   initStatusTooltips();initFiscalYearFilters();loadData();
 }());
