@@ -9779,6 +9779,35 @@ function showCustomEditForm(rec) {
                                                         bodyStyle: { padding: '15px' },
                                                         defaults: { anchor: '100%', msgTarget: 'side', allowBlank: false },
                                                         tbar: [{
+                                                                text: 'อัปเดท ใช้งาน',
+                                                                hidden: Number(Ext.session.dc_center_user) !== 1,
+                                                                handler: function (button) {
+                                                                        var checkId = rec && rec.get('sp_check_period_hdr_id');
+                                                                        if (!checkId) return Ext.Msg.alert('แจ้งเตือน', 'ไม่พบรายการตรวจรับ');
+                                                                        button.disable();
+                                                                        function request(mode, token) {
+                                                                                Ext.Ajax.request({
+                                                                                        url: 'tor/api/checkingAdmin.php', method: mode === 'enable_load' ? 'GET' : 'POST',
+                                                                                        params: {mode: mode, sp_check_period_hdr_id: checkId, csrf_token: token},
+                                                                                        callback: function (options, success, response) {
+                                                                                                button.enable();
+                                                                                                var result;
+                                                                                                try { result = Ext.decode(response.responseText); } catch (ignore) {}
+                                                                                                if (!success || !result || !result.success) return Ext.Msg.alert('แจ้งเตือน', result && result.msg || 'ไม่สามารถอัปเดตสถานะได้');
+                                                                                                if (mode === 'enable_load') {
+                                                                                                        Ext.Msg.confirm('ยืนยันเปิดใช้งาน', 'ตั้งค่า i_enabled = 1 ทั้งใบตรวจรับและงวดสัญญาที่เกี่ยวข้องหรือไม่?<br>สถานะปัจจุบัน ใบตรวจรับ: ' + Ext.util.Format.htmlEncode(String(result.data.i_enabled)) + ' / งวดสัญญา: ' + Ext.util.Format.htmlEncode(String(result.data.period_enabled)), function (answer) {
+                                                                                                                if (answer === 'yes') { button.disable(); request('enable_save', result.csrf_token); }
+                                                                                                        });
+                                                                                                } else {
+                                                                                                        Ext.Msg.alert('สำเร็จ', result.msg);
+                                                                                                        if (Ext.store && Ext.store.reload) Ext.store.reload();
+                                                                                                }
+                                                                                        }
+                                                                                });
+                                                                        }
+                                                                        request('enable_load');
+                                                                }
+                                                        }, {
                                                                 text: 'ถอยสถานะกลับมารอวางบิล',
                                                                 iconCls: 'icon-arrow-undo',
                                                                 hidden: Number(Ext.session.dc_center_user) !== 1,

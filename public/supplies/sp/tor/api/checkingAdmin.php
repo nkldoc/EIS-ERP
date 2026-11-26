@@ -33,6 +33,12 @@ $rows = function ($sql, $params = array()) use ($query) {
     }
     return $result;
 };
+if (in_array($_REQUEST['mode'] ?? '', array('enable_load', 'enable_save'), true)) {
+    if (!$isAdmin) adminCheckingReply(403, array('success'=>false,'msg'=>'เฉพาะ Admin เท่านั้น'));
+    $token = hash_hmac('sha256', 'checking-enable|' . $_SESSION['user_id'] . '|' . $id, session_id());
+    require __DIR__ . '/checkingEnable.php';
+    exit;
+}
 $access = $rows('SELECT sp_check_period_hdr_id FROM dbo.sp_check_period_hdr WHERE sp_check_period_hdr_id=? AND i_enabled=1', array($id));
 if (!$access) adminCheckingReply(404, array('success' => false, 'msg' => 'ไม่พบใบตรวจรับที่เลือก'));
 if (!$isAdmin) adminCheckingReply(403, array('success' => false, 'msg' => 'เฉพาะ Admin เท่านั้นที่แก้ไขใบตรวจรับได้'));
