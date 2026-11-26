@@ -4426,8 +4426,9 @@ Ext.AppUx = function (app, menu) {
                                         icon: "../images/icons/application_form_edit.png",
                                         handler: function () {
                                             Ext.openQuickProgress(Ext.selectRow, {
-                                                menuCode: "ST0003",
-                                                menuName: "ตรวจสอบเอกสาร",
+                                                menuCode: Ext.selectRow.get("c_code_status") || "ST0003",
+                                                menuName: Ext.selectRow.get("c_name_status") || "ตรวจสอบเอกสาร",
+                                                torStatusId: Ext.selectRow.get("tor_status_id"),
                                                 store: Ext.storeDtl
                                             });
                                         }

@@ -37,8 +37,8 @@
         return null;
     }
 
-    function selectDefaultType(combo, menuCode) {
-        var wanted = progressFromMenu(menuCode, Ext.menu_name);
+    function selectDefaultType(combo, menuCode, menuName) {
+        var wanted = progressFromMenu(menuCode, menuName);
         var found = combo.getStore().find("c_name", wanted, 0, false, true);
         if (found >= 0) combo.setValue(combo.getStore().getAt(found).get("id"));
     }
@@ -235,7 +235,7 @@
                             mode: "Save_Event_Notor",
                             sp_tor_id: valueFrom(record, ["sp_tor_id", "id", "tor_id"]),
                             sp_tor_contract_id: valueFrom(record, ["sp_tor_contract_id", "sp_contract_id"]),
-                            tor_status_id: Ext.menu_id || null,
+                            tor_status_id: typeof config.torStatusId !== "undefined" ? config.torStatusId : (Ext.menu_id || null),
                             sp_status_hdr_name: menuName,
                             menu_code: menuCode,
                             event_type: typeCombo.getValue(),
@@ -258,7 +258,7 @@
             }, {text: "ยกเลิก", handler: function () { win.close(); }}]
         });
         typeStore.on("load", function () {
-            selectDefaultType(typeCombo, menuCode);
+            selectDefaultType(typeCombo, menuCode, menuName);
             Ext.Ajax.request({
                 url: config.saveUrl || "tor/api/mnTorController.php",
                 params: {mode: "GET_PROGRESS_MENU_MAP", menu_code: menuCode},
