@@ -67,8 +67,9 @@ if ($i_view == 3 && $p_emp !== null) {
 $extraDeptWhere = "AND (? IS NULL OR (SELECT dc_department_id FROM EIS_PROCURE..sp_emp WHERE sp_emp_id = a.sp_emp_id) = ?)";
 
 // ── 3. ORDER BY ────────────────────────────────────────────────────────────────
-// เรียงตามเลขที่สัญญา (ทุกโหมด) โดยสัญญากลุ่ม "สนธ." ไปอยู่ท้ายรายงาน (เดิมโหมด PR เรียงตามเลขที่ PR)
-$orderBy = "CASE WHEN c_code LIKE N'สนธ.%' THEN 1 ELSE 0 END ASC, c_code ASC, i_period ASC";
+$orderBy = ($i_type_Rep == 2)
+    ? 'c_code ASC, i_period ASC'   // เรียงตามเลขสัญญา
+    : 'PR_code ASC, i_period ASC'; // เรียงตามเลขที่ PR
 
 // ── 4. SQL ────────────────────────────────────────────────────────────────────
 // DatabaseServer::QueryParam ใช้ ? เป็น placeholder

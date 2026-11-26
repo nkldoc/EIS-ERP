@@ -329,7 +329,7 @@ function renderReport(data) {
   const hdrDiv = document.createElement('div');
   hdrDiv.className = 'report-header';
   hdrDiv.innerHTML = `
-    <div class="uni-name">มหาวิทยาลัยนวมินทราธิราช</div>
+    <div class="uni-name">มหาวิทยาลัยนวมินทราธิราช คณะแพทยศาสตร์วชิรพยาบาล</div>
     <div class="report-title">รายงานทะเบียนคุมสัญญาภาระผูกพัน</div>
     <div class="report-params">
       <span>ระหว่างวันที่ : <b>${dateRange}</b></span>
@@ -656,7 +656,7 @@ function executePdfDownload(includeCancel = true) {
   doc.setTextColor(44, 62, 80);
   doc.setFont('Sarabun', 'bold');
   doc.setFontSize(16);
-  doc.text('มหาวิทยาลัยนวมินทราธิราช', doc.internal.pageSize.getWidth() / 2, 14, { align: 'center' });
+  doc.text('มหาวิทยาลัยนวมินทราธิราช คณะแพทยศาสตร์วชิรพยาบาล', doc.internal.pageSize.getWidth() / 2, 14, { align: 'center' });
   doc.setFontSize(13);
   doc.text('รายงานทะเบียนคุมสัญญาภาระผูกพัน', doc.internal.pageSize.getWidth() / 2, 21, { align: 'center' });
   doc.setFont('Sarabun', 'normal');
@@ -999,7 +999,7 @@ function downloadExcel(includeCancel = true) {
 </style>
 </head>
 <body>
-  <div style="font-size:22pt;font-weight:700;color:#2c3e50;text-align:center;font-family:${FONT};">มหาวิทยาลัยนวมินทราธิราช</div>
+  <div style="font-size:22pt;font-weight:700;color:#2c3e50;text-align:center;font-family:${FONT};">มหาวิทยาลัยนวมินทราธิราช คณะแพทยศาสตร์วชิรพยาบาล</div>
   <div style="font-size:18pt;font-weight:700;color:#2c3e50;text-align:center;font-family:${FONT};">รายงานทะเบียนคุมสัญญาภาระผูกพัน</div>
   <div style="font-size:14pt;color:#555;text-align:center;font-family:${FONT};">
     ระหว่างวันที่ : ${dateRange}
