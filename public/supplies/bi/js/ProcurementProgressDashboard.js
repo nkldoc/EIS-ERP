@@ -135,10 +135,13 @@
       var currentStage=stage(r);return '<tr><td><b>'+esc(r.pr_code)+'</b></td><td>'+esc(r.c_name)+'</td><td>'+esc(r.owner_name)+'</td><td>'+esc(r.fund_source)+'</td><td>'+esc(r.procurement_type)+'</td><td class="status-hover"'+statusTitle(currentStage)+'>'+esc(currentStage)+'</td><td>'+overlap+'</td><td><span class="level level-'+level+'">'+esc(levelText)+'</span></td><td>'+flag(r.period_total)+'</td><td>'+flag(r.arrival_total)+'</td><td>'+flag(r.inspection_total)+'</td><td>'+flag(r.paid_total)+'</td></tr>';}).join("")||'<tr><td colspan="12">ไม่พบข้อมูล</td></tr>';
   }
   function statusMatrix(rows,field,selectedStatus){
+    var statusOrder=["รอดำเนินการ","อยู่ระหว่างดำเนินการ","บริหารสัญญา","บริหารสัญญา/งวด","รับของ","ตรวจรับ","ขอเบิกจ่าย","เบิกจ่ายสมบูรณ์"];
+    function compareStatus(a,b){var ai=statusOrder.indexOf(a),bi=statusOrder.indexOf(b);return (ai<0?99:ai)-(bi<0?99:bi)||a.localeCompare(b);}
     var columns={},matrix={},totals={};rows.forEach(function(r){var col=r[field]||"ไม่ระบุ",s=stage(r);columns[col]=(columns[col]||0)+1;matrix[s]=matrix[s]||{};matrix[s][col]=(matrix[s][col]||0)+1;totals[s]=(totals[s]||0)+1;});
-    var names=Object.keys(columns).sort(function(a,b){return columns[b]-columns[a];}),statuses=Object.keys(matrix).sort(function(a,b){return totals[b]-totals[a];});if(selectedStatus)statuses=statuses.filter(function(s){return s===selectedStatus;});
+    var names=Object.keys(columns).sort(function(a,b){return columns[b]-columns[a];}),statuses=Object.keys(matrix).sort(compareStatus);if(selectedStatus)statuses=statuses.filter(function(s){return s===selectedStatus;});
     var html='<table><thead><tr><th>สถานะ</th>'+names.map(function(n){return '<th>'+esc(n)+'</th>';}).join('')+'<th>รวม</th></tr></thead><tbody>'+statuses.map(function(s,i){return '<tr><td class="status-hover"'+statusTitle(s)+'><i class="matrix-dot" style="background:'+colors[i%colors.length]+'"></i>'+esc(s)+'</td>'+names.map(function(n){return '<td>'+number(matrix[s][n]||0)+'</td>';}).join('')+'<td><b>'+number(totals[s])+'</b></td></tr>';}).join('')+'<tr class="matrix-total"><th>รวมทั้งหมด</th>'+names.map(function(n){return '<th>'+number(columns[n])+'</th>';}).join('')+'<th>'+number(rows.length)+'</th></tr></tbody></table>';
-    return {html:html,labels:Object.keys(totals).sort(function(a,b){return totals[b]-totals[a];}),values:Object.keys(totals).sort(function(a,b){return totals[b]-totals[a];}).map(function(s){return totals[s];}),columns:names,matrix:matrix};
+    var labels=Object.keys(totals).sort(compareStatus);
+    return {html:html,labels:labels,values:labels.map(function(s){return totals[s];}),columns:names,matrix:matrix};
   }
   function renderCrossReports(){
     var ownerFilter=el("ownerMatrixFilter").value,ownerTypeFilter=el("ownerTypeFilter").value,departmentFilter=el("departmentMatrixFilter").value;
