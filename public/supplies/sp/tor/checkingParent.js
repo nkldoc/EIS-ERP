@@ -4,7 +4,7 @@
         if (!panel || Number(Ext.session.dc_center_user) !== 1) return;
         var id = Number(inspection.get('sp_check_period_hdr_id') || inspection.get('id'));
         if (!id) return;
-        var selected = {}, syncing = false, ready = false, csrf, snapshot, motherAmount = null;
+        var selected = {}, syncing = false, ready = false, csrf, snapshot, motherAmount = null, motherBudget = {};
         function setPanelHtml(target, html) {
             if (target.rendered) target.update(html);
             else target.html = html;
@@ -15,7 +15,7 @@
         var store = new Ext.data.JsonStore({
             url: 'tor/api/mnCheckingController.php', root: 'data',
             idProperty: 'sp_check_period_hdr_id',
-            fields: ['sp_check_period_hdr_id', 'c_code', 'c_arrive_code', 'contract_code', 'c_name', 'i_period', 'f_total', 'budget_name'],
+            fields: ['sp_check_period_hdr_id', 'c_code', 'c_arrive_code', 'contract_code', 'c_name', 'i_period', 'f_total', 'budget_name', 'budget_id'],
             baseParams: {mode: 'SEARCH_RELATION_CODES', source: 'contract_ap'}
         });
         var selection = new Ext.grid.CheckboxSelectionModel({singleSelect: false});
@@ -38,6 +38,23 @@
                 html += difference === 0 ? ' | <b style="color:#15803d">ยอดเท่ากัน</b>' : ' | <b style="color:#b91c1c">' + (difference > 0 ? 'ยอดที่ยังขาด: ' : 'ยอดเกิน: ') + money(Math.abs(difference)) + ' บาท</b>';
             }
             setPanelHtml(amountSummary, html);
+            var mismatches = [], unknown = [];
+            for (var childId in selected) if (Object.prototype.hasOwnProperty.call(selected, childId)) {
+                var child = selected[childId], motherFund = fundKey(motherBudget), childFund = fundKey(child);
+                var code = child.c_code || child.c_arrive_code || childId;
+                if (!motherFund || !childFund) unknown.push(code);
+                else if (motherFund !== childFund) mismatches.push(code);
+            }
+            var warning = mismatches.length ? '<b style="color:#b91c1c">แหล่งเงินไม่ตรงกัน: ' + encode(mismatches.join(', ')) + '</b>' : '';
+            if (unknown.length) warning += '<div style="color:#b91c1c">ยังตรวจสอบแหล่งเงินไม่ได้ (ข้อมูลไม่ครบ): ' + encode(unknown.join(', ')) + '</div>';
+            setPanelHtml(budgetSummary, warning);
+        }
+        function fundKey(row) {
+            var fundId = Number(row.budget_id), name = String(row.budget_name || '').replace(/\s+/g, '');
+            // Legacy faculty/hospital income and department income are equivalent.
+            if (fundId === 2 || fundId === 49 || name === 'เงินรายได้ส่วนงาน' ||
+                    name === 'เงินรายได้คณะแพทย์ฯ-โรงพยาบาล' || name === 'เงินรายได้คณะแพทย์+โรงพยาบาล') return 'income';
+            return fundId > 0 ? 'id:' + fundId : (name ? 'name:' + name : null);
         }
         function moneyCents(value) {
             if (value === null || value === undefined || value === '') return null;
@@ -72,8 +89,9 @@
                     children.push(row);
                 } else {
                     motherAmount = moneyCents(row.f_total);
+                    motherBudget = row;
                     enabled.setValue(Number(row.i_parent) === 1);
-                    setPanelHtml(motherSummary, 'เลข AP แม่: <b style="color:#b91c1c">' + encode(row.c_code || 'ยังไม่ออกเลข AP') + '</b>');
+                    setPanelHtml(motherSummary, 'เลข AP แม่: <b style="color:#b91c1c">' + encode(row.c_code || 'ยังไม่ออกเลข AP') + '</b> | แหล่งเงิน AP แม่: <b>' + encode(row.budget_name || '-') + '</b>');
                 }
             });
             syncing = true;
@@ -84,6 +102,7 @@
         }
         var selectedSummary = new Ext.Panel({border: false, html: 'AP ลูกที่เลือก: -', bodyStyle: 'padding:8px;word-break:break-word'});
         var amountSummary = new Ext.Panel({border: false, bodyStyle: 'padding:8px;font-size:14px', html: ''});
+        var budgetSummary = new Ext.Panel({border: false, bodyStyle: 'padding:0 8px 8px', html: ''});
         var grid = new Ext.grid.GridPanel({
             store: store, sm: selection, height: 340, border: true,
             columns: [selection,
@@ -105,7 +124,7 @@
         });
         var reason = new Ext.form.TextField({fieldLabel: 'เหตุผลในการแก้ไข', maxLength: 1000, anchor: '98%'});
         grid.on('viewready', restoreChecks);
-        var details = new Ext.Panel({border: false, items: [grid, amountSummary, selectedSummary]});
+        var details = new Ext.Panel({border: false, items: [grid, amountSummary, budgetSummary, selectedSummary]});
         var enabled = new Ext.form.Checkbox({name: 'i_parent', fieldLabel: 'i_parent',
             boxLabel: 'เป็นใบแม่ (เลือก AP ลูกจากเลขสัญญา)', checked: false, disabled: true});
         keyword.on('specialkey', function (field, event) { if (event.getKey() === event.ENTER) search(); });

@@ -84,6 +84,21 @@ assert.deepEqual(Array.from(result.panel.getSelectedParentAPs()), [13]);
 assert(result.controls.some(c => c.html && c.html.includes('IR13')));
 assert(result.controls.some(c => c.columns && c.columns.some(column => column.dataIndex === 'c_arrive_code')));
 console.log('PASS: deferred tab load enables controls; restores children; explains child restriction; retries failed loads');
+function fundScenario(motherId, childId) {
+    return scenario([
+        {sp_check_period_hdr_id: 10, i_parent: 1, budget_id: motherId, budget_name: 'Mother fund'},
+        {sp_check_period_hdr_id: 12, parent_id: 10, c_code: 'AP12', budget_id: childId, budget_name: 'Child fund'}
+    ]);
+}
+for (const [mother, child] of [[2,49], [49,2], [4,4]]) {
+    const funds = fundScenario(mother, child);
+    assert(!funds.controls.some(c => c.html && c.html.includes('แหล่งเงินไม่ตรงกัน')));
+    assert(funds.controls.some(c => c.html && c.html.includes('แหล่งเงิน AP แม่: <b>Mother fund</b>')));
+}
+const differentFunds = fundScenario(4, 49);
+assert(differentFunds.controls.some(c => c.html && c.html.includes('color:#b91c1c') && c.html.includes('แหล่งเงินไม่ตรงกัน: AP12')));
+differentFunds.grid.bbar[2].handler();
+assert(!differentFunds.controls.some(c => c.html && c.html.includes('แหล่งเงินไม่ตรงกัน')));
 
 result = scenario([{sp_check_period_hdr_id: 10, i_parent: 1, f_total: 1000},
     {sp_check_period_hdr_id: 12, parent_id: 10, f_total: 600, budget_name: 'Income'}]);
