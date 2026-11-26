@@ -16,14 +16,20 @@ final class SingleLogin
         $name = strtolower(trim($name));
         // The registry already separates systems; keep the base operator stable.
         $name = preg_replace('/-(?:supplies|eis-docs)$/D', '', $name);
-        if (!preg_match('/^admin-[a-z0-9][a-z0-9_-]{1,31}$/D', $name)) throw new RuntimeException('กรุณากรอกชื่อผู้ดูแล เช่น admin-eak หรือ admin-moo (ภาษาอังกฤษ ตัวเลข ขีดกลาง)');
+        if (!preg_match('/^(?:admin|pr)-[a-z0-9][a-z0-9_-]{1,31}$/D', $name)) throw new RuntimeException('กรุณากรอกชื่อผู้ดูแล เช่น admin-eak หรือ pr-somchai สำหรับผู้ใช้จัดสรรงบประมาณ (ภาษาอังกฤษ ตัวเลข ขีดกลาง)');
         return $name;
+    }
+    // บัญชีที่ใช้งานพร้อมกันได้หลายคนโดยระบุชื่อผู้ใช้ (named operator): Admin (i_type_user = 2) และ
+    // "จัดสรรงบประมาณพัสดุ" (PRbudget, dc_user_id 60104) ของ SUPPLIES - ชื่อผู้ใช้ PRbudget ขึ้นต้นด้วย pr- เช่น pr-somchai
+    public static function namedAccount(string $system, string $uid, int $type): bool
+    {
+        return $type === 2 || ($system === 'SUPPLIES' && $uid === '60104');
     }
     public static function operator(string $system, string $uid): string
     {
         $identity = $system === 'EIS-DOCS' ? ($_SESSION['auth'] ?? []) : ($_SESSION ?? []);
         $type = $system === 'EIS-DOCS' ? ($identity['user_type'] ?? 0) : ($identity['i_type_user'] ?? 0);
-        if ((string)($identity['user_id'] ?? '') !== $uid || (int)$type !== 2 || isset($_SESSION['impersonation_admin']) || isset($_SESSION['impersonation_admin_center_id'])) return '';
+        if ((string)($identity['user_id'] ?? '') !== $uid || !self::namedAccount($system, $uid, (int)$type) || isset($_SESSION['impersonation_admin']) || isset($_SESSION['impersonation_admin_center_id'])) return '';
         return isset($identity['admin_operator']) ? self::operatorName((string)$identity['admin_operator']) : '';
     }
     public static function scoped(string $uid, string $operator): string
