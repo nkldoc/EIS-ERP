@@ -1251,7 +1251,11 @@ switch ($mode) {
         }
         $blockedWd = array();
         foreach ($wdRows as $rw) {
-            if (intval($rw["i_status_last"]) !== 0 || floatval($rw["sub_status"]) > 0.30) {
+            // ใบเบิกที่ยังไม่ลงนาม (ขั้น <= 0.30) แก้ได้ / ใบที่ถูกทักท้วงฏีกา (สถานะ 3, ขั้น 3.00) แก้ได้เพื่อให้ user แก้ข้อมูลแล้วส่งคืนทักท้วง
+            // (ไม่ย้อนสถานะ) ส่วนใบที่ผ่านไปแล้วต้องให้ผู้ดูแลย้อนก่อน
+            $okDraft = intval($rw["i_status_last"]) === 0 && floatval($rw["sub_status"]) <= 0.30;
+            $okProtest = intval($rw["i_status_last"]) === 3 && floatval($rw["sub_status"]) == 3.0;
+            if (!$okDraft && !$okProtest) {
                 $blockedWd[] = $rw["c_code_ref"];
             }
         }
