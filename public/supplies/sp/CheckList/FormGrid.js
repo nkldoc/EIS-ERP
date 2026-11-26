@@ -106,6 +106,7 @@ const search = function () {
         Ext.storeDtl.setBaseParam("i_budget_year_overlap", Ext.getCmp("s_i_budget_year_overlap").getValue());
         Ext.storeDtl.setBaseParam("i_year_contract", Ext.getCmp("s_i_year_contract").getValue());
         Ext.storeDtl.setBaseParam("sp_tor_status_id", Ext.getCmp("sp_tor_status_id").getValue());
+        Ext.storeDtl.setBaseParam("progress_event_type_id", Ext.getCmp("s_progress_event_type_id").getValue());
         // Ext.storeDtl.setBaseParam("i_enable", Ext.getCmp("s_i_enable").getValue());
 
         // Ext.storeDtl.setBaseParam("userid", Ext.getCmp("userid-ID").getValue());
@@ -149,7 +150,8 @@ const exportExcel = async function (button) {
         i_budget_year: getCmpValue("s_i_budget_year", 0),
         i_budget_year_overlap: getCmpValue("s_i_budget_year_overlap", 0),
         i_year_contract: getCmpValue("s_i_year_contract", 0),
-        sp_tor_status_id: getCmpValue("sp_tor_status_id", 0)
+        sp_tor_status_id: getCmpValue("sp_tor_status_id", 0),
+        progress_event_type_id: getCmpValue("s_progress_event_type_id", 0)
     };
     var loading = new Ext.LoadMask(Ext.getBody(), {msg: 'กำลังเตรียมไฟล์ Excel กรุณารอสักครู่...'});
     Ext.checkListExporting = true;
@@ -5949,6 +5951,26 @@ Ext.AppUx = function (app, menu) {
                                                 {xtype: "label", text: " : รายการที่ยังไม่ได้ระบุ KPI"},
                                             ],
                                         },
+                                    ],
+                                },
+                                {
+                                    xtype: "buttongroup",
+                                    frame: false,
+                                    items: [
+                                        {xtype: "label", text: "ประเภทความก้าวหน้า : "},
+                                        new Ext.form.ComboBox({
+                                            id: "s_progress_event_type_id",
+                                            width: 190,
+                                            store: new Ext.data.JsonStore({
+                                                url: "api/All_PoWorkingImpHdr.php",
+                                                baseParams: {type: "sp_event_type", all: "all"},
+                                                root: "data", fields: ["id", "c_name"], autoLoad: true
+                                            }),
+                                            valueField: "id", displayField: "c_name", value: "0",
+                                            mode: "local", triggerAction: "all", editable: false,
+                                            forceSelection: true, emptyText: "- เลือกทั้งหมด -",
+                                            listeners: {select: function () { search(); }}
+                                        }),
                                     ],
                                 },
                                 {

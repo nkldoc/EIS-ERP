@@ -180,6 +180,13 @@ switch ($mode) {
             if (($_REQUEST["sp_tor_status_id"] ?? 0) > 0) {
                 $wh .= " AND  a.tor_status_id  = " . $_REQUEST["sp_tor_status_id"];
             }
+            $progressEventTypeId = intval($_REQUEST['progress_event_type_id'] ?? 0);
+            if ($progressEventTypeId > 0) {
+                // Match the latest active progress entry displayed in the grid.
+                $wh .= " AND (SELECT TOP 1 progress.event_type FROM " . DB_NMU_ERP . "sp_tor_event progress"
+                    . " WHERE progress.sp_tor_id=a.tor_id AND progress.i_enabled=1"
+                    . " ORDER BY progress.d_create DESC, progress.sp_tor_event_id DESC) = " . $progressEventTypeId;
+            }
             if (($_REQUEST["f_total_amtPr"] ?? 0) > 0) {
                 $wh .= " AND  a.f_total_amt  = " . str_replace(",", "", $_REQUEST["f_total_amtPr"]);
                 ;
