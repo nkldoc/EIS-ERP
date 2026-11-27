@@ -11,8 +11,11 @@ $cases = array(
     array(array('i_type_bg'=>1), array(evidence('PR'),evidence('PO')), 'ไม่เข้าข่ายกันเหลื่อม'),
     array($base, array(evidence('PO','INVALID')), 'ต้องตรวจสอบ'),
     array($base, array(evidence('PO','',false,3)), 'ต้องตรวจสอบ'),
-    array($base, array(evidence('PO','SECOND',true)), 'บันทึกใบกันเหลื่อมแล้ว'),
-    array($base, array(evidence('ใบกัน NMU_EIS','DOC',true)), 'บันทึกใบกันเหลื่อมแล้ว')
+    array($base, array(evidence('PO','SECOND',true)), 'บันทึกใช้ใบกันแล้ว'),
+    array($base, array(evidence('ใบกัน NMU_EIS','DOC',true)), 'ยังไม่ก่อหนี้'),
+    array($base, array(evidence('จองใบกัน','DOC',true)), 'จองใช้ใบกัน'),
+    array($base, array(evidence('ใบกัน NMU_EIS','DOC',true), evidence('PO')), 'ยังไม่ก่อหนี้'),
+    array($base, array(evidence('PO','VALID',true), evidence('PO','INVALID')), 'ต้องตรวจสอบ')
 );
 foreach ($cases as $case) checkOverlap(procurementOverlapClassify($case[0],$case[1])['overlap_status']===$case[2],$case[2]);
 $result=procurementOverlapClassify($base,array(evidence('PO','FIRST',true),evidence('PO','SECOND',true),evidence('AP','SECOND',true)));
@@ -31,7 +34,16 @@ $fetch=function($sql,$params){
 $row=array('tor_id'=>1,'pr_code'=>'PR1','i_type_bg'=>4,'pr_overlap_code'=>'FIRST','pr_overlap_year'=>2025,'pr_overlap_flag'=>1);
 $rows=procurementOverlapEnrich(array($row),$fetch);
 checkOverlap(count($rows)===1,'Multiple contracts must not duplicate a PR');
-checkOverlap($rows[0]['overlap_status']==='บันทึกใบกันเหลื่อมแล้ว','Validate both PO slots');
+checkOverlap($rows[0]['overlap_status']==='บันทึกใช้ใบกันแล้ว','Validate both PO slots');
 checkOverlap(count($rows[0]['overlap_warnings'])===0,'Buddhist and Gregorian years must match');
 checkOverlap(count(array_filter($rows[0]['overlap_evidence'],function($i){return $i['reference']==='PO2';}))===2,'Keep all active contracts, including empty slots');
 echo "PASS: overlap groups, second slot, multiple contracts, AP mismatch, system scope, year normalization\n";
+
+$po = evidence('PO','DOC',true); $po['po_id'] = 10;
+$ap = evidence('AP','DOC',true); $ap['po_id'] = 20;
+checkOverlap(procurementOverlapClassify($base,array($po,$ap))['overlap_status']==='ต้องตรวจสอบ','AP cannot borrow evidence from another contract');
+$doc = evidence('ใบกัน NMU_EIS','DOC',true); $doc['po_id'] = 10;
+checkOverlap(procurementOverlapClassify($base,array($doc))['overlap_debt_status']==='ก่อหนี้แล้ว','Document po_id is debt evidence');
+$doc['year_mismatch'] = true;
+checkOverlap(procurementOverlapClassify($base,array($doc))['overlap_status']==='ต้องตรวจสอบ','Year mismatch must take precedence');
+echo "PASS: registry versus usage, reservation, debt link, partial invalid evidence, per-contract AP matching\n";

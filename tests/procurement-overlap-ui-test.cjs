@@ -10,6 +10,8 @@ context.filteredRows = [
   {tor_id:3,pr_code:'PR3',owner_name:'A',overlap_status:'review'}
 ];
 assert.equal(vm.runInContext('overlapRows("", "").length', context),3);
+assert.equal(vm.runInContext('overlapGroups.length', context),6);
+assert(vm.runInContext('overlapGroups.includes("จองใช้ใบกัน") && overlapGroups.includes("บันทึกใช้ใบกันแล้ว")', context));
 elements.statusOwnerFilter.value='A';
 assert.equal(vm.runInContext('overlapRows("", "").length', context),2);
 assert.equal(vm.runInContext('overlapRows("", "saved").length', context),1);

@@ -1,5 +1,6 @@
 (function () {
   "use strict";
+  var appliedReport = {from: "", to: "", fund: ""};
   var allRows = [], filteredRows = [], workloadChart, dimensionChart, statusChart, ownerStatusChart, departmentStatusChart, ownerRelationChart, personalStatusChart, personalRadarChart, kpiCharts = [], groupField = "procurement_type", workloadMetric = "count", dimensionTableMetric = "count", sankeyMetric = "count", relationOwner = "";
   var colors = ["#168de2", "#11b997", "#f5b62e", "#ff7f43", "#7467c7", "#d65db1", "#5a9bd4", "#8bc56b"];
   function el(id) { return document.getElementById(id); }
@@ -45,12 +46,12 @@
     return row.current_progress || "อยู่ระหว่างดำเนินการ";
   }
   function applyFilters() {
-    var fund = el("fundFilter").value, keyword = el("keywordFilter").value.toLowerCase();
+    var fund = appliedReport.fund, keyword = el("keywordFilter").value.toLowerCase();
     filteredRows = allRows.filter(function (r) { return (!fund || r.fund_source === fund) && (!keyword || [r.pr_code,r.c_name,r.owner_name,r.department_name].join(" ").toLowerCase().indexOf(keyword) >= 0); });
     updateReportContext();
     render();
   }
-  function updateReportContext(){var from=el("yearFromFilter").value,to=el("yearToFilter").value,fund=el("fundFilter").value||"รวมทุกแหล่งเงิน",yearText=from===to?from:(from+" – "+to),now=new Date(),reportedAt=now.toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"});el("reportContext").innerHTML='<strong>รายงานปีงบประมาณ '+esc(yearText)+'</strong><span>แหล่งเงิน: '+esc(fund)+'</span><small>'+number(filteredRows.length)+' รายการ</small><small class="report-generated-at">ณ วันที่เรียกรายงาน '+esc(reportedAt)+' น.</small>';document.title='Dashboard จัดซื้อจัดจ้าง | ปีงบประมาณ '+yearText+' | '+fund;}
+  function updateReportContext(){var from=appliedReport.from,to=appliedReport.to,fund=appliedReport.fund||"รวมทุกแหล่งเงิน",yearText=from===to?from:(from+" – "+to),now=new Date(),reportedAt=now.toLocaleString("th-TH",{dateStyle:"medium",timeStyle:"short"});el("reportContext").innerHTML='<strong>รายงานปีงบประมาณ '+esc(yearText)+'</strong><span>แหล่งเงิน: '+esc(fund)+'</span><small>'+number(filteredRows.length)+' รายการ</small><small class="report-generated-at">ณ วันที่เรียกรายงาน '+esc(reportedAt)+' น.</small>';document.title='Dashboard จัดซื้อจัดจ้าง | ปีงบประมาณ '+yearText+' | '+fund;}
   function renderMetrics() {
     var total = filteredRows.length, completed = filteredRows.filter(function (r) { return Number(r.is_completed) === 1; }).length;
     var contract = filteredRows.filter(function (r) { return Number(r.period_total) > 0; }).length;
@@ -122,7 +123,7 @@
     var pipelineStatuses=["บริหารสัญญา/งวด","รับของ","ตรวจรับ","เบิกจ่ายสมบูรณ์"];
     el("pipelineGrid").innerHTML=steps.map(function(s,i){var p=percent(s[1],total);return '<article class="pipeline-step"'+statusTitle(pipelineStatuses[i])+'><header><b>'+s[0]+'</b><strong>'+number(s[1])+'</strong></header><div class="pipeline-amount"><span>ยอดเงินรวม</span><b>'+money(s[2])+'</b></div>'+fundHtml(s[3])+'<div class="progress green-bar"><span style="width:'+p+'%"></span></div><small>'+p+'% · '+s[4]+'</small></article>';}).join("");
   }
-  var overlapGroups = ["ยังไม่ก่อหนี้", "ก่อหนี้แล้ว", "บันทึกใบกันเหลื่อมแล้ว", "ต้องตรวจสอบ", "ไม่เข้าข่ายกันเหลื่อม"];
+  var overlapGroups = ["ยังไม่ก่อหนี้", "ก่อหนี้แล้ว", "จองใช้ใบกัน", "บันทึกใช้ใบกันแล้ว", "ต้องตรวจสอบ", "ไม่เข้าข่ายกันเหลื่อม"];
   function overlapRows(status, group) {
     var owner = el("statusOwnerFilter").value;
     return filteredRows.filter(function (r) { return (!owner || r.owner_name === owner) && (!status || stage(r) === status) && (!group || r.overlap_status === group); });
@@ -157,7 +158,7 @@
     var totals={}; overlapGroups.forEach(function (group) { totals[group]=0; });
     var body=labels.map(function(k,i){return '<tr><td class="status-hover"'+statusTitle(k)+'>'+esc(k)+'</td>'+overlapGroups.map(function(group){var count=matrix[k][group]||0;totals[group]+=count;return '<td class="overlap-value">'+overlapCountButton(count,k,group)+'</td>';}).join('')+'<td>'+overlapCountButton(values[i],k,'')+'</td></tr>';}).join("");
     body+='<tr><th>รวมทั้งหมด</th>'+overlapGroups.map(function(group){return '<th class="overlap-value">'+overlapCountButton(totals[group],'',group)+'</th>';}).join('')+'<th>'+overlapCountButton(rows.length,'','')+'</th></tr>';
-    el("statusRows").innerHTML=labels.length?body:'<tr><td colspan="7">ไม่พบข้อมูล</td></tr>';
+    el("statusRows").innerHTML=labels.length?body:'<tr><td colspan="8">ไม่พบข้อมูล</td></tr>';
   }
   function detailStatusCounts() {
     var counts = new Map(), order = ["รอดำเนินการ","อยู่ระหว่างดำเนินการ","บริหารสัญญา","บริหารสัญญา/งวด","รับของ","ตรวจรับ","ขอเบิกจ่าย","เบิกจ่ายสมบูรณ์"];
@@ -178,7 +179,7 @@
     sheet["!cols"] = [22,70,28,26,24,28,28,44,12,12,12,16].map(function (width) { return {wch: width}; });
     sheet["!autofilter"] = {ref: sheet["!ref"]};
     XLSX.utils.book_append_sheet(workbook, sheet, "รายการทั้งหมด");
-    var summary = [["ปีงบประมาณ", el("yearFromFilter").value + " - " + el("yearToFilter").value], ["แหล่งเงิน", el("fundFilter").value || "รวมทั้งหมด"], ["คำค้น", el("keywordFilter").value], [], ["สถานะ", "จำนวนรายการ"]]
+    var summary = [["ปีงบประมาณ", appliedReport.from + " - " + appliedReport.to], ["แหล่งเงิน", appliedReport.fund || "รวมทั้งหมด"], ["คำค้น", el("keywordFilter").value], [], ["สถานะ", "จำนวนรายการ"]]
       .concat(detailStatusCounts(), [["รวมทั้งหมด", filteredRows.length]]);
     var summarySheet = XLSX.utils.aoa_to_sheet(summary);
     summarySheet["!cols"] = [{wch: 42}, {wch: 28}];
@@ -194,7 +195,7 @@
     evidenceSheet["!cols"] = [22,28,20,18,26,24,30,16,18,16,70].map(function (width) { return {wch:width}; });
     evidenceSheet["!autofilter"] = {ref:evidenceSheet["!ref"]};
     XLSX.utils.book_append_sheet(workbook, evidenceSheet, "หลักฐานใบกัน PR PO AP");
-    XLSX.writeFile(workbook, "ProcurementProgress_" + el("yearFromFilter").value + "_" + el("yearToFilter").value + ".xlsx");
+    XLSX.writeFile(workbook, "ProcurementProgress_" + appliedReport.from + "_" + appliedReport.to + ".xlsx");
   }
   function renderDetails() {
     el("exportDetailsButton").disabled = filteredRows.length === 0;
@@ -261,8 +262,8 @@
   function render(){renderMetrics();if(!el("workloadChart").closest("[hidden]"))renderWorkload();renderDimensionTable();try{renderDimensionChart();}catch(err){console.error("Dimension chart:",err);var canvas=el("dimensionChart"),holder=canvas&&canvas.parentNode;if(canvas)canvas.style.display="none";if(holder&&!holder.querySelector(".dimension-error"))holder.insertAdjacentHTML("beforeend",'<div class="empty-state dimension-error">ไม่สามารถแสดงกราฟมิติได้ กรุณากดดึงข้อมูลใหม่</div>');}try{renderSankey();}catch(sankeyError){console.error("Sankey chart:",sankeyError);if(el("sankeyChart"))el("sankeyChart").innerHTML='<div class="empty-state">ไม่สามารถแสดงกราฟ Sankey ได้</div>';}renderPipeline();renderStatus();renderCrossReports();renderDetails();renderKpi();renderWarnings();renderPersonal();}
   function currentFiscalYear(){var d=new Date();return d.getFullYear()+(d.getMonth()>=9?544:543);}
   function initFiscalYearFilters(){var current=currentFiscalYear(),years=[];for(var y=current;y>=current-10;y--)years.push(y);["yearFromFilter","yearToFilter"].forEach(function(id){el(id).innerHTML=years.map(function(v){return '<option value="'+v+'">'+v+'</option>';}).join('');el(id).value=String(current);});}
-  function loadData(){var from=Number(el("yearFromFilter").value),to=Number(el("yearToFilter").value);if(from>to){var swap=from;from=to;to=swap;el("yearFromFilter").value=String(from);el("yearToFilter").value=String(to);}el("loading").classList.add("show");fetch("../api/List_ProcurementProgress.php?year_from="+encodeURIComponent(from)+"&year_to="+encodeURIComponent(to),{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(j){if(!j.success)throw new Error(j.msg||"โหลดข้อมูลไม่สำเร็จ");allRows=j.data||[];fillSelect(el("fundFilter"),unique("fund_source"),"รวมทั้งหมด");fillSelect(el("statusOwnerFilter"),unique("owner_name"),"รวมทุกเจ้าหน้าที่");fillSelect(el("ownerMatrixFilter"),unique("owner_name"),"รวมทุกเจ้าหน้าที่");fillSelect(el("departmentMatrixFilter"),unique("department_name"),"รวมทุกหน่วยงาน");fillSelect(el("personalOwnerFilter"),unique("owner_name"),"เลือกเจ้าหน้าที่");if(!el("personalOwnerFilter").value&&el("personalOwnerFilter").options.length>1)el("personalOwnerFilter").selectedIndex=1;applyFilters();}).catch(function(err){alert("โหลดข้อมูลไม่สำเร็จ: "+err.message);}).finally(function(){el("loading").classList.remove("show");});}
-  ["yearFromFilter","yearToFilter"].forEach(function(id){el(id).addEventListener("change",loadData);});el("fundFilter").addEventListener("change",applyFilters); el("statusOwnerFilter").addEventListener("change",renderStatus); el("keywordFilter").addEventListener("input",applyFilters); el("refreshButton").addEventListener("click",loadData);
+  function loadData(){if(el("refreshButton").disabled)return;var requestedFund=el("fundFilter").value;var from=Number(el("yearFromFilter").value),to=Number(el("yearToFilter").value);if(from>to){var swap=from;from=to;to=swap;el("yearFromFilter").value=String(from);el("yearToFilter").value=String(to);}el("refreshButton").disabled=true;el("loading").classList.add("show");fetch("../api/List_ProcurementProgress.php?year_from="+encodeURIComponent(from)+"&year_to="+encodeURIComponent(to),{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}).then(function(j){if(!j.success)throw new Error(j.msg||"โหลดข้อมูลไม่สำเร็จ");allRows=j.data||[];appliedReport={from:String(from),to:String(to),fund:requestedFund};fillSelect(el("fundFilter"),unique("fund_source").concat(requestedFund && unique("fund_source").indexOf(requestedFund)<0 ? [requestedFund] : []),"รวมทั้งหมด");el("fundFilter").value=requestedFund;fillSelect(el("statusOwnerFilter"),unique("owner_name"),"รวมทุกเจ้าหน้าที่");fillSelect(el("ownerMatrixFilter"),unique("owner_name"),"รวมทุกเจ้าหน้าที่");fillSelect(el("departmentMatrixFilter"),unique("department_name"),"รวมทุกหน่วยงาน");fillSelect(el("personalOwnerFilter"),unique("owner_name"),"เลือกเจ้าหน้าที่");if(!el("personalOwnerFilter").value&&el("personalOwnerFilter").options.length>1)el("personalOwnerFilter").selectedIndex=1;applyFilters();}).catch(function(err){alert("โหลดข้อมูลไม่สำเร็จ: "+err.message);}).finally(function(){el("loading").classList.remove("show");el("refreshButton").disabled=false;});}
+  el("statusOwnerFilter").addEventListener("change",renderStatus); el("keywordFilter").addEventListener("input",applyFilters); el("refreshButton").addEventListener("click",loadData);
   el("warningFilter").addEventListener("change",renderWarnings);el("personalOwnerFilter").addEventListener("change",renderPersonal);
   el("workloadMethodFilter").addEventListener("change",renderWorkload);
   el("groupButtons").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;[].forEach.call(this.querySelectorAll("button"),function(x){x.classList.remove("active");});b.classList.add("active");groupField=b.getAttribute("data-group");renderWorkload();});

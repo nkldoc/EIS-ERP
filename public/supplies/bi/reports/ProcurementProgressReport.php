@@ -11,7 +11,7 @@ if (empty($_SESSION['user_id'])) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Dashboard ติดตามงานจัดซื้อจัดจ้าง</title>
-    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261126-9">
+    <link rel="stylesheet" href="../css/ProcurementProgressDashboard.css?v=20261127-1">
     <script src="../lib/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
@@ -43,8 +43,8 @@ if (empty($_SESSION['user_id'])) {
             <div class="chart-holder"><canvas id="workloadChart"></canvas></div>
         </article>
         <article class="panel chart-panel dimension-panel">
-            <div class="panel-heading dimension-heading"><div><h2>ปริมาณงานตามสถานะ แยกสีตามประเภทงาน</h2><p class="muted">กราฟมิติเพิ่มเติม เลือกแกน กลุ่มสี หรือสลับมิติได้โดยไม่กระทบตัวกรองเดิม</p></div><div class="dimension-controls"><label><span>แกน (แกน X)</span><select id="workloadAxis"><option value="status">สถานะ</option><option value="owner_name">เจ้าหน้าที่</option><option value="procurement_type">ประเภทงาน</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option></select></label><button id="swapDimensions" class="swap-button" type="button">⇆ สลับ</button><label><span>สีของกราฟ</span><select id="workloadColor"><option value="procurement_type">ประเภทงาน</option><option value="status">สถานะ</option><option value="owner_name">เจ้าหน้าที่</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option></select></label><div class="metric-toggle" id="workloadMetric"><button class="active" data-metric="count" type="button">จำนวนงาน</button><button data-metric="amount" type="button">วงเงิน (ลบ.)</button></div></div></div>
             <section class="dimension-table-block"><div class="dimension-table-heading"><div><h3>ตารางสรุปจำนวนงาน: สถานะ × ประเภทงาน</h3><p>แถวเรียงตามลำดับสถานะมาตรฐาน คลิกชื่อสถานะเพื่อดูคำอธิบาย</p></div><div class="dimension-table-controls"><label><span>คอลัมน์แนวนอน</span><select id="dimensionTableColumns"><option value="procurement_type">ประเภทงาน</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option><option value="owner_name">เจ้าหน้าที่</option></select></label><div class="metric-toggle" id="dimensionTableMetric"><button class="active" data-metric="count" type="button">จำนวนงาน</button><button data-metric="amount" type="button">วงเงิน (ลบ.)</button><button data-metric="both" type="button">จำนวน + วงเงิน</button></div></div></div><div id="dimensionSummaryTable" class="table-scroll dimension-summary-table"></div></section>
+            <div class="panel-heading dimension-heading"><div><h2>ปริมาณงานตามสถานะ แยกสีตามประเภทงาน</h2><p class="muted">กราฟมิติเพิ่มเติม เลือกแกน กลุ่มสี หรือสลับมิติได้โดยไม่กระทบตัวกรองเดิม</p></div><div class="dimension-controls"><label><span>แกน (แกน X)</span><select id="workloadAxis"><option value="status">สถานะ</option><option value="owner_name">เจ้าหน้าที่</option><option value="procurement_type">ประเภทงาน</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option></select></label><button id="swapDimensions" class="swap-button" type="button">⇆ สลับ</button><label><span>สีของกราฟ</span><select id="workloadColor"><option value="procurement_type">ประเภทงาน</option><option value="status">สถานะ</option><option value="owner_name">เจ้าหน้าที่</option><option value="method_name">วิธีจัดหา</option><option value="fund_source">แหล่งเงิน</option></select></label><div class="metric-toggle" id="workloadMetric"><button class="active" data-metric="count" type="button">จำนวนงาน</button><button data-metric="amount" type="button">วงเงิน (ลบ.)</button></div></div></div>
             <div class="chart-holder dimension-chart-holder"><canvas id="dimensionChart"></canvas></div>
         </article>
         <article class="panel sankey-panel">
@@ -67,7 +67,11 @@ if (empty($_SESSION['user_id'])) {
     </section>
     <section class="status-grid overview-extra">
         <article class="panel"><div class="panel-heading"><h2>สัดส่วนสถานะงาน</h2><select id="statusOwnerFilter"><option value="">รวมทุกเจ้าหน้าที่</option></select></div><div class="donut-holder"><canvas id="statusChart"></canvas></div><p class="chart-note">สถานะคำนวณจากขั้นตอนล่าสุดของแต่ละ PR</p></article>
-        <article class="panel status-table-panel"><div class="panel-heading"><div><h2>ตารางสรุปสถานะและใบกันเหลื่อม</h2><p class="muted">อ้างอิง PR, สัญญา และใบกันเหลื่อมจาก NMU_EIS</p></div></div><div class="table-scroll"><table><thead><tr><th>สถานะ</th><th class="overlap-head no-debt">ยังไม่ก่อหนี้<br><small>อ้างอิง PR</small></th><th class="overlap-head debt">ก่อหนี้แล้ว<br><small>อ้างอิงสัญญา</small></th><th class="overlap-head saved">บันทึกใบกันเหลื่อมแล้ว<br><small>NMU_EIS</small></th><th id="overlapReviewHeader"></th><th id="overlapOutsideHeader"></th><th>รวม</th></tr></thead><tbody id="statusRows"></tbody></table></div></article>
+        <article class="panel status-table-panel">
+            <div class="panel-heading"><div><h2>ตารางสรุปสถานะและใบกันเหลื่อม</h2><p class="muted">นับ PR ไม่ซ้ำ · คลิกจำนวนเพื่อดูใบกัน การจอง สัญญา และตรวจรับ</p></div></div>
+            <div class="table-scroll"><table><thead><tr><th>สถานะ</th><th class="overlap-head no-debt">ยังไม่ก่อหนี้<br><small>PR / ใบกันยังไม่ผูกสัญญา</small></th><th class="overlap-head debt">ก่อหนี้แล้ว<br><small>สัญญา / po_id</small></th><th class="overlap-head reserved">จองใช้ใบกัน<br><small>NMU_EIS</small></th><th class="overlap-head saved">บันทึกใช้ใบกันแล้ว<br><small>Supplies</small></th><th id="overlapReviewHeader"></th><th id="overlapOutsideHeader"></th><th>รวม</th></tr></thead><tbody id="statusRows"></tbody></table></div>
+            <p class="overlap-method-note">นับ PR ครั้งเดียวตามลำดับ: ต้องตรวจสอบ → บันทึกใช้แล้ว → จองใช้ → ยังไม่ก่อหนี้ / ก่อหนี้แล้ว · ใบกันใช้ po_id ในทะเบียนแยกการก่อหนี้ หากยังไม่มีทะเบียนใช้การมีสัญญาของ PR · กรณีหลายใบกันมี po_id อย่างน้อยหนึ่งใบจัดเป็นก่อหนี้แล้ว · การพบทะเบียนเพียงอย่างเดียวยังไม่ถือว่าบันทึกใช้ · สถานะสัญญาของ PR แสดงแยกในรายละเอียด</p>
+        </article>
     </section>
     <section class="panel status-guide overview-extra">
         <div class="panel-heading"><div><h2>คำอธิบายเกณฑ์สถานะงาน</h2><p class="muted">ระบบแสดงสถานะจากขั้นตอนล่าสุดที่พบของแต่ละ PR</p></div></div>
@@ -144,5 +148,5 @@ if (empty($_SESSION['user_id'])) {
     <div class="table-scroll overlap-dialog-table"><table><thead><tr><th>เลข PR / ดูรายละเอียด</th><th>โครงการ/รายการ</th><th>เลขสัญญา (PO)</th><th>เลขใบกันทั้งหมด</th><th>กลุ่มใบกัน</th><th>การก่อหนี้</th><th>ผลตรวจสอบ</th></tr></thead><tbody id="overlapDialogRows"></tbody></table></div>
 </dialog>
 <div id="loading" class="loading"><div class="spinner"></div><span>กำลังโหลดข้อมูล...</span></div>
-<script src="../js/ProcurementProgressDashboard.js?v=20261126-6"></script>
+<script src="../js/ProcurementProgressDashboard.js?v=20261127-2"></script>
 </body></html>
