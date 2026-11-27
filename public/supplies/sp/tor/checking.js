@@ -13720,7 +13720,7 @@ Ext.AppUx = function (app, menu) {
                         var save = Ext.getCmp("saveCheckingPdfID");
                         var unlock = Ext.getCmp("unlockCheckingPdfID");
                         var paymentStatus = Number(Ext.selectRow.data.pdf_payment_status);
-                        var locked = paymentStatus === 2;
+                        var locked = paymentStatus === 2 || paymentStatus > 3;
                         var allowed = !locked && (paymentStatus === 3 || !hasCheckingPdf() || (Number(Ext.session.dc_center_user) === 1 && field && field.adminPdfUnlocked));
                         var stored = Ext.getCmp("storedCheckingPdfID");
                         if (stored) {

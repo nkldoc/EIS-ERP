@@ -37,7 +37,7 @@ try {
     $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
     if (!$row) throw new Exception('ไม่พบรายการตรวจรับ');
     $paymentStatus = (int)($row['pdf_payment_status'] ?? 0);
-    if ($paymentStatus === 2) throw new Exception('สถานะเบิก 2 ไม่สามารถแก้ไขหรืออัปโหลด PDF ได้');
+    if ($paymentStatus === 2 || $paymentStatus > 3) throw new Exception('สถานะเบิก 2 หรือมากกว่า 3 ไม่สามารถแก้ไขหรืออัปโหลด PDF ได้');
     $admin = (int)($_SESSION['dc_center_user'] ?? 0) === 1;
     if (SuppliesWorkspacePolicy::externalUnit($_SESSION)
         && (int)$row['dc_cost_id'] !== (int)($_SESSION['dc_cost_id'] ?? 0)) {

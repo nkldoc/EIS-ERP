@@ -21,21 +21,37 @@ $dir = sys_get_temp_dir() . '/eis-pdf-' . bin2hex(random_bytes(6));
 mkdir($dir);
 $target = $dir . '/IRTEST.pdf'; $incoming = $dir . '/incoming.pdf';
 file_put_contents($target, '%PDF-original'); file_put_contents($incoming, '%PDF-replacement');
+$firstUpload = in_array($case, array('firstNull', 'first1', 'first3'), true);
+if ($firstUpload) unlink($target);
 putenv('EIS_CHECKING_PDF_DIR=' . $dir);
 $released = in_array($case, array('released2', 'released'), true);
 $GLOBALS['row'] = array('c_arrive_code'=>'IRTEST','check_pdf'=>$released ? null : 1,'i_is_upload_chk'=>$released ? null : 'upload_Chk/IRTEST.pdf','dc_cost_id'=>38,
     'pdf_payment_status'=>in_array($case,array('staff2','admin2','released2'),true) ? 2 : (in_array($case,array('staff3','rollback3'),true) ? 3 : 0));
+if ($firstUpload) {
+    $GLOBALS['row']['check_pdf'] = 0;
+    $GLOBALS['row']['i_is_upload_chk'] = null;
+    $GLOBALS['row']['pdf_payment_status'] = $case === 'firstNull' ? null : ($case === 'first1' ? 1 : 3);
+}
+if (preg_match('/^(staff|admin|empty)(4|5|11|99)$/', $case, $statusCase)) {
+    $GLOBALS['row']['pdf_payment_status'] = intval($statusCase[2]);
+    if ($statusCase[1] === 'empty') {
+        $GLOBALS['row']['check_pdf'] = null;
+        $GLOBALS['row']['i_is_upload_chk'] = null;
+    }
+}
 $_SESSION = array('user_id'=>1,'dc_center_user'=>$case === 'admin2' ? 1 : 0,'dc_cost_id'=>38);
+if (strpos($case, 'admin') === 0) $_SESSION['dc_center_user'] = 1;
 $_SERVER['REQUEST_METHOD'] = 'POST';
 $_FILES = array('upload_pdf1'=>array('error'=>UPLOAD_ERR_OK,'name'=>'new.pdf','tmp_name'=>$incoming));
 ob_start();
 register_shutdown_function(function() use ($case, $dir, $target) {
     $output = ob_get_clean(); $result = json_decode($output, true);
-    $success = in_array($case,array('staff3','released'),true);
+    $success = in_array($case,array('staff3','released','firstNull','first1','first3'),true);
     $pass = is_array($result) && $result['success'] === $success;
     if ($success) $pass = $pass && !empty($GLOBALS['committed']) && file_get_contents($target) === '%PDF-replacement';
     else $pass = $pass && empty($GLOBALS['committed']) && !empty($GLOBALS['rolledBack']) && file_get_contents($target) === '%PDF-original';
     if (in_array($case,array('staff2','admin2','released2'),true)) $pass = $pass && empty($GLOBALS['updated']);
+    if (preg_match('/^(staff|admin|empty)(4|5|11|99)$/', $case)) $pass = $pass && empty($GLOBALS['updated']);
     foreach (glob($dir . '/*') as $file) unlink($file);
     rmdir($dir);
     echo ($pass ? 'PASS: ' : 'FAIL: ') . 'PDF status ' . $case . "\n";
