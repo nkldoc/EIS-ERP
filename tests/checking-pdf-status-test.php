@@ -32,6 +32,11 @@ if ($firstUpload) {
     $GLOBALS['row']['i_is_upload_chk'] = null;
     $GLOBALS['row']['pdf_payment_status'] = $case === 'firstNull' ? null : ($case === 'first1' ? 1 : 3);
 }
+if ($case === 'staff1') $GLOBALS['row']['pdf_payment_status'] = 1;
+if ($case === 'foreign3') {
+    $GLOBALS['row']['pdf_payment_status'] = 3;
+    $GLOBALS['row']['dc_cost_id'] = 999;
+}
 if (preg_match('/^(staff|admin|empty)(4|5|11|99)$/', $case, $statusCase)) {
     $GLOBALS['row']['pdf_payment_status'] = intval($statusCase[2]);
     if ($statusCase[1] === 'empty') {
@@ -46,7 +51,7 @@ $_FILES = array('upload_pdf1'=>array('error'=>UPLOAD_ERR_OK,'name'=>'new.pdf','t
 ob_start();
 register_shutdown_function(function() use ($case, $dir, $target) {
     $output = ob_get_clean(); $result = json_decode($output, true);
-    $success = in_array($case,array('staff3','released','firstNull','first1','first3'),true);
+    $success = in_array($case,array('staff3','staffExisting','staff1','released','firstNull','first1','first3'),true);
     $pass = is_array($result) && $result['success'] === $success;
     if ($success) $pass = $pass && !empty($GLOBALS['committed']) && file_get_contents($target) === '%PDF-replacement';
     else $pass = $pass && empty($GLOBALS['committed']) && !empty($GLOBALS['rolledBack']) && file_get_contents($target) === '%PDF-original';

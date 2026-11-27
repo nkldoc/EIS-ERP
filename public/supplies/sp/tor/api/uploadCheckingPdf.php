@@ -38,7 +38,6 @@ try {
     if (!$row) throw new Exception('ไม่พบรายการตรวจรับ');
     $paymentStatus = (int)($row['pdf_payment_status'] ?? 0);
     if ($paymentStatus === 2 || $paymentStatus > 3) throw new Exception('สถานะเบิก 2 หรือมากกว่า 3 ไม่สามารถแก้ไขหรืออัปโหลด PDF ได้');
-    $admin = (int)($_SESSION['dc_center_user'] ?? 0) === 1;
     if (SuppliesWorkspacePolicy::externalUnit($_SESSION)
         && (int)$row['dc_cost_id'] !== (int)($_SESSION['dc_cost_id'] ?? 0)) {
         throw new Exception('ไม่มีสิทธิ์ในรายการนี้');
@@ -48,10 +47,7 @@ try {
     $dir = getenv('EIS_CHECKING_PDF_DIR') ?: 'D:/php_supplies/api/upload_Chk';
     if (!is_dir($dir) || !is_writable($dir)) throw new Exception('โฟลเดอร์ PDF ไม่พร้อมใช้งาน');
     $target = $dir . '/' . $code . '.pdf';
-    $hasPdf = (int)$row['check_pdf'] === 1 && trim((string)$row['i_is_upload_chk']) !== '';
-    // A NULL status and path mean an admin has released this PDF for replacement.
-    $released = $row['check_pdf'] === null && $row['i_is_upload_chk'] === null;
-    if (!$admin && $paymentStatus !== 3 && ($hasPdf || (is_file($target) && !$released))) throw new Exception('มีเอกสารแล้ว เฉพาะ Admin หรือรายการสถานะ 3 ทักท้วงเท่านั้นที่เปลี่ยนไฟล์ได้');
+    // Authorized staff may replace the PDF in any unlocked payment status.
     if (is_file($target)) {
         $backup = tempnam($dir, 'pdf_backup_');
         if (!$backup || !copy($target, $backup)) throw new Exception('ไม่สามารถสำรองไฟล์เดิมได้');
