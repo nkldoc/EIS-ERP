@@ -62,6 +62,9 @@ function imp_cut($s, $max)
 // อ่านอย่างเดียว ใช้แสดงให้เห็นตอนตรวจสอบ/ดูรายการที่นำเข้า - ไม่ได้เปลี่ยนสถานะ/ปุ่มจองเงินของ ST00092
 // i_reserve: 1 = ขั้น PR, 2 = ขั้นสัญญา (มี po_id), 3 = ขั้นตรวจรับ (มี chk_id)
 define("MEDSUP_ERP_I_SYS", 2);
+// [ผู้ใช้ขอ] ปีงบประมาณ (พ.ศ.) ตั้งแต่ค่านี้ขึ้นไป ต้องมีการจองเงินจาก ERP (PR) ในระบบงบก่อน ไม่พบการจอง = นำเข้าสัญญาไม่ได้
+// (ปีก่อนหน้านี้ไม่พบการจองยังเป็นแค่คำเตือน) ปรับค่านี้เมื่อต้องการเริ่มบังคับปีอื่น
+define("MEDSUP_RSV_REQUIRED_FROM_YEAR", 2570);
 
 function imp_reserve_status($db, $prId, $poId, $chkId)
 {
@@ -525,6 +528,14 @@ function imp_validate($db, $inputRows)
             $errs[] = "กรอกวันที่บันทึกการตรวจรับ แต่ไม่มีรายการรับของ (จำนวนเงินรับของ)";
         }
 
+        $rsvSt = imp_reserve_status($db, $groups[$seq]["periods"][$pIdx]["ref"]["pr_id"],
+            $groups[$seq]["periods"][$pIdx]["ref"]["po_id"], $in["chk_id"] ?? "");
+        // ปีงบประมาณตั้งแต่ MEDSUP_RSV_REQUIRED_FROM_YEAR ที่ยังไม่มีการจองเงินจาก ERP มา = ผิด นำเข้าไม่ได้ (ทั้งสัญญา)
+        $hYear = intval(imp_str($h["year"] ?? ""));
+        if ($hYear >= MEDSUP_RSV_REQUIRED_FROM_YEAR && strpos($rsvSt, "ไม่พบการจอง") === 0) {
+            $errs[] = "ปีงบประมาณ {$hYear} ยังไม่มีการจองเงินจาก ERP ในระบบงบ (pr_id " . imp_str($groups[$seq]["periods"][$pIdx]["ref"]["pr_id"]) . ") นำเข้าสัญญาไม่ได้ จนกว่า ERP จะส่งการจองเงินมา";
+        }
+
         $groups[$seq]["periods"][$pIdx]["rowIdx"][] = count($rowsOut);
         $groups[$seq]["rowIdx"][] = count($rowsOut);
         $rowsOut[] = array(
@@ -541,8 +552,7 @@ function imp_validate($db, $inputRows)
             "calc_penalty" => $money ? $money["penalty"] : null,
             "calc_pay" => $money ? $money["pay"] : null,
             // สถานะจองเงินในระบบงบ (ของฝั่ง ERP เวชภัณฑ์) จาก pr_id/po_id ของงวด + chk_id ของแถวนี้
-            "rsv_status" => imp_reserve_status($db, $groups[$seq]["periods"][$pIdx]["ref"]["pr_id"],
-                $groups[$seq]["periods"][$pIdx]["ref"]["po_id"], $in["chk_id"] ?? ""),
+            "rsv_status" => $rsvSt,
             "errs" => $errs, "warns" => $warns,
         );
     }
