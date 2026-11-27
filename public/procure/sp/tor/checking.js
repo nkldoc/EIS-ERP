@@ -10442,10 +10442,10 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                         items: [{ region: "center", xtype: "panel", autoScroll: true,
                                 bodyStyle: "background:#555;text-align:center;padding:12px",
                                 html: "<img src='" + src + "?_dc=" + new Date().getTime() + "' style='max-width:100%;height:auto;background:white'>"
-                        }, { region: "south", xtype: "panel", height: 95, frame: true, autoScroll: true, bodyStyle: "padding:8px",
+                        }, { region: "south", xtype: "panel", height: 180, split: true, minSize: 95, frame: true, autoScroll: true, bodyStyle: "padding:8px",
                                 html: "<b>ผู้ยืนยัน:</b> " + Ext.util.Format.htmlEncode(data.c_resolved_officer_name || "-") +
                                       " &nbsp; <b>วันที่ยืนยัน:</b> " + Ext.util.Format.htmlEncode(data.d_resolved || "-") +
-                                      "<br><b>รายละเอียดการแก้ไข:</b> " + Ext.util.Format.htmlEncode(data.c_resolved_note || "-")
+                                      "<br><b>รายละเอียดการแก้ไข:</b> " + renderProtestReason(data.c_resolved_note || "-")
                         }],
                         buttons: [{ text: "เปิดภาพเต็ม", handler: function () { window.open(src, "_blank"); } },
                                   { text: "ปิด", handler: function (button) { button.ownerCt.ownerCt.close(); } }]
@@ -10487,7 +10487,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                                 { header: "ครั้งที่", dataIndex: "i_round", width: 65, align: "center" },
                                 { header: "ผู้ยืนยัน", dataIndex: "c_resolved_officer_name", width: 180 },
                                 { header: "วันเวลาที่ยืนยัน", dataIndex: "d_resolved", width: 145 },
-                                { header: "รายละเอียดการแก้ไข", dataIndex: "c_resolved_note", width: 350 },
+                                { header: "รายละเอียดการแก้ไข", dataIndex: "c_resolved_note", width: 420, renderer: renderProtestReason },
                                 { header: "ผลตรวจ", dataIndex: "i_review_status", width: 120, align: "center",
                                   renderer: function (value, meta, row) { if (parseInt(row.get("i_enable"), 10) !== 1) return "<b style='color:#888'>ยกเลิกใช้งาน</b>"; value = parseInt(value, 10); if (value === 1) return "<b style='color:green'>ผ่าน</b>"; if (value === 2) return "<b style='color:#c00'>ทักท้วงอีกครั้ง</b>"; return "<b style='color:#d08000'>รอตรวจ</b>"; } },
                                 { header: "วันที่กดผ่าน", dataIndex: "d_reviewed", width: 145 },
