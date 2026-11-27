@@ -1339,7 +1339,7 @@ switch ($mode) {
             ? "(SELECT COUNT(*) FROM dbo.sp_check_item_resolutions r WHERE r.sp_check_item_id = i.sp_check_item_id)"
             : "CAST(0 AS INT)";
         $sqlMain = "SELECT sp_check_item_id AS id, c_officer_name,
-                           CONVERT(VARCHAR(19), d_receive, 120) AS d_receive,
+                           CONVERT(VARCHAR(19), i.d_create, 120) AS d_create, CONVERT(VARCHAR(19), d_receive, 120) AS d_receive,
                            CONVERT(VARCHAR(19), d_send, 120) AS d_send,
                            c_reason, c_annotation_image, c_document_url, i_status,
                            c_resolved_image, c_resolved_note, c_resolved_officer_name,

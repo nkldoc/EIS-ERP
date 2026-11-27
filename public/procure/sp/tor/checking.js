@@ -10403,7 +10403,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                 url: "tor/api/mnCheckingController.php",
                 baseParams: { mode: "LIST_PROTEST_ITEMS", sp_check_period_hdr_id: record.get("sp_check_period_hdr_id") },
                 root: "data", totalProperty: "totalCount",
-                fields: ["id", "c_officer_name", "d_receive", "d_send", "c_reason", "c_annotation_image", "c_document_url", "i_status",
+                fields: ["id", "c_officer_name", "d_create", "d_receive", "d_send", "c_reason", "c_annotation_image", "c_document_url", "i_status",
                         "c_resolved_image", "c_resolved_note", "c_resolved_officer_name", "d_resolved", "return_count", "resolution_count"]
         });
         var imageUrl = function (path) {
@@ -10605,6 +10605,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                 viewConfig: { emptyText: "ไม่พบประวัติการทักท้วง", deferEmptyText: false },
                 columns: [
                         { header: "เจ้าพนักงาน", dataIndex: "c_officer_name", width: 160 },
+                        { header: "วันที่สร้างรายการครั้งแรก", dataIndex: "d_create", width: 145 },
                         { header: "เวลารับ", dataIndex: "d_receive", width: 135 },
                         { header: "เวลาส่ง", dataIndex: "d_send", width: 135 },
                         { header: "รายละเอียดการทักท้วง", dataIndex: "c_reason", width: 420, renderer: renderProtestReason },
