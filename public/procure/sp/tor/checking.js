@@ -10394,6 +10394,10 @@ var updateMissingWithdrawEmp = function (grid, record, button) {
 
 
 Ext.showCheckingProtestDetails = function (record, mainGrid) {
+        var renderProtestReason = function (value) {
+                var text = Ext.util.Format.htmlEncode(String(value == null ? "" : value));
+                return '<div style="white-space:pre-wrap;overflow-wrap:break-word;word-wrap:break-word;line-height:1.5">' + text + '</div>';
+        };
         var detailWindow = null;
         var protestStore = new Ext.data.JsonStore({
                 url: "tor/api/mnCheckingController.php",
@@ -10423,7 +10427,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                                 html: "<b>เจ้าพนักงาน:</b> " + Ext.util.Format.htmlEncode(data.c_officer_name || "-") +
                                       " &nbsp; <b>เวลารับ:</b> " + Ext.util.Format.htmlEncode(data.d_receive || "-") +
                                       " &nbsp; <b>เวลาส่ง:</b> " + Ext.util.Format.htmlEncode(data.d_send || "-") +
-                                      "<br><b>รายละเอียด:</b> " + Ext.util.Format.htmlEncode(data.c_reason || "-").replace(/\n/g, "<br>")
+                                      "<br><b>รายละเอียด:</b> " + renderProtestReason(data.c_reason || "-")
                         }],
                         buttons: [{ text: "เปิดภาพเต็ม", handler: function () { window.open(src, "_blank"); } },
                                   { text: "ปิด", handler: function (button) { button.ownerCt.ownerCt.close(); } }]
@@ -10603,7 +10607,7 @@ Ext.showCheckingProtestDetails = function (record, mainGrid) {
                         { header: "เจ้าพนักงาน", dataIndex: "c_officer_name", width: 160 },
                         { header: "เวลารับ", dataIndex: "d_receive", width: 135 },
                         { header: "เวลาส่ง", dataIndex: "d_send", width: 135 },
-                        { header: "รายละเอียดการทักท้วง", dataIndex: "c_reason", width: 310 },
+                        { header: "รายละเอียดการทักท้วง", dataIndex: "c_reason", width: 420, renderer: renderProtestReason },
                         { header: "รูปภาพ", id: "checking_protest_image", dataIndex: "c_annotation_image", width: 90, align: "center",
                           renderer: function (value) { return value ? "<button style='cursor:pointer;color:#d00000'>ภาพทักท้วง</button>" : "-"; } },
                         { header: "สถานะ", dataIndex: "i_status", width: 120, align: "center",
